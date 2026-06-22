@@ -1,0 +1,42 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "agent_platform"
+version = "0.1.0"
+description = "A project to build agents with LLMs and graph-based reasoning."
+readme = "README.md"
+requires-python = ">=3.10"
+
+authors = [
+    { name = "Mathieu Le Gouill", email = "mathieulegouill@outlook.com" }
+]
+license = "MIT"
+
+dependencies = [
+    "openai",
+    "anthropic",
+    "mistral",
+    "langchain",
+    "langgraph",
+    "langsmith",
+    "ollama",
+    "soundfile",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest",
+    "ruff",
+    "mypy",
+]
+
+[tool.ruff]
+line-length = 88
+
+[tool.pytest.ini_options]
+asyncio_mode = "auto"
+
+[project.scripts]
+agent_platform = "agent_plateform.main:main"
