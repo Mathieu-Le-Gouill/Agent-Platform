@@ -1,39 +1,39 @@
 from agent_platform.core.entities.text.chunk import Chunk
-from agent_platform.core.entities.content import Content
 from dataclasses import dataclass, field
 from datetime import datetime
+from typing import Optional, Any
+from uuid import UUID, uuid4
 
+   
 
 @dataclass(slots=True)
-class DocumentMetadata:
-    source: str | None = None
-    source_type: str | None = None
-    author: str | None = None
-    language: str | None = None
-    created_at: datetime | None = None
+class Document:
+    id: UUID = field(default_factory=uuid4)
+
+    # Source information
+    source: str = ""
+    title: Optional[str] = None
+    document_type: Optional[str] = None
+    url: Optional[str] = None
+
+    # Global information
+    language: Optional[str] = None
+    summary: Optional[str] = None
+
+    # Classification
     tags: list[str] = field(default_factory=list)
-    extra: dict[str, str | int | float | bool] = field(default_factory=dict)
 
+    # Lifecycle
+    created_at: datetime = field(default_factory=datetime.now)
 
-@dataclass(slots=True)
-class Document(Content):
-    id: str
-    content: str
-    metadata: DocumentMetadata | None
+    # Arbitrary source metadata
+    metadata: dict[str, Any] = field(default_factory=dict)
+
+    # Chunks
+    chunks: list["Chunk"] = field(default_factory=list)
+
 
     # --- Constructors ---
-
-    def __init__(
-        self,
-        id: str,
-        content: str,
-        metadata: DocumentMetadata | None = None,
-    ) -> None:
-        
-        self.id = id
-        self.content = content
-        self.metadata = metadata
-
 
     @classmethod
     def from_url(
@@ -42,9 +42,13 @@ class Document(Content):
     ) -> "Document":
         ...
 
-
-    def split(
-        self,
-        chunck_size: int
-    ) -> list[Chunk]:
+    @classmethod
+    def from_files(
+        cls,
+        file_path: str,
+        file_type: str
+    ) -> "Document":
         ...
+
+
+    # --- Tools ---

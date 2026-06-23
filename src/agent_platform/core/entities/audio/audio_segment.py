@@ -4,13 +4,16 @@ from torch import Tensor
 import torch
 import base64
 from dataclasses import dataclass
+from typing import Optional
+from core.entities.audio.transcript import Transcript
 
 
 @dataclass(slots=True)
 class AudioSegment():
     data: Tensor
     sample_rate: int
-    metadata: dict | None
+    metadata: Optional[dict]
+    transcript: Optional[Transcript]
     
     # --- Constructors ---
 
@@ -18,7 +21,7 @@ class AudioSegment():
         self,
         data: Tensor,
         sample_rate: int,
-        metadata: dict | None = None,
+        metadata: Optional[dict] = None,
     ) -> None:
         
         self.data = data

@@ -17,7 +17,7 @@ license = "MIT"
 dependencies = [
     "openai",
     "anthropic",
-    "mistral",
+    "mistralai",
     "langchain",
     "langgraph",
     "langsmith",

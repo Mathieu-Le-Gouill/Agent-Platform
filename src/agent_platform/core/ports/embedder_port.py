@@ -1,5 +1,9 @@
 from typing import Protocol
+from torch import Tensor
 
 class EmbedderPort(Protocol):
-    async def embed(self, data: str) -> str: 
+    async def encode(
+        self,
+        data: Tensor,
+    ) -> str: 
         ...

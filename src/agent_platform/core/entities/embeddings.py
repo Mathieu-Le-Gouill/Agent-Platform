@@ -2,7 +2,7 @@ from dataclasses import dataclass
 import numpy as np
 
 @dataclass(slots=True)
-class Embedding:
+class Embeddings:
     chunk_id: str
     vector: np.ndarray
     model: str
