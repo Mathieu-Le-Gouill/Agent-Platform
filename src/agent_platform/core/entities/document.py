@@ -1,26 +1,27 @@
-from agent_platform.core.entities.text.chunk import Chunk
+from __future__ import annotations
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Any
 from uuid import UUID, uuid4
-
+from agent_platform.core.entities.chunk import Chunk
+from core.value_objects.language import Language
    
 
 @dataclass(slots=True)
 class Document:
     id: UUID = field(default_factory=uuid4)
 
-    # Source information
+    # Source
     source: str = ""
     title: Optional[str] = None
     document_type: Optional[str] = None
     url: Optional[str] = None
 
-    # Global information
-    language: Optional[str] = None
-    summary: Optional[str] = None
+    # Content
+    raw_text: Optional[str] = None
 
-    # Classification
+    # Global information
+    language: Optional[Language] = None
     tags: list[str] = field(default_factory=list)
 
     # Lifecycle
@@ -30,25 +31,4 @@ class Document:
     metadata: dict[str, Any] = field(default_factory=dict)
 
     # Chunks
-    chunks: list["Chunk"] = field(default_factory=list)
-
-
-    # --- Constructors ---
-
-    @classmethod
-    def from_url(
-        cls,
-        url: str,
-    ) -> "Document":
-        ...
-
-    @classmethod
-    def from_files(
-        cls,
-        file_path: str,
-        file_type: str
-    ) -> "Document":
-        ...
-
-
-    # --- Tools ---
+    chunks: list[Chunk] = field(default_factory=list)
