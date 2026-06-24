@@ -40,7 +40,7 @@ line-length = 88
 asyncio_mode = "auto"
 
 [project.scripts]
-agent_platform = "agent_plateform.main:main"
+platform = "platform.main:main"
 
 
 
@@ -53,19 +53,19 @@ root_package = "agent_platform"
 name = "Core cannot depend on outer layers"
 type = "forbidden"
 source_modules = [
-    "your_project.core"
+    "agent_platform.core"
 ]
 forbidden_modules = [
-    "your_project.adapters",
-    "your_project.agents",
-    "your_project.workflows"
+    "agent_platform.adapters",
+    "agent_platform.agents",
+    "agent_platform.workflows"
 ]
 
 [[tool.importlinter.contracts]]
 name = "Core cannot depend on third party SDKs"
 type = "forbidden"
 source_modules = [
-    "your_project.core"
+    "agent_platform.core"
 ]
 forbidden_modules = [
     "openai",
