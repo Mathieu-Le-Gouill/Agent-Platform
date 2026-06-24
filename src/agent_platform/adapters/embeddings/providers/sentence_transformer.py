@@ -2,7 +2,7 @@ from sentence_transformers import SentenceTransformer
 from core.value_objects.embeddable import Embeddable
 from core.entities.embedding import Embedding
 from core.value_objects.score import Score
-from adapters.embeddings.bridges.torch_bridge import from_tensor, to_tensor
+from adapters.embeddings.bridges._torch_bridge import from_tensor, to_tensor
 
 class SentenceTransformerEmbedder:
     client: SentenceTransformer

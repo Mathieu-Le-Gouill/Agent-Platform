@@ -23,6 +23,7 @@ dependencies = [
     "langsmith",
     "ollama",
     "soundfile",
+    "langchain-chroma"
 ]
 
 [project.optional-dependencies]
