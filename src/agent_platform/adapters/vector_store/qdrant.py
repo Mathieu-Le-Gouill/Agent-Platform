@@ -3,7 +3,7 @@ from qdrant_client import QdrantClient
 from langchain.embeddings import Embeddings
 from core.entities.chunk import Chunk
 from core.entities.document import Document
-from agent_platform.adapters.loaders._langchain_bridge import from_langchain, to_langchain
+from platform.adapters.loaders._langchain_bridge import from_langchain, to_langchain
 from uuid import UUID
 
 

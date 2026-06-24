@@ -1,6 +1,6 @@
 from typing import AsyncIterator, Protocol
-from agent_platform.core.entities.audio_segment import AudioSegment
-from agent_platform.core.entities.transcript import Transcript
+from core.value_objects.audio_segment import AudioSegment
+from core.entities.transcript import Transcript
 
 
 class SpeechToTextPort(Protocol):

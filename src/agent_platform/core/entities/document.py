@@ -3,7 +3,7 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Any
 from uuid import UUID, uuid4
-from agent_platform.core.entities.chunk import Chunk
+from core.entities.chunk import Chunk
 from core.value_objects.language import Language
    
 

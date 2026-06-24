@@ -1,4 +1,3 @@
-# adapters/llm/openai.py
 from openai import AsyncOpenAI
 
 class OpenAILLM:  

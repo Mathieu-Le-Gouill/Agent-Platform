@@ -1,6 +1,6 @@
 from typing import Protocol
-from platform.core.entities.embedding import Embedding
-from platform.core.ports.embeddable import Embeddable
+from core.value_objects.embeddable import Embeddable
+from core.entities.embedding import Embedding
 
 
 class EmbedderPort(Protocol):

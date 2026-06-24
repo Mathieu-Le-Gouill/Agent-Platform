@@ -1,4 +1,4 @@
-from agent_platform.core.entities.audio.audio_segment import AudioSegment
+from platform.core.value_objects.audio_segment import AudioSegment
 
 
 

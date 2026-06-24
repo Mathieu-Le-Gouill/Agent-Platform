@@ -1,5 +1,6 @@
 from langchain_core.documents import Document as LCDocument
-from core.entities.document import Chunk, Document
+from core.entities.document import Document
+from core.entities.chunk import Chunk
 from uuid import uuid4, UUID
 
 

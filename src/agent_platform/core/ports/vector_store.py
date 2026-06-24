@@ -1,7 +1,6 @@
 from typing import Protocol
-from agent_platform.core.entities.document import Document
-from agent_platform.core.entities.chunk import Chunk
-#from agent_platform.core.entities.embedding import Embedding
+from core.entities.document import Document
+from core.entities.chunk import Chunk
 from typing import List
 
 

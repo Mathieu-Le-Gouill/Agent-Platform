@@ -1,4 +1,3 @@
-# adapters/llm/openai.py
 from mistralai.client import Mistral
 
 class MistralLLM:

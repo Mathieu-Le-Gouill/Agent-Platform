@@ -1,5 +1,5 @@
 from typing import Protocol
-from core.ports.embeddable import Embeddable
+from agent_platform.core.value_objects.embeddable import Embeddable
 
 
 class RerankerPort(Protocol):
