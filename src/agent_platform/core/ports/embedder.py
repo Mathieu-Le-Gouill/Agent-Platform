@@ -1,9 +1,11 @@
 from typing import Protocol
-from torch import Tensor
+from platform.core.entities.embedding import Embedding
+from platform.core.ports.embeddable import Embeddable
+
 
 class EmbedderPort(Protocol):
     async def encode(
         self,
-        data: Tensor,
-    ) -> str: 
+        items: list[Embeddable],
+    ) -> list[Embedding]: 
         ...
