@@ -68,8 +68,7 @@ def from_chroma_many(results: dict) -> list[Chunk]:
     return chunks
 
 
-# --- helpers ---
-
+# --- Helpers ---
 
 def _uuid(val) -> UUID:
     try:

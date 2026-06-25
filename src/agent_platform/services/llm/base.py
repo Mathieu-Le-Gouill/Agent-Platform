@@ -1,25 +1,30 @@
 from typing import Protocol
+from typing import Optional, AsyncIterator
+
+from models.message import AssistantMessage
+from models.prompt import Prompt
+
 
 class BaseLLM(Protocol):
     async def generate(
         self,
-        prompt: str,
+        prompt: Prompt,
         model: str,
-    ) -> str | None: 
+    ) -> Optional[AssistantMessage]:
         ...
 
 
     async def stream(
         self,
-        prompt: str,
+        prompt: Prompt,
         model: str,
-    ) -> str | None: 
+    ) -> AsyncIterator[str]:
         ...
 
 
     async def chat(
         self,
-        prompt: str,
+        prompt: Prompt,
         model: str,
-    ) -> str | None: 
+    ) -> Optional[AssistantMessage]: 
         ...

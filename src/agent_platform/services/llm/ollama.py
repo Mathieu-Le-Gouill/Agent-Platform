@@ -1,33 +1,76 @@
-from openai import AsyncOpenAI
+from typing import AsyncIterator, Optional
 
-class OpenAILLM:  
-    client: AsyncOpenAI
+from ollama import AsyncClient
+
+from bridges.message.ollama import from_ollama, to_ollama
+from models.message import AssistantMessage
+from models.prompt import Prompt
 
 
-    def __init__(
-        self,
-        base_url: str
-    ):
-        self.client = AsyncOpenAI(
-            base_url=base_url,
-            api_key='ollama'
-        )
+class OllamaLLM:
+    client: AsyncClient
+
+
+    def __init__(self, host: str) -> None:
+        self.client = AsyncClient(host=host)
 
 
     async def generate(
         self,
-        prompt: str,
+        prompt: Prompt,
         model: str,
-    ) -> str | None:
+    ) -> Optional[AssistantMessage]:
+        """Single-turn generation."""
 
-        chat_completion = await self.client.chat.completions.create(
-            messages=[
-                {
-                    "role": "user",
-                    "content": prompt,
-                }
-            ],
+        response = await self.client.chat(
             model=model,
+            messages=[to_ollama(m) for m in prompt.messages],
         )
 
-        return chat_completion.choices[0].message.content
+        message = response.get("message")
+
+        if message is None:
+            return None
+
+        return from_ollama(message)
+    
+
+    async def stream(
+        self,
+        prompt: Prompt,
+        model: str,
+    ) -> AsyncIterator[str]:
+        """Stream assistant tokens."""
+
+        stream = await self.client.chat(
+            model=model,
+            messages=[to_ollama(m) for m in prompt.messages],
+            stream=True,
+        )
+
+        async for chunk in stream:
+            message = chunk.get("message", {})
+            content = message.get("content")
+
+            if content:
+                yield content
+
+
+    async def chat(
+        self,
+        prompt: Prompt,
+        model: str,
+    ) -> Optional[AssistantMessage]:
+        """Multi-turn chat."""
+
+        response = await self.client.chat(
+            model=model,
+            messages=[to_ollama(m) for m in prompt.messages],
+        )
+
+        message = response.get("message")
+
+        if message is None:
+            return None
+
+        return from_ollama(message)

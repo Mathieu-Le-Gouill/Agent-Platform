@@ -43,7 +43,7 @@ def from_point(point) -> Chunk:
     return chunk
 
 
-# --- helpers ---
+# --- Helpers ---
 
 
 def _chunk_payload(chunk: Chunk) -> dict:
