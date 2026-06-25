@@ -1,6 +1,6 @@
 from typing import Protocol
-from agent_platform.models.document import Document
-from agent_platform.models.chunk import Chunk
+from models.document import Document
+from models.chunk import Chunk
 from typing import List
 
 

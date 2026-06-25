@@ -1,8 +1,8 @@
 from typing import Protocol
-from agent_platform.models.embeddable import Embeddable
+from models.protocols.text_unit import TextUnit
 
 
 class BaseReranker(Protocol):
 
-    async def rerank(self, items: list[Embeddable]) -> list[Embeddable]: 
+    async def rerank(self, items: list[TextUnit]) -> list[TextUnit]: 
         ...

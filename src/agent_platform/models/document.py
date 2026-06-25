@@ -3,8 +3,17 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Any
 from uuid import UUID, uuid4
-from agent_platform.models.chunk import Chunk
-from agent_platform.models.language import Language
+from models.chunk import Chunk
+from models.language import Language
+
+
+@dataclass(slots=True, frozen=True)
+class DocumentMetadata:
+    author:      Optional[str] = None
+    description: Optional[str] = None
+    created_at:  Optional[datetime] = None   # source system's date, distinct from your lifecycle created_at
+    modified_at: Optional[datetime] = None
+    extra:       dict[str, Any] = field(default_factory=dict)
    
 
 @dataclass(slots=True)
@@ -18,7 +27,7 @@ class Document:
     url: Optional[str] = None
 
     # Content
-    raw_text: Optional[str] = None
+    text: Optional[str] = None
 
     # Global information
     language: Optional[Language] = None
@@ -28,7 +37,7 @@ class Document:
     created_at: datetime = field(default_factory=datetime.now)
 
     # Arbitrary source metadata
-    metadata: dict[str, Any] = field(default_factory=dict)
+    metadata: DocumentMetadata = field(default_factory=DocumentMetadata)
 
     # Chunks
     chunks: list[Chunk] = field(default_factory=list)

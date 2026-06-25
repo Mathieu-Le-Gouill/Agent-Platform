@@ -11,7 +11,7 @@ class ScoreKind(str, Enum):
     SENTIMENT    = "sentiment"     # positive pole of a sentiment scale
 
 
-@dataclass(frozen=True)
+@dataclass(slots=True, frozen=True)
 class Score:
     value: float
     kind:  ScoreKind = ScoreKind.SIMILARITY

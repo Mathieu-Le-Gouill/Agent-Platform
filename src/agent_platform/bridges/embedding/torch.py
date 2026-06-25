@@ -1,5 +1,5 @@
 import torch
-from agent_platform.models.embedding import Embedding
+from models.embedding import Embedding
 
 
 def to_tensor(embedding: Embedding, device: str = "cpu") -> torch.Tensor:

@@ -1,9 +1,10 @@
 from typing import Protocol, runtime_checkable
 
+
 @runtime_checkable
-class Embeddable(Protocol):
+class TextUnit(Protocol):
     @property
     def id(self) -> str: ...
 
     @property
-    def content(self) -> str: ...
+    def text(self) -> str: ...

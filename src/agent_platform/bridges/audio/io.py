@@ -4,10 +4,9 @@ import base64
 import numpy as np
 import soundfile as sf
 import torch
-import torchaudio
 from torch import Tensor
 
-from agent_platform.models.audio import AudioSegment
+from models.audio import AudioSegment
 
 
 class AudioSegmentIO:

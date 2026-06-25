@@ -1,12 +1,12 @@
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 from typing import Optional
-from agent_platform.models.language import Language
+from models.language import Language
 
 @dataclass(slots=True)
 class Transcript:
     id: UUID = field(default_factory=uuid4)
-    content: str = ""
+    text: str = ""
     audio_segment_id: Optional[UUID] = None
     language: Optional[Language] = None
 

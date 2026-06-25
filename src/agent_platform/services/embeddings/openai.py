@@ -1,6 +1,6 @@
 from openai import AsyncOpenAI
-from agent_platform.models.embeddable import Embeddable
-from agent_platform.models.embedding import Embedding
+from models.protocols.text_unit import TextUnit
+from models.embedding import Embedding
 
 class OpenAIEmbeddings:
     client: AsyncOpenAI
@@ -19,10 +19,10 @@ class OpenAIEmbeddings:
 
     async def encode(
         self,
-        item: Embeddable,
+        item: TextUnit,
     ) -> Embedding:
         
-        response = await self.client.embeddings.create(input=item.content, model=self.model)
+        response = await self.client.embeddings.create(input=item.text, model=self.model)
 
         emb = response.data[0].embedding 
         

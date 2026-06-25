@@ -1,6 +1,6 @@
 from typing import AsyncIterator, Protocol
-from agent_platform.models.audio import AudioSegment
-from agent_platform.models.transcript import Transcript
+from models.audio import AudioSegment
+from models.transcript import Transcript
 
 
 class BaseSpeechToText(Protocol):

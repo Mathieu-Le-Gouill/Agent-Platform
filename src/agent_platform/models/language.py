@@ -1,32 +1,27 @@
 from enum import Enum
 
 class Language(str, Enum):
-    AFRIKAANS = "af"
-    AMHARIC = "am"
-    ARABIC = "ar"
-    ASSAMESE = "as"
-    AZERBAIJANI = "az"
+    AF = "af" # AFRIKAANS
+    AM = "am" # AMHARIC
+    AR = "ar" # ARABIC
+    AS = "as" # ASSAMESE
+    AZ = "az" # AZERBAIJANI
 
-    ENGLISH = "en"
-    FRENCH = "fr"
-    GERMAN = "de"
-    SPANISH = "es"
-    CHINESE = "zh"
+    EN = "en" # ENGLISH
+    FR = "fr" # FRENCH
+    GE = "de" # GERMAN
+    SP = "es" # SPANISH
+    CH = "zh" # CHINESE
 
-    JAPANESE = "ja"
-    KOREAN = "ko"
-    ITALIAN = "it"
-    PORTUGUESE = "pt"
-    RUSSIAN = "ru"
+    JA = "ja" # JAPANESE
+    KO = "ko" # KOREAN
+    IT = "it" # ITALIAN
+    PO = "pt" # PORTUGUESE
+    RU = "ru" # RUSSIAN
     # ...
 
 
-    # --- Properties ---
-
-    @property
-    def label(self) -> str:
-        return self.name.replace("_", " ").title()
-    
+    # --- Properties ---   
 
     @property
     def code(self) -> str:

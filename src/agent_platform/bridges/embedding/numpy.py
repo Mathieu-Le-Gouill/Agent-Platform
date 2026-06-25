@@ -1,5 +1,5 @@
 import numpy as np
-from agent_platform.models.embedding import Embedding
+from models.embedding import Embedding
 
 
 def to_ndarray(embedding: Embedding) -> np.ndarray:

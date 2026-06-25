@@ -7,10 +7,10 @@ import chromadb
 from chromadb.api import AsyncClientAPI
 from chromadb.api.models.AsyncCollection import AsyncCollection
 
-from agent_platform.models.chunk import Chunk
-from agent_platform.models.document import Document
-from agent_platform.models.score import Score
-from agent_platform.services.vector_store._mapper import chunk_to_chroma, chroma_to_chunk
+from models.chunk import Chunk
+from models.document import Document
+from models.score import Score
+from bridges.chunk.chroma import to_chroma, from_chroma
 
 
 class ChromaStore: # implements VectorStorePort
@@ -50,21 +50,21 @@ class ChromaStore: # implements VectorStorePort
     async def add(self, documents: list[Document]) -> None:
 
         collection = await self._get_collection()
-        ids, embeddings, metadatas, contents = [], [], [], []
+        ids, embeddings, metadatas, texts = [], [], [], []
 
         for document in documents:
             for chunk in document.chunks:
-                row = chunk_to_chroma(chunk, document)
+                row = to_chroma(chunk)
                 ids.append(row["id"])
                 embeddings.append(row["embedding"])
                 metadatas.append(row["metadata"])
-                contents.append(row["content"])
+                texts.append(row["text"])
 
         await collection.upsert(
             ids=ids,
             embeddings=embeddings,
             metadatas=metadatas,
-            documents=contents,
+            documents=texts,
         )
 
 
@@ -115,7 +115,7 @@ class ChromaStore: # implements VectorStorePort
         distances = raw_distances[0] if raw_distances else []
 
         chunks = [
-            chroma_to_chunk(doc, dict(meta)) 
+            from_chroma(doc, dict(meta)) 
             for doc, meta in zip(docs, metadatas)
         ]
         return chunks, distances

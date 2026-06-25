@@ -1,15 +1,16 @@
+from __future__ import annotations
 from uuid import UUID
 
 from qdrant_client import AsyncQdrantClient
 from qdrant_client.models import Distance, Filter, FieldCondition, MatchAny, VectorParams
 
-from agent_platform.models.chunk import Chunk
-from agent_platform.models.document import Document
-from agent_platform.models.score import Score
-from agent_platform.services.vector_store._mapper import chunk_to_point, point_to_chunk
+from models.chunk import Chunk
+from models.document import Document
+from models.score import Score
+from bridges.chunk.qdrant import to_point, from_point
 
 
-class QdrantStore:  # implements VectorStorePort
+class QdrantStore:
 
     def __init__(
         self,
@@ -23,6 +24,21 @@ class QdrantStore:  # implements VectorStorePort
         self._collection = collection_name
         self._vector_size = vector_size
         self._distance = distance
+
+
+    @classmethod
+    async def create(
+        cls,
+        url: str,
+        api_key: str,
+        collection_name: str,
+        vector_size: int,
+        distance: Distance = Distance.COSINE
+    ) -> QdrantStore:
+        
+        instance = cls(url, api_key, collection_name, vector_size, distance)
+        await instance.ensure_collection()
+        return instance
 
 
     async def ensure_collection(self) -> None:
@@ -39,7 +55,7 @@ class QdrantStore:  # implements VectorStorePort
 
     async def add(self, documents: list[Document]) -> None:
         points = [
-            chunk_to_point(chunk, document)
+            to_point(chunk)
             for document in documents
             for chunk in document.chunks
         ]
@@ -50,7 +66,7 @@ class QdrantStore:  # implements VectorStorePort
         await self._client.delete(
             collection_name=self._collection,
             points_selector=Filter(
-                should=[
+                must=[
                     FieldCondition(
                         key="document_id",
                         match=MatchAny(any=[str(did) for did in document_ids]),
@@ -67,7 +83,7 @@ class QdrantStore:  # implements VectorStorePort
             limit=k,
             with_payload=True,
         )
-        return [point_to_chunk(r) for r in results.points]
+        return [from_point(r) for r in results.points]
 
 
     async def search_with_scores(
@@ -80,6 +96,6 @@ class QdrantStore:  # implements VectorStorePort
             with_payload=True,
         )
         return [
-            (point_to_chunk(r), Score.similarity(max(-1.0, min(1.0, r.score))))
+            (from_point(r), Score.similarity(max(-1.0, min(1.0, r.score))))
             for r in results.points
         ]

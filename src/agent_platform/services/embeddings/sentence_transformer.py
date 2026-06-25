@@ -1,8 +1,8 @@
 from sentence_transformers import SentenceTransformer
-from agent_platform.models.embeddable import Embeddable
-from agent_platform.models.embedding import Embedding
-from agent_platform.models.score import Score
-from adapters.embeddings.bridges._torch_bridge import from_tensor, to_tensor
+from models.protocols.text_unit import TextUnit
+from models.embedding import Embedding
+from models.score import Score
+from bridges.embedding.torch import from_tensor, to_tensor
 
 class SentenceTransformerEmbedder:
     client: SentenceTransformer
@@ -20,10 +20,10 @@ class SentenceTransformerEmbedder:
 
     async def encode(
         self,
-        item: Embeddable,
+        item: TextUnit,
     ) -> Embedding:
         
-        tensor = self.client.encode(item.content, convert_to_tensor=True)
+        tensor = self.client.encode(item.text, convert_to_tensor=True)
 
         return from_tensor(tensor, model=self.model)
 
