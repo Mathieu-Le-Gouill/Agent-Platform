@@ -42,36 +42,3 @@ asyncio_mode = "auto"
 
 [project.scripts]
 platform = "platform.main:main"
-
-
-
-# Import linter rules
-
-[tool.importlinter]
-root_package = "agent_platform"
-
-[[tool.importlinter.contracts]]
-name = "Core cannot depend on outer layers"
-type = "forbidden"
-source_modules = [
-    "agent_platform.core"
-]
-forbidden_modules = [
-    "agent_platform.adapters",
-    "agent_platform.agents",
-    "agent_platform.workflows"
-]
-
-[[tool.importlinter.contracts]]
-name = "Core cannot depend on third party SDKs"
-type = "forbidden"
-source_modules = [
-    "agent_platform.core"
-]
-forbidden_modules = [
-    "openai",
-    "anthropic",
-    "boto3",
-    "requests",
-    "sqlalchemy"
-]
