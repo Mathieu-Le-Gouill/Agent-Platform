@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from datetime import datetime
 from typing import Optional, Any
 from uuid import UUID, uuid4
+
 from models.chunk import Chunk
 from models.language import Language
 

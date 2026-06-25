@@ -7,3 +7,19 @@ class BaseLLM(Protocol):
         model: str,
     ) -> str | None: 
         ...
+
+
+    async def stream(
+        self,
+        prompt: str,
+        model: str,
+    ) -> str | None: 
+        ...
+
+
+    async def chat(
+        self,
+        prompt: str,
+        model: str,
+    ) -> str | None: 
+        ...

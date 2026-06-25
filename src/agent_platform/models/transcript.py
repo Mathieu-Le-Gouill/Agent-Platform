@@ -1,6 +1,9 @@
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 from typing import Optional
+
 from models.language import Language
 
 @dataclass(slots=True)

@@ -1,7 +1,10 @@
 
+from __future__ import annotations
+
 from dataclasses import dataclass, field
 from typing import Optional, Any
 from uuid import UUID, uuid4
+
 from models.score import Score, ScoreKind
 from models.language import Language
 

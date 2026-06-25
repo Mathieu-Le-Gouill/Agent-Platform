@@ -1,8 +1,11 @@
 from __future__ import annotations
+
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
-from models.protocols.text_unit import TextUnit
 from typing import Optional
+
+from models.protocols.text_unit import TextUnit
+
 
 @dataclass(slots=True)
 class Cluster:

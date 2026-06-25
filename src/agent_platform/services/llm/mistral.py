@@ -1,4 +1,5 @@
 from mistralai.client import Mistral
+from models.message import Message
 
 class MistralLLM:
     client: Mistral
@@ -15,8 +16,7 @@ class MistralLLM:
         self,
         prompt: str,
         model: str,
-    ) -> str | None:
-
+    ) -> str | None: 
         response = await self.client.chat.complete_async(
             model=model,
             messages = [
@@ -30,3 +30,30 @@ class MistralLLM:
         content = getattr(response.choices[0].message, "content", None)
 
         return content if isinstance(content, str) else None
+
+    
+    async def stream(
+        self,
+        prompt: str,
+        model: str,
+    ) -> str | None: 
+        ...
+
+
+    async def chat(
+        self,
+        messages: list[Message],
+        model: str,
+    ) -> str | None:
+
+        response = await self.client.chat.complete_async(
+            model=model,
+            messages=messages,
+        )
+
+        content = response.choices[0].message.content
+
+        return content if isinstance(content, str) else None
+    
+
+
