@@ -3,6 +3,7 @@ from typing import AsyncIterator
 
 from models.message import AssistantMessage
 from models.prompt import Prompt
+from models.generation import GenerationConfig
 
 
 class LLMProvider(Protocol):
@@ -10,6 +11,7 @@ class LLMProvider(Protocol):
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AssistantMessage | None:
         ...
 
@@ -18,6 +20,7 @@ class LLMProvider(Protocol):
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AsyncIterator[str]:
         ...
 
@@ -26,5 +29,6 @@ class LLMProvider(Protocol):
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AssistantMessage | None: 
         ...

@@ -2,13 +2,16 @@ from typing import AsyncIterator
 
 from openai import AsyncOpenAI
 
-from bridges.message.openai import from_openai, to_openai
+from agent_platform.bridges.generation.openai import to_openai_params
+from agent_platform.models.generation import GenerationConfig
+from bridges.message.openai import from_openai_message, to_openai_message
 from models.message import AssistantMessage
 from models.prompt import Prompt
 
 
 class OpenAILLM:
     client: AsyncOpenAI
+    
 
     def __init__(self, api_key: str) -> None:
         self.client = AsyncOpenAI(api_key=api_key)
@@ -17,30 +20,33 @@ class OpenAILLM:
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AssistantMessage | None:
-        """Single-turn generation."""
 
         response = await self.client.chat.completions.create(
             model=model,
-            messages=[to_openai(m) for m in prompt.messages],
+            messages=[to_openai_message(m) for m in prompt.messages],
+            **to_openai_params(config),
         )
 
         if not response.choices:
             return None
 
         message = response.choices[0].message
-        return from_openai(message)
+        return from_openai_message(message)
+    
 
     async def stream(
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AsyncIterator[str]:
-        """Stream assistant tokens."""
 
         stream = await self.client.chat.completions.create(
             model=model,
-            messages=[to_openai(m) for m in prompt.messages],
+            messages=[to_openai_message(m) for m in prompt.messages],
+            **to_openai_params(config),
             stream=True,
         )
 
@@ -53,20 +59,22 @@ class OpenAILLM:
             if delta.content:
                 yield delta.content
 
+
     async def chat(
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AssistantMessage | None:
-        """Multi-turn chat."""
 
         response = await self.client.chat.completions.create(
             model=model,
-            messages=[to_openai(m) for m in prompt.messages],
+            messages=[to_openai_message(m) for m in prompt.messages],
+            **to_openai_params(config),
         )
 
         if not response.choices:
             return None
 
         message = response.choices[0].message
-        return from_openai(message)
+        return from_openai_message(message)

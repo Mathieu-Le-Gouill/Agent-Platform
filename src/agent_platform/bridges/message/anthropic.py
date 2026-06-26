@@ -12,7 +12,7 @@ from models.message import (
 )
 
 
-def to_anthropic(message: Message) -> MessageParam:
+def to_anthropic_message(message: Message) -> MessageParam:
     """Translate a domain Message into an Anthropic MessageParam dict."""
     
     match message:
@@ -66,7 +66,7 @@ def to_anthropic(message: Message) -> MessageParam:
             raise ValueError(f"Unsupported message type: {type(message)}")
 
 
-def from_anthropic(response: AnthropicMessage) -> AssistantMessage | None:
+def from_anthropic_message(response: AnthropicMessage) -> AssistantMessage | None:
     """Translate an Anthropic response into a domain AssistantMessage."""
 
     if not response.content:

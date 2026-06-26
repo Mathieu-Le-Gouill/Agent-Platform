@@ -2,8 +2,10 @@ from typing import AsyncIterator
 
 from ollama import AsyncClient
 
-from bridges.message.ollama import from_ollama, to_ollama
+from bridges.message.ollama import from_ollama_message, to_ollama_message
+from bridges.generation.ollama import to_ollama_params
 from models.message import AssistantMessage
+from models.generation import GenerationConfig
 from models.prompt import Prompt
 
 
@@ -19,12 +21,13 @@ class OllamaLLM:
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AssistantMessage | None:
-        """Single-turn generation."""
 
         response = await self.client.chat(
             model=model,
-            messages=[to_ollama(m) for m in prompt.messages],
+            messages=[to_ollama_message(m) for m in prompt.messages],
+            **to_ollama_params(config),
         )
 
         message = response.get("message")
@@ -32,20 +35,21 @@ class OllamaLLM:
         if message is None:
             return None
 
-        return from_ollama(message)
+        return from_ollama_message(message)
     
 
     async def stream(
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AsyncIterator[str]:
-        """Stream assistant tokens."""
 
         stream = await self.client.chat(
             model=model,
-            messages=[to_ollama(m) for m in prompt.messages],
+            messages=[to_ollama_message(m) for m in prompt.messages],
             stream=True,
+            **to_ollama_params(config),
         )
 
         async for chunk in stream:
@@ -60,12 +64,13 @@ class OllamaLLM:
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AssistantMessage | None:
-        """Multi-turn chat."""
 
         response = await self.client.chat(
             model=model,
-            messages=[to_ollama(m) for m in prompt.messages],
+            messages=[to_ollama_message(m) for m in prompt.messages],
+            **to_ollama_params(config),
         )
 
         message = response.get("message")
@@ -73,4 +78,4 @@ class OllamaLLM:
         if message is None:
             return None
 
-        return from_ollama(message)
+        return from_ollama_message(message)

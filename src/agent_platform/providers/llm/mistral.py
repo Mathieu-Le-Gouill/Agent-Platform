@@ -1,8 +1,10 @@
 from mistralai.client import Mistral
 from typing import AsyncIterator
 
-from bridges.message.mistral import from_mistral, to_mistral
+from bridges.message.mistral import from_mistral_message, to_mistral_message
+from bridges.generation.mistral import to_mistral_params
 from models.message import AssistantMessage
+from models.generation import GenerationConfig
 from models.prompt import Prompt
 
 
@@ -18,37 +20,33 @@ class MistralLLM:
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AssistantMessage | None:
-        """Single-turn generation, no conversation history, just the prompt."""
 
         response = await self.client.chat.complete_async(
             model=model,
-            messages=[to_mistral(m) for m in prompt.messages],
+            messages=[to_mistral_message(m) for m in prompt.messages],
+            **to_mistral_params(config),
         )
         
         if not response.choices:
             return None
 
         message = response.choices[0].message
-        return from_mistral(message) if message is not None else None
+        return from_mistral_message(message) if message is not None else None
 
     
     async def stream(
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AsyncIterator[str]:
-        """
-        Streams the assistant reply token by token.
-
-        Usage:
-            async for token in llm.stream(prompt, model):
-                print(token, end="", flush=True)
-        """
 
         response = await self.client.chat.stream_async(
             model=model,
-            messages=[to_mistral(m) for m in prompt.messages],
+            messages=[to_mistral_message(m) for m in prompt.messages],
+            **to_mistral_params(config),
         )
 
         async for event in response:
@@ -62,19 +60,20 @@ class MistralLLM:
         self,
         prompt: Prompt,
         model: str,
+        config: GenerationConfig | None = None,
     ) -> AssistantMessage | None:
-        """Multi-turn chat, full conversation history passed via Prompt."""
 
         response = await self.client.chat.complete_async(
             model=model,
-            messages=[to_mistral(m) for m in prompt.messages],
+            messages=[to_mistral_message(m) for m in prompt.messages],
+            **to_mistral_params(config),
         )
 
         if not response.choices:
             return None
 
         message = response.choices[0].message
-        return from_mistral(message) if message is not None else None
+        return from_mistral_message(message) if message is not None else None
     
 
 
