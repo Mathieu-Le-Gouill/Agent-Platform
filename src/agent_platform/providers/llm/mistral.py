@@ -3,6 +3,7 @@ from typing import AsyncIterator
 
 from bridges.message.mistral import from_mistral_message, to_mistral_message
 from bridges.generation.mistral import to_mistral_params
+
 from models.message import AssistantMessage
 from models.generation import GenerationConfig
 from models.prompt import Prompt

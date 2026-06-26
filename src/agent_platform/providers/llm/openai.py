@@ -2,16 +2,17 @@ from typing import AsyncIterator
 
 from openai import AsyncOpenAI
 
-from agent_platform.bridges.generation.openai import to_openai_params
-from agent_platform.models.generation import GenerationConfig
+from bridges.generation.openai import to_openai_params
 from bridges.message.openai import from_openai_message, to_openai_message
+
+from models.generation import GenerationConfig
 from models.message import AssistantMessage
 from models.prompt import Prompt
 
 
 class OpenAILLM:
     client: AsyncOpenAI
-    
+
 
     def __init__(self, api_key: str) -> None:
         self.client = AsyncOpenAI(api_key=api_key)

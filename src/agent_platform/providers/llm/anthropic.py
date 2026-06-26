@@ -4,6 +4,7 @@ from anthropic import AsyncAnthropic
 
 from bridges.message.anthropic import extract_system, from_anthropic_message, to_anthropic_message
 from bridges.generation.anthropic import to_anthropic_params
+
 from models.message import AssistantMessage
 from models.prompt import Prompt
 from models.generation import GenerationConfig

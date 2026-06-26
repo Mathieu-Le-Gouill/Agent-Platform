@@ -4,6 +4,7 @@ from ollama import AsyncClient
 
 from bridges.message.ollama import from_ollama_message, to_ollama_message
 from bridges.generation.ollama import to_ollama_params
+
 from models.message import AssistantMessage
 from models.generation import GenerationConfig
 from models.prompt import Prompt
