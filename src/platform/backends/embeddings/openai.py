@@ -2,9 +2,9 @@ from openai import AsyncOpenAI
 from models.token import TokenUsage
 from models.protocols.text_unit import TextUnit
 from models.embedding import Embedding
-from mappers.openai.utils import omit_none
-from adapters.embeddings.response import EmbeddingResponse
-from adapters.embeddings.config import EmbeddingConfig
+from bridges.openai.utils import omit_none
+from providers.embeddings.response import EmbeddingResponse
+from providers.embeddings.config import EmbeddingConfig
 
 
 class OpenAIEmbeddings:

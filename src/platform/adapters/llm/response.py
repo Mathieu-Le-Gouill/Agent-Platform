@@ -8,6 +8,7 @@ from models.token import TokenUsage
 
 class FinishReason(str, Enum):
     STOP = "stop"
+    STOP_SEQUENCE = "stop_sequence"
     LENGTH = "length"
     TOOL_CALL = "tool_call"
     CONTENT_FILTER = "content_filter"
@@ -17,7 +18,7 @@ class FinishReason(str, Enum):
 
 @dataclass(slots=True, frozen=True)
 class LLMResponse:
-    message: AssistantMessage
+    message: AssistantMessage | None
     usage: TokenUsage
     model: str
     latency_ms: float | None = None

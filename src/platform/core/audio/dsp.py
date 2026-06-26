@@ -3,7 +3,7 @@ from __future__ import annotations
 import torchaudio
 
 from models.audio import AudioSegment
-from converters.audio.io import AudioSegmentIO
+from platform.core.audio.io import AudioSegmentIO
 
 
 class AudioSegmentDSP:

@@ -2,12 +2,14 @@ from typing import AsyncIterator
 
 from ollama import AsyncClient
 
-from mappers.ollama.message import to_ollama as to_ollama_message, from_ollama as from_ollama_message
-from mappers.ollama.generation import to_ollama as to_ollama_params
+from mappers.ollama.message import to_ollama as to_ollama_message
+from mappers.ollama.generation_config import to_ollama as to_ollama_params
 
-from adapters.llm.message import AssistantMessage
 from adapters.llm.config import GenerationConfig
 from adapters.llm.prompt import Prompt
+from adapters.llm.response import LLMResponse, StreamChunk
+from mappers.ollama.response import from_ollama_finish_reason, from_ollama_response
+from models.token import TokenUsage
 
 
 class OllamaLLM:
@@ -23,7 +25,7 @@ class OllamaLLM:
         prompt: Prompt,
         model: str,
         config: GenerationConfig | None = None,
-    ) -> AssistantMessage | None:
+    ) -> LLMResponse:
 
         response = await self.client.chat(
             model=model,
@@ -31,12 +33,7 @@ class OllamaLLM:
             **to_ollama_params(config),
         )
 
-        message = response.get("message")
-
-        if message is None:
-            return None
-
-        return from_ollama_message(message)
+        return from_ollama_response(response)
     
 
     async def stream(
@@ -44,7 +41,7 @@ class OllamaLLM:
         prompt: Prompt,
         model: str,
         config: GenerationConfig | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[StreamChunk]:
 
         stream = await self.client.chat(
             model=model,
@@ -53,9 +50,29 @@ class OllamaLLM:
             **to_ollama_params(config),
         )
 
+        finish_reason = None
+        usage = None
+
         async for chunk in stream:
             message = chunk.get("message", {})
             content = message.get("content")
 
             if content:
-                yield content
+                yield StreamChunk(delta=content)
+            
+            if chunk.get("done"):
+                if chunk.get("done_reason"):
+                    finish_reason = from_ollama_finish_reason(
+                        chunk.get("done_reason")
+                    )
+
+                usage = TokenUsage(
+                    input_tokens=chunk.get("input_tokens", 0),
+                    output_tokens=chunk.get("output_tokens", 0),
+                )
+                
+        yield StreamChunk(
+            delta="",
+            finish_reason=finish_reason,
+            usage=usage,
+        )

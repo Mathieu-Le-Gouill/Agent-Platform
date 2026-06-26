@@ -1,12 +1,14 @@
 from mistralai.client import Mistral
 from typing import AsyncIterator
 
-from mappers.mistral.message import to_mistral as to_mistral_message, from_mistral as from_mistral_message
-from mappers.mistral.generation import to_mistral as to_mistral_params
+from mappers.mistral.message import to_mistral as to_mistral_message
+from platform.mappers.mistral.generation_config import to_mistral as to_mistral_params
 
-from adapters.llm.message import AssistantMessage
 from adapters.llm.config import GenerationConfig
 from adapters.llm.prompt import Prompt
+from adapters.llm.response import LLMResponse, StreamChunk
+from mappers.mistral.response import from_mistral_response, from_mistral_finish_reason
+from models.token import TokenUsage
 
 
 class MistralLLM:
@@ -22,7 +24,7 @@ class MistralLLM:
         prompt: Prompt,
         model: str,
         config: GenerationConfig | None = None,
-    ) -> AssistantMessage | None:
+    ) -> LLMResponse:
 
         response = await self.client.chat.complete_async(
             model=model,
@@ -30,11 +32,7 @@ class MistralLLM:
             **to_mistral_params(config),
         )
         
-        if not response.choices:
-            return None
-
-        message = response.choices[0].message
-        return from_mistral_message(message) if message is not None else None
+        return from_mistral_response(response)
 
     
     async def stream(
@@ -42,16 +40,42 @@ class MistralLLM:
         prompt: Prompt,
         model: str,
         config: GenerationConfig | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[StreamChunk]:
 
         response = await self.client.chat.stream_async(
             model=model,
             messages=[to_mistral_message(m) for m in prompt.messages],
+            stream=True,
             **to_mistral_params(config),
         )
 
+        finish_reason = None
+        usage = None
+
         async for event in response:
-            delta = event.data.choices[0].delta
+            choice = event.data.choices[0]
+
+            delta = choice.delta
             token = getattr(delta, "content", None)
+
             if isinstance(token, str):
-                yield token
+                yield StreamChunk(delta=token)
+
+            if choice.finish_reason:
+                finish_reason = from_mistral_finish_reason(
+                    choice.finish_reason
+                )
+            
+            if event.data.usage:
+                usage = TokenUsage(
+                    input_tokens=event.data.usage.prompt_tokens or 0,
+                    output_tokens=event.data.usage.completion_tokens or 0,
+                )
+
+        yield StreamChunk(
+            delta="",
+            finish_reason=finish_reason,
+            usage=usage,
+        )
+
+            

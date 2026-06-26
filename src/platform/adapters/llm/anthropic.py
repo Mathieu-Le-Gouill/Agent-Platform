@@ -2,12 +2,14 @@ from typing import AsyncIterator
 
 from anthropic import AsyncAnthropic
 
-from mappers.anthropic.generation import to_anthropic as to_anthropic_params
-from mappers.anthropic.message import extract_system, to_anthropic as to_anthropic_message, from_anthropic as from_anthropic_message
+from platform.mappers.anthropic.generation_config import to_anthropic as to_anthropic_params
+from mappers.anthropic.message import extract_system, to_anthropic as to_anthropic_message
 
-from adapters.llm.message import AssistantMessage
 from adapters.llm.prompt import Prompt
 from adapters.llm.config import GenerationConfig
+from adapters.llm.response import LLMResponse, StreamChunk
+from mappers.anthropic.response import from_anthropic_response, from_anthropic_finish_reason
+from platform.models.token import TokenUsage
 
 
 class AnthropicLLM:
@@ -23,7 +25,7 @@ class AnthropicLLM:
         prompt: Prompt,
         model: str,
         config: GenerationConfig | None = None,
-    ) -> AssistantMessage | None:
+    ) -> LLMResponse:
 
         system, messages = extract_system(prompt)
 
@@ -34,7 +36,7 @@ class AnthropicLLM:
             **to_anthropic_params(config),
         )
 
-        return from_anthropic_message(response)
+        return from_anthropic_response(response)
 
 
     async def stream(
@@ -42,9 +44,11 @@ class AnthropicLLM:
         prompt: Prompt,
         model: str,
         config: GenerationConfig | None = None,
-    ) -> AsyncIterator[str]:
+    ) -> AsyncIterator[StreamChunk]:
 
         system, messages = extract_system(prompt)
+
+        finish_reason = None
 
         async with self.client.messages.stream(
             model=model,
@@ -52,24 +56,20 @@ class AnthropicLLM:
             messages=[to_anthropic_message(m) for m in messages],
             **to_anthropic_params(config),
         ) as stream:
+
             async for text in stream.text_stream:
-                yield text
-    
+                yield StreamChunk(delta=text)
 
-    async def chat(
-        self,
-        prompt: Prompt,
-        model: str,
-        config: GenerationConfig | None = None,
-    ) -> AssistantMessage | None:
-        
-        system, messages = extract_system(prompt)
+            final_message = await stream.get_final_message()
 
-        response = await self.client.messages.create(
-            model=model,
-            system=system or "",
-            messages=[to_anthropic_message(m) for m in messages],
-            **to_anthropic_params(config),
-        )
+            if final_message.stop_reason:
+                finish_reason = from_anthropic_finish_reason(final_message.stop_reason)
 
-        return from_anthropic_message(response)
+            yield StreamChunk(
+                delta="",
+                finish_reason=finish_reason,
+                usage=TokenUsage(
+                    input_tokens=final_message.usage.input_tokens,
+                    output_tokens=final_message.usage.output_tokens,
+                ),
+            )

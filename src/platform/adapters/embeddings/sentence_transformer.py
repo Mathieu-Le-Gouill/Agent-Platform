@@ -2,6 +2,7 @@ from sentence_transformers import SentenceTransformer
 from models.protocols.text_unit import TextUnit
 from adapters.embeddings.response import EmbeddingResponse
 from adapters.embeddings.config import EmbeddingConfig
+from core.embedding.torch import from_torch
 
 class SentenceTransformerEmbedder:
     client: SentenceTransformer
@@ -28,5 +29,7 @@ class SentenceTransformerEmbedder:
             convert_to_tensor=True,
         )
 
-        return from_torch(tensor, model=self.model)
+        embeddings = from_torch(tensor, model=self.model, ids=[item.id for item in items])
+
+        return EmbeddingResponse(embeddings=embeddings, model=self.model, usage=None)
         
