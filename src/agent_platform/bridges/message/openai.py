@@ -1,4 +1,4 @@
-from typing import Any, Optional
+from typing import Any
 import json
 
 from models.message import (
@@ -50,7 +50,7 @@ def to_openai(message: Message) -> ChatCompletionMessageParam:
             raise ValueError(...)
         
 
-def from_openai(response) -> Optional[AssistantMessage]:
+def from_openai(response) -> AssistantMessage | None:
     if response is None:
         return None
 

@@ -1,5 +1,5 @@
 
-from typing import Optional, Union, Any
+from typing import Union, Any
 import json
 
 from mistralai.client.models import (
@@ -59,7 +59,7 @@ def to_mistral(message: Message) -> MistralMessage:
             raise ValueError(f"Unsupported message type: {type(message)}")
         
         
-def from_mistral(response: MistralAssistantMessage) -> Optional[AssistantMessage]:
+def from_mistral(response: MistralAssistantMessage) -> AssistantMessage | None:
     if response is None:
         return None
 

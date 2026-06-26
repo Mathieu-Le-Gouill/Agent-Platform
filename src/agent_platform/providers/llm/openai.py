@@ -1,4 +1,4 @@
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 
 from openai import AsyncOpenAI
 
@@ -17,7 +17,7 @@ class OpenAILLM:
         self,
         prompt: Prompt,
         model: str,
-    ) -> Optional[AssistantMessage]:
+    ) -> AssistantMessage | None:
         """Single-turn generation."""
 
         response = await self.client.chat.completions.create(
@@ -57,7 +57,7 @@ class OpenAILLM:
         self,
         prompt: Prompt,
         model: str,
-    ) -> Optional[AssistantMessage]:
+    ) -> AssistantMessage | None:
         """Multi-turn chat."""
 
         response = await self.client.chat.completions.create(

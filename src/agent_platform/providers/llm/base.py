@@ -1,5 +1,5 @@
 from typing import Protocol
-from typing import Optional, AsyncIterator
+from typing import AsyncIterator
 
 from models.message import AssistantMessage
 from models.prompt import Prompt
@@ -10,7 +10,7 @@ class LLMProvider(Protocol):
         self,
         prompt: Prompt,
         model: str,
-    ) -> Optional[AssistantMessage]:
+    ) -> AssistantMessage | None:
         ...
 
 
@@ -26,5 +26,5 @@ class LLMProvider(Protocol):
         self,
         prompt: Prompt,
         model: str,
-    ) -> Optional[AssistantMessage]: 
+    ) -> AssistantMessage | None: 
         ...

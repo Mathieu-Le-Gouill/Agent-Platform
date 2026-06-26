@@ -1,5 +1,5 @@
 from mistralai.client import Mistral
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 
 from bridges.message.mistral import from_mistral, to_mistral
 from models.message import AssistantMessage
@@ -18,7 +18,7 @@ class MistralLLM:
         self,
         prompt: Prompt,
         model: str,
-    ) -> Optional[AssistantMessage]:
+    ) -> AssistantMessage | None:
         """Single-turn generation, no conversation history, just the prompt."""
 
         response = await self.client.chat.complete_async(
@@ -62,7 +62,7 @@ class MistralLLM:
         self,
         prompt: Prompt,
         model: str,
-    ) -> Optional[AssistantMessage]:
+    ) -> AssistantMessage | None:
         """Multi-turn chat, full conversation history passed via Prompt."""
 
         response = await self.client.chat.complete_async(

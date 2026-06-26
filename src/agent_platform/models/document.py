@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from datetime import datetime
-from typing import Optional, Any
+from typing import Any
 from uuid import UUID, uuid4
 
 from models.chunk import Chunk
@@ -11,10 +11,10 @@ from models.language import Language
 
 @dataclass(slots=True, frozen=True)
 class DocumentMetadata:
-    author:      Optional[str] = None
-    description: Optional[str] = None
-    created_at:  Optional[datetime] = None   # source system's date, distinct from your lifecycle created_at
-    modified_at: Optional[datetime] = None
+    author:      str | None = None
+    description: str | None = None
+    created_at:  datetime | None = None   # source system's date, distinct from your lifecycle created_at
+    modified_at: datetime | None = None
     extra:       dict[str, Any] = field(default_factory=dict)
    
 
@@ -24,15 +24,15 @@ class Document:
 
     # Source
     source: str = ""
-    title: Optional[str] = None
-    document_type: Optional[str] = None
-    url: Optional[str] = None
+    title: str | None = None
+    document_type: str | None = None
+    url: str | None = None
 
     # Content
-    text: Optional[str] = None
+    text: str | None = None
 
     # Global information
-    language: Optional[Language] = None
+    language: Language | None = None
     tags: list[str] = field(default_factory=list)
 
     # Lifecycle

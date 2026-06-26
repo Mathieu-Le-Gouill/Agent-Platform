@@ -1,4 +1,4 @@
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 
 from ollama import AsyncClient
 
@@ -19,7 +19,7 @@ class OllamaLLM:
         self,
         prompt: Prompt,
         model: str,
-    ) -> Optional[AssistantMessage]:
+    ) -> AssistantMessage | None:
         """Single-turn generation."""
 
         response = await self.client.chat(
@@ -60,7 +60,7 @@ class OllamaLLM:
         self,
         prompt: Prompt,
         model: str,
-    ) -> Optional[AssistantMessage]:
+    ) -> AssistantMessage | None:
         """Multi-turn chat."""
 
         response = await self.client.chat(

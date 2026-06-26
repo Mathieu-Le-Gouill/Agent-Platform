@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional
 
 
 @dataclass(frozen=True, slots=True)
@@ -10,8 +9,8 @@ class AudioSegment:
     data: bytes
     sample_rate: int
     channels: int = 1
-    start_ms: Optional[int] = None 
-    end_ms: Optional[int] = None
+    start_ms: int | None = None 
+    end_ms: int | None = None
 
     # --- Properties ---
 

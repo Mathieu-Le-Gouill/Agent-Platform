@@ -1,4 +1,4 @@
-from typing import AsyncIterator, Optional
+from typing import AsyncIterator
 
 from anthropic import AsyncAnthropic
 
@@ -20,7 +20,7 @@ class AnthropicLLM:
         prompt: Prompt,
         model: str,
         max_tokens: int = 1024,
-    ) -> Optional[AssistantMessage]:
+    ) -> AssistantMessage | None:
         """Single-turn generation — stateless, no conversation history."""
         system, messages = extract_system(prompt)
 
@@ -64,7 +64,7 @@ class AnthropicLLM:
         prompt: Prompt,
         model: str,
         max_tokens: int = 1024,
-    ) -> Optional[AssistantMessage]:
+    ) -> AssistantMessage | None:
         """Multi-turn chat — full conversation history passed via Prompt."""
         system, messages = extract_system(prompt)
 

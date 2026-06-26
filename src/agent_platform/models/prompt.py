@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Optional
 
 from models.message import Message, SystemMessage, ToolCall, ToolMessage, ToolResult, UserMessage, AssistantMessage
 from models.language import Language
@@ -28,10 +27,10 @@ class Prompt:
     def build(
         cls,
         *,
-        system:  Optional[str]         = None,
+        system:  str | None         = None,
         history: list[Message]         | None = None,
-        user:    Optional[str]         = None,
-        language: Optional[Language]   = None,
+        user:    str | None         = None,
+        language: Language | None   = None,
     ) -> Prompt:
         """
         Canonical factory used by pipelines and nodes.
@@ -78,13 +77,13 @@ class Prompt:
 
     # --- Introspection ---
 
-    def last_user_message(self) -> Optional[UserMessage]:
+    def last_user_message(self) -> UserMessage | None:
         return next(
             (m for m in reversed(self.messages) if isinstance(m, UserMessage)),
             None,
         )
 
 
-    def system_prompt(self) -> Optional[str]:
+    def system_prompt(self) -> str | None:
         msg = next((m for m in self.messages if isinstance(m, SystemMessage)), None)
         return msg.content if msg else None

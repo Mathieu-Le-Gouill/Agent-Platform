@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
-from typing import Optional, Union, Any
+from typing import Union, Any
 from datetime import datetime
 from enum import Enum
 
@@ -48,7 +48,7 @@ class BaseMessage:
     role:       MessageRole
     id:         UUID     = field(default_factory=uuid4)
     created_at: datetime = field(default_factory=datetime.now)
-    language:   Optional[Language] = None
+    language:   Language | None = None
 
     # Provider-level metadata (model name, token counts, finish reason…)
     # Kept as a plain dict so callers can store whatever a provider returns
@@ -76,7 +76,7 @@ class UserMessage(BaseMessage):
     """
     role:    MessageRole = field(default=MessageRole.USER, init=False)
     content: str = ""
-    user_id: Optional[UUID] = None
+    user_id: UUID | None = None
 
 
 @dataclass(slots=True)

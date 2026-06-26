@@ -1,4 +1,4 @@
-from typing import Literal, TypedDict, Any, Optional
+from typing import Literal, TypedDict, Any
 
 from models.message import (
     Message,
@@ -63,7 +63,7 @@ def to_ollama(message: Message) -> OllamaMessage:
             raise ValueError(...)
 
 
-def from_ollama(response: OllamaMessage) -> Optional[AssistantMessage]:
+def from_ollama(response: OllamaMessage) -> AssistantMessage | None:
     if response is None:
         return None
 
