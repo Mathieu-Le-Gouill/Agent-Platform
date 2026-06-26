@@ -3,7 +3,7 @@ from typing import Protocol
 from models.protocols.text_unit import TextUnit
 
     
-class BaseClassifier(Protocol):
+class ClassificationModel(Protocol):
 
     async def classify(self, items: list[TextUnit]) -> list[str]: 
         ...

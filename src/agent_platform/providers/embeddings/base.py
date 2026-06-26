@@ -3,7 +3,7 @@ from models.protocols.text_unit import TextUnit
 from models.embedding import Embedding
 
 
-class BaseEmbedder(Protocol):
+class EmbeddingProvider(Protocol):
     async def encode(
         self,
         items: TextUnit,

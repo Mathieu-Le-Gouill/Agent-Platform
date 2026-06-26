@@ -2,7 +2,7 @@ from typing import AsyncIterator, Protocol
 from models.protocols.loadable import Loadable
 
 
-class BaseLoader(Protocol):
+class DocumentLoader(Protocol):
     """Loads raw source material and returns a populated Document."""
 
     async def load(self, source: str, **kwargs) -> Loadable: ...

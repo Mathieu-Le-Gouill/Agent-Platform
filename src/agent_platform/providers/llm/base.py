@@ -5,7 +5,7 @@ from models.message import AssistantMessage
 from models.prompt import Prompt
 
 
-class BaseLLM(Protocol):
+class LLMProvider(Protocol):
     async def generate(
         self,
         prompt: Prompt,
