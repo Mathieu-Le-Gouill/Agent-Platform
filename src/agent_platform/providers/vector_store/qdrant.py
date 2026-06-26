@@ -7,7 +7,7 @@ from qdrant_client.models import Distance, Filter, FieldCondition, MatchAny, Vec
 from models.chunk import Chunk
 from models.document import Document
 from models.score import Score
-from bridges.chunk.qdrant import to_point, from_point
+from agent_platform.bridges.qdrant.chunk import to_point, from_point
 
 
 class QdrantStore:

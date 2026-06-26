@@ -23,7 +23,7 @@ from models.message import (
 MistralMessage = Union[MistralSystemMessage, MistralUserMessage, MistralAssistantMessage, MistralToolMessage]
 
 
-def to_mistral_message(message: Message) -> MistralMessage:
+def to_mistral(message: Message) -> MistralMessage:
     match message:
         case SystemMessage():
             return MistralSystemMessage(content=message.content)
@@ -59,7 +59,7 @@ def to_mistral_message(message: Message) -> MistralMessage:
             raise ValueError(f"Unsupported message type: {type(message)}")
         
         
-def from_mistral_message(response: MistralAssistantMessage) -> AssistantMessage | None:
+def from_mistral(response: MistralAssistantMessage) -> AssistantMessage | None:
     if response is None:
         return None
 

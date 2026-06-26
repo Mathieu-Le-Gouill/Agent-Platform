@@ -19,7 +19,7 @@ from openai.types.chat import (
 )
 
 
-def to_openai_message(message: Message) -> ChatCompletionMessageParam:
+def to_openai(message: Message) -> ChatCompletionMessageParam:
     match message:
         case SystemMessage():
             return ChatCompletionSystemMessageParam(
@@ -50,7 +50,7 @@ def to_openai_message(message: Message) -> ChatCompletionMessageParam:
             raise ValueError(...)
         
 
-def from_openai_message(response) -> AssistantMessage | None:
+def from_openai(response) -> AssistantMessage | None:
     if response is None:
         return None
 

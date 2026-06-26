@@ -3,7 +3,7 @@ from typing import Any
 from models.generation import GenerationConfig, ResponseFormat
 
 
-def to_anthropic_params(
+def to_anthropic(
     config: GenerationConfig | None,
 ) -> dict[str, Any]:
 

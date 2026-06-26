@@ -2,7 +2,7 @@ from sentence_transformers import SentenceTransformer
 from models.protocols.text_unit import TextUnit
 from models.embedding import Embedding
 from models.score import Score
-from bridges.embedding.torch import embedding_from_tensor, embedding_to_tensor
+from converters.embedding.torch import to_torch, from_torch
 
 class SentenceTransformerEmbedder:
     client: SentenceTransformer
@@ -25,7 +25,7 @@ class SentenceTransformerEmbedder:
         
         tensor = self.client.encode(item.text, convert_to_tensor=True)
 
-        return embedding_from_tensor(tensor, model=self.model)
+        return from_torch(tensor, model=self.model)
 
 
     async def similarity(
@@ -34,7 +34,7 @@ class SentenceTransformerEmbedder:
         embeddings2: Embedding,
     ) -> Score:
         
-        tensor = self.client.similarity(embedding_to_tensor(embeddings1), embedding_to_tensor(embeddings2))
+        tensor = self.client.similarity(to_torch(embeddings1), to_torch(embeddings2))
 
         return Score.similarity(tensor.item(), low=-1.0, high=1.0)
         

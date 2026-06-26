@@ -10,7 +10,7 @@ from chromadb.api.models.AsyncCollection import AsyncCollection
 from models.chunk import Chunk
 from models.document import Document
 from models.score import Score
-from bridges.chunk.chroma import to_chroma, from_chroma
+from agent_platform.bridges.chroma.chunk import to_chroma, from_chroma
 
 
 class ChromaStore: # implements VectorStorePort

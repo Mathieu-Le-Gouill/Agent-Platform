@@ -3,7 +3,7 @@ from typing import Any
 from models.generation import GenerationConfig, ResponseFormat
 
 
-def to_openai_params(
+def to_openai(
     config: GenerationConfig | None,
 ) -> dict[str, Any]:
     if config is None:

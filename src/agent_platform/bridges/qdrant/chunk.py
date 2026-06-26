@@ -1,5 +1,5 @@
 from uuid import UUID, uuid4
-import dataclasses
+from dataclasses import fields, asdict
 
 from qdrant_client.models import PointStruct
 
@@ -7,7 +7,7 @@ from models.chunk import Chunk, ChunkMetadata
 from models.score import Score, ScoreKind
 
 
-_META_FIELDS = {f.name for f in dataclasses.fields(ChunkMetadata)} - {"extra"}
+_META_FIELDS = {f.name for f in fields(ChunkMetadata)} - {"extra"}
 _RESERVED    = _META_FIELDS | {"chunk_id", "document_id", "chunk_index"}
 
 
@@ -43,6 +43,10 @@ def from_point(point) -> Chunk:
     return chunk
 
 
+def chunks_from_points(points: list) -> list[Chunk]:
+    return [from_point(point) for point in points]
+
+
 # --- Helpers ---
 
 
@@ -53,7 +57,7 @@ def _chunk_payload(chunk: Chunk) -> dict:
         "chunk_index": chunk.index,
         "text":        chunk.text,
 
-        **{k: v for k, v in dataclasses.asdict(chunk.metadata).items() if k != "extra"},
+        **{k: v for k, v in asdict(chunk.metadata).items() if k != "extra"},
         **chunk.metadata.extra,
     }
 

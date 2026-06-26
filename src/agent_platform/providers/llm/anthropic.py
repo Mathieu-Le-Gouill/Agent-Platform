@@ -2,8 +2,8 @@ from typing import AsyncIterator
 
 from anthropic import AsyncAnthropic
 
-from bridges.message.anthropic import extract_system, from_anthropic_message, to_anthropic_message
-from bridges.generation.anthropic import to_anthropic_params
+from bridges.anthropic.generation import to_anthropic as to_anthropic_params
+from bridges.anthropic.message import extract_system, to_anthropic as to_anthropic_message, from_anthropic as from_anthropic_message
 
 from models.message import AssistantMessage
 from models.prompt import Prompt

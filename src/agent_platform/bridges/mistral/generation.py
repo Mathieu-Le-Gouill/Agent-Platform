@@ -3,7 +3,7 @@ from typing import Any
 from models.generation import GenerationConfig, ResponseFormat
 
 
-def to_mistral_params(
+def to_mistral(
     config: GenerationConfig | None,
 ) -> dict[str, Any]:
     if config is None:

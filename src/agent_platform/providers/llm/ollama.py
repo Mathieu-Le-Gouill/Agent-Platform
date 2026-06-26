@@ -2,8 +2,8 @@ from typing import AsyncIterator
 
 from ollama import AsyncClient
 
-from bridges.message.ollama import from_ollama_message, to_ollama_message
-from bridges.generation.ollama import to_ollama_params
+from agent_platform.bridges.ollama.message import to_ollama as to_ollama_message, from_ollama as from_ollama_message
+from agent_platform.bridges.ollama.generation import to_ollama as to_ollama_params
 
 from models.message import AssistantMessage
 from models.generation import GenerationConfig

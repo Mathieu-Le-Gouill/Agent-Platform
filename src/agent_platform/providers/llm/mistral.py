@@ -1,8 +1,8 @@
 from mistralai.client import Mistral
 from typing import AsyncIterator
 
-from bridges.message.mistral import from_mistral_message, to_mistral_message
-from bridges.generation.mistral import to_mistral_params
+from agent_platform.bridges.mistral.message import to_mistral as to_mistral_message, from_mistral as from_mistral_message
+from agent_platform.bridges.mistral.generation import to_mistral as to_mistral_params
 
 from models.message import AssistantMessage
 from models.generation import GenerationConfig

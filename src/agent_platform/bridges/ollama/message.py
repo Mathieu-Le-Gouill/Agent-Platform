@@ -17,7 +17,7 @@ class OllamaMessage(TypedDict, total=False):
     tool_call_id: str
 
 
-def to_ollama_message(message: Message) -> OllamaMessage:
+def to_ollama(message: Message) -> OllamaMessage:
     match message:
         case SystemMessage():
             return {
@@ -63,7 +63,7 @@ def to_ollama_message(message: Message) -> OllamaMessage:
             raise ValueError(...)
 
 
-def from_ollama_message(response: OllamaMessage) -> AssistantMessage | None:
+def from_ollama(response: OllamaMessage) -> AssistantMessage | None:
     if response is None:
         return None
 

@@ -2,8 +2,8 @@ from typing import AsyncIterator
 
 from openai import AsyncOpenAI
 
-from bridges.generation.openai import to_openai_params
-from bridges.message.openai import from_openai_message, to_openai_message
+from agent_platform.bridges.openai.generation import to_openai as to_openai_params
+from agent_platform.bridges.openai.message import to_openai as to_openai_message, from_openai as from_openai_message
 
 from models.generation import GenerationConfig
 from models.message import AssistantMessage
