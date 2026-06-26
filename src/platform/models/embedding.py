@@ -2,11 +2,13 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 import math
+from uuid import UUID
 
 
 @dataclass(slots=True)
 class Embedding:
     vector: tuple[float, ...]
+    id: UUID
     model: str = ""
     dimensions: int = field(init=False)
 
@@ -16,8 +18,8 @@ class Embedding:
             raise ValueError("Embedding vector cannot be empty")
 
     @classmethod
-    def from_list(cls, vector: list[float], model: str) -> Embedding:
-        return cls(vector=tuple(vector), model=model)
+    def from_list(cls, vector: list[float], model: str, id: UUID) -> Embedding:
+        return cls(vector=tuple(vector), model=model, id=id)
 
     def to_list(self) -> list[float]:
         return list(self.vector)
