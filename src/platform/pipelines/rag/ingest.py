@@ -1,6 +1,6 @@
-"""
-async def ingest(doc: Document) -> None:
-    chunks = chunk_document(doc)
-    embeddings = await embedder.embed_batch(chunks)
-    await store.upsert(chunks, embeddings)
-"""
+from integrations.vector_store.port import VectorStore
+from models.document import Document
+
+
+async def ingest(docs: list[Document], store: VectorStore) -> None:
+    await store.add(docs)

@@ -6,3 +6,10 @@ def parse_uuid(val) -> UUID:
         return UUID(str(val))
     except (TypeError, ValueError):
         return uuid4()
+    
+
+def uuid_to_str(val: UUID) -> str:
+    try:
+        return str(val)
+    except (TypeError, ValueError):
+        return ""

@@ -15,15 +15,17 @@ authors = [
 license = "MIT"
 
 dependencies = [
-    "openai",
-    "anthropic",
-    "mistralai",
     "langchain",
     "langgraph",
     "langsmith",
-    "ollama",
     "soundfile",
-    "langchain-chroma"
+    "langchain-chroma",
+    "langchain-openai",
+    "langchain-anthropic",
+    "langchain-mistral",
+    "langchain-ollama",
+    "langchain-community",
+    "langchain-cohere"
 ]
 
 [project.optional-dependencies]

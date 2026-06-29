@@ -1,5 +1,5 @@
-from ports.speech import BaseSpeechToText
-from ports.translator import BaseTranslator
+from platform.integrations.speech.port import BaseSpeechToText
+from platform.integrations.translation.port import BaseTranslator
 from models.language import Language
 from models.transcript import Transcript
 

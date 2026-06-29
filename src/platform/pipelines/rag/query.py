@@ -1,6 +1,6 @@
-"""
-chunks = await store.search(query)
-doc_ids = {c.document_id for c in chunks}
-documents = await doc_store.get_many(doc_ids)
-doc_by_id = {d.id: d for d in documents}
-"""
+from integrations.vector_store.port import VectorStore
+from models.document import Document
+
+
+async def ingest(docs: list[Document], store: VectorStore) -> None:
+    await store.add(docs)
