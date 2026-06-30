@@ -1,18 +1,26 @@
-from pathlib import Path
-from datetime import datetime
-from typing import Sequence
-
-from models.document import TextDocument
-from platform.models.enums.language import Language
-
+from mimetypes import guess_type
+from typing import Callable, Sequence
 from langchain_core.documents import Document as LC_Document
+
+from models.document import (
+    Document, DocumentMetadata,
+    TextFile, TextInfo, TextProperties,
+    ImageFile, ImageInfo, ImageProperties,
+    AudioFile, AudioInfo, AudioProperties,
+    VideoFile, VideoInfo, VideoProperties,
+)
+from models.enums.language import Language
+from models.enums.file_format import FileFormat, MediaType
+from uuid import uuid4
+
+
 
 
 _EMAIL_FIELDS = ("sent_from", "sent_to", "cc_recipient", "bcc_recipient",
                  "email_message_id", "subject", "signature")
 
 
-def to_langchain(doc: TextDocument) -> LC_Document:
+def to_langchain(doc: TextFile) -> LC_Document:
     
     return LC_Document(
         page_content=doc.text,
@@ -41,6 +49,81 @@ def to_langchain(doc: TextDocument) -> LC_Document:
             ),
         },
     )
+
+
+def from_langchain(
+    lc_docs: list[LC_Document],
+    source: str = "",
+) -> Sequence[Document]:
+    mime, _ = guess_type(source)
+
+    file_format = (
+        FileFormat.from_mime(mime)
+        if mime
+        else FileFormat.UNKNOWN
+    )
+
+    converter = _CONVERTERS.get(file_format.media_type)
+
+    if converter is None:
+        return []
+
+    return [converter(doc) for doc in lc_docs]
+
+
+def text_from_langchain(doc: LC_Document) -> TextFile:
+    metadata = doc.metadata
+
+    text = doc.page_content
+
+    return TextFile(
+        id=uuid4(),
+        source=metadata.get("source") or "",
+        metadata=DocumentMetadata(
+            title=metadata.get("title"),
+            author=metadata.get("author"),
+            description=None,
+            format=metadata.get("filetype"),
+            created_at=metadata.get("created"),
+            modified_at=metadata.get("last_modified"),
+            extra=metadata,
+        ),
+        text=text,
+        info=TextInfo(
+            mime_type=metadata.get("filetype"),
+            encoding=metadata.get("encoding"),
+            language=(
+                metadata["languages"][0]
+                if metadata.get("languages")
+                else None
+            ),
+        ),
+        properties=TextProperties(
+            character_count=len(text),
+            word_count=len(text.split()),
+            line_count=text.count("\n") + 1,
+            page_count=metadata.get("page_number"),  # not really page count
+        ),
+    )
+
+def image_from_langchain(doc: LC_Document) -> ImageFile:
+    ...
+
+def audio_from_langchain(doc: LC_Document) -> AudioFile:
+    ...
+
+
+def video_from_langchain(doc: LC_Document) -> VideoFile:
+    ...
+
+
+_CONVERTERS: dict[MediaType, Callable[[LC_Document], Document]] = {
+    MediaType.TEXT: text_from_langchain,
+    MediaType.IMAGE: image_from_langchain,
+    MediaType.AUDIO: audio_from_langchain,
+    MediaType.VIDEO: video_from_langchain,
+}
+
 
 """
 # --- helpers ---

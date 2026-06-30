@@ -1,10 +1,10 @@
-from typing import AsyncIterator, Protocol
+from typing import AsyncIterator, Protocol, Sequence
 from models.protocols.loadable import Loadable
 
 
-class DocumentLoader(Protocol):
-    """Loads raw source material and returns a populated Document."""
+class MediaLoader(Protocol):
 
-    async def load(self, source: str, **kwargs) -> Loadable: ...
+    async def load(self, source: str, **kwargs) -> Sequence[Loadable]: ...
+    
 
-    async def load_many(self, sources: list[str], **kwargs) -> AsyncIterator[Loadable]: ...
+    async def load_many(self, sources: list[str], **kwargs) -> AsyncIterator[Sequence[Loadable]]: ...

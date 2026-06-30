@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID, uuid4
 
 from models.enums.language import Language
-from models.enums.fileformat import FileFormat
+from models.enums.file_format import FileFormat
 
 
 @dataclass(slots=True, frozen=True)

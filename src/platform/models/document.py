@@ -6,7 +6,7 @@ from datetime import datetime
 from typing import Any
 
 from models.enums.language import Language
-from models.enums.fileformat import FileFormat
+from models.enums.file_format import FileFormat
 
 
 @dataclass(slots=True, frozen=True)
@@ -45,7 +45,7 @@ class TextProperties:
 
 
 @dataclass(slots=True, frozen=True)
-class TextDocument(Document):
+class TextFile(Document):
     text: str
 
     info: TextInfo = field(default_factory=TextInfo)
@@ -71,7 +71,7 @@ class ImageProperties:
 
 
 @dataclass(slots=True, frozen=True)
-class ImageDocument(Document):
+class ImageFile(Document):
     content: bytes
     info: ImageInfo = field(default_factory=ImageInfo)
     properties: ImageProperties = field(default_factory=ImageProperties)
@@ -95,7 +95,7 @@ class AudioProperties:
 
 
 @dataclass(slots=True, frozen=True)
-class AudioDocument(Document):
+class AudioFile(Document):
     content: bytes
     info: AudioInfo = field(default_factory=AudioInfo)
     properties: AudioProperties = field(default_factory=AudioProperties)
@@ -124,7 +124,7 @@ class VideoProperties:
 
 
 @dataclass(slots=True, frozen=True)
-class VideoDocument(Document):
+class VideoFile(Document):
     content: bytes
 
     info: VideoInfo = field(default_factory=VideoInfo)
