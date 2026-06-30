@@ -2,75 +2,47 @@ from pathlib import Path
 from datetime import datetime
 from typing import Sequence
 
-from models.document import Document, DocumentMetadata, DocumentType, ImageMetadata, AudioMetadata
-from models.language import Language
+from models.document import TextDocument
+from platform.models.enums.language import Language
 
-from langchain_core.documents import Document as LCDocument
-from bridges.langchain.chunk import from_langchain as chunk_from_lc, to_langchain as chunk_to_lc
+from langchain_core.documents import Document as LC_Document
 
 
 _EMAIL_FIELDS = ("sent_from", "sent_to", "cc_recipient", "bcc_recipient",
                  "email_message_id", "subject", "signature")
 
 
-def to_langchain(doc: Document) -> list[LCDocument]:
-    base_metadata = {
-        "document_id":   str(doc.id),
-        "source":        doc.source,
-        "title":         doc.title,
-        "document_type": doc.document_type.value if doc.document_type else None,
-        "url":           doc.url,
-        "language":      str(doc.language) if doc.language else None,
-        "tags":          doc.tags,
-        "created_at":    doc.created_at.isoformat(),
-        "author":        doc.metadata.author,
-        "description":   doc.metadata.description,
-        **doc.metadata.extra,
-    }
+def to_langchain(doc: TextDocument) -> LC_Document:
+    
+    return LC_Document(
+        page_content=doc.text,
+        metadata={
+            "document_id": str(doc.id),
+            "source": doc.source,
 
-    if doc.chunks:
-        lc_docs = []
-        for chunk in doc.chunks:
-            lc_doc = chunk_to_lc(chunk)
-            lc_doc.metadata = {**base_metadata, **lc_doc.metadata}
-            lc_docs.append(lc_doc)
-        return lc_docs
-
-    return [LCDocument(id=str(doc.id), page_content=doc.text or "", metadata=base_metadata)]
-
-
-def from_langchain(lc_docs: Sequence[LCDocument], source: str = "") -> Document:
-    first_meta = lc_docs[0].metadata
-    all_meta   = [d.metadata for d in lc_docs]
-    doc_type   = _extract_document_type(first_meta, source)
-
-    return Document(
-        source        = source,
-        title         = _extract_title(lc_docs, first_meta, source),
-        document_type = doc_type,
-        url           = first_meta.get("url") or _data_source(first_meta).get("url"),
-        text          = "\n\n".join(d.page_content for d in lc_docs),
-        language      = _parse_language(first_meta),
-        tags          = _extract_tags(first_meta),
-        created_at    = _parse_datetime(first_meta, "date_created", "creation_date") or datetime.now(),
-        metadata=DocumentMetadata(
-            author      = first_meta.get("author") or None,
-            description = first_meta.get("description") or None,
-            created_at  = _parse_datetime(first_meta, "date_created", "creation_date"),
-            modified_at = _parse_datetime(first_meta, "last_modified", "date_modified"),
-            image       = _extract_image_metadata(first_meta) if doc_type == DocumentType.IMAGE else None,
-            audio       = _extract_audio_metadata(first_meta) if doc_type == DocumentType.AUDIO else None,
-            extra={
-                "page_count":    _count_pages(lc_docs),
-                "file_metadata": first_meta,
-                "page_metadata": all_meta,
-                **{k: v for k in _EMAIL_FIELDS if (v := first_meta.get(k))},
-            },
-        ),
-        chunks=[chunk_from_lc(doc) for doc in lc_docs],
+            "title": doc.metadata.title,
+            "author": doc.metadata.author,
+            "description": doc.metadata.description,
+            "format": (
+                doc.metadata.format.value
+                if doc.metadata.format
+                else None
+            ),
+            "created_at": doc.metadata.created_at,
+            "modified_at": doc.metadata.modified_at,
+            "extra": doc.metadata.extra,
+            
+            "mime_type": doc.info.mime_type,
+            "encoding": doc.info.encoding,
+            "language": (
+                doc.info.language.code
+                if doc.info.language
+                else None
+            ),
+        },
     )
 
-
+"""
 # --- helpers ---
 
 def _data_source(meta: dict) -> dict:
@@ -87,7 +59,6 @@ def _parse_language(meta: dict) -> Language | None:
 
 
 def _parse_datetime(meta: dict, *keys: str) -> datetime | None:
-    """Try each key in order, also checking data_source; return the first parseable value."""
     for key in keys:
         raw = meta.get(key) or _data_source(meta).get(key)
         if raw:
@@ -149,3 +120,5 @@ def _extract_audio_metadata(meta: dict) -> AudioMetadata | None:
         format           = meta.get("audio_format"),
         bitrate          = meta.get("bitrate"),
     )
+
+"""
