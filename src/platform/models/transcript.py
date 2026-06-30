@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from uuid import UUID, uuid4
 
-from models.language import Language
+from platform.models.enums.language import Language
 
 @dataclass(slots=True)
 class Transcript:
