@@ -25,28 +25,21 @@ def to_langchain(doc: TextFile) -> LC_Document:
     return LC_Document(
         page_content=doc.text,
         metadata={
-            "document_id": str(doc.id),
+            "document_id": doc.id,
             "source": doc.source,
 
             "title": doc.metadata.title,
             "author": doc.metadata.author,
             "description": doc.metadata.description,
-            "format": (
-                doc.metadata.format.value
-                if doc.metadata.format
-                else None
-            ),
+            "format": doc.metadata.format,
+
             "created_at": doc.metadata.created_at,
             "modified_at": doc.metadata.modified_at,
             "extra": doc.metadata.extra,
             
             "mime_type": doc.info.mime_type,
             "encoding": doc.info.encoding,
-            "language": (
-                doc.info.language.code
-                if doc.info.language
-                else None
-            ),
+            "language": doc.info.language,
         },
     )
 
@@ -77,7 +70,7 @@ def text_from_langchain(doc: LC_Document) -> TextFile:
     text = doc.page_content
 
     return TextFile(
-        id=uuid4(),
+        id=metadata.get("document_id") or uuid4(),
         source=metadata.get("source") or "",
         metadata=DocumentMetadata(
             title=metadata.get("title"),

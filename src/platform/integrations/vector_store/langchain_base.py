@@ -6,10 +6,8 @@ from langchain_core.documents import Document as LC_Document
 
 from integrations.vector_store.base import BaseVectorStore
 
-from bridges.langchain.document import to_langchain as doc_to_lc
-from bridges.langchain.chunk import from_langchain as chunk_from_lc
+from bridges.langchain.chunk import from_langchain as chunk_from_lc, from_langchain_many as chunks_from_lc, to_langchain as chunk_to_lc
 from models.chunk import Chunk
-from models.document import Document
 from models.score import Score
 
 
@@ -34,13 +32,12 @@ class LangChainVectorStore(BaseVectorStore):
 
     async def add(
         self,
-        documents: list[Document],
+        documents: list[Chunk],
     ) -> None:
         
         lc_docs: list[LC_Document] = [ 
-            doc 
+            chunk_to_lc(document) 
             for document in documents
-            for doc in doc_to_lc(document) 
         ]
 
         await asyncio.to_thread(
@@ -62,7 +59,7 @@ class LangChainVectorStore(BaseVectorStore):
             k,
         )
 
-        return [chunk_from_lc(doc) for doc in results]
+        return chunks_from_lc(results)
     
 
     async def search_with_scores(

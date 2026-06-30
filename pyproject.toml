@@ -25,7 +25,7 @@ dependencies = [
     "langchain-mistral",
     "langchain-ollama",
     "langchain-community",
-    "langchain-cohere"
+    "langchain-cohere",
 ]
 
 [project.optional-dependencies]

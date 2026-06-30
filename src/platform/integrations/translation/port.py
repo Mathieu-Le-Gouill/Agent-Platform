@@ -1,6 +1,6 @@
 from typing import Protocol
 from models.protocols.text_unit import TextUnit
-from platform.models.language import Language
+from platform.models.enums.language import Language
 
 
 class BaseTranslator(Protocol):

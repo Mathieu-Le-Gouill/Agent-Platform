@@ -1,6 +1,6 @@
 from platform.integrations.speech.port import BaseSpeechToText
 from platform.integrations.translation.port import BaseTranslator
-from models.language import Language
+from platform.models.enums.language import Language
 from models.transcript import Transcript
 
 class SpeechTranslationPipeline:

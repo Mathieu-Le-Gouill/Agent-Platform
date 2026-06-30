@@ -1,16 +1,17 @@
-from typing import Protocol, Sequence
+from typing import Protocol, Sequence, TypeVar
 
-from models.document import TextDocument
+from models.protocols.text_unit import TextUnit
 from models.chunk import Chunk
 
 from integrations.chunking.config import ChunkerConfig
 
+T_contra = TypeVar("T_contra", bound=TextUnit, contravariant=True)
 
-class BaseChunker(Protocol):
+class BaseChunker(Protocol[T_contra]):
 
     async def chunk(
         self,
-        documents: Sequence[TextDocument],
+        documents: Sequence[T_contra],
         config: ChunkerConfig | None = None,
     ) -> list[Chunk]:
         ...

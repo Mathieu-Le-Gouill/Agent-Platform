@@ -2,7 +2,6 @@ from abc import ABC
 from uuid import UUID
 
 from models.chunk import Chunk
-from models.document import Document
 from models.score import Score
 
 
@@ -10,7 +9,7 @@ class BaseVectorStore(ABC):
 
     async def add(
         self,
-        documents: list[Document],
+        documents: list[Chunk],
     ) -> None:
         ...
 

@@ -1,5 +1,5 @@
 from models.transcript import Transcript
-from models.language import Language
+from platform.models.enums.language import Language
 
 class WhisperCppClient:
 

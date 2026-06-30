@@ -3,7 +3,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 
 from integrations.llm.message import Message, SystemMessage, ToolCall, ToolMessage, ToolResult, UserMessage, AssistantMessage
-from models.language import Language
+from platform.models.enums.language import Language
 
 
 @dataclass(slots=True)

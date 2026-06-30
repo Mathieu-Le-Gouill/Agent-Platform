@@ -1,13 +1,14 @@
-from typing import Protocol, Sequence
+from typing import Protocol, Sequence, TypeVar
 from models.protocols.text_unit import TextUnit
 from integrations.reranking.config import RerankerConfig
 
+T = TypeVar("T", bound=TextUnit)
 
-class BaseReranker(Protocol):
+class BaseReranker(Protocol[T]):
 
     async def rerank(
         self,
-        items: Sequence[TextUnit],
+        items: Sequence[T],
         config: RerankerConfig | None = None,
-    ) -> Sequence[TextUnit]: 
+    ) -> Sequence[T]: 
         ...
