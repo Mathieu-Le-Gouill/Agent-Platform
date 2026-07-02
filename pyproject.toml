@@ -7,7 +7,7 @@ name = "agent_platform"
 version = "0.1.0"
 description = "A project to build agents with LLMs and graph-based reasoning."
 readme = "README.md"
-requires-python = ">=3.10"
+requires-python = ">=3.11,<3.12"
 
 authors = [
     { name = "Mathieu Le Gouill", email = "mathieulegouill@outlook.com" }
@@ -22,19 +22,32 @@ dependencies = [
     "langchain-chroma",
     "langchain-openai",
     "langchain-anthropic",
-    "langchain-mistral",
+    "langchain-mistralai",
     "langchain-ollama",
     "langchain-community",
     "langchain-cohere",
+    "langchain-qdrant",
+    "pytesseract",
+    "boto3",
+    "google-cloud-vision",
+    "silero-vad",
+    "webrtcvad",
 ]
 
 [project.optional-dependencies]
 dev = [
     "pytest",
+    "pytest-asyncio",
     "ruff",
     "mypy",
     "import-linter",
 ]
+
+[tool.setuptools]
+package-dir = {"" = "src"}
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.ruff]
 line-length = 88
@@ -43,4 +56,12 @@ line-length = 88
 asyncio_mode = "auto"
 
 [project.scripts]
-platform = "platform.main:main"
+platform = "agent_platform.main:main"
+
+[tool.poetry]
+name = "agent_platform"
+version = "0.1.0"
+
+packages = [
+    { include = "agent_platform" }
+]
