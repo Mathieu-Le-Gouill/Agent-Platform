@@ -5,14 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "agent_platform"
 version = "0.1.0"
-description = "A project to build agents with LLMs and graph-based reasoning."
-readme = "README.md"
 requires-python = ">=3.11,<3.12"
-
-authors = [
-    { name = "Mathieu Le Gouill", email = "mathieulegouill@outlook.com" }
-]
-license = "MIT"
 
 dependencies = [
     "langchain",
@@ -32,6 +25,7 @@ dependencies = [
     "google-cloud-vision",
     "silero-vad",
     "webrtcvad",
+    "ten-vad @ git+https://github.com/TEN-framework/ten-vad.git@22a3bcd4509d0faaa8eef4881e8af5f39c178950"
 ]
 
 [project.optional-dependencies]
@@ -57,11 +51,3 @@ asyncio_mode = "auto"
 
 [project.scripts]
 platform = "agent_platform.main:main"
-
-[tool.poetry]
-name = "agent_platform"
-version = "0.1.0"
-
-packages = [
-    { include = "agent_platform" }
-]
