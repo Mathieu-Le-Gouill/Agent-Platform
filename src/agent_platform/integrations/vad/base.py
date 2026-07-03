@@ -42,3 +42,17 @@ class BaseVAD(ABC, Generic[T]):
         config: T,
     ) -> bool:
         ...
+
+    
+    def _validate_chunk(
+        self,
+        chunk: AudioChunk,
+        config_sample_rate: int,
+    ) -> None:
+        
+        self.requirements.validate(chunk)
+        
+        if chunk.sample_rate != config_sample_rate:
+            raise ValueError(
+                f"configuration sample rate differ from chunk sample rate, got {chunk.sample_rate}, expected {config_sample_rate}"
+            )

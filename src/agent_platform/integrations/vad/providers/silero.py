@@ -5,7 +5,6 @@ from typing import AsyncIterator, Sequence
 from collections import deque
 
 import torch
-import numpy as np
 
 from agent_platform.integrations.vad.base import BaseVAD
 from agent_platform.integrations.vad.configuration import SileroVadConfig
@@ -13,6 +12,7 @@ from agent_platform.integrations.vad.requirements import AudioRequirements
 from agent_platform.models.chunk import AudioChunk
 from agent_platform.models.span import SampleSpan
 from agent_platform.audio.io import AudioIO
+from agent_platform.models.enums.dtype import DataType
 
 
 
@@ -27,7 +27,7 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
         return AudioRequirements(
             sample_rates=(8000, 16000),
             channels=1,
-            dtype=np.float32,
+            dtype=DataType.FLOAT32,
             normalized=True,
         )
     
@@ -46,10 +46,7 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
         chunks = []
 
         for chunk in audio_sequence:
-            if chunk.sample_rate != config.sample_rate:
-                raise ValueError(
-                    f"Expected {config.sample_rate}, got {chunk.sample_rate}"
-                )
+            self._validate_chunk(chunk, config.sample_rate)
 
             chunks.append(AudioIO.to_tensor(chunk))
 

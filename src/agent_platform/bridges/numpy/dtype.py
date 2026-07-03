@@ -1,35 +1,35 @@
-from agent_platform.models.enums.dtype import AudioSampleType
+from agent_platform.models.enums.dtype import DataType
 
 
-def to_numpy_dtype(sample_type: AudioSampleType):
+def to_numpy_dtype(sample_type: DataType):
     match sample_type:
-        case AudioSampleType.INT16:
+        case DataType.INT16:
             import numpy as np
             return np.int16
-        case AudioSampleType.FLOAT32:
+        case DataType.FLOAT32:
             import numpy as np
             return np.float32
-        case AudioSampleType.INT8:
+        case DataType.INT8:
             import numpy as np
             return np.int8
-        case AudioSampleType.UINT8:
+        case DataType.UINT8:
             import numpy as np
             return np.uint8
         
 
-def from_numpy_dtype(dtype) -> AudioSampleType:
+def from_numpy_dtype(dtype) -> DataType:
     import numpy as np
 
     match dtype:
         case np.int16:
-            return AudioSampleType.INT16
+            return DataType.INT16
         case np.int8:
-            return AudioSampleType.INT8
+            return DataType.INT8
         case np.uint8:
-            return AudioSampleType.UINT8
+            return DataType.UINT8
         case np.float32:
-            return AudioSampleType.FLOAT32
+            return DataType.FLOAT32
         case np.float64:
-            return AudioSampleType.FLOAT32
+            return DataType.FLOAT32
         case _:
             raise ValueError(f"Unsupported numpy dtype: {dtype}")

@@ -1,6 +1,5 @@
 from typing import Sequence, AsyncIterator
 import webrtcvad
-import numpy as np
 
 from agent_platform.integrations.vad.framebased import FrameBasedVAD
 from agent_platform.integrations.vad.configuration import WebrtcVadConfig
@@ -8,6 +7,7 @@ from agent_platform.models.chunk import AudioChunk
 from agent_platform.models.span import SampleSpan
 from agent_platform.integrations.vad.state import VADState 
 from agent_platform.integrations.vad.requirements import AudioRequirements
+from agent_platform.models.enums.dtype import DataType
 
 from audio.io import AudioIO
 
@@ -23,7 +23,7 @@ class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
         return AudioRequirements(
             sample_rates=(8000, 16000, 32000, 48000),
             channels=1,
-            dtype=np.int16,
+            dtype=DataType.INT16,
             normalized=False,
         )
     

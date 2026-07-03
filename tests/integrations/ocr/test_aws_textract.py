@@ -1,5 +1,5 @@
 from unittest.mock import MagicMock, patch
-from uuid import uuid4
+from agent_platform.utils.uuid import new_uuid
 
 import pytest
 
@@ -18,7 +18,7 @@ FAKE_TEXTRACT_RESPONSE = {
 @pytest.mark.asyncio
 async def test_extract_returns_chunks_from_line_blocks():
 
-    document_id = uuid4()
+    document_id = new_uuid()
 
     with patch("integrations.ocr.aws_textract.boto3.client") as mock_boto:
         mock_client = MagicMock()

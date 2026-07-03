@@ -9,25 +9,8 @@ from agent_platform.integrations.vad.state import VADState
 
 T = TypeVar("T", bound="VADConfig")
     
-class FrameBasedVAD(BaseVAD[T]):
-
-    def _validate_chunk(
-        self,
-        chunk: AudioChunk,
-        sample_rate: int,
-    ) -> None:
-        
-        if chunk.sample_rate != sample_rate:
-            raise ValueError(
-                f"Sample rate must be {sample_rate}, got {chunk.sample_rate}"
-            )
-        if chunk.channels != 1:
-            raise ValueError(
-                f"Audio must be mono channel, got {chunk.channels} channels"
-            )
-        
+class FrameBasedVAD(BaseVAD[T]):      
     
-
     def _on_speech(
         self,
         state: VADState,

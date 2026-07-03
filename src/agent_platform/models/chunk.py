@@ -6,7 +6,7 @@ from typing import Any
 from uuid import UUID
 
 from agent_platform.models.enums.file_format import VideoFormat, DocumentFormat, AudioFormat
-from agent_platform.models.enums.dtype import AudioSampleType
+from agent_platform.models.enums.dtype import DataType
 
 
 @dataclass(slots=True, frozen=True, kw_only=True)
@@ -31,7 +31,7 @@ class AudioChunk(Chunk):
     sample_rate: int
     start: int # start sample id
     end: int # end sample id
-    dtype: AudioSampleType # int16, float32
+    dtype: DataType # int16, float32
     channels: int = 1
     format: AudioFormat | None = None # .wav, .mp3
 

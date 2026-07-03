@@ -7,6 +7,7 @@ import numpy as np
 
 from agent_platform.integrations.vad.configuration import VADConfig
 from agent_platform.models.chunk import AudioChunk
+from agent_platform.models.enums.dtype import DataType
 
 
 T = TypeVar("T", bound="VADConfig")
@@ -17,7 +18,7 @@ class AudioRequirements:
 
     sample_rates: tuple[int, ...]
     channels: int
-    dtype: type[np.generic]
+    dtype: DataType
     normalized: bool
 
     def validate(self, chunk: AudioChunk) -> None:

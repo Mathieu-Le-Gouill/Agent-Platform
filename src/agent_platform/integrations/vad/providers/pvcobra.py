@@ -3,7 +3,6 @@ from __future__ import annotations
 import pvcobra
 from typing import AsyncIterator, Sequence
 from pydantic import SecretStr
-import numpy as np
 
 from agent_platform.integrations.vad.framebased import FrameBasedVAD
 from agent_platform.integrations.vad.configuration import PvcobraVadConfig
@@ -11,6 +10,7 @@ from agent_platform.models.chunk import AudioChunk
 from agent_platform.models.span import SampleSpan
 from agent_platform.integrations.vad.state import VADState
 from agent_platform.integrations.vad.requirements import AudioRequirements
+from agent_platform.models.enums.dtype import DataType
 
 
 class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
@@ -18,7 +18,7 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
     def __init__(
         self, 
         acess_key: SecretStr,
-        device: str | None, 
+        device: str | None = None, 
         library_path: str | None = None
     ) -> None:
 
@@ -30,7 +30,7 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
         return AudioRequirements(
             sample_rates=(16000,),
             channels=1,
-            dtype=np.int16,
+            dtype=DataType.INT16,
             normalized=False,
         )
 

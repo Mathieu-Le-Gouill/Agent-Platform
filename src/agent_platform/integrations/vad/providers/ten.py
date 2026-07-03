@@ -3,8 +3,6 @@ from __future__ import annotations
 from ten_vad import TenVad
 from typing import AsyncIterator, Sequence
 
-import numpy as np
-
 from agent_platform.integrations.vad.framebased import FrameBasedVAD
 from agent_platform.integrations.vad.configuration import TenVadConfig
 from agent_platform.models.chunk import AudioChunk
@@ -12,6 +10,7 @@ from agent_platform.models.span import SampleSpan
 from agent_platform.integrations.vad.state import VADState
 from agent_platform.audio.io import AudioIO
 from agent_platform.integrations.vad.requirements import AudioRequirements
+from agent_platform.models.enums.dtype import DataType
 
 
 class TenVAD(FrameBasedVAD[TenVadConfig]):
@@ -21,7 +20,7 @@ class TenVAD(FrameBasedVAD[TenVadConfig]):
         return AudioRequirements(
             sample_rates=(16000,),
             channels=1,
-            dtype=np.int16,
+            dtype=DataType.INT16,
             normalized=True,
         )
     
