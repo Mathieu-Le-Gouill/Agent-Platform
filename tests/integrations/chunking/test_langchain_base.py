@@ -1,0 +1,256 @@
+from datetime import datetime
+from unittest.mock import MagicMock, patch
+from uuid import UUID, uuid4
+
+import pytest
+
+pytest.importorskip("langchain_core")
+
+from langchain_core.documents import Document as LC_Document
+
+from agent_platform.integrations.chunking.langchain_base import (
+    _doc_to_lc,
+    _lc_to_chunks,
+    LangChainChunker,
+)
+from agent_platform.integrations.chunking.config import ChunkerConfig
+from agent_platform.models.chunk import TextChunk
+from agent_platform.models.document import TextDocument, DocumentMetadata
+from agent_platform.models.enums import DocumentFormat, Language
+
+
+def test_doc_to_lc_maps_all_fields():
+    doc_id = uuid4()
+    created = datetime(2025, 1, 1)
+    modified = datetime(2025, 6, 1)
+    doc = TextDocument(
+        id=doc_id,
+        text="Hello world",
+        source="test.txt",
+        format=DocumentFormat.TXT,
+        language=Language.EN,
+        encoding="utf-8",
+        metadata=DocumentMetadata(
+            title="Test",
+            author="me",
+            description="desc",
+            created_at=created,
+            modified_at=modified,
+            extra={"key": "val"},
+        ),
+    )
+    lc = _doc_to_lc(doc)
+    assert isinstance(lc, LC_Document)
+    assert lc.page_content == "Hello world"
+    assert lc.metadata["document_id"] == str(doc_id)
+    assert lc.metadata["source"] == "test.txt"
+    assert lc.metadata["title"] == "Test"
+    assert lc.metadata["author"] == "me"
+    assert lc.metadata["description"] == "desc"
+    assert lc.metadata["format"] == "txt"
+    assert lc.metadata["created_at"] == created
+    assert lc.metadata["modified_at"] == modified
+    assert lc.metadata["extra"] == {"key": "val"}
+    assert lc.metadata["encoding"] == "utf-8"
+    assert lc.metadata["language"] == "en"
+
+
+def test_doc_to_lc_none_language():
+    doc = TextDocument(text="hello", language=None)
+    lc = _doc_to_lc(doc)
+    assert lc.metadata["format"] == "unknown"
+    assert lc.metadata["language"] is None
+
+
+def test_doc_to_lc_default_metadata():
+    doc = TextDocument(text="hello")
+    lc = _doc_to_lc(doc)
+    assert lc.metadata["title"] is None
+    assert lc.metadata["author"] is None
+    assert lc.metadata["description"] is None
+    assert lc.metadata["created_at"] is None
+    assert lc.metadata["modified_at"] is None
+    assert lc.metadata["extra"] == {}
+    assert lc.metadata["encoding"] is None
+
+
+def test_lc_to_chunks_basic():
+    lc_docs = [
+        LC_Document(
+            page_content="chunk one",
+            metadata={"index": 0, "format": "txt"},
+        ),
+        LC_Document(
+            page_content="chunk two",
+            metadata={"index": 1, "format": "txt"},
+        ),
+    ]
+    chunks = _lc_to_chunks(lc_docs)
+    assert len(chunks) == 2
+    assert all(isinstance(c, TextChunk) for c in chunks)
+    assert chunks[0].text == "chunk one"
+    assert chunks[0].index == 0
+    assert chunks[1].text == "chunk two"
+    assert chunks[1].index == 1
+
+
+def test_lc_to_chunks_uses_chunk_id_from_metadata():
+    expected = uuid4()
+    lc_docs = [
+        LC_Document(
+            page_content="text",
+            metadata={"chunk_id": str(expected), "format": "txt"},
+        ),
+    ]
+    chunks = _lc_to_chunks(lc_docs)
+    assert chunks[0].id == expected
+
+
+def test_lc_to_chunks_uses_document_id_from_metadata():
+    expected = uuid4()
+    lc_docs = [
+        LC_Document(
+            page_content="text",
+            metadata={"document_id": str(expected), "format": "txt"},
+        ),
+    ]
+    chunks = _lc_to_chunks(lc_docs)
+    assert chunks[0].document_id == expected
+
+
+def test_lc_to_chunks_missing_index_defaults_to_zero():
+    lc_docs = [LC_Document(page_content="text", metadata={"format": "txt"})]
+    chunks = _lc_to_chunks(lc_docs)
+    assert chunks[0].index == 0
+
+
+def test_lc_to_chunks_start_char_and_end_char():
+    lc_docs = [
+        LC_Document(
+            page_content="hello there",
+            metadata={"start_char": 10, "format": "txt"},
+        ),
+    ]
+    chunks = _lc_to_chunks(lc_docs)
+    assert chunks[0].start_char == 10
+    assert chunks[0].end_char == 21
+
+
+def test_lc_to_chunks_start_char_none_leaves_end_char_none():
+    lc_docs = [LC_Document(page_content="text", metadata={"format": "txt"})]
+    chunks = _lc_to_chunks(lc_docs)
+    assert chunks[0].start_char is None
+    assert chunks[0].end_char is None
+
+
+def test_lc_to_chunks_format_from_metadata():
+    lc_docs = [
+        LC_Document(
+            page_content="text",
+            metadata={"format": "markdown", "extra": {}},
+        ),
+    ]
+    chunks = _lc_to_chunks(lc_docs)
+    assert chunks[0].format == DocumentFormat.MARKDOWN
+
+
+def test_lc_to_chunks_language_from_metadata():
+    lc_docs = [
+        LC_Document(
+            page_content="text",
+            metadata={"format": "txt", "language": "fr", "extra": {}},
+        ),
+    ]
+    chunks = _lc_to_chunks(lc_docs)
+    assert chunks[0].metadata["language"] == Language.FR
+
+
+def test_lc_to_chunks_handles_extra_metadata_fallback():
+    lc_docs = [LC_Document(page_content="text", metadata={"format": "txt"})]
+    chunks = _lc_to_chunks(lc_docs)
+    assert chunks[0].metadata["extra"] == {}
+
+
+def test_lc_to_chunks_uses_start_index_alias():
+    lc_docs = [
+        LC_Document(
+            page_content="text",
+            metadata={"start_index": 5, "format": "txt"},
+        ),
+    ]
+    chunks = _lc_to_chunks(lc_docs)
+    assert chunks[0].start_char == 5
+
+
+class _TestChunker(LangChainChunker):
+    def _splitter(self, config=None):
+        return MagicMock()
+
+
+class TestLangChainChunker:
+    async def test_chunk_returns_text_chunks(self):
+        mock_splitter = MagicMock()
+        mock_splitter.split_documents.return_value = [
+            LC_Document(page_content="chunk1", metadata={"format": "txt"}),
+            LC_Document(page_content="chunk2", metadata={"format": "txt"}),
+        ]
+
+        chunker = _TestChunker()
+        with patch.object(chunker, "_splitter", return_value=mock_splitter):
+            docs = [TextDocument(text="full text")]
+            result = await chunker.chunk(docs)
+
+        assert len(result) == 2
+        assert all(isinstance(c, TextChunk) for c in result)
+        assert result[0].text == "chunk1"
+        assert result[1].text == "chunk2"
+
+    async def test_chunk_passes_config_to_splitter(self):
+        mock_splitter = MagicMock()
+        mock_splitter.split_documents.return_value = [
+            LC_Document(page_content="c", metadata={"format": "txt"}),
+        ]
+
+        config = ChunkerConfig(chunk_size=256, chunk_overlap=32)
+
+        chunker = _TestChunker()
+        with patch.object(
+            chunker, "_splitter", return_value=mock_splitter
+        ) as mock_method:
+            docs = [TextDocument(text="some text")]
+            await chunker.chunk(docs, config=config)
+
+        mock_method.assert_called_once_with(config)
+
+    async def test_chunk_empty_documents(self):
+        mock_splitter = MagicMock()
+        mock_splitter.split_documents.return_value = []
+
+        chunker = _TestChunker()
+        with patch.object(chunker, "_splitter", return_value=mock_splitter):
+            result = await chunker.chunk([])
+
+        assert result == []
+
+    async def test_chunk_return_type(self):
+        mock_splitter = MagicMock()
+        mock_splitter.split_documents.return_value = []
+
+        chunker = _TestChunker()
+        with patch.object(chunker, "_splitter", return_value=mock_splitter):
+            result = await chunker.chunk([])
+
+        assert isinstance(result, list)
+
+    async def test_chunk_with_config_none(self):
+        mock_splitter = MagicMock()
+        mock_splitter.split_documents.return_value = [
+            LC_Document(page_content="data", metadata={"format": "txt"}),
+        ]
+
+        chunker = _TestChunker()
+        with patch.object(chunker, "_splitter", return_value=mock_splitter):
+            docs = [TextDocument(text="data")]
+            result = await chunker.chunk(docs, config=None)
+
+        assert len(result) == 1

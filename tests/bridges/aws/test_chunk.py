@@ -2,11 +2,10 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.bridges.aws.chunk import from_textract
+from agent_platform.integrations.ocr.providers.aws_textract import _from_textract
 
 
 def test_from_textract_only_keeps_line_blocks():
-
     document_id = uuid4()
 
     response = {
@@ -26,9 +25,9 @@ def test_from_textract_only_keeps_line_blocks():
         ]
     }
 
-    chunks = from_textract(response, document_id=document_id, min_confidence=0.5)
+    chunks = _from_textract(response, document_id=document_id, min_confidence=50.0)
 
     assert len(chunks) == 1
     assert chunks[0].text == "Invoice #123"
     assert chunks[0].document_id == document_id
-    assert chunks[0].metadata.extra["confidence"] == pytest.approx( 0.992)
+    assert chunks[0].metadata["confidence"] == pytest.approx(99.2)

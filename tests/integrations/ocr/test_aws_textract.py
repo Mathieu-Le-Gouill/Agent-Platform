@@ -1,9 +1,12 @@
 from unittest.mock import MagicMock, patch
-from agent_platform.utils.uuid import new_uuid
+from uuid import uuid4
 
 import pytest
 
-from agent_platform.integrations.ocr.providers.aws_textract import AWSTextractOCR
+from agent_platform.integrations.ocr.providers.aws_textract import (
+    AWSTextractOCR,
+    _from_textract,
+)
 from agent_platform.integrations.ocr.config import AWSTextractConfig
 
 
@@ -18,9 +21,11 @@ FAKE_TEXTRACT_RESPONSE = {
 @pytest.mark.asyncio
 async def test_extract_returns_chunks_from_line_blocks():
 
-    document_id = new_uuid()
+    document_id = uuid4()
 
-    with patch("integrations.ocr.aws_textract.boto3.client") as mock_boto:
+    with patch(
+        "agent_platform.integrations.ocr.providers.aws_textract.boto3.client"
+    ) as mock_boto:
         mock_client = MagicMock()
         mock_client.detect_document_text.return_value = FAKE_TEXTRACT_RESPONSE
         mock_boto.return_value = mock_client
@@ -35,3 +40,13 @@ async def test_extract_returns_chunks_from_line_blocks():
     mock_client.detect_document_text.assert_called_once_with(
         Document={"Bytes": b"fake-bytes"}
     )
+
+
+def test_from_textract_only_keeps_line_blocks():
+    document_id = uuid4()
+    chunks = _from_textract(
+        FAKE_TEXTRACT_RESPONSE, document_id=document_id, min_confidence=0.5
+    )
+    assert len(chunks) == 1
+    assert chunks[0].text == "Invoice #123"
+    assert chunks[0].document_id == document_id
