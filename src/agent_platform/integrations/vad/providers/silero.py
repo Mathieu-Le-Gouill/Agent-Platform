@@ -11,8 +11,8 @@ from agent_platform.integrations.vad.configuration import SileroVadConfig
 from agent_platform.integrations.vad.requirements import AudioRequirements
 from agent_platform.models.chunk import AudioChunk
 from agent_platform.models.span import SampleSpan
+from agent_platform.models.enums import DataType
 from agent_platform.audio.io import AudioIO
-from agent_platform.models.enums.dtype import DataType
 
 
 

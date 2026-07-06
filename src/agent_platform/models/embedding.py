@@ -1,28 +1,32 @@
 from __future__ import annotations
 
-from dataclasses import dataclass, field
 import math
-from uuid import UUID
+from uuid import UUID, uuid4
+
+from pydantic import BaseModel, Field, model_validator
 
 
-@dataclass(slots=True)
-class Embedding:
+class Embedding(BaseModel, frozen=True):
     vector: tuple[float, ...]
-    id: UUID
+    id: UUID = Field(default_factory=uuid4)
     model: str = ""
-    dimensions: int = field(init=False)
 
-    def __post_init__(self):
-        object.__setattr__(self, "dimensions", len(self.vector))
-        if self.dimensions == 0:
+    @model_validator(mode="after")
+    def _check_not_empty(self) -> "Embedding":
+        if len(self.vector) == 0:
             raise ValueError("Embedding vector cannot be empty")
+        return self
 
     @classmethod
-    def from_list(cls, vector: list[float], model: str, id: UUID) -> Embedding:
-        return cls(vector=tuple(vector), model=model, id=id)
+    def from_list(cls, vector: list[float], model: str = "", id: UUID | None = None) -> "Embedding":
+        return cls(vector=tuple(vector), model=model, id=id or uuid4())
 
     def to_list(self) -> list[float]:
         return list(self.vector)
+
+    @property
+    def dimensions(self) -> int:
+        return len(self.vector)
 
     @property
     def norm(self) -> float:

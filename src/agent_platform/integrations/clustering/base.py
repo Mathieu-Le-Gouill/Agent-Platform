@@ -1,11 +1,21 @@
 from __future__ import annotations
-from abc import ABC, abstractmethod
-from agent_platform.models.protocols.text_unit import TextUnit
-from agent_platform.models.cluster import Cluster
 
-    
-class ClusteringAlgorithm(ABC):
+from abc import ABC, abstractmethod
+from typing import Generic, TypeVar
+
+from agent_platform.models.chunk import TextChunk
+
+from .config import ClusteringConfig
+from .response import ClusterResult
+
+ClusteringConfigT = TypeVar("ClusteringConfigT", bound=ClusteringConfig)
+
+
+class ClusteringAlgorithm(ABC, Generic[ClusteringConfigT]):
 
     @abstractmethod
-    async def clusterize(self, items: list[TextUnit]) -> list[Cluster]: 
-        ...
+    async def clusterize(
+        self,
+        items: list[TextChunk],
+        config: ClusteringConfigT | None = None,
+    ) -> ClusterResult: ...

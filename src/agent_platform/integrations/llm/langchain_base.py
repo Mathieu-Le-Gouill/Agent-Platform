@@ -1,29 +1,25 @@
 from abc import abstractmethod
 from typing import AsyncIterator
 
-from agent_platform.integrations.llm.prompt import Prompt
+from langchain_core.language_models.chat_models import BaseChatModel
+from langchain_core.messages import (
+    BaseMessage as LCBaseMessage, HumanMessage, SystemMessage as LCSystemMessage,
+    AIMessage, ToolMessage as LCToolMessage,
+)
+
 from agent_platform.integrations.llm.config import GenerationConfig
 from agent_platform.integrations.llm.response import LLMResponse, StreamChunk, FinishReason
 from agent_platform.models.token import TokenUsage
-
+from agent_platform.models.message import (
+    AssistantMessage, SystemMessage, UserMessage, ToolMessage, ToolCall, Prompt
+)
 from agent_platform.integrations.llm.base import BaseLLMProvider
-from agent_platform.bridges.langchain.prompt import to_langchain
-from agent_platform.bridges.langchain.response import from_langchain
-from langchain_core.language_models.chat_models import BaseChatModel
 
 
-class LangChainLLMProvider(BaseLLMProvider):
+class LangChainLLMProvider(BaseLLMProvider[GenerationConfig]):
 
     @abstractmethod
     def _client(self, model: str, config: GenerationConfig | None) -> BaseChatModel:
-        ...
-
-    @abstractmethod
-    def _to_prompt(self, prompt: Prompt):
-        ...
-
-    @abstractmethod
-    def _from_response(self, response, model: str) -> LLMResponse:
         ...
 
     async def generate(
@@ -32,40 +28,32 @@ class LangChainLLMProvider(BaseLLMProvider):
         model: str,
         config: GenerationConfig | None = None,
     ) -> LLMResponse:
-
         lc = self._client(model, config)
-        response = await lc.ainvoke(to_langchain(prompt))
-
-        return from_langchain(response, model)
-    
+        response = await lc.ainvoke(_to_langchain(prompt))
+        return _from_langchain(response, model)
 
     async def stream(
         self,
         prompt: Prompt,
         model: str,
-        config: GenerationConfig | None = None
+        config: GenerationConfig | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        
         lc = self._client(model, config)
 
-        async for chunk in lc.astream(to_langchain(prompt)):
+        async for chunk in lc.astream(_to_langchain(prompt)):
             content = chunk.content
-
             if isinstance(content, str):
                 if content:
                     yield StreamChunk(delta=content)
-
             elif isinstance(content, list):
                 for item in content:
-
                     if isinstance(item, str) and item:
                         yield StreamChunk(delta=item)
-
                     elif isinstance(item, dict):
                         text = item.get("text", "")
                         if isinstance(text, str) and text:
                             yield StreamChunk(delta=text)
-            
+
             usage = chunk.usage_metadata
             if usage:
                 yield StreamChunk(
@@ -74,7 +62,58 @@ class LangChainLLMProvider(BaseLLMProvider):
                     usage=TokenUsage(
                         input_tokens=usage.get("input_tokens", 0),
                         output_tokens=usage.get("output_tokens", 0),
-                    )
+                    ),
                 )
 
         yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
+
+
+# --- Mappers ---
+
+def _to_langchain(prompt: Prompt) -> list[LCBaseMessage]:
+    result = []
+    for m in prompt.messages:
+        match m:
+            case SystemMessage():
+                result.append(LCSystemMessage(content=m.content))
+            case UserMessage():
+                result.append(HumanMessage(content=m.content))
+            case AssistantMessage():
+                result.append(AIMessage(content=m.content))
+            case ToolMessage():
+                result.append(LCToolMessage(
+                    content=m.result.content,
+                    tool_call_id=m.result.tool_call_id,
+                ))
+    return result
+
+
+def _from_langchain(response: AIMessage, model: str) -> LLMResponse:
+    tool_calls = [
+        ToolCall(
+            id=tc["id"] or "",
+            name=tc["name"],
+            arguments=tc["args"],
+        )
+        for tc in (response.tool_calls or [])
+    ]
+
+    usage_meta = response.usage_metadata or {}
+
+    if isinstance(response.content, str):
+        content = response.content
+    else:
+        content = "".join(
+            part if isinstance(part, str) else part.get("text", "")
+            for part in response.content
+        )
+
+    return LLMResponse(
+        message=AssistantMessage(content=content, tool_calls=tool_calls),
+        usage=TokenUsage(
+            input_tokens=usage_meta.get("input_tokens", 0),
+            output_tokens=usage_meta.get("output_tokens", 0),
+        ),
+        model=model,
+        finish_reason=FinishReason.STOP,
+    )

@@ -3,8 +3,9 @@ from __future__ import annotations
 from dataclasses import dataclass
 from enum import Enum
 
-from agent_platform.integrations.llm.message import AssistantMessage
+from agent_platform.models.message import AssistantMessage
 from agent_platform.models.token import TokenUsage
+
 
 class FinishReason(str, Enum):
     STOP = "stop"
@@ -30,4 +31,3 @@ class StreamChunk:
     delta: str
     finish_reason: FinishReason | None = None
     usage: TokenUsage | None = None
-    #tool_call_delta: ToolCallDelta | None = None

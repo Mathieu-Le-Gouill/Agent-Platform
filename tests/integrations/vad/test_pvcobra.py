@@ -4,10 +4,10 @@ from agent_platform.integrations.vad.providers.pvcobra import (
     PvcobraVadConfig,
     AudioRequirements,
 )
-from agent_platform.utils.uuid import new_uuid
+from uuid import uuid4
 from pydantic import SecretStr
 from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.enums.dtype import DataType
+from agent_platform.models.enums import DataType
 
 
 def test_requirements():
@@ -20,7 +20,7 @@ def mock_requirements_validate(sample_rate: int, dtype: DataType, channels: int)
     vad = PvcobraVAD(SecretStr("mock_acess_key"))
 
     mock_chunk = AudioChunk(
-            id=new_uuid(),
+            id=uuid4(),
             data=bytes(),
             sample_rate=sample_rate,
             start=0,

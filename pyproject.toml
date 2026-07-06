@@ -8,24 +8,54 @@ version = "0.1.0"
 requires-python = ">=3.11,<3.12"
 
 dependencies = [
+    # --- Core ---
     "langchain",
     "langgraph",
     "langsmith",
     "soundfile",
-    "langchain-chroma",
+
+    # --- LLM ---
     "langchain-openai",
     "langchain-anthropic",
     "langchain-mistralai",
     "langchain-ollama",
     "langchain-community",
+
+    # --- Embeddings / Vector Stores / Reranking ---
+    "langchain-chroma",
     "langchain-cohere",
     "langchain-qdrant",
+
+    # --- OCR ---
     "pytesseract",
     "boto3",
     "google-cloud-vision",
+
+    # --- Speech-to-Text ---
+    "numpy",
+    "whisperx",
+    "deepgram-sdk",
+
+    # --- Translation ---
+    "deepl",
+    "googletrans==4.0.0rc1",
+
+    # --- VAD ---
     "silero-vad",
     "webrtcvad",
-    "ten-vad @ git+https://github.com/TEN-framework/ten-vad.git@22a3bcd4509d0faaa8eef4881e8af5f39c178950"
+    "ten-vad @ git+https://github.com/TEN-framework/ten-vad.git@22a3bcd4509d0faaa8eef4881e8af5f39c178950",
+
+    # --- Classification ---
+    "transformers",
+
+    # --- Clustering ---
+    "hdbscan",
+    "scikit-learn",
+
+    # --- Image Generation ---
+    "diffusers[torch]",
+    "accelerate",
+    "httpx",
 ]
 
 [project.optional-dependencies]

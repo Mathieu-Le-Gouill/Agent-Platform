@@ -10,7 +10,7 @@ from agent_platform.models.chunk import AudioChunk
 from agent_platform.models.span import SampleSpan
 from agent_platform.integrations.vad.state import VADState
 from agent_platform.integrations.vad.requirements import AudioRequirements
-from agent_platform.models.enums.dtype import DataType
+from agent_platform.models.enums import DataType
 
 
 class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):

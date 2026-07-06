@@ -1,6 +1,6 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from agent_platform.models.document import Document
-from agent_platform.models.chunk import Chunk, ChunkMetadata
+from agent_platform.models.document import TextDocument
+from agent_platform.models.chunk import TextChunk
 
 
 _splitter = RecursiveCharacterTextSplitter(
@@ -10,27 +10,23 @@ _splitter = RecursiveCharacterTextSplitter(
 )
 
 
-def chunk_document(doc: Document) -> list[Chunk]:
-    if not doc.text:
+def chunk_document(doc: TextDocument) -> list[TextChunk]:
+    text = doc.text if hasattr(doc, "text") and isinstance(doc.text, str) else ""
+    if not text:
         return []
 
-    pieces = _splitter.split_text(doc.text)
+    pieces = _splitter.split_text(text)
 
     return [
-        Chunk(
+        TextChunk(
             document_id=doc.id,
             text=piece,
             index=i,
-            start_char=None,    # splitter doesn't expose offsets directly
-            metadata=ChunkMetadata(
-                source=doc.source,
-                language=doc.language,
-                title=doc.title,
-                document_type=doc.document_type,
-            ),
+            metadata={
+                "source": doc.source,
+                "language": doc.language.value if hasattr(doc, "language") and doc.language else None,
+                "title": doc.metadata.title,
+            },
         )
         for i, piece in enumerate(pieces)
     ]
-
-
-# TODO langchain_experimental.text_splitter.SemanticChunker

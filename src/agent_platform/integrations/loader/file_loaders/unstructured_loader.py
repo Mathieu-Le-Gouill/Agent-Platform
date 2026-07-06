@@ -7,7 +7,7 @@ from langchain_community.document_loaders import (
 )
 from langchain_community.document_loaders.unstructured import UnstructuredFileLoader as LC_UnstructuredFileLoader
 from agent_platform.integrations.loader.unstructured_base import UnstructuredBaseLoader
-from agent_platform.models.enums.file_format import FileFormat
+from agent_platform.models.enums import FileFormat
 
 
 class UnstructuredFileLoader(UnstructuredBaseLoader):

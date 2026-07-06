@@ -10,7 +10,7 @@ from agent_platform.models.span import SampleSpan
 from agent_platform.integrations.vad.state import VADState
 from agent_platform.audio.io import AudioIO
 from agent_platform.integrations.vad.requirements import AudioRequirements
-from agent_platform.models.enums.dtype import DataType
+from agent_platform.models.enums import DataType
 
 
 class TenVAD(FrameBasedVAD[TenVadConfig]):

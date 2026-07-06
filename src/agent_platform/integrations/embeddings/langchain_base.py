@@ -6,8 +6,8 @@ from langchain_core.embeddings import Embeddings
 from agent_platform.integrations.embeddings.response import EmbeddingResponse
 from agent_platform.integrations.embeddings.base import BaseEmbeddingProvider
 from agent_platform.models.embedding import Embedding
-from agent_platform.models.protocols.text_unit import TextUnit
 from agent_platform.models.token import TokenUsage
+from agent_platform.models.chunk import TextChunk
 
 
 class LangChainEmbedder(BaseEmbeddingProvider):
@@ -30,7 +30,7 @@ class LangChainEmbedder(BaseEmbeddingProvider):
 
     async def encode(
         self,
-        items: Sequence[TextUnit],
+        items: Sequence[TextChunk],
     ) -> EmbeddingResponse:
         
         texts = [item.text for item in items]
