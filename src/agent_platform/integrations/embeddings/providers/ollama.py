@@ -4,10 +4,7 @@ from agent_platform.integrations.embeddings.langchain_base import LangChainEmbed
 from agent_platform.integrations.embeddings.config import OllamaEmbeddingConfig
 
 
-class OllamaEmbeddingProvider(
-    LangChainEmbedder
-):
-
+class OllamaEmbeddingProvider(LangChainEmbedder):
     def __init__(
         self,
         model="nomic-embed-text",
@@ -18,7 +15,6 @@ class OllamaEmbeddingProvider(
         self.config = config or OllamaEmbeddingConfig()
 
         super().__init__()
-
 
     def _build_client(self):
 

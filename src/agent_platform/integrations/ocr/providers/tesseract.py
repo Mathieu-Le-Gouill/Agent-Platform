@@ -12,7 +12,9 @@ from agent_platform.integrations.ocr.config import TesseractConfig
 from agent_platform.models.chunk import TextChunk
 
 
-def _from_tesseract(data: dict, document_id: UUID, min_confidence: float) -> list[TextChunk]:
+def _from_tesseract(
+    data: dict, document_id: UUID, min_confidence: float
+) -> list[TextChunk]:
     chunks: list[TextChunk] = []
     n = len(data.get("text", []))
 
@@ -25,28 +27,29 @@ def _from_tesseract(data: dict, document_id: UUID, min_confidence: float) -> lis
         if conf < min_confidence:
             continue
 
-        chunks.append(TextChunk(
-            id=uuid4(),
-            document_id=document_id,
-            text=text.strip(),
-            metadata={
-                "confidence": conf,
-                "bbox": {
-                    "x": int((data.get("left") or [0])[i]),
-                    "y": int((data.get("top") or [0])[i]),
-                    "w": int((data.get("width") or [0])[i]),
-                    "h": int((data.get("height") or [0])[i]),
+        chunks.append(
+            TextChunk(
+                id=uuid4(),
+                document_id=document_id,
+                text=text.strip(),
+                metadata={
+                    "confidence": conf,
+                    "bbox": {
+                        "x": int((data.get("left") or [0])[i]),
+                        "y": int((data.get("top") or [0])[i]),
+                        "w": int((data.get("width") or [0])[i]),
+                        "h": int((data.get("height") or [0])[i]),
+                    },
+                    "page": (data.get("page_num") or [None] * n)[i],
+                    "block_num": (data.get("block_num") or [None] * n)[i],
                 },
-                "page": (data.get("page_num") or [None])[i],
-                "block_num": (data.get("block_num") or [None])[i],
-            },
-        ))
+            )
+        )
 
     return chunks
 
 
 class TesseractOCR(BaseOCR[TesseractConfig]):
-
     def __init__(self, config: TesseractConfig | None = None) -> None:
         self._config = config or TesseractConfig()
         if self._config.tesseract_cmd:
@@ -70,7 +73,9 @@ class TesseractOCR(BaseOCR[TesseractConfig]):
             output_type=pytesseract.Output.DICT,
         )
 
-        return _from_tesseract(data, document_id=doc_id, min_confidence=cfg.min_confidence)
+        return _from_tesseract(
+            data, document_id=doc_id, min_confidence=cfg.min_confidence
+        )
 
     @staticmethod
     def _load_image(source: str) -> Image.Image:

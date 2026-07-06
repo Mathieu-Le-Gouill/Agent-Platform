@@ -19,7 +19,6 @@ _DEEPL_TARGETS: dict[Language, str] = {
 
 
 class DeepLTranslator(BaseTranslator):
-
     def __init__(self, auth_key: str) -> None:
         self._client = deepl.Translator(auth_key)
 

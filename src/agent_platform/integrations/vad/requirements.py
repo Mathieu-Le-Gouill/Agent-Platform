@@ -13,7 +13,6 @@ T = TypeVar("T", bound="VADConfig")
 
 @dataclass(frozen=True, slots=True)
 class AudioRequirements:
-
     sample_rates: tuple[int, ...]
     channels: int
     dtype: DataType
@@ -28,12 +27,8 @@ class AudioRequirements:
 
         if chunk.channels != self.channels:
             raise ValueError(
-                f"Expected {self.channels} channel(s), "
-                f"got {chunk.channels}."
+                f"Expected {self.channels} channel(s), got {chunk.channels}."
             )
 
         if chunk.dtype != self.dtype:
-            raise TypeError(
-                f"Expected dtype {self.dtype.__name__}, "
-                f"got {chunk.dtype}."
-            )
+            raise TypeError(f"Expected dtype {self.dtype.name}, got {chunk.dtype}.")

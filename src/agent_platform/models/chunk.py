@@ -6,7 +6,11 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from agent_platform.models.enums import (
-    MediaType, DocumentFormat, AudioFormat, VideoFormat, DataType,
+    MediaType,
+    DocumentFormat,
+    AudioFormat,
+    VideoFormat,
+    DataType,
 )
 
 

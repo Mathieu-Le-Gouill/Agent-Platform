@@ -57,7 +57,9 @@ class AssistantMessage(BaseMessage):
 
 class ToolMessage(BaseMessage):
     role: MessageRole = MessageRole.TOOL
-    result: ToolResult = Field(default_factory=lambda: ToolResult(tool_call_id="", name="", content=""))
+    result: ToolResult = Field(
+        default_factory=lambda: ToolResult(tool_call_id="", name="", content="")
+    )
 
 
 Message = Union[SystemMessage, UserMessage, AssistantMessage, ToolMessage]
@@ -96,8 +98,12 @@ class Prompt(BaseModel):
         self.messages.append(UserMessage(content=content, **kw))
         return self
 
-    def add_assistant(self, content: str, tool_calls: list[ToolCall] | None = None, **kw) -> Prompt:
-        self.messages.append(AssistantMessage(content=content, tool_calls=tool_calls or [], **kw))
+    def add_assistant(
+        self, content: str, tool_calls: list[ToolCall] | None = None, **kw
+    ) -> Prompt:
+        self.messages.append(
+            AssistantMessage(content=content, tool_calls=tool_calls or [], **kw)
+        )
         return self
 
     def add_tool_result(self, result: ToolResult, **kw) -> Prompt:

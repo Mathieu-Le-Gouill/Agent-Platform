@@ -5,7 +5,6 @@ from agent_platform.integrations.embeddings.config import OpenAIEmbeddingConfig
 
 
 class OpenAIEmbeddingProvider(LangChainEmbedder):
-
     def __init__(
         self,
         model: str = "text-embedding-3-small",
@@ -15,7 +14,6 @@ class OpenAIEmbeddingProvider(LangChainEmbedder):
         self.config = config or OpenAIEmbeddingConfig()
 
         super().__init__()
-
 
     def _build_client(self):
 

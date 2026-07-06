@@ -22,14 +22,13 @@ _SIZE_MAP: dict[str, tuple[str, ...]] = {
 
 
 class DallEImageGenerator(BaseImageGenerator):
-
     def __init__(
         self,
         api_key: str,
         model: str = "dall-e-3",
         quality: Literal["standard", "hd"] = "standard",
     ) -> None:
-        
+
         if model not in _MODEL_MAP:
             raise ValueError(f"Unsupported model: {model}. Use dall-e-2 or dall-e-3.")
         self._client = AsyncOpenAI(api_key=api_key)
@@ -42,7 +41,7 @@ class DallEImageGenerator(BaseImageGenerator):
         size: str | None = None,
         format: ImageFormat = ImageFormat.PNG,
     ) -> ImageDocument:
-        
+
         size = size or _SIZE_MAP[self._model][0]
         _validate_size(self._model, size)
 
@@ -76,7 +75,6 @@ class DallEImageGenerator(BaseImageGenerator):
                 },
             ),
         )
-    
 
     async def generate_many(
         self,
@@ -85,7 +83,7 @@ class DallEImageGenerator(BaseImageGenerator):
         size: str | None = None,
         format: ImageFormat = ImageFormat.PNG,
     ) -> list[ImageDocument]:
-        
+
         size = size or _SIZE_MAP[self._model][0]
         _validate_size(self._model, size)
 
@@ -125,7 +123,8 @@ class DallEImageGenerator(BaseImageGenerator):
         return documents
 
 
-# --- Utils ---
+# --- Utils ---
+
 
 def _validate_size(model: str, size: str) -> None:
     valid_sizes = _SIZE_MAP.get(model, ())

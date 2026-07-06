@@ -10,19 +10,17 @@ from agent_platform.models.chunk import TextChunk
 
 
 class ZeroShotClassifier(ClassificationModel):
-
     def __init__(
         self,
         model: str = "facebook/bart-large-mnli",
         device: int = -1,
         hypothesis_template: str = "This example is {}",
     ) -> None:
-        
+
         self._model_name = model
         self._device = device
         self._hypothesis_template = hypothesis_template
         self._pipeline = None
-
 
     async def _load(self) -> None:
         if self._pipeline is not None:
@@ -38,18 +36,17 @@ class ZeroShotClassifier(ClassificationModel):
             ),
         )
 
-
     async def classify(
         self,
         items: list[TextChunk],
         candidate_labels: list[str] | None = None,
     ) -> list[str]:
-        
+
         pipeline = self._pipeline
 
         if pipeline is None:
             raise RuntimeError("Failed to load Zero Shot Classification pipeline")
-        
+
         if candidate_labels is None:
             labels = self._infer_labels(items)
         else:
@@ -78,11 +75,10 @@ class ZeroShotClassifier(ClassificationModel):
                 results.append(str(output["labels"][0]))  # type: ignore[index]
 
         return results
-    
 
     @staticmethod
     def _infer_labels(items: Sequence[TextChunk]) -> list[str]:
-        
+
         seen: set[str] = set()
         labels: list[str] = []
         for item in items:

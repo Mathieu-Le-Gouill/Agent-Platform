@@ -7,7 +7,6 @@ from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 
 
 class MistralLLM(LangChainLLMProvider):
-
     def __init__(self, api_key: SecretStr) -> None:
         self._api_key = api_key
 
@@ -53,7 +52,9 @@ def _to_langchain_mistral(config: GenerationConfig | None) -> dict[str, Any]:
             model_kwargs["response_format"] = {"type": "json_object"}
         case ResponseFormat.JSON_SCHEMA:
             if config.json_schema is None:
-                raise ValueError("json_schema is required for JSON_SCHEMA response format")
+                raise ValueError(
+                    "json_schema is required for JSON_SCHEMA response format"
+                )
             model_kwargs["response_format"] = {
                 "type": "json_schema",
                 "json_schema": config.json_schema,

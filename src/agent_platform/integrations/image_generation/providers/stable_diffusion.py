@@ -14,7 +14,6 @@ from agent_platform.models.enums import ImageFormat
 
 
 class StableDiffusionGenerator(BaseImageGenerator):
-
     def __init__(
         self,
         model_id: str = "runwayml/stable-diffusion-v1-5",
@@ -52,7 +51,7 @@ class StableDiffusionGenerator(BaseImageGenerator):
         size: str | None = None,
         format: ImageFormat = ImageFormat.PNG,
     ) -> ImageDocument:
-        
+
         await self._load()
         pipeline = self._pipeline
 

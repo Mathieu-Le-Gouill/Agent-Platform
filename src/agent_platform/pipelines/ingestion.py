@@ -24,7 +24,9 @@ def chunk_document(doc: TextDocument) -> list[TextChunk]:
             index=i,
             metadata={
                 "source": doc.source,
-                "language": doc.language.value if hasattr(doc, "language") and doc.language else None,
+                "language": doc.language.value
+                if hasattr(doc, "language") and doc.language
+                else None,
                 "title": doc.metadata.title,
             },
         )

@@ -12,7 +12,6 @@ ClusteringConfigT = TypeVar("ClusteringConfigT", bound=ClusteringConfig)
 
 
 class ClusteringAlgorithm(ABC, Generic[ClusteringConfigT]):
-
     @abstractmethod
     async def clusterize(
         self,

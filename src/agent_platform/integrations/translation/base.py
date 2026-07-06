@@ -5,12 +5,7 @@ from agent_platform.models.enums import Language
 
 
 class BaseTranslator(ABC):
-    
     @abstractmethod
     async def translate(
-        self,
-        content: TextChunk,
-        target: Language,
-        source: Language | None = None
-    ) -> TextChunk: 
-        ...
+        self, content: TextChunk, target: Language, source: Language | None = None
+    ) -> TextChunk: ...

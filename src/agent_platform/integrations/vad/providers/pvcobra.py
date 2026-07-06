@@ -14,16 +14,14 @@ from agent_platform.models.enums import DataType
 
 
 class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
-
     def __init__(
-        self, 
+        self,
         acess_key: SecretStr,
-        device: str | None = None, 
-        library_path: str | None = None
+        device: str | None = None,
+        library_path: str | None = None,
     ) -> None:
 
         self.handle = pvcobra.create(acess_key.get_secret_value(), device, library_path)
-
 
     @property
     def requirements(self) -> AudioRequirements:
@@ -34,19 +32,18 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
             normalized=False,
         )
 
-
     def detect(
         self,
         audio_sequence: Sequence[AudioChunk],
-        config: PvcobraVadConfig | None = None
-    ) -> list[SampleSpan]: 
-        
+        config: PvcobraVadConfig | None = None,
+    ) -> list[SampleSpan]:
+
         config = config or PvcobraVadConfig()
         state = VADState()
-        
+
         if not audio_sequence:
             return []
-        
+
         voiced_frames: list[SampleSpan] = []
 
         for chunk in audio_sequence:
@@ -59,21 +56,19 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
 
                 if span is not None:
                     voiced_frames.append(span)
-                    
+
         return voiced_frames
-    
 
     async def adetect(
         self,
         audio_sequence: AsyncIterator[AudioChunk],
         config: PvcobraVadConfig | None = None,
-    ) -> AsyncIterator[SampleSpan]: 
-        
+    ) -> AsyncIterator[SampleSpan]:
+
         config = config or PvcobraVadConfig()
         state = VADState()
 
         async for chunk in audio_sequence:
-
             self._validate_chunk(chunk, config.sample_rate)
 
             if self._is_speech(chunk, config):
@@ -84,12 +79,11 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
                 if span is not None:
                     yield span
 
-
     def _is_speech(
         self,
         chunk: AudioChunk,
         config: PvcobraVadConfig,
     ) -> bool:
-        
+
         voice_prob = self.handle.process(chunk.data)
         return voice_prob > config.threshold

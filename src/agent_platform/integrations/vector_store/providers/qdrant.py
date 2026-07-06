@@ -3,17 +3,10 @@ from qdrant_client import QdrantClient
 from pydantic import SecretStr
 
 
-from agent_platform.integrations.vector_store.langchain_base import (
-    LangChainVectorStore
-)
+from agent_platform.integrations.vector_store.langchain_base import LangChainVectorStore
 
 
-
-class QdrantVectorStoreProvider(
-    LangChainVectorStore
-):
-
-
+class QdrantVectorStoreProvider(LangChainVectorStore):
     def __init__(
         self,
         url,
@@ -29,15 +22,12 @@ class QdrantVectorStoreProvider(
 
         super().__init__()
 
-
-
     def _build_client(self) -> QdrantVectorStore:
 
         client = QdrantClient(
             url=self.url,
             api_key=self.api_key.get_secret_value() if self.api_key else None,
         )
-
 
         return QdrantVectorStore(
             client=client,

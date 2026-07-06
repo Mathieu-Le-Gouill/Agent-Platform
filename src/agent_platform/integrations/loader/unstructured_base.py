@@ -3,8 +3,11 @@ from typing import AsyncIterator, Sequence
 import asyncio
 from pathlib import Path
 from uuid import uuid4
+import warnings
 
-from langchain_community.document_loaders.unstructured import UnstructuredFileLoader
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", message="`langchain-community` is being sunset")
+    from langchain_community.document_loaders.unstructured import UnstructuredFileLoader
 from langchain_core.documents import Document as LCDocument
 
 from agent_platform.integrations.loader.text_base import BaseTextLoader
@@ -13,7 +16,6 @@ from agent_platform.models.enums import DocumentFormat, Language, FileFormat
 
 
 class UnstructuredBaseLoader(BaseTextLoader):
-
     @abstractmethod
     def _loader(self, source: str, **kwargs) -> UnstructuredFileLoader: ...
 
@@ -25,7 +27,9 @@ class UnstructuredBaseLoader(BaseTextLoader):
             return []
         return [_text_from_langchain(doc) for doc in docs]
 
-    async def load_many(self, sources: list[str], **kwargs) -> AsyncIterator[Sequence[TextDocument]]:
+    async def load_many(
+        self, sources: list[str], **kwargs
+    ) -> AsyncIterator[Sequence[TextDocument]]:
         results = await asyncio.gather(
             *[self.load(s, **kwargs) for s in sources],
             return_exceptions=True,
@@ -57,9 +61,7 @@ def _text_from_langchain(doc: LCDocument) -> TextDocument:
         format=fmt,
         encoding=metadata.get("encoding"),
         language=(
-            Language(metadata["languages"][0])
-            if metadata.get("languages")
-            else None
+            Language(metadata["languages"][0]) if metadata.get("languages") else None
         ),
         character_count=len(text),
         word_count=len(text.split()),
@@ -69,16 +71,34 @@ def _text_from_langchain(doc: LCDocument) -> TextDocument:
 
 
 def _extract_format(meta: dict, source: str = "") -> DocumentFormat:
-    raw = meta.get("filetype") or meta.get("category") or meta.get("format") or meta.get("mime_type")
+    raw = (
+        meta.get("filetype")
+        or meta.get("category")
+        or meta.get("format")
+        or meta.get("mime_type")
+    )
     if raw:
         ff = FileFormat.from_mime(raw.lower())
-        return ff.extension_format if isinstance(ff.extension_format, DocumentFormat) else DocumentFormat.UNKNOWN
+        return (
+            ff.extension_format
+            if isinstance(ff.extension_format, DocumentFormat)
+            else DocumentFormat.UNKNOWN
+        )
     ext = Path(source).suffix if source else ""
     if ext:
         ff = FileFormat.from_extension(ext.lstrip("."))
-        return ff.extension_format if isinstance(ff.extension_format, DocumentFormat) else DocumentFormat.UNKNOWN
+        return (
+            ff.extension_format
+            if isinstance(ff.extension_format, DocumentFormat)
+            else DocumentFormat.UNKNOWN
+        )
     return DocumentFormat.UNKNOWN
 
 
 def _extract_title(meta: dict, source: str) -> str | None:
-    return meta.get("title") or meta.get("filename") or (Path(source).stem if source else None) or None
+    return (
+        meta.get("title")
+        or meta.get("filename")
+        or (Path(source).stem if source else None)
+        or None
+    )

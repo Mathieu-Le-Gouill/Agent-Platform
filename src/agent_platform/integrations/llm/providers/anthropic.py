@@ -7,7 +7,6 @@ from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 
 
 class AnthropicLLM(LangChainLLMProvider):
-
     def __init__(self, api_key: SecretStr) -> None:
         self._api_key = api_key
 

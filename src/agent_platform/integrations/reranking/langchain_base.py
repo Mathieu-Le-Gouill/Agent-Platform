@@ -14,10 +14,8 @@ from agent_platform.models.enums import Language
 
 
 class LangChainReranker(BaseReranker[TextChunk, RerankerConfig]):
-
     @abstractmethod
-    def _client(self) -> BaseDocumentCompressor:
-        ...
+    def _client(self) -> BaseDocumentCompressor: ...
 
     async def rerank(
         self,
@@ -36,6 +34,7 @@ class LangChainReranker(BaseReranker[TextChunk, RerankerConfig]):
 
 
 # --- Mappers ---
+
 
 def _chunk_to_lc(chunk: TextChunk) -> LC_Document:
     metadata = chunk.metadata or {}
@@ -59,17 +58,21 @@ def _lc_to_chunks(lc_chunks: Sequence[LC_Document]) -> list[TextChunk]:
     result = []
     for c in lc_chunks:
         m = c.metadata
-        result.append(TextChunk(
-            id=UUID(m["chunk_id"]) if m.get("chunk_id") else UUID(int=0),
-            document_id=UUID(m["document_id"]) if m.get("document_id") else None,
-            text=c.page_content,
-            index=m.get("index") or 0,
-            start_char=m.get("start_index"),
-            end_char=(m.get("start_index") or 0) + len(c.page_content) if m.get("start_index") else None,
-            metadata={
-                "source": m.get("source"),
-                "language": Language(m["language"]) if m.get("language") else None,
-                "extra": m.get("extra") or {},
-            },
-        ))
+        result.append(
+            TextChunk(
+                id=UUID(m["chunk_id"]) if m.get("chunk_id") else UUID(int=0),
+                document_id=UUID(m["document_id"]) if m.get("document_id") else None,
+                text=c.page_content,
+                index=m.get("index") or 0,
+                start_char=m.get("start_index"),
+                end_char=(m.get("start_index") or 0) + len(c.page_content)
+                if m.get("start_index")
+                else None,
+                metadata={
+                    "source": m.get("source"),
+                    "language": Language(m["language"]) if m.get("language") else None,
+                    "extra": m.get("extra") or {},
+                },
+            )
+        )
     return result

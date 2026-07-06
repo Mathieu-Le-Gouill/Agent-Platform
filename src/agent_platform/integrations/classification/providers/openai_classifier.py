@@ -14,7 +14,6 @@ _SYSTEM_TEMPLATE = (
 
 
 class OpenAIZeroShotClassifier(ClassificationModel):
-
     def __init__(
         self,
         api_key: str,
@@ -23,13 +22,12 @@ class OpenAIZeroShotClassifier(ClassificationModel):
         self._client = AsyncOpenAI(api_key=api_key)
         self._model = model
 
-
     async def classify(
         self,
         items: list[TextChunk],
         candidate_labels: list[str] | None = None,
     ) -> list[str]:
-        
+
         labels = candidate_labels or ["positive", "negative", "neutral"]
         system_prompt = _SYSTEM_TEMPLATE.format(labels=", ".join(labels))
 

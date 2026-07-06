@@ -14,25 +14,20 @@ class LangChainEmbedder(BaseEmbeddingProvider):
     _client: Embeddings
     _model: str
 
-
     def __init__(self):
         self._client = self._build_client()
 
-
     @abstractmethod
-    def _build_client(self) -> Embeddings:
-        ...
-
+    def _build_client(self) -> Embeddings: ...
 
     def _extract_usage(self, raw: list[list[float]]) -> TokenUsage:
         return TokenUsage.zero()
-
 
     async def encode(
         self,
         items: Sequence[TextChunk],
     ) -> EmbeddingResponse:
-        
+
         texts = [item.text for item in items]
 
         vectors: list[list[float]] = await self._client.aembed_documents(texts)

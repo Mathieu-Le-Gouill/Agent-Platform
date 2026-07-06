@@ -6,7 +6,6 @@ from agent_platform.integrations.reranking.config import CohereRerankerConfig
 
 
 class CohereRerankerProvider(LangChainReranker):
-
     def __init__(
         self,
         model="rerank-english-v3.0",
@@ -16,7 +15,6 @@ class CohereRerankerProvider(LangChainReranker):
         self.config = config or CohereRerankerConfig()
 
         super().__init__()
-
 
     def _client(self) -> CohereRerank:
 

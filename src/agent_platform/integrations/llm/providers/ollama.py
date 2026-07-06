@@ -6,7 +6,6 @@ from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 
 
 class OllamaLLM(LangChainLLMProvider):
-
     def _client(
         self,
         model: str,
@@ -17,7 +16,6 @@ class OllamaLLM(LangChainLLMProvider):
             model=model,
             **_to_langchain_ollama(cfg),
         )
-
 
 
 def _to_langchain_ollama(config: GenerationConfig | None) -> dict[str, Any]:
@@ -45,7 +43,9 @@ def _to_langchain_ollama(config: GenerationConfig | None) -> dict[str, Any]:
             params["format"] = "json"
         case ResponseFormat.JSON_SCHEMA:
             if config.json_schema is None:
-                raise ValueError("json_schema is required for JSON_SCHEMA response format")
+                raise ValueError(
+                    "json_schema is required for JSON_SCHEMA response format"
+                )
             params["format"] = config.json_schema
 
     return params

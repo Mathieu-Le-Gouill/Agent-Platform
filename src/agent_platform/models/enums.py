@@ -162,33 +162,54 @@ class FileFormat(Enum):
 
 # --- Lookup tables ---
 
-_MIME_TO_FORMAT.update({
-    "application/pdf": FileFormat.PDF,
-    "text/plain": FileFormat.TXT,
-    "text/html": FileFormat.HTML,
-    "text/markdown": FileFormat.MARKDOWN,
-    "text/x-markdown": FileFormat.MARKDOWN,
-    "text/csv": FileFormat.CSV,
-    "application/json": FileFormat.JSON,
-    "application/msword": FileFormat.DOCX,
-    "application/vnd.openxmlformats-officedocument.wordprocessingml.document": FileFormat.DOCX,
-    "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": FileFormat.XLSX,
-    "application/vnd.openxmlformats-officedocument.presentationml.presentation": FileFormat.PPTX,
-})
+_MIME_TO_FORMAT.update(
+    {
+        "application/pdf": FileFormat.PDF,
+        "text/plain": FileFormat.TXT,
+        "text/html": FileFormat.HTML,
+        "text/markdown": FileFormat.MARKDOWN,
+        "text/x-markdown": FileFormat.MARKDOWN,
+        "text/csv": FileFormat.CSV,
+        "application/json": FileFormat.JSON,
+        "application/msword": FileFormat.DOCX,
+        "application/vnd.openxmlformats-officedocument.wordprocessingml.document": FileFormat.DOCX,
+        "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": FileFormat.XLSX,
+        "application/vnd.openxmlformats-officedocument.presentationml.presentation": FileFormat.PPTX,
+    }
+)
 
-_FORMAT_BY_EXTENSION.update({
-    # Documents
-    "pdf": FileFormat.PDF, "docx": FileFormat.DOCX, "xlsx": FileFormat.XLSX,
-    "pptx": FileFormat.PPTX, "txt": FileFormat.TXT, "csv": FileFormat.CSV,
-    "json": FileFormat.JSON, "html": FileFormat.HTML, "markdown": FileFormat.MARKDOWN,
-    # Images
-    "png": FileFormat.PNG, "jpg": FileFormat.JPEG, "jpeg": FileFormat.JPEG,
-    "webp": FileFormat.WEBP, "gif": FileFormat.GIF, "bmp": FileFormat.BMP,
-    "tiff": FileFormat.TIFF,
-    # Audio
-    "mp3": FileFormat.MP3, "wav": FileFormat.WAV, "flac": FileFormat.FLAC,
-    "aac": FileFormat.AAC, "m4a": FileFormat.M4A, "ogg": FileFormat.OGG,
-    # Video
-    "mp4": FileFormat.MP4, "mov": FileFormat.MOV, "avi": FileFormat.AVI,
-    "mkv": FileFormat.MKV, "webm": FileFormat.WEBM,
-})
+_FORMAT_BY_EXTENSION.update(
+    {
+        # Documents
+        "pdf": FileFormat.PDF,
+        "docx": FileFormat.DOCX,
+        "xlsx": FileFormat.XLSX,
+        "pptx": FileFormat.PPTX,
+        "txt": FileFormat.TXT,
+        "csv": FileFormat.CSV,
+        "json": FileFormat.JSON,
+        "html": FileFormat.HTML,
+        "markdown": FileFormat.MARKDOWN,
+        # Images
+        "png": FileFormat.PNG,
+        "jpg": FileFormat.JPEG,
+        "jpeg": FileFormat.JPEG,
+        "webp": FileFormat.WEBP,
+        "gif": FileFormat.GIF,
+        "bmp": FileFormat.BMP,
+        "tiff": FileFormat.TIFF,
+        # Audio
+        "mp3": FileFormat.MP3,
+        "wav": FileFormat.WAV,
+        "flac": FileFormat.FLAC,
+        "aac": FileFormat.AAC,
+        "m4a": FileFormat.M4A,
+        "ogg": FileFormat.OGG,
+        # Video
+        "mp4": FileFormat.MP4,
+        "mov": FileFormat.MOV,
+        "avi": FileFormat.AVI,
+        "mkv": FileFormat.MKV,
+        "webm": FileFormat.WEBM,
+    }
+)

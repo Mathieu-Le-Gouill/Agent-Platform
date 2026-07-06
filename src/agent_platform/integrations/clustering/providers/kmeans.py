@@ -13,13 +13,11 @@ from agent_platform.models.cluster import Cluster
 
 
 class KMeansClusterer(ClusteringAlgorithm[KMeansConfig]):
-
     def __init__(
         self,
         config: KMeansConfig | None = None,
     ) -> None:
         self._config = config or KMeansConfig()
-
 
     async def clusterize(
         self,

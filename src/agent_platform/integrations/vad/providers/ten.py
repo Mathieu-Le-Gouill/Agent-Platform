@@ -14,7 +14,6 @@ from agent_platform.models.enums import DataType
 
 
 class TenVAD(FrameBasedVAD[TenVadConfig]):
-
     @property
     def requirements(self) -> AudioRequirements:
         return AudioRequirements(
@@ -23,22 +22,19 @@ class TenVAD(FrameBasedVAD[TenVadConfig]):
             dtype=DataType.INT16,
             normalized=True,
         )
-    
 
     def detect(
-        self,
-        audio_sequence: Sequence[AudioChunk],
-        config: TenVadConfig | None = None
-    ) -> list[SampleSpan]: 
-        
+        self, audio_sequence: Sequence[AudioChunk], config: TenVadConfig | None = None
+    ) -> list[SampleSpan]:
+
         config = config or TenVadConfig()
         state = VADState()
 
         self.handle = TenVad(config.hop_size, config.threshold)
-        
+
         if not audio_sequence:
             return []
-        
+
         voiced_frames: list[SampleSpan] = []
 
         for chunk in audio_sequence:
@@ -51,21 +47,19 @@ class TenVAD(FrameBasedVAD[TenVadConfig]):
 
                 if span is not None:
                     voiced_frames.append(span)
-                    
+
         return voiced_frames
-    
 
     async def adetect(
         self,
         audio_sequence: AsyncIterator[AudioChunk],
         config: TenVadConfig | None = None,
-    ) -> AsyncIterator[SampleSpan]: 
-        
+    ) -> AsyncIterator[SampleSpan]:
+
         config = config or TenVadConfig()
         state = VADState()
 
         async for chunk in audio_sequence:
-
             self._validate_chunk(chunk, config.sample_rate)
 
             if self._is_speech(chunk, config):
@@ -76,12 +70,11 @@ class TenVAD(FrameBasedVAD[TenVadConfig]):
                 if span is not None:
                     yield span
 
-
     def _is_speech(
         self,
         chunk: AudioChunk,
         config: TenVadConfig,
     ) -> bool:
-        
+
         voice_prob, flag = self.handle.process(AudioIO.to_numpy(chunk))
         return voice_prob > config.threshold

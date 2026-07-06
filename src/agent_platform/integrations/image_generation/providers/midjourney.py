@@ -11,14 +11,13 @@ from agent_platform.models.enums import ImageFormat
 
 
 class MidjourneyGenerator(BaseImageGenerator):
-
     def __init__(
         self,
         api_url: str,
         api_key: str,
         timeout: float = 120.0,
     ) -> None:
-        
+
         self._api_url = api_url.rstrip("/")
         self._api_key = api_key
         self._timeout = timeout
@@ -30,7 +29,7 @@ class MidjourneyGenerator(BaseImageGenerator):
         size: str | None = None,
         format: ImageFormat = ImageFormat.PNG,
     ) -> ImageDocument:
-    
+
         payload = {
             "prompt": prompt,
             "aspect_ratio": _size_to_aspect(size),
@@ -68,7 +67,7 @@ class MidjourneyGenerator(BaseImageGenerator):
         size: str | None = None,
         format: ImageFormat = ImageFormat.PNG,
     ) -> list[ImageDocument]:
-        
+
         payload = {
             "prompt": prompt,
             "aspect_ratio": _size_to_aspect(size),
@@ -111,6 +110,7 @@ class MidjourneyGenerator(BaseImageGenerator):
 
 
 # --- Utils ---
+
 
 def _size_to_aspect(size: str | None) -> str:
     if size is None:

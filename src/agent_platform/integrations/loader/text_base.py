@@ -6,10 +6,10 @@ from agent_platform.integrations.loader.base import BaseMediaLoader
 
 
 class BaseTextLoader(BaseMediaLoader[TextDocument]):
-
     @abstractmethod
     async def load(self, source: str) -> Sequence[TextDocument]: ...
-    
 
     @abstractmethod
-    def load_many(self, sources: list[str], **kwargs) -> AsyncIterator[Sequence[TextDocument]]: ...
+    def load_many(
+        self, sources: list[str], **kwargs
+    ) -> AsyncIterator[Sequence[TextDocument]]: ...

@@ -6,7 +6,6 @@ from agent_platform.integrations.reranking.config import JinaRerankerConfig
 
 
 class JinaRerankerProvider(LangChainReranker):
-
     def __init__(
         self,
         model="jina-reranker-v2-base-multilingual",
@@ -16,7 +15,6 @@ class JinaRerankerProvider(LangChainReranker):
         self.config = config
 
         super().__init__()
-
 
     def _client(self) -> JinaRerank:
 

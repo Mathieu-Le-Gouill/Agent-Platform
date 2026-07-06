@@ -9,12 +9,10 @@ OCRConfigT = TypeVar("OCRConfigT", bound=OCRConfig)
 
 
 class BaseOCR(ABC, Generic[OCRConfigT]):
-
     @abstractmethod
     async def extract(
         self,
         source: str,
         config: OCRConfigT | None = None,
         document_id: UUID | None = None,
-    ) -> Sequence[TextChunk]:
-        ...
+    ) -> Sequence[TextChunk]: ...

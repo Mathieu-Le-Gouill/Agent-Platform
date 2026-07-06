@@ -13,6 +13,7 @@ from agent_platform.models.enums import AudioFormat, DataType
 
 def _to_numpy_dtype(sample_type: DataType):
     import numpy as np
+
     match sample_type:
         case DataType.INT16:
             return np.int16
@@ -26,6 +27,7 @@ def _to_numpy_dtype(sample_type: DataType):
 
 def _from_numpy_dtype(dtype) -> DataType:
     import numpy as np
+
     match dtype:
         case np.int16:
             return DataType.INT16
@@ -42,7 +44,6 @@ def _from_numpy_dtype(dtype) -> DataType:
 
 
 class AudioIO:
-
     @staticmethod
     def from_file(file_path: str) -> AudioDocument:
         info = sf.info(file_path)

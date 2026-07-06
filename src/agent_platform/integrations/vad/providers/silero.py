@@ -15,12 +15,9 @@ from agent_platform.models.enums import DataType
 from agent_platform.audio.io import AudioIO
 
 
-
 class SileroVAD(BaseVAD[SileroVadConfig]):
-
     def __init__(self):
         self.model = load_silero_vad()
-
 
     @property
     def requirements(self) -> AudioRequirements:
@@ -30,19 +27,18 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
             dtype=DataType.FLOAT32,
             normalized=True,
         )
-    
 
     def detect(
         self,
         audio_sequence: Sequence[AudioChunk],
-        config: SileroVadConfig | None = None
-    ) -> list[SampleSpan]: 
-        
+        config: SileroVadConfig | None = None,
+    ) -> list[SampleSpan]:
+
         config = config or SileroVadConfig()
-        
+
         if not audio_sequence:
             return []
-        
+
         chunks = []
 
         for chunk in audio_sequence:
@@ -62,18 +58,14 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
             min_silence_duration_ms=config.min_silence_duration_ms,
         )
 
-        return [
-            SampleSpan(start=s["start"], end=s["end"])
-            for s in speech_samples
-        ]
-    
+        return [SampleSpan(start=s["start"], end=s["end"]) for s in speech_samples]
 
     async def adetect(
         self,
         audio_sequence: AsyncIterator[AudioChunk],
         config: SileroVadConfig | None = None,
-    ) -> AsyncIterator[SampleSpan]: 
-        
+    ) -> AsyncIterator[SampleSpan]:
+
         config = config or SileroVadConfig()
 
         buffer_chunks = deque()
@@ -84,7 +76,7 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
                 raise ValueError(
                     f"Expected {config.sample_rate}, got {chunk.sample_rate}"
                 )
-            
+
             tensor = AudioIO.to_tensor(chunk)
 
             buffer_chunks.append(tensor)
@@ -95,9 +87,12 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
                 torch_audio = torch.cat((torch_audio, tensor), dim=-1)
 
             if torch_audio.shape[-1] > config.max_samples:
-                torch_audio = torch_audio[:, -config.max_samples:]
+                torch_audio = torch_audio[-config.max_samples :]
 
-                while buffer_chunks and sum(x.shape[-1] for x in buffer_chunks) > config.max_samples:
+                while (
+                    buffer_chunks
+                    and sum(x.shape[-1] for x in buffer_chunks) > config.max_samples
+                ):
                     buffer_chunks.popleft()
 
             speech_samples = get_speech_timestamps(
@@ -112,5 +107,17 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
 
             for s in speech_samples:
                 yield SampleSpan(start=s["start"], end=s["end"])
-    
-    # Ref: https://github.com/snakers4/silero-vad
+
+    def _is_speech(
+        self,
+        chunk: AudioChunk,
+        config: SileroVadConfig,
+    ) -> bool:
+        # SileroVAD uses batched get_speech_timestamps, not per-chunk detection.
+        # This method is required by BaseVAD but not used in the batched flow.
+        raise NotImplementedError(
+            "SileroVAD uses batched detection, not per-chunk _is_speech"
+        )
+
+
+# Ref: https://github.com/snakers4/silero-vad

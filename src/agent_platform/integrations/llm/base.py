@@ -1,7 +1,7 @@
 from abc import ABC, abstractmethod
 from typing import AsyncIterator, Generic, TypeVar
 
-from agent_platform.integrations.llm.prompt import Prompt
+from agent_platform.models.message import Prompt
 from agent_platform.integrations.llm.config import GenerationConfig
 from agent_platform.integrations.llm.response import LLMResponse, StreamChunk
 
@@ -9,7 +9,6 @@ GenerationConfigT = TypeVar("GenerationConfigT", bound=GenerationConfig)
 
 
 class BaseLLMProvider(ABC, Generic[GenerationConfigT]):
-
     @abstractmethod
     async def generate(
         self,

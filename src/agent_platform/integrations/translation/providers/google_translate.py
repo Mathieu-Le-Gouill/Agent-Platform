@@ -13,7 +13,6 @@ _GOOGLE_TARGETS: dict[Language, str] = {
 
 
 class GoogleTranslator(BaseTranslator):
-
     def __init__(self) -> None:
         self._client = GoogleTranslatorClient()
 

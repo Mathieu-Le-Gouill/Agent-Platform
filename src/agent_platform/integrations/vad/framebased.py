@@ -8,9 +8,9 @@ from agent_platform.models.chunk import AudioChunk
 from agent_platform.integrations.vad.state import VADState
 
 T = TypeVar("T", bound="VADConfig")
-    
-class FrameBasedVAD(BaseVAD[T]):      
-    
+
+
+class FrameBasedVAD(BaseVAD[T]):
     def _on_speech(
         self,
         state: VADState,
@@ -32,7 +32,6 @@ class FrameBasedVAD(BaseVAD[T]):
                 0,
                 state.segment_start - config.speech_pad_ms,
             )
-
 
     def _on_silence(
         self,

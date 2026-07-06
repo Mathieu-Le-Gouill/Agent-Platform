@@ -13,13 +13,11 @@ from agent_platform.models.cluster import Cluster
 
 
 class HDBSCANClusterer(ClusteringAlgorithm[HDBSCANConfig]):
-
     def __init__(
         self,
         config: HDBSCANConfig | None = None,
     ) -> None:
         self._config = config or HDBSCANConfig()
-
 
     async def clusterize(
         self,

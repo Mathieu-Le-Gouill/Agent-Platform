@@ -6,10 +6,8 @@ from agent_platform.models.chunk import TextChunk
 
 
 class BaseEmbeddingProvider(ABC):
-
     @abstractmethod
     async def encode(
         self,
         items: Sequence[TextChunk],
-    ) -> EmbeddingResponse:
-        ...
+    ) -> EmbeddingResponse: ...

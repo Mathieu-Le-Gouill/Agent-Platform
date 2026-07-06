@@ -3,13 +3,6 @@ from __future__ import annotations
 import asyncio
 from typing import AsyncIterator
 
-from deepgram import (
-    DeepgramClient,
-    PrerecordedOptions,
-    LiveOptions,
-    LiveTranscriptionEvents,
-)
-
 from agent_platform.integrations.speech.base import BaseSpeechToText
 from agent_platform.models.chunk import AudioChunk
 from agent_platform.models.conversation import Transcript, Utterance
@@ -17,11 +10,14 @@ from agent_platform.models.enums import Language
 
 
 class DeepgramSTT(BaseSpeechToText):
-
     def __init__(self, api_key: str) -> None:
+        from deepgram import DeepgramClient
+
         self._client = DeepgramClient(api_key)
 
     async def transcribe(self, audio: AudioChunk) -> Transcript:
+        from deepgram import PrerecordedOptions
+
         options = PrerecordedOptions(
             model="nova-2",
             language="en",
@@ -73,6 +69,8 @@ class DeepgramSTT(BaseSpeechToText):
 
         def _on_result(result: str) -> None:
             queue.put_nowait(result)
+
+        from deepgram import LiveOptions, LiveTranscriptionEvents
 
         options = LiveOptions(
             model="nova-2",
@@ -142,7 +140,7 @@ def _parse_deepgram_result(raw: str) -> list[Utterance]:
 
 def _parse_language(code: str) -> Language | None:
     try:
-        return Language(code.split("-")[0])
+        return Language(code.split("-")[0].split("_")[0])
     except ValueError:
         return None
 

@@ -12,7 +12,6 @@ from agent_platform.audio.io import AudioIO
 
 
 class AudioDSP:
-
     @staticmethod
     def decode(audio: AudioDocument) -> tuple[torch.Tensor, int]:
         buffer = io.BytesIO(audio.content)
@@ -29,7 +28,7 @@ class AudioDSP:
         chunks = []
         total_len = waveform.shape[-1]
         for i in range(0, total_len, chunk_size):
-            chunks.append(waveform[:, i:i + chunk_size])
+            chunks.append(waveform[:, i : i + chunk_size])
         return chunks
 
     @staticmethod
@@ -49,7 +48,7 @@ class AudioDSP:
         chunk_index = 0
 
         for i in range(0, total_len, chunk_size):
-            chunk = waveform[:, i:i + chunk_size]
+            chunk = waveform[:, i : i + chunk_size]
             end_sample = i + chunk.shape[-1]
 
             result.append(
@@ -77,7 +76,9 @@ class AudioDSP:
             return chunk
 
         waveform = AudioIO.to_tensor(chunk)
-        waveform = torchaudio.functional.resample(waveform, chunk.sample_rate, target_rate)
+        waveform = torchaudio.functional.resample(
+            waveform, chunk.sample_rate, target_rate
+        )
 
         return AudioIO.from_tensor(
             waveform,

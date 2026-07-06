@@ -3,6 +3,7 @@ from agent_platform.integrations.translation.base import BaseTranslator
 from agent_platform.models.enums import Language
 from agent_platform.models.conversation import Transcript
 
+
 class SpeechTranslationPipeline:
     def __init__(self, stt: BaseSpeechToText, translator: BaseTranslator):
         self._stt = stt

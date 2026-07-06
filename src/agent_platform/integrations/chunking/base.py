@@ -10,12 +10,11 @@ Document_T = TypeVar("Document_T", bound=Document, contravariant=True)
 Chunk_T = TypeVar("Chunk_T", bound=Chunk)
 ChunkerConfigT = TypeVar("ChunkerConfigT", bound=ChunkerConfig)
 
-class BaseChunker(ABC, Generic[Document_T, Chunk_T, ChunkerConfigT]):
 
+class BaseChunker(ABC, Generic[Document_T, Chunk_T, ChunkerConfigT]):
     @abstractmethod
     async def chunk(
         self,
         documents: Sequence[Document_T],
         config: ChunkerConfigT | None = None,
-    ) -> list[Chunk_T]:
-        ...
+    ) -> list[Chunk_T]: ...

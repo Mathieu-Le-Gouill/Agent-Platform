@@ -4,7 +4,6 @@ from agent_platform.integrations.vector_store.langchain_base import LangChainVec
 
 
 class ChromaStore(LangChainVectorStore):
-
     def __init__(
         self,
         collection_name,
@@ -14,7 +13,6 @@ class ChromaStore(LangChainVectorStore):
         self.embedding = embedding
 
         super().__init__()
-
 
     def _build_client(self) -> Chroma:
 

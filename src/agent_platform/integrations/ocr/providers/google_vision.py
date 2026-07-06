@@ -9,7 +9,9 @@ from agent_platform.integrations.ocr.config import GoogleVisionConfig
 from agent_platform.models.chunk import TextChunk
 
 
-def _from_google_vision(response, document_id: UUID, min_confidence: float) -> list[TextChunk]:
+def _from_google_vision(
+    response, document_id: UUID, min_confidence: float
+) -> list[TextChunk]:
     chunks: list[TextChunk] = []
 
     for page in response.full_text_annotation.pages:
@@ -20,8 +22,7 @@ def _from_google_vision(response, document_id: UUID, min_confidence: float) -> l
                     continue
 
                 text = " ".join(
-                    "".join(symbol.text for symbol in word.symbols)
-                    for word in words
+                    "".join(symbol.text for symbol in word.symbols) for word in words
                 )
                 confs = [
                     symbol.confidence
@@ -34,21 +35,22 @@ def _from_google_vision(response, document_id: UUID, min_confidence: float) -> l
                 if avg_conf < min_confidence:
                     continue
 
-                chunks.append(TextChunk(
-                    id=uuid4(),
-                    document_id=document_id,
-                    text=text.strip(),
-                    metadata={
-                        "confidence": avg_conf,
-                        "page": page.page_number,
-                    },
-                ))
+                chunks.append(
+                    TextChunk(
+                        id=uuid4(),
+                        document_id=document_id,
+                        text=text.strip(),
+                        metadata={
+                            "confidence": avg_conf,
+                            "page": page.page_number,
+                        },
+                    )
+                )
 
     return chunks
 
 
 class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
-
     def __init__(self, config: GoogleVisionConfig | None = None) -> None:
         self._config = config or GoogleVisionConfig()
         self._client = self._build_client()
@@ -83,7 +85,9 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
         if response.error.message:
             raise RuntimeError(response.error.message)
 
-        return _from_google_vision(response, document_id=doc_id, min_confidence=cfg.min_confidence)
+        return _from_google_vision(
+            response, document_id=doc_id, min_confidence=cfg.min_confidence
+        )
 
     @staticmethod
     def _load_image(source: str) -> vision.Image:

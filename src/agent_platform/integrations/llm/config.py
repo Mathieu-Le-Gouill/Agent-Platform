@@ -35,5 +35,5 @@ class AnthropicConfig(GenerationConfig):
 
 @dataclass(slots=True, frozen=True)
 class OpenAIConfig(GenerationConfig):
-    reasoning_effort: str | None = None   # for o1/o3
+    reasoning_effort: str | None = None  # for o1/o3
     parallel_tool_calls: bool = True

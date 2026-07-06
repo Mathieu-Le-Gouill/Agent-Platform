@@ -7,8 +7,14 @@ from datetime import datetime
 from pydantic import BaseModel, Field
 
 from agent_platform.models.enums import (
-    MediaType, DocumentFormat, ImageFormat, AudioFormat, VideoFormat, Language,
+    MediaType,
+    DocumentFormat,
+    ImageFormat,
+    AudioFormat,
+    VideoFormat,
+    Language,
 )
+
 
 class DocumentMetadata(BaseModel, frozen=True):
     title: str | None = None

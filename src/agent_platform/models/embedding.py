@@ -18,7 +18,9 @@ class Embedding(BaseModel, frozen=True):
         return self
 
     @classmethod
-    def from_list(cls, vector: list[float], model: str = "", id: UUID | None = None) -> "Embedding":
+    def from_list(
+        cls, vector: list[float], model: str = "", id: UUID | None = None
+    ) -> "Embedding":
         return cls(vector=tuple(vector), model=model, id=id or uuid4())
 
     def to_list(self) -> list[float]:

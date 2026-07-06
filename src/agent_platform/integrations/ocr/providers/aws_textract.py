@@ -10,7 +10,9 @@ from agent_platform.integrations.ocr.config import AWSTextractConfig
 from agent_platform.models.chunk import TextChunk
 
 
-def _from_textract(response: dict, document_id: UUID, min_confidence: float) -> list[TextChunk]:
+def _from_textract(
+    response: dict, document_id: UUID, min_confidence: float
+) -> list[TextChunk]:
     chunks: list[TextChunk] = []
 
     for block in response.get("Blocks", []):
@@ -24,27 +26,28 @@ def _from_textract(response: dict, document_id: UUID, min_confidence: float) -> 
         text = block.get("Text", "") or ""
         bbox = block.get("Geometry", {}).get("BoundingBox", {})
 
-        chunks.append(TextChunk(
-            id=uuid4(),
-            document_id=document_id,
-            text=text.strip(),
-            metadata={
-                "confidence": conf,
-                "bbox": {
-                    "left": bbox.get("Left"),
-                    "top": bbox.get("Top"),
-                    "width": bbox.get("Width"),
-                    "height": bbox.get("Height"),
+        chunks.append(
+            TextChunk(
+                id=uuid4(),
+                document_id=document_id,
+                text=text.strip(),
+                metadata={
+                    "confidence": conf,
+                    "bbox": {
+                        "left": bbox.get("Left"),
+                        "top": bbox.get("Top"),
+                        "width": bbox.get("Width"),
+                        "height": bbox.get("Height"),
+                    },
+                    "page": block.get("Page"),
                 },
-                "page": block.get("Page"),
-            },
-        ))
+            )
+        )
 
     return chunks
 
 
 class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
-
     def __init__(self, config: AWSTextractConfig | None = None) -> None:
         self._config = config or AWSTextractConfig()
         self._client = self._build_client()
@@ -72,7 +75,9 @@ class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
             Document={"Bytes": document_bytes},
         )
 
-        return _from_textract(response, document_id=doc_id, min_confidence=cfg.min_confidence)
+        return _from_textract(
+            response, document_id=doc_id, min_confidence=cfg.min_confidence
+        )
 
     @staticmethod
     def _load_bytes(source: str) -> bytes:

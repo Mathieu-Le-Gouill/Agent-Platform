@@ -7,13 +7,12 @@ from agent_platform.integrations.reranking.config import RerankerConfig
 T = TypeVar("T", bound=TextChunk)
 RerankerConfigT = TypeVar("RerankerConfigT", bound=RerankerConfig)
 
-class BaseReranker(ABC, Generic[T, RerankerConfigT]):
 
+class BaseReranker(ABC, Generic[T, RerankerConfigT]):
     @abstractmethod
     async def rerank(
         self,
         query: str,
         items: Sequence[T],
         config: RerankerConfigT = RerankerConfig(),  # type: ignore[assignment]
-    ) -> Sequence[T]:
-        ...
+    ) -> Sequence[T]: ...

@@ -1,21 +1,23 @@
 from typing import Sequence, AsyncIterator
-import webrtcvad
+import warnings
+
+with warnings.catch_warnings():
+    warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
+    import webrtcvad
 
 from agent_platform.integrations.vad.framebased import FrameBasedVAD
 from agent_platform.integrations.vad.configuration import WebrtcVadConfig
 from agent_platform.models.chunk import AudioChunk
 from agent_platform.models.span import SampleSpan
-from agent_platform.integrations.vad.state import VADState 
+from agent_platform.integrations.vad.state import VADState
 from agent_platform.integrations.vad.requirements import AudioRequirements
 from agent_platform.models.enums import DataType
 from agent_platform.audio.io import AudioIO
 
 
 class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
-
     def __init__(self):
         self.model = webrtcvad.Vad()
-
 
     @property
     def requirements(self) -> AudioRequirements:
@@ -25,17 +27,16 @@ class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
             dtype=DataType.INT16,
             normalized=False,
         )
-    
 
     def detect(
         self,
         audio_sequence: Sequence[AudioChunk],
-        config: WebrtcVadConfig | None = None
-    ) -> list[SampleSpan]: 
-        
+        config: WebrtcVadConfig | None = None,
+    ) -> list[SampleSpan]:
+
         if not audio_sequence:
             return []
-        
+
         config = config or WebrtcVadConfig()
         state = VADState()
 
@@ -56,7 +57,6 @@ class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
                     voiced_frames.append(span)
 
         return voiced_frames
-        
 
     async def adetect(
         self,
@@ -70,7 +70,6 @@ class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
         self.model.set_mode(config.mode)
 
         async for chunk in audio_sequence:
-
             self._validate_chunk(chunk, config.sample_rate)
 
             if self._is_speech(chunk, config):
@@ -81,13 +80,12 @@ class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
                 if span is not None:
                     yield span
 
-
     def _is_speech(
         self,
         chunk: AudioChunk,
         config: WebrtcVadConfig,
     ) -> bool:
-        
+
         return self.model.is_speech(
             AudioIO.to_numpy(chunk),
             config.sample_rate,

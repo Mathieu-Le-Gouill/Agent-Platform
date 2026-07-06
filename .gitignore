@@ -8,3 +8,4 @@ __init__.py
 dist/
 build/
 *.egg-info/
+.coverage

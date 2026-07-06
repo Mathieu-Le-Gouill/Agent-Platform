@@ -7,7 +7,6 @@ from agent_platform.integrations.reranking.langchain_base import LangChainRerank
 
 
 class HuggingFaceRerankerProvider(LangChainReranker):
-
     def __init__(
         self,
         model="BAAI/bge-reranker-v2-m3",
@@ -15,7 +14,6 @@ class HuggingFaceRerankerProvider(LangChainReranker):
         self._model = model
 
         super().__init__()
-
 
     def _client(self) -> CrossEncoderReranker:
 

@@ -13,7 +13,6 @@ from agent_platform.models.enums import Language
 
 
 class WhisperXSTT(BaseSpeechToText):
-
     def __init__(
         self,
         model_size: str = "large-v3",
@@ -80,7 +79,7 @@ class WhisperXSTT(BaseSpeechToText):
     async def stream(
         self, frames: AsyncIterator[AudioChunk]
     ) -> AsyncIterator[Transcript]:
-        
+
         await self._load_model()
 
         buffer: list[AudioChunk] = []
@@ -100,10 +99,8 @@ class WhisperXSTT(BaseSpeechToText):
         if buffer:
             yield await self._transcribe_buffer(buffer)
 
-    async def _transcribe_buffer(
-        self, buffer: list[AudioChunk]
-    ) -> Transcript:
-        
+    async def _transcribe_buffer(self, buffer: list[AudioChunk]) -> Transcript:
+
         model = self._model
 
         if model is None:

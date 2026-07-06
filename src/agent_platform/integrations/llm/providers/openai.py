@@ -1,21 +1,16 @@
 from langchain_openai import ChatOpenAI
 from pydantic import SecretStr
-from openai._types import Omit
-from typing import TypeVar, Any
+from typing import Any
 
-from agent_platform.integrations.llm.config import GenerationConfig, OpenAIConfig, ResponseFormat
+from agent_platform.integrations.llm.config import (
+    GenerationConfig,
+    OpenAIConfig,
+    ResponseFormat,
+)
 from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 
 
-T = TypeVar("T")
-
-
-def _omit_none(value: T | None) -> T | Omit:
-    return value if value is not None else Omit()
-
-
 class OpenAILLM(LangChainLLMProvider):
-
     def __init__(self, api_key: SecretStr) -> None:
         self._api_key = api_key
 
@@ -67,7 +62,9 @@ def _to_langchain_openai(config: GenerationConfig | None) -> dict[str, Any]:
             model_kwargs["response_format"] = {"type": "json_object"}
         case ResponseFormat.JSON_SCHEMA:
             if config.json_schema is None:
-                raise ValueError("json_schema is required for JSON_SCHEMA response format")
+                raise ValueError(
+                    "json_schema is required for JSON_SCHEMA response format"
+                )
             model_kwargs["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {"name": "response", "schema": config.json_schema},
@@ -76,4 +73,3 @@ def _to_langchain_openai(config: GenerationConfig | None) -> dict[str, Any]:
     if model_kwargs:
         params["model_kwargs"] = model_kwargs
     return params
-

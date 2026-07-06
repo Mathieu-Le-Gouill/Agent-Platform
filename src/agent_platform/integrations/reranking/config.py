@@ -5,7 +5,6 @@ from os import getenv
 
 @dataclass(slots=True, frozen=True)
 class RerankerConfig:
-
     top_k: int | None = None
 
     return_scores: bool = False
@@ -24,9 +23,7 @@ class CohereRerankerConfig(RerankerConfig):
 
 @dataclass(slots=True, frozen=True)
 class JinaRerankerConfig(RerankerConfig):
-    api_key: SecretStr | None = (
-        SecretStr(v) if (v := getenv("JINA_API_KEY")) else None
-    )
+    api_key: SecretStr | None = SecretStr(v) if (v := getenv("JINA_API_KEY")) else None
 
 
 @dataclass(slots=True, frozen=True)

@@ -3,24 +3,34 @@ from typing import AsyncIterator
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
-    BaseMessage as LCBaseMessage, HumanMessage, SystemMessage as LCSystemMessage,
-    AIMessage, ToolMessage as LCToolMessage,
+    BaseMessage as LCBaseMessage,
+    HumanMessage,
+    SystemMessage as LCSystemMessage,
+    AIMessage,
+    ToolMessage as LCToolMessage,
 )
 
 from agent_platform.integrations.llm.config import GenerationConfig
-from agent_platform.integrations.llm.response import LLMResponse, StreamChunk, FinishReason
+from agent_platform.integrations.llm.response import (
+    LLMResponse,
+    StreamChunk,
+    FinishReason,
+)
 from agent_platform.models.token import TokenUsage
 from agent_platform.models.message import (
-    AssistantMessage, SystemMessage, UserMessage, ToolMessage, ToolCall, Prompt
+    AssistantMessage,
+    SystemMessage,
+    UserMessage,
+    ToolMessage,
+    ToolCall,
+    Prompt,
 )
 from agent_platform.integrations.llm.base import BaseLLMProvider
 
 
 class LangChainLLMProvider(BaseLLMProvider[GenerationConfig]):
-
     @abstractmethod
-    def _client(self, model: str, config: GenerationConfig | None) -> BaseChatModel:
-        ...
+    def _client(self, model: str, config: GenerationConfig | None) -> BaseChatModel: ...
 
     async def generate(
         self,
@@ -70,6 +80,7 @@ class LangChainLLMProvider(BaseLLMProvider[GenerationConfig]):
 
 # --- Mappers ---
 
+
 def _to_langchain(prompt: Prompt) -> list[LCBaseMessage]:
     result = []
     for m in prompt.messages:
@@ -81,10 +92,12 @@ def _to_langchain(prompt: Prompt) -> list[LCBaseMessage]:
             case AssistantMessage():
                 result.append(AIMessage(content=m.content))
             case ToolMessage():
-                result.append(LCToolMessage(
-                    content=m.result.content,
-                    tool_call_id=m.result.tool_call_id,
-                ))
+                result.append(
+                    LCToolMessage(
+                        content=m.result.content,
+                        tool_call_id=m.result.tool_call_id,
+                    )
+                )
     return result
 
 

@@ -13,11 +13,8 @@ from agent_platform.integrations.chunking.config import ChunkerConfig
 
 
 class LangChainChunker(BaseChunker[TextDocument, TextChunk, ChunkerConfig]):
-
     @abstractmethod
-    def _splitter(self, config: ChunkerConfig | None) -> TextSplitter:
-        ...
-        
+    def _splitter(self, config: ChunkerConfig | None) -> TextSplitter: ...
 
     async def chunk(
         self,
@@ -31,6 +28,7 @@ class LangChainChunker(BaseChunker[TextDocument, TextChunk, ChunkerConfig]):
 
 
 # --- Mappers ---
+
 
 def _doc_to_lc(doc: TextDocument) -> LC_Document:
     return LC_Document(
@@ -53,6 +51,7 @@ def _doc_to_lc(doc: TextDocument) -> LC_Document:
 
 def _lc_to_chunks(lc_chunks: list[LC_Document]) -> list[TextChunk]:
     from uuid import UUID
+
     result = []
     for c in lc_chunks:
         m = c.metadata
@@ -62,18 +61,22 @@ def _lc_to_chunks(lc_chunks: list[LC_Document]) -> list[TextChunk]:
         start_char = m.get("start_index") or m.get("start_char")
         format = m.get("format")
 
-        result.append(TextChunk(
-            id=UUID(chunk_id) if chunk_id else __import__("uuid").uuid4(),
-            document_id=UUID(document_id) if document_id else None,
-            text=c.page_content,
-            index=m.get("index") or 0,
-            format=DocumentFormat(format),
-            start_char=start_char,
-            end_char=(start_char + len(c.page_content)) if start_char is not None else None,
-            metadata={
-                "source": m.get("source"),
-                "language": Language(language) if language else None,
-                "extra": m.get("extra") or {},
-            },
-        ))
+        result.append(
+            TextChunk(
+                id=UUID(chunk_id) if chunk_id else __import__("uuid").uuid4(),
+                document_id=UUID(document_id) if document_id else None,
+                text=c.page_content,
+                index=m.get("index") or 0,
+                format=DocumentFormat(format),
+                start_char=start_char,
+                end_char=(start_char + len(c.page_content))
+                if start_char is not None
+                else None,
+                metadata={
+                    "source": m.get("source"),
+                    "language": Language(language) if language else None,
+                    "extra": m.get("extra") or {},
+                },
+            )
+        )
     return result

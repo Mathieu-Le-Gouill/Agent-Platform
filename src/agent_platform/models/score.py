@@ -22,13 +22,19 @@ class Score(BaseModel, frozen=True):
     @model_validator(mode="after")
     def _validate_bounds(self) -> "Score":
         if self.low >= self.high:
-            raise ValueError(f"Score bounds invalid: low={self.low} >= high={self.high}")
+            raise ValueError(
+                f"Score bounds invalid: low={self.low} >= high={self.high}"
+            )
         if not (self.low <= self.value <= self.high):
-            raise ValueError(f"{self.kind.value} score {self.value} outside [{self.low}, {self.high}]")
+            raise ValueError(
+                f"{self.kind.value} score {self.value} outside [{self.low}, {self.high}]"
+            )
         return self
 
     @classmethod
-    def similarity(cls, value: float, *, low: float = 0.0, high: float = 1.0) -> "Score":
+    def similarity(
+        cls, value: float, *, low: float = 0.0, high: float = 1.0
+    ) -> "Score":
         return cls(value=value, kind=ScoreKind.SIMILARITY, low=low, high=high)
 
     @classmethod

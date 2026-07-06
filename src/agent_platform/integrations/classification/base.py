@@ -6,7 +6,6 @@ from agent_platform.models.chunk import TextChunk
 
 
 class ClassificationModel(ABC):
-
     @abstractmethod
     async def classify(
         self,

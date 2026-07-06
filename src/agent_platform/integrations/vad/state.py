@@ -1,5 +1,6 @@
 from dataclasses import dataclass
 
+
 @dataclass(slots=True)
 class VADState:
     in_speech: bool = False

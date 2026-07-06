@@ -7,7 +7,6 @@ from agent_platform.models.enums import ImageFormat
 
 
 class BaseImageGenerator(ABC):
-
     @abstractmethod
     async def generate(
         self,
