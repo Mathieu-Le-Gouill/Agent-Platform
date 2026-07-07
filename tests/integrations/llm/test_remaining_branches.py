@@ -11,6 +11,9 @@ async def test_stream_content_is_none():
         def _client(self, model, config=None):
             raise NotImplementedError
 
+        def _tool_to_schema(self, tool):
+            raise NotImplementedError
+
     chunk = MagicMock(spec=[])
     chunk.content = None
     chunk.usage_metadata = None

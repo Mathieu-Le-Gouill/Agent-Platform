@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -69,3 +69,15 @@ def mock_langchain_response() -> MagicMock:
     response.tool_calls = []
     response.usage_metadata = {"input_tokens": 10, "output_tokens": 20}
     return response
+
+
+# ---------------------------------------------------------------------------
+# Agent test helpers
+# ---------------------------------------------------------------------------
+
+
+@pytest.fixture
+def mock_llm():
+    llm = MagicMock()
+    llm.generate = AsyncMock()
+    return llm

@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+
 import numpy as np
 import soundfile as sf
 import torch
@@ -102,3 +103,4 @@ class AudioIO:
     @staticmethod
     def to_base64(segment: AudioChunk) -> str:
         return base64.b64encode(segment.data).decode("utf-8")
+

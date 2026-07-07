@@ -5,7 +5,7 @@ import io
 from typing import Any
 
 import torch
-from diffusers import StableDiffusionPipeline
+from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import StableDiffusionPipeline
 from PIL import Image
 
 from agent_platform.integrations.image_generation.base import BaseImageGenerator
@@ -14,6 +14,7 @@ from agent_platform.models.enums import ImageFormat
 
 
 class StableDiffusionGenerator(BaseImageGenerator):
+
     def __init__(
         self,
         model_id: str = "runwayml/stable-diffusion-v1-5",
@@ -51,7 +52,7 @@ class StableDiffusionGenerator(BaseImageGenerator):
         size: str | None = None,
         format: ImageFormat = ImageFormat.PNG,
     ) -> ImageDocument:
-
+        
         await self._load()
         pipeline = self._pipeline
 
@@ -143,13 +144,7 @@ class StableDiffusionGenerator(BaseImageGenerator):
         return docs
 
 
-def _pluck_images(
-    output: Any,
-) -> list[Image.Image]:
-    if isinstance(output, tuple):
-        return list(output[0])
-    return list(output.images)
-
+# --- Utils ---
 
 def _parse_size(size: str | None) -> tuple[int, int]:
     if size is None:
@@ -161,3 +156,11 @@ def _parse_size(size: str | None) -> tuple[int, int]:
         return int(parts[0]), int(parts[1])
     except ValueError:
         return 512, 512
+
+
+def _pluck_images(
+        output:Any,
+) -> list[Image.Image]:
+    if isinstance(output, tuple):
+        return list(output[0])
+    return list(output.images)

@@ -200,6 +200,9 @@ class _TestLLMProvider(LangChainLLMProvider):
     def _client(self, model, config=None):
         raise NotImplementedError
 
+    def _tool_to_schema(self, tool):
+        raise NotImplementedError
+
 
 class TestLangChainLLMProviderStream:
     async def test_stream_with_string_content(self):

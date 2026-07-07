@@ -100,32 +100,6 @@ class TestToolRegistry:
         with pytest.raises(ToolError, match="already registered"):
             registry.register(tool)
 
-    def test_openai_schemas_structure(self, registry):
-        registry.register(_DummyTool())
-        registry.register(_OtherTool())
-        schemas = registry.openai_schemas()
-        assert len(schemas) == 2
-        for s in schemas:
-            assert s["type"] == "function"
-            assert "name" in s["function"]
-            assert "description" in s["function"]
-            assert "parameters" in s["function"]
-
-    def test_openai_schemas_empty(self, registry):
-        assert registry.openai_schemas() == []
-
-    def test_anthropic_schemas_structure(self, registry):
-        registry.register(_DummyTool())
-        schemas = registry.anthropic_schemas()
-        assert len(schemas) == 1
-        s = schemas[0]
-        assert "name" in s
-        assert "description" in s
-        assert "input_schema" in s
-
-    def test_anthropic_schemas_empty(self, registry):
-        assert registry.anthropic_schemas() == []
-
     @pytest.mark.asyncio
     async def test_resolve_call_lookup_and_execute(self, registry):
         registry.register(_DummyTool())

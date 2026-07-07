@@ -3,7 +3,11 @@ from __future__ import annotations
 from typing import Any
 
 from agent_platform.agents.tools.base import Tool, ToolError
-from agent_platform.models.message import ToolCall
+from agent_platform.models.message import (
+    ToolCall,
+    ToolMessage,
+    ToolResult,
+)
 
 
 class ToolRegistry:
@@ -31,15 +35,27 @@ class ToolRegistry:
             raise ToolError(f"Unknown tool: '{name}'")
         del self._tools[name]
 
-    def openai_schemas(self) -> list[dict[str, Any]]:
-        return [tool.to_openai_schema() for tool in self._tools.values()]
-
-    def anthropic_schemas(self) -> list[dict[str, Any]]:
-        return [tool.to_anthropic_schema() for tool in self._tools.values()]
-
     async def resolve_call(self, call: ToolCall) -> Any:
         tool = self.get(call.name)
         return await tool.run(**call.arguments)
+
+    async def call_and_wrap(self, call: ToolCall) -> ToolMessage:
+        try:
+            raw = await self.resolve_call(call)
+            content = str(raw) if raw is not None else ""
+            is_error = False
+        except Exception as exc:
+            content = str(exc)
+            is_error = True
+
+        return ToolMessage(
+            result=ToolResult(
+                tool_call_id=call.id,
+                name=call.name,
+                content=content,
+                is_error=is_error,
+            )
+        )
 
     def __len__(self) -> int:
         return len(self._tools)

@@ -1,5 +1,8 @@
+from __future__ import annotations
+
+import json
 from abc import abstractmethod
-from typing import AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
@@ -27,18 +30,27 @@ from agent_platform.models.message import (
 )
 from agent_platform.integrations.llm.base import BaseLLMProvider
 
+if TYPE_CHECKING:
+    from agent_platform.agents.tools.base import Tool
+
 
 class LangChainLLMProvider(BaseLLMProvider[GenerationConfig]):
     @abstractmethod
     def _client(self, model: str, config: GenerationConfig | None) -> BaseChatModel: ...
+
+    @abstractmethod
+    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]: ...
 
     async def generate(
         self,
         prompt: Prompt,
         model: str,
         config: GenerationConfig | None = None,
+        tools: list[Tool] | None = None,
     ) -> LLMResponse:
         lc = self._client(model, config)
+        if tools:
+            lc = lc.bind_tools([self._tool_to_schema(t) for t in tools])
         response = await lc.ainvoke(_to_langchain(prompt))
         return _from_langchain(response, model)
 
@@ -90,7 +102,22 @@ def _to_langchain(prompt: Prompt) -> list[LCBaseMessage]:
             case UserMessage():
                 result.append(HumanMessage(content=m.content))
             case AssistantMessage():
-                result.append(AIMessage(content=m.content))
+                if m.tool_calls:
+                    lc_tool_calls: list[dict[str, Any]] = [
+                        {
+                            "id": tc.id,
+                            "function": {
+                                "name": tc.name,
+                                "arguments": json.dumps(tc.arguments),
+                            },
+                        }
+                        for tc in m.tool_calls
+                    ]
+                    result.append(
+                        AIMessage(content=m.content, tool_calls=lc_tool_calls)
+                    )
+                else:
+                    result.append(AIMessage(content=m.content))
             case ToolMessage():
                 result.append(
                     LCToolMessage(

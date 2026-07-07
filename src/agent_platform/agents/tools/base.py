@@ -6,10 +6,6 @@ from typing import Any
 from pydantic import BaseModel
 
 from agent_platform.core.errors import PlatformError
-from agent_platform.agents.tools._utils import (
-    tool_to_openai_schema,
-    tool_to_anthropic_schema,
-)
 
 
 class ToolError(PlatformError):
@@ -31,9 +27,3 @@ class Tool(ABC):
 
     @abstractmethod
     async def run(self, **kwargs: Any) -> Any: ...
-
-    def to_openai_schema(self) -> dict[str, Any]:
-        return tool_to_openai_schema(self)
-
-    def to_anthropic_schema(self) -> dict[str, Any]:
-        return tool_to_anthropic_schema(self)

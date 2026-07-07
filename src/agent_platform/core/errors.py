@@ -35,3 +35,22 @@ class LLMTimeoutError(LLMError):
 
 class LLMRateLimitError(LLMError):
     pass
+
+
+# --- Agent errors ---
+
+
+class AgentError(PlatformError):
+    pass
+
+
+class AgentThinkError(AgentError):
+    pass
+
+
+class AgentActError(AgentError):
+    pass
+
+
+class AgentMaxIterations(AgentError):
+    pass

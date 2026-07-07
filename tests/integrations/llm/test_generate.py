@@ -63,6 +63,9 @@ async def test_stream_handles_non_str_non_dict_items():
         def _client(self, model, config=None):
             raise NotImplementedError
 
+        def _tool_to_schema(self, tool):
+            raise NotImplementedError
+
     chunk = MagicMock(spec=[])
     chunk.content = [1, 2, 3]
     chunk.usage_metadata = None

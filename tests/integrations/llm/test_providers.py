@@ -1,8 +1,9 @@
 from uuid import uuid4
 
 import pytest
-from pydantic import SecretStr
+from pydantic import BaseModel, SecretStr
 
+from agent_platform.agents.tools.base import Tool
 from agent_platform.integrations.llm.config import (
     GenerationConfig,
     AnthropicConfig,
@@ -296,3 +297,41 @@ class TestOllamaLLMConstruction:
     def test_construct(self):
         provider = OllamaLLM()
         assert hasattr(provider, "_client")
+
+
+class _SchemaTool(Tool):
+    name = "test_tool"
+    description = "A test tool"
+    input_schema = BaseModel
+
+    async def run(self, **kwargs):
+        return None
+
+
+class OpenAISchemaTest:
+    def test_openai_schema(self):
+        provider = OpenAILLM(api_key=SecretStr("sk-test"))
+        tool = _SchemaTool()
+        schema = provider._tool_to_schema(tool)
+        assert schema["type"] == "function"
+        assert schema["function"]["name"] == "test_tool"
+        assert "parameters" in schema["function"]
+
+    def test_anthropic_schema(self):
+        provider = AnthropicLLM(api_key=SecretStr("sk-ant-test"))
+        tool = _SchemaTool()
+        schema = provider._tool_to_schema(tool)
+        assert schema["name"] == "test_tool"
+        assert "input_schema" in schema
+
+    def test_mistral_schema(self):
+        provider = MistralLLM(api_key=SecretStr("sk-mist-test"))
+        tool = _SchemaTool()
+        schema = provider._tool_to_schema(tool)
+        assert schema["type"] == "function"
+
+    def test_ollama_schema(self):
+        provider = OllamaLLM()
+        tool = _SchemaTool()
+        schema = provider._tool_to_schema(tool)
+        assert schema["type"] == "function"

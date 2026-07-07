@@ -3,9 +3,13 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool, ToolError
-from agent_platform.agents.tools._utils import safe_call, audio_chunk
+from uuid import uuid4
+
+from agent_platform.agents.tools._utils import safe_call
 from agent_platform.integrations.speech.base import BaseSpeechToText
+from agent_platform.models.chunk import AudioChunk
 from agent_platform.models.conversation import Transcript
+from agent_platform.models.enums import AudioFormat, DataType
 
 
 class TranscribeInput(BaseModel):
@@ -27,10 +31,13 @@ class TranscribeTool(Tool):
 
     async def run(self, **kwargs) -> Transcript:
         validated = TranscribeInput(**kwargs)
-        chunk = audio_chunk(
+        chunk = AudioChunk(
+            id=uuid4(),
             data=validated.data,
             sample_rate=validated.sample_rate,
             channels=validated.channels,
+            dtype=DataType.FLOAT32,
+            format=AudioFormat.UNKNOWN,
         )
         result = await safe_call(
             self._provider.transcribe(chunk),

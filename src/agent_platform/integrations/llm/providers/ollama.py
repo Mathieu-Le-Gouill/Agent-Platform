@@ -1,11 +1,29 @@
-from langchain_ollama import ChatOllama
-from typing import Any
+from __future__ import annotations
 
+from typing import TYPE_CHECKING, Any
+
+from langchain_ollama import ChatOllama
+
+from agent_platform.core.schema import model_schema
 from agent_platform.integrations.llm.config import GenerationConfig, ResponseFormat
 from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 
+if TYPE_CHECKING:
+    from agent_platform.agents.tools.base import Tool
+
 
 class OllamaLLM(LangChainLLMProvider):
+    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
+        schema = model_schema(tool.input_schema)
+        return {
+            "type": "function",
+            "function": {
+                "name": tool.name,
+                "description": tool.description,
+                "parameters": schema,
+            },
+        }
+
     def _client(
         self,
         model: str,

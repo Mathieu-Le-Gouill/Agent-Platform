@@ -50,3 +50,4 @@ class VideoChunk(Chunk, frozen=True):
     height: int | None = None
     frame_rate: float | None = None
     format: VideoFormat = VideoFormat.UNKNOWN
+

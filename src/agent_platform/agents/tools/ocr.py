@@ -5,10 +5,11 @@ from uuid import uuid4
 from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool
-from agent_platform.agents.tools._utils import safe_call, filter_by_confidence
+from agent_platform.agents.tools._utils import safe_call
 from agent_platform.integrations.ocr.base import BaseOCR
 from agent_platform.integrations.ocr.config import OCRConfig
 from agent_platform.models.chunk import TextChunk
+from agent_platform.utils.score import filter_by_score
 
 
 class OCRInput(BaseModel):
@@ -50,4 +51,8 @@ class OCRTool(Tool):
             ),
             "OCR extraction failed",
         )
-        return filter_by_confidence(results, validated.min_confidence)
+        return filter_by_score(
+            results,
+            validated.min_confidence,
+            key=lambda c: c.metadata.get("confidence") or 1.0,
+        )

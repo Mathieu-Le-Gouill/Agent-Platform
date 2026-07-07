@@ -3,7 +3,9 @@ from __future__ import annotations
 from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool, ToolError
-from agent_platform.agents.tools._utils import safe_call, text_chunk
+from uuid import uuid4
+
+from agent_platform.agents.tools._utils import safe_call
 from agent_platform.integrations.embeddings.base import BaseEmbeddingProvider
 from agent_platform.integrations.vector_store.port import VectorStore
 from agent_platform.models.chunk import TextChunk
@@ -44,7 +46,7 @@ class SearchTool(Tool):
 
     async def run(self, **kwargs) -> list[SearchResult]:
         validated = SearchInput(**kwargs)
-        query_chunk = text_chunk(validated.query)
+        query_chunk = TextChunk(id=uuid4(), text=validated.query, index=0)
         response = await safe_call(
             self._embedder.encode([query_chunk]),
             "Embedding failed",
