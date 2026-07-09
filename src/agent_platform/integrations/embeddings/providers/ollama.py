@@ -1,24 +1,44 @@
 from langchain_ollama import OllamaEmbeddings
+from typing import Any
 
 from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
 from agent_platform.integrations.embeddings.config import OllamaEmbeddingConfig
+from agent_platform.integrations.credentials import (
+    OllamaCredentials,
+    resolve_timeout,
+)
 
 
-class OllamaEmbeddingProvider(LangChainEmbedder):
-    def __init__(
-        self,
-        model="nomic-embed-text",
-        config: OllamaEmbeddingConfig | None = None,
-    ):
+class OllamaEmbeddingProvider(LangChainEmbedder[OllamaCredentials, OllamaEmbeddingConfig]):
+    def __init__(self, credentials: OllamaCredentials | None = None) -> None:
+        super().__init__(credentials if credentials is not None else OllamaCredentials())
 
-        self._model = model
-        self.config = config or OllamaEmbeddingConfig()
-
-        super().__init__()
-
-    def _build_client(self):
-
+    def _client(self, config: OllamaEmbeddingConfig) -> OllamaEmbeddings:
         return OllamaEmbeddings(
-            model=self._model,
-            base_url=self.config.base_url,
+            model=config.model,
+            base_url=self._credentials.base_url,
+            **_to_langchain_ollama(config, self._credentials)
         )
+        
+    def _default_config(self) -> OllamaEmbeddingConfig: 
+        return OllamaEmbeddingConfig()
+
+def _to_langchain_ollama(
+    config: OllamaEmbeddingConfig,
+    credentials: OllamaCredentials,
+) -> dict[str, Any]:
+    params: dict[str, Any] = {}
+    if config.dimensions is not None:
+        params["dimensions"] = config.dimensions
+    if config.temperature is not None:
+        params["temperature"] = config.temperature
+    if config.top_p is not None:
+        params["top_p"] = config.top_p
+    if config.top_k is not None:
+        params["top_k"] = config.top_k
+
+    timeout = resolve_timeout(config.timeout, credentials)
+    if timeout is not None:
+        params["timeout"] = timeout
+
+    return params

@@ -1,13 +1,47 @@
-from abc import ABC, abstractmethod
-from typing import Sequence
+from __future__ import annotations
 
+from abc import ABC, abstractmethod
+
+from typing import Generic, Sequence, TypeVar
+
+from agent_platform.integrations.embeddings.config import EmbeddingConfig
 from agent_platform.integrations.embeddings.response import EmbeddingResponse
+from agent_platform.integrations.credentials import BaseCredentials
 from agent_platform.models.chunk import TextChunk
 
+EmbeddingConfigT = TypeVar("EmbeddingConfigT", bound=EmbeddingConfig)
+CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials, covariant=True)
 
-class BaseEmbeddingProvider(ABC):
+
+class BaseEmbeddingProvider(ABC, Generic[CredentialsT, EmbeddingConfigT]):
+
+    def __init__(self, credentials: CredentialsT) -> None:
+        self._credentials = credentials
+
     @abstractmethod
-    async def encode(
+    def embed_document(
         self,
         items: Sequence[TextChunk],
+        config: EmbeddingConfigT | None = None,
+    ) -> EmbeddingResponse: ...
+
+    @abstractmethod
+    async def aembed_document(
+        self,
+        items: Sequence[TextChunk],
+        config: EmbeddingConfigT | None = None,
+    ) -> EmbeddingResponse: ...
+
+    @abstractmethod
+    def embed_query(
+        self,
+        query: str,
+        config: EmbeddingConfigT | None = None,
+    ) -> EmbeddingResponse: ...
+
+    @abstractmethod
+    async def aembed_query(
+        self,
+        query: str,
+        config: EmbeddingConfigT | None = None,
     ) -> EmbeddingResponse: ...

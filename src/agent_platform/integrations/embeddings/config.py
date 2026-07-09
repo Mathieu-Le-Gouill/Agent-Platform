@@ -1,35 +1,50 @@
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
+from enum import Enum
 
 
-@dataclass(slots=True, frozen=True)
-class EmbeddingConfig:
+
+class EmbeddingConfig(BaseModel):
+
+    model_config = ConfigDict(populate_by_name=True)
+
+    model: str = ""
     batch_size: int = 32
-    normalize: bool = True
-    truncate: bool = True
-
     dimensions: int | None = None
-
-    device: str | None = None
-    show_progress: bool = False
-
-
-@dataclass(slots=True, frozen=True)
-class OpenAIEmbeddingConfig(EmbeddingConfig):
-    organization: str | None = None
     timeout: float | None = None
 
 
-@dataclass(slots=True, frozen=True)
-class SentenceTransformerConfig(EmbeddingConfig):
+class OpenAIEmbeddingConfig(EmbeddingConfig):
+    model: str = "text-embedding-ada-002"
+    max_retries: int | None = None
+    model_kwargs: dict | None = None
+
+
+class HuggingFaceEmbeddingMode(str, Enum):
+    LOCAL = "local"
+    HOSTED = "hosted"
+
+class HuggingFaceEmbeddingConfig(EmbeddingConfig):
+    model: str = "sentence-transformers/all-MiniLM-L6-v2"
+    mode: HuggingFaceEmbeddingMode = HuggingFaceEmbeddingMode.LOCAL
+
+    # Local only
     model_kwargs: dict | None = None
     encode_kwargs: dict | None = None
 
+    # Hosted only
+    provider: str | None = None
 
-@dataclass(slots=True, frozen=True)
+
 class MistralEmbeddingConfig(EmbeddingConfig):
-    timeout: int | None = None
+    model: str = "mistral-embed"
+    max_retries: int | None = None
+    endpoint: str = "https://api.mistral.ai/v1/"
+    wait_time: int | None = None
+    max_concurrent_requests: int | None = None
 
 
-@dataclass(slots=True, frozen=True)
 class OllamaEmbeddingConfig(EmbeddingConfig):
-    base_url: str = "http://localhost:11434"
+    model: str = "nomic-embed-text"
+    top_p: float | None = None
+    top_k: int | None = None
+    temperature: float | None = None
