@@ -1,18 +1,26 @@
 from unittest.mock import AsyncMock, MagicMock
 
 from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
+from agent_platform.integrations.llm.config import GenerationConfig
+from agent_platform.integrations.credentials import NoCredentials
 from agent_platform.models.message import Prompt, UserMessage
 
 
 async def test_stream_content_is_none():
-    """Cover langchain_base branch 48->57: content is neither str nor list."""
+    """Cover langchain_base branch: content is neither str nor list."""
 
     class _Provider(LangChainLLMProvider):
-        def _client(self, model, config=None):
+        def __init__(self):
+            super().__init__(NoCredentials())
+
+        def _client(self, config):
             raise NotImplementedError
 
         def _tool_to_schema(self, tool):
             raise NotImplementedError
+
+        def _default_config(self):
+            return GenerationConfig()
 
     chunk = MagicMock(spec=[])
     chunk.content = None
@@ -28,7 +36,8 @@ async def test_stream_content_is_none():
     provider._client = MagicMock(return_value=mock_model)
 
     prompt = Prompt(messages=[UserMessage(content="Hi")])
-    results = [c async for c in provider.stream(prompt, model="test")]
+    config = GenerationConfig(model="test")
+    results = [c async for c in provider.stream(prompt, config=config)]
 
     assert len(results) == 1
     assert results[0].delta == ""

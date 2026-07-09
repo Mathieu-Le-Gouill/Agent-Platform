@@ -1,24 +1,19 @@
 from __future__ import annotations
 
-from dataclasses import dataclass
+from pydantic import BaseModel
 from enum import Enum
 
 from agent_platform.models.message import AssistantMessage
 from agent_platform.models.token import TokenUsage
+from agent_platform.models.enums import FinishReason
 
 
-class FinishReason(str, Enum):
-    STOP = "stop"
-    STOP_SEQUENCE = "stop_sequence"
-    LENGTH = "length"
-    TOOL_CALL = "tool_call"
-    CONTENT_FILTER = "content_filter"
-    ERROR = "error"
-    UNKNOWN = "unknown"
+class ResponseFormat(Enum):
+    TEXT = "text"
+    JSON = "json"
+    JSON_SCHEMA = "json_schema"
 
-
-@dataclass(slots=True, frozen=True)
-class LLMResponse:
+class LLMResponse(BaseModel, frozen=True):
     message: AssistantMessage | None
     usage: TokenUsage
     model: str
@@ -26,8 +21,7 @@ class LLMResponse:
     finish_reason: FinishReason = FinishReason.STOP
 
 
-@dataclass(slots=True, frozen=True)
-class StreamChunk:
+class StreamChunk(BaseModel, frozen=True):
     delta: str
-    finish_reason: FinishReason | None = None
+    finish_reason: FinishReason = FinishReason.STOP
     usage: TokenUsage | None = None

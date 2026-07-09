@@ -5,15 +5,23 @@ from typing import TYPE_CHECKING, Any
 from langchain_ollama import ChatOllama
 
 from agent_platform.core.schema import model_schema
-from agent_platform.integrations.llm.config import GenerationConfig, ResponseFormat
+from agent_platform.integrations.llm.config import OllamaGenerationConfig
+from agent_platform.integrations.credentials import (
+    OllamaCredentials,
+    resolve_timeout,
+)
+from agent_platform.integrations.llm.response import ResponseFormat
 from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class OllamaLLM(LangChainLLMProvider):
-    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
+class OllamaLLM(LangChainLLMProvider[OllamaCredentials, OllamaGenerationConfig]):
+    def __init__(self, credentials: OllamaCredentials | None = None) -> None:
+        super().__init__(credentials if credentials is not None else OllamaCredentials())
+
+    def _tool_to_schema(self, tool: "Tool") -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
         return {
             "type": "function",
@@ -21,25 +29,26 @@ class OllamaLLM(LangChainLLMProvider):
                 "name": tool.name,
                 "description": tool.description,
                 "parameters": schema,
+                "required": [],
             },
         }
 
-    def _client(
-        self,
-        model: str,
-        config: GenerationConfig | None,
-    ) -> ChatOllama:
-        cfg = config or GenerationConfig()
+    def _client(self, config: OllamaGenerationConfig) -> ChatOllama:
+
         return ChatOllama(
-            model=model,
-            **_to_langchain_ollama(cfg),
+            model=config.model,
+            base_url=self._credentials.base_url,
+            **_to_langchain_ollama(config, self._credentials),
         )
+    
+    def _default_config(self) -> OllamaGenerationConfig: 
+        return OllamaGenerationConfig()
 
 
-def _to_langchain_ollama(config: GenerationConfig | None) -> dict[str, Any]:
-    if config is None:
-        return {}
-
+def _to_langchain_ollama(
+    config: OllamaGenerationConfig,
+    credentials: OllamaCredentials,
+) -> dict[str, Any]:
     params: dict[str, Any] = {"temperature": config.temperature}
     if config.max_tokens is not None:
         params["num_predict"] = config.max_tokens
@@ -53,8 +62,10 @@ def _to_langchain_ollama(config: GenerationConfig | None) -> dict[str, Any]:
         params["stop"] = config.stop_sequences
     if config.frequency_penalty is not None:
         params["repeat_penalty"] = config.frequency_penalty
-    if config.timeout is not None:
-        params["timeout"] = config.timeout
+
+    timeout = resolve_timeout(config.timeout, credentials)
+    if timeout is not None:
+        params["timeout"] = timeout
 
     match config.response_format:
         case ResponseFormat.JSON:

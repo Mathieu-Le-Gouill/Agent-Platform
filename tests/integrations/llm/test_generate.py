@@ -3,7 +3,10 @@ from unittest.mock import AsyncMock, MagicMock, patch
 import pytest
 from pydantic import SecretStr
 
-from agent_platform.integrations.llm.config import GenerationConfig
+pytest.importorskip("langchain_openai")
+
+from agent_platform.integrations.llm.config import GenerationConfig, OpenAIGenerationConfig
+from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.models.message import Prompt, UserMessage
 
 
@@ -13,7 +16,7 @@ class _TestConcreteLLM:
     def __init__(self):
         from agent_platform.integrations.llm.providers.openai import OpenAILLM
 
-        self.provider = OpenAILLM(api_key=SecretStr("sk-test"))
+        self.provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")))
         self.mock_client = MagicMock()
         self.provider._client = MagicMock(return_value=self.mock_client)
 
@@ -27,7 +30,8 @@ async def test_generate():
     c.mock_client.ainvoke = AsyncMock(return_value=mock_response)
 
     prompt = Prompt(messages=[UserMessage(content="Hi")])
-    result = await c.provider.generate(prompt, model="gpt-4")
+    config = OpenAIGenerationConfig(model="gpt-4")
+    result = await c.provider.agenerate(prompt, config=config)
 
     assert result.message.content == "Hello world"
     assert result.model == "gpt-4"
@@ -45,26 +49,58 @@ async def test_generate_with_openai_client(mock_chat):
 
     from agent_platform.integrations.llm.providers.openai import OpenAILLM
 
-    provider = OpenAILLM(api_key=SecretStr("sk-test"))
+    provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")))
 
     prompt = Prompt(messages=[UserMessage(content="Hi")])
-    result = await provider.generate(prompt, model="gpt-4")
+    config = OpenAIGenerationConfig(model="gpt-4")
+    result = await provider.agenerate(prompt, config=config)
 
     assert result.message.content == "Response"
     mock_chat.assert_called_once()
     mock_instance.ainvoke.assert_called_once()
 
 
+async def test_sync_generate():
+    from agent_platform.integrations.llm.providers.openai import OpenAILLM
+    from unittest.mock import MagicMock
+
+    provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")))
+    mock_response = MagicMock()
+    mock_response.content = "Sync hello"
+    mock_response.tool_calls = None
+    mock_response.usage_metadata = None
+    mock_client = MagicMock()
+    mock_client.invoke.return_value = mock_response
+    provider._client = MagicMock(return_value=mock_client)
+
+    prompt = Prompt(messages=[UserMessage(content="Hi")])
+    config = OpenAIGenerationConfig(model="gpt-4")
+    result = provider.generate(prompt, config=config)
+
+    assert result.message.content == "Sync hello"
+    assert result.model == "gpt-4"
+    mock_client.invoke.assert_called_once()
+
+
 async def test_stream_handles_non_str_non_dict_items():
     from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
     from agent_platform.models.message import UserMessage, Prompt
 
+    from agent_platform.integrations.credentials import NoCredentials
+
     class _Provider(LangChainLLMProvider):
-        def _client(self, model, config=None):
+        def __init__(self):
+            super().__init__(NoCredentials())
+
+        def _client(self, config):
             raise NotImplementedError
 
         def _tool_to_schema(self, tool):
             raise NotImplementedError
+
+        def _default_config(self):
+            from agent_platform.integrations.llm.config import GenerationConfig
+            return GenerationConfig()
 
     chunk = MagicMock(spec=[])
     chunk.content = [1, 2, 3]
@@ -80,7 +116,8 @@ async def test_stream_handles_non_str_non_dict_items():
     provider._client = MagicMock(return_value=mock_model)
 
     prompt = Prompt(messages=[UserMessage(content="Hi")])
-    results = [c async for c in provider.stream(prompt, model="test")]
+    config = GenerationConfig(model="test")
+    results = [c async for c in provider.stream(prompt, config=config)]
 
     assert len(results) == 1
     assert results[0].delta == ""

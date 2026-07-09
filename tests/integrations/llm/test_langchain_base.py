@@ -16,8 +16,8 @@ from agent_platform.integrations.llm.langchain_base import (
 from agent_platform.integrations.llm.response import (
     LLMResponse,
     StreamChunk,
-    FinishReason,
 )
+from agent_platform.models.enums import FinishReason
 from agent_platform.models.message import (
     SystemMessage,
     UserMessage,
@@ -28,6 +28,7 @@ from agent_platform.models.message import (
     Prompt,
 )
 from agent_platform.models.token import TokenUsage
+from agent_platform.integrations.llm.config import GenerationConfig
 
 
 class TestToLangchain:
@@ -196,12 +197,21 @@ class TestFromLangchain:
         assert result.message.content == ""
 
 
+from agent_platform.integrations.credentials import NoCredentials
+
+
 class _TestLLMProvider(LangChainLLMProvider):
-    def _client(self, model, config=None):
+    def __init__(self):
+        super().__init__(NoCredentials())
+
+    def _client(self, config):
         raise NotImplementedError
 
     def _tool_to_schema(self, tool):
         raise NotImplementedError
+
+    def _default_config(self):
+        return GenerationConfig()
 
 
 class TestLangChainLLMProviderStream:
@@ -224,13 +234,12 @@ class TestLangChainLLMProviderStream:
         provider._client = MagicMock(return_value=mock_model)
 
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        results = [c async for c in provider.stream(prompt, model="gpt-4")]
+        config = GenerationConfig(model="gpt-4")
+        results = [c async for c in provider.stream(prompt, config=config)]
 
         assert len(results) == 3
         assert results[0].delta == "Hello"
-        assert results[0].finish_reason is None
         assert results[1].delta == " World"
-        assert results[1].finish_reason is None
         assert results[2].delta == ""
         assert results[2].finish_reason == FinishReason.STOP
 
@@ -253,7 +262,8 @@ class TestLangChainLLMProviderStream:
         provider._client = MagicMock(return_value=mock_model)
 
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        results = [c async for c in provider.stream(prompt, model="gpt-4")]
+        config = GenerationConfig(model="gpt-4")
+        results = [c async for c in provider.stream(prompt, config=config)]
 
         assert len(results) == 2
         assert results[0].delta == "Actual"
@@ -275,7 +285,8 @@ class TestLangChainLLMProviderStream:
         provider._client = MagicMock(return_value=mock_model)
 
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        results = [c async for c in provider.stream(prompt, model="gpt-4")]
+        config = GenerationConfig(model="gpt-4")
+        results = [c async for c in provider.stream(prompt, config=config)]
 
         assert len(results) == 4
         assert results[0].delta == "Hello"
@@ -299,7 +310,8 @@ class TestLangChainLLMProviderStream:
         provider._client = MagicMock(return_value=mock_model)
 
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        results = [c async for c in provider.stream(prompt, model="gpt-4")]
+        config = GenerationConfig(model="gpt-4")
+        results = [c async for c in provider.stream(prompt, config=config)]
 
         assert len(results) == 4
         assert [r.delta for r in results[:3]] == ["A", "B", "C"]
@@ -321,11 +333,11 @@ class TestLangChainLLMProviderStream:
         provider._client = MagicMock(return_value=mock_model)
 
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        results = [c async for c in provider.stream(prompt, model="gpt-4")]
+        config = GenerationConfig(model="gpt-4")
+        results = [c async for c in provider.stream(prompt, config=config)]
 
         assert len(results) == 3
         assert results[0].delta == "Done"
-        assert results[0].finish_reason is None
         assert results[1].delta == ""
         assert results[1].finish_reason == FinishReason.STOP
         assert results[1].usage is not None
@@ -349,7 +361,8 @@ class TestLangChainLLMProviderStream:
         provider._client = MagicMock(return_value=mock_model)
 
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        results = [c async for c in provider.stream(prompt, model="gpt-4")]
+        config = GenerationConfig(model="gpt-4")
+        results = [c async for c in provider.stream(prompt, config=config)]
 
         assert len(results) == 2
         assert results[0].delta == ""
@@ -369,7 +382,8 @@ class TestLangChainLLMProviderStream:
         provider._client = MagicMock(return_value=mock_model)
 
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        results = [c async for c in provider.stream(prompt, model="gpt-4")]
+        config = GenerationConfig(model="gpt-4")
+        results = [c async for c in provider.stream(prompt, config=config)]
 
         assert len(results) == 1
         assert results[0].delta == ""

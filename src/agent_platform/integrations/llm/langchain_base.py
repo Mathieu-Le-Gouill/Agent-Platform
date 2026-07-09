@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import json
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, AsyncIterator
+from typing import TYPE_CHECKING, Any, AsyncIterator, Generic
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
@@ -13,7 +13,6 @@ from langchain_core.messages import (
     ToolMessage as LCToolMessage,
 )
 
-from agent_platform.integrations.llm.config import GenerationConfig
 from agent_platform.integrations.llm.response import (
     LLMResponse,
     StreamChunk,
@@ -28,39 +27,64 @@ from agent_platform.models.message import (
     ToolCall,
     Prompt,
 )
-from agent_platform.integrations.llm.base import BaseLLMProvider
+from agent_platform.integrations.llm.base import (
+    BaseLLMProvider,
+    CredentialsT,
+    GenerationConfigT,
+)
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class LangChainLLMProvider(BaseLLMProvider[GenerationConfig]):
+class LangChainLLMProvider(
+    BaseLLMProvider[CredentialsT, GenerationConfigT],
+    Generic[CredentialsT, GenerationConfigT],
+):
     @abstractmethod
-    def _client(self, model: str, config: GenerationConfig | None) -> BaseChatModel: ...
+    def _client(self, config: GenerationConfigT) -> BaseChatModel: ...
 
     @abstractmethod
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]: ...
 
-    async def generate(
+    @abstractmethod
+    def _default_config(self) -> GenerationConfigT: ...
+
+    def generate(
         self,
         prompt: Prompt,
-        model: str,
-        config: GenerationConfig | None = None,
+        config: GenerationConfigT | None = None,
         tools: list[Tool] | None = None,
     ) -> LLMResponse:
-        lc = self._client(model, config)
+        config = config or self._default_config()
+
+        lc = self._client(config)
+        if tools:
+            lc = lc.bind_tools([self._tool_to_schema(t) for t in tools])
+        response = lc.invoke(_to_langchain(prompt))
+        return _from_langchain(response, config.model)
+
+    async def agenerate(
+        self,
+        prompt: Prompt,
+        config: GenerationConfigT | None = None,
+        tools: list[Tool] | None = None,
+    ) -> LLMResponse:
+        config = config or self._default_config()
+
+        lc = self._client(config)
         if tools:
             lc = lc.bind_tools([self._tool_to_schema(t) for t in tools])
         response = await lc.ainvoke(_to_langchain(prompt))
-        return _from_langchain(response, model)
+        return _from_langchain(response, config.model)
 
     async def stream(
         self,
         prompt: Prompt,
-        model: str,
-        config: GenerationConfig | None = None,
+        config: GenerationConfigT | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        lc = self._client(model, config)
+        config = config or self._default_config()
+        lc = self._client(config)
 
         async for chunk in lc.astream(_to_langchain(prompt)):
             content = chunk.content

@@ -3,21 +3,27 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from langchain_mistralai import ChatMistralAI
-from pydantic import SecretStr
 
 from agent_platform.core.schema import model_schema
-from agent_platform.integrations.llm.config import GenerationConfig, ResponseFormat
+from agent_platform.integrations.llm.config import MistralGenerationConfig
+from agent_platform.integrations.credentials import (
+    MistralCredentials,
+    resolve_max_retries,
+    resolve_timeout,
+)
+from agent_platform.integrations.llm.response import ResponseFormat
 from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
+from agent_platform.core.errors import MissingCredentialError
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class MistralLLM(LangChainLLMProvider):
-    def __init__(self, api_key: SecretStr) -> None:
-        self._api_key = api_key
+class MistralLLM(LangChainLLMProvider[MistralCredentials, MistralGenerationConfig]):
+    def __init__(self, credentials: MistralCredentials | None = None) -> None:
+        super().__init__(credentials if credentials is not None else MistralCredentials())
 
-    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
+    def _tool_to_schema(self, tool: "Tool") -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
         return {
             "type": "function",
@@ -28,23 +34,27 @@ class MistralLLM(LangChainLLMProvider):
             },
         }
 
-    def _client(
-        self,
-        model: str,
-        config: GenerationConfig | None,
-    ) -> ChatMistralAI:
-        cfg = config or GenerationConfig()
+    def _client(self, config: MistralGenerationConfig) -> ChatMistralAI:
+
+        if self._credentials.api_key is None:
+            raise MissingCredentialError("Mistral API key is required but was not provided")
+
         return ChatMistralAI(
-            model_name=model,
-            api_key=self._api_key,
-            **_to_langchain_mistral(cfg),
+            model_name=config.model,
+            api_key=self._credentials.api_key,
+            base_url=self._credentials.base_url,
+
+            **_to_langchain_mistral(config, self._credentials),
         )
+    
+    def _default_config(self) -> MistralGenerationConfig: 
+        return MistralGenerationConfig()
 
 
-def _to_langchain_mistral(config: GenerationConfig | None) -> dict[str, Any]:
-    if config is None:
-        return {}
-
+def _to_langchain_mistral(
+    config: MistralGenerationConfig,
+    credentials: MistralCredentials,
+) -> dict[str, Any]:
     params: dict[str, Any] = {"temperature": config.temperature}
     if config.max_tokens is not None:
         params["max_tokens"] = config.max_tokens
@@ -54,10 +64,11 @@ def _to_langchain_mistral(config: GenerationConfig | None) -> dict[str, Any]:
         params["stop"] = config.stop_sequences
     if config.seed is not None:
         params["random_seed"] = config.seed
-    if config.timeout is not None:
-        params["timeout"] = config.timeout
-    if config.max_retries is not None:
-        params["max_retries"] = config.max_retries
+
+    timeout = resolve_timeout(config.timeout, credentials)
+    if timeout is not None:
+        params["timeout"] = int(timeout)
+    params["max_retries"] = resolve_max_retries(config.max_retries, credentials)
 
     model_kwargs: dict[str, Any] = {}
     if config.frequency_penalty is not None:

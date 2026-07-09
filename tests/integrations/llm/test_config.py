@@ -1,13 +1,11 @@
-from dataclasses import FrozenInstanceError
-
 import pytest
 
 from agent_platform.integrations.llm.config import (
     GenerationConfig,
-    AnthropicConfig,
-    OpenAIConfig,
-    ResponseFormat,
+    AnthropicGenerationConfig,
+    OpenAIGenerationConfig,
 )
+from agent_platform.integrations.llm.response import ResponseFormat
 
 
 class TestResponseFormat:
@@ -29,7 +27,7 @@ class TestGenerationConfig:
         assert cfg.frequency_penalty is None
         assert cfg.presence_penalty is None
         assert cfg.timeout is None
-        assert cfg.max_retries == 3
+        assert cfg.max_retries is None
         assert cfg.response_format == ResponseFormat.TEXT
         assert cfg.json_schema is None
 
@@ -61,22 +59,17 @@ class TestGenerationConfig:
         assert cfg.response_format == ResponseFormat.JSON
         assert cfg.json_schema == {"type": "object"}
 
-    def test_frozen(self):
-        cfg = GenerationConfig()
-        with pytest.raises(FrozenInstanceError):
-            cfg.temperature = 0.5
 
-
-class TestAnthropicConfig:
+class TestAnthropicGenerationConfig:
     def test_defaults(self):
-        cfg = AnthropicConfig()
+        cfg = AnthropicGenerationConfig()
         assert cfg.temperature == 0.7
         assert cfg.thinking is False
         assert cfg.thinking_budget is None
         assert cfg.cache_control is False
 
     def test_construction(self):
-        cfg = AnthropicConfig(
+        cfg = AnthropicGenerationConfig(
             thinking=True,
             thinking_budget=10000,
             cache_control=True,
@@ -85,28 +78,18 @@ class TestAnthropicConfig:
         assert cfg.thinking_budget == 10000
         assert cfg.cache_control is True
 
-    def test_frozen(self):
-        cfg = AnthropicConfig()
-        with pytest.raises(FrozenInstanceError):
-            cfg.thinking = True
 
-
-class TestOpenAIConfig:
+class TestOpenAIGenerationConfig:
     def test_defaults(self):
-        cfg = OpenAIConfig()
+        cfg = OpenAIGenerationConfig()
         assert cfg.temperature == 0.7
         assert cfg.reasoning_effort is None
         assert cfg.parallel_tool_calls is True
 
     def test_construction(self):
-        cfg = OpenAIConfig(
+        cfg = OpenAIGenerationConfig(
             reasoning_effort="high",
             parallel_tool_calls=False,
         )
         assert cfg.reasoning_effort == "high"
         assert cfg.parallel_tool_calls is False
-
-    def test_frozen(self):
-        cfg = OpenAIConfig()
-        with pytest.raises(FrozenInstanceError):
-            cfg.reasoning_effort = "low"

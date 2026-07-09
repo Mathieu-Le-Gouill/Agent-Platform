@@ -5,20 +5,33 @@ from typing import TYPE_CHECKING, AsyncIterator, Generic, TypeVar
 
 from agent_platform.models.message import Prompt
 from agent_platform.integrations.llm.config import GenerationConfig
+from agent_platform.integrations.credentials import BaseCredentials
 from agent_platform.integrations.llm.response import LLMResponse, StreamChunk
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
+CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
 GenerationConfigT = TypeVar("GenerationConfigT", bound=GenerationConfig)
 
 
-class BaseLLMProvider(ABC, Generic[GenerationConfigT]):
+class BaseLLMProvider(ABC, Generic[CredentialsT, GenerationConfigT]):
+
+    def __init__(self, credentials: CredentialsT) -> None:
+        self._credentials = credentials
+
     @abstractmethod
-    async def generate(
+    def generate(
         self,
         prompt: Prompt,
-        model: str,
+        config: GenerationConfigT | None = None,
+        tools: list[Tool] | None = None,
+    ) -> LLMResponse: ...
+
+    @abstractmethod
+    async def agenerate(
+        self,
+        prompt: Prompt,
         config: GenerationConfigT | None = None,
         tools: list[Tool] | None = None,
     ) -> LLMResponse: ...
@@ -27,6 +40,5 @@ class BaseLLMProvider(ABC, Generic[GenerationConfigT]):
     def stream(
         self,
         prompt: Prompt,
-        model: str,
         config: GenerationConfigT | None = None,
     ) -> AsyncIterator[StreamChunk]: ...

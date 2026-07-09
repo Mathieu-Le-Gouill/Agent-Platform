@@ -56,8 +56,8 @@ class TestLLMResponse:
         assert response.message is None
 
     def test_frozen(self):
-        from dataclasses import FrozenInstanceError
         import pytest
+        from pydantic import ValidationError
 
         usage = TokenUsage.zero()
         response = LLMResponse(
@@ -65,7 +65,7 @@ class TestLLMResponse:
             usage=usage,
             model="test",
         )
-        with pytest.raises(FrozenInstanceError):
+        with pytest.raises(ValidationError):
             response.model = "other"
 
 
@@ -73,7 +73,7 @@ class TestStreamChunk:
     def test_minimal(self):
         chunk = StreamChunk(delta="Hello")
         assert chunk.delta == "Hello"
-        assert chunk.finish_reason is None
+        assert chunk.finish_reason == FinishReason.STOP
         assert chunk.usage is None
 
     def test_with_finish_reason(self):
@@ -87,9 +87,9 @@ class TestStreamChunk:
         assert chunk.usage.input_tokens == 10
 
     def test_frozen(self):
-        from dataclasses import FrozenInstanceError
         import pytest
+        from pydantic import ValidationError
 
         chunk = StreamChunk(delta="test")
-        with pytest.raises(FrozenInstanceError):
+        with pytest.raises(ValidationError):
             chunk.delta = "changed"

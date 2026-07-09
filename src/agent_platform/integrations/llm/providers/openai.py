@@ -3,52 +3,55 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any
 
 from langchain_openai import ChatOpenAI
-from pydantic import SecretStr
 
 from agent_platform.core.schema import model_schema
-from agent_platform.integrations.llm.config import (
-    GenerationConfig,
-    OpenAIConfig,
-    ResponseFormat,
+from agent_platform.integrations.llm.config import OpenAIGenerationConfig
+from agent_platform.integrations.credentials import (
+    OpenAICredentials,
+    resolve_max_retries,
+    resolve_timeout,
 )
+from agent_platform.integrations.llm.response import ResponseFormat
 from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
+from agent_platform.core.errors import MissingCredentialError
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class OpenAILLM(LangChainLLMProvider):
-    def __init__(self, api_key: SecretStr) -> None:
-        self._api_key = api_key
+class OpenAILLM(LangChainLLMProvider[OpenAICredentials, OpenAIGenerationConfig]):
+    def __init__(self, credentials: OpenAICredentials | None = None) -> None:
+        super().__init__(credentials if credentials is not None else OpenAICredentials())
 
-    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
+    def _tool_to_schema(self, tool: "Tool") -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
         return {
-            "type": "function",
-            "function": {
-                "name": tool.name,
-                "description": tool.description,
-                "parameters": schema,
-            },
+            "name": tool.name,
+            "description": tool.description,
+            "parameters": schema,
+            "strict": True,
         }
 
-    def _client(
-        self,
-        model: str,
-        config: GenerationConfig | None,
-    ) -> ChatOpenAI:
-        cfg = config or GenerationConfig()
+    def _client(self, config: OpenAIGenerationConfig) -> ChatOpenAI:
+
+        if self._credentials.api_key is None:
+            raise MissingCredentialError("OPENAI API key is required but was not provided")
+        
         return ChatOpenAI(
-            model=model,
-            api_key=self._api_key,
-            **_to_langchain_openai(cfg),
+            model=config.model,
+            api_key=self._credentials.api_key,
+            base_url=self._credentials.base_url,
+            **_to_langchain_openai(config, self._credentials),
         )
+    
+    def _default_config(self) -> OpenAIGenerationConfig: 
+        return OpenAIGenerationConfig()
 
 
-def _to_langchain_openai(config: GenerationConfig | None) -> dict[str, Any]:
-    if config is None:
-        return {}
-
+def _to_langchain_openai(
+    config: OpenAIGenerationConfig,
+    credentials: OpenAICredentials,
+) -> dict[str, Any]:
     params: dict[str, Any] = {"temperature": config.temperature}
     if config.max_tokens is not None:
         params["max_tokens"] = config.max_tokens
@@ -58,10 +61,11 @@ def _to_langchain_openai(config: GenerationConfig | None) -> dict[str, Any]:
         params["stop"] = config.stop_sequences
     if config.seed is not None:
         params["seed"] = config.seed
-    if config.timeout is not None:
-        params["timeout"] = config.timeout
-    if config.max_retries is not None:
-        params["max_retries"] = config.max_retries
+
+    timeout = resolve_timeout(config.timeout, credentials)
+    if timeout is not None:
+        params["timeout"] = timeout
+    params["max_retries"] = resolve_max_retries(config.max_retries, credentials)
 
     model_kwargs: dict[str, Any] = {}
     if config.frequency_penalty is not None:
@@ -69,11 +73,10 @@ def _to_langchain_openai(config: GenerationConfig | None) -> dict[str, Any]:
     if config.presence_penalty is not None:
         model_kwargs["presence_penalty"] = config.presence_penalty
 
-    if isinstance(config, OpenAIConfig):
-        if config.reasoning_effort is not None:
-            model_kwargs["reasoning_effort"] = config.reasoning_effort
-        if not config.parallel_tool_calls:
-            model_kwargs["parallel_tool_calls"] = config.parallel_tool_calls
+    if config.reasoning_effort is not None:
+        model_kwargs["reasoning_effort"] = config.reasoning_effort
+    if not config.parallel_tool_calls:
+        model_kwargs["parallel_tool_calls"] = config.parallel_tool_calls
 
     match config.response_format:
         case ResponseFormat.JSON:
