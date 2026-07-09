@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Sequence
+from typing import Sequence, Generic
 
 from langchain_text_splitters import TextSplitter
 from langchain_core.documents import Document as LC_Document
@@ -8,19 +8,27 @@ from agent_platform.models.chunk import TextChunk
 from agent_platform.models.document import TextDocument
 from agent_platform.models.enums import Language, DocumentFormat
 
-from agent_platform.integrations.chunking.base import BaseChunker
-from agent_platform.integrations.chunking.config import ChunkerConfig
+from agent_platform.integrations.chunking.base import (
+    BaseChunker, 
+    ChunkerConfigT,
+    CredentialsT,
+)
 
-
-class LangChainChunker(BaseChunker[TextDocument, TextChunk, ChunkerConfig]):
+class LangChainChunker(BaseChunker[CredentialsT, TextDocument, TextChunk, ChunkerConfigT], Generic[CredentialsT, ChunkerConfigT]):
+    
     @abstractmethod
-    def _splitter(self, config: ChunkerConfig | None) -> TextSplitter: ...
+    def _splitter(self, config: ChunkerConfigT) -> TextSplitter: ...
 
-    async def chunk(
+    @abstractmethod
+    def _default_config(self) -> ChunkerConfigT: ...
+
+    def chunk(
         self,
         documents: Sequence[TextDocument],
-        config: ChunkerConfig | None = None,
+        config: ChunkerConfigT | None,
     ) -> list[TextChunk]:
+        config = config or self._default_config()
+
         splitter = self._splitter(config)
         lc_documents = [_doc_to_lc(doc) for doc in documents]
         lc_chunks = splitter.split_documents(lc_documents)
@@ -61,12 +69,22 @@ def _lc_to_chunks(lc_chunks: list[LC_Document]) -> list[TextChunk]:
         start_char = m.get("start_index") or m.get("start_char")
         format = m.get("format")
 
+        try:
+            parsed_chunk_id = UUID(chunk_id) if chunk_id else None
+        except ValueError:
+            parsed_chunk_id = None
+
+        try:
+            parsed_document_id = UUID(document_id) if document_id else None
+        except ValueError:
+            parsed_document_id = None
+
         result.append(
             TextChunk(
-                id=UUID(chunk_id) if chunk_id else __import__("uuid").uuid4(),
-                document_id=UUID(document_id) if document_id else None,
+                id=parsed_chunk_id or __import__("uuid").uuid4(),
+                document_id=parsed_document_id,
                 text=c.page_content,
-                index=m.get("index") or 0,
+                index=m.get("index", 0),
                 format=DocumentFormat(format),
                 start_char=start_char,
                 end_char=(start_char + len(c.page_content))
@@ -75,7 +93,7 @@ def _lc_to_chunks(lc_chunks: list[LC_Document]) -> list[TextChunk]:
                 metadata={
                     "source": m.get("source"),
                     "language": Language(language) if language else None,
-                    "extra": m.get("extra") or {},
+                    "extra": m.get("extra", {}),
                 },
             )
         )

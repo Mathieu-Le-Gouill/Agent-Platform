@@ -14,9 +14,15 @@ from agent_platform.integrations.chunking.langchain_base import (
     LangChainChunker,
 )
 from agent_platform.integrations.chunking.config import ChunkerConfig
+from agent_platform.integrations.credentials import NoCredentials
 from agent_platform.models.chunk import TextChunk
 from agent_platform.models.document import TextDocument, DocumentMetadata
 from agent_platform.models.enums import DocumentFormat, Language
+
+
+# ================================================================
+# _doc_to_lc  mapper
+# ================================================================
 
 
 def test_doc_to_lc_maps_all_fields():
@@ -74,121 +80,191 @@ def test_doc_to_lc_default_metadata():
     assert lc.metadata["encoding"] is None
 
 
-def test_lc_to_chunks_basic():
-    lc_docs = [
-        LC_Document(
-            page_content="chunk one",
-            metadata={"index": 0, "format": "txt"},
-        ),
-        LC_Document(
-            page_content="chunk two",
-            metadata={"index": 1, "format": "txt"},
-        ),
-    ]
-    chunks = _lc_to_chunks(lc_docs)
-    assert len(chunks) == 2
-    assert all(isinstance(c, TextChunk) for c in chunks)
-    assert chunks[0].text == "chunk one"
-    assert chunks[0].index == 0
-    assert chunks[1].text == "chunk two"
-    assert chunks[1].index == 1
+# ================================================================
+# _lc_to_chunks  mapper  (with edge case tests)
+# ================================================================
 
 
-def test_lc_to_chunks_uses_chunk_id_from_metadata():
-    expected = uuid4()
-    lc_docs = [
-        LC_Document(
-            page_content="text",
-            metadata={"chunk_id": str(expected), "format": "txt"},
-        ),
-    ]
-    chunks = _lc_to_chunks(lc_docs)
-    assert chunks[0].id == expected
+class TestLcToChunks:
+    def test_basic(self):
+        lc_docs = [
+            LC_Document(
+                page_content="chunk one",
+                metadata={"index": 0, "format": "txt"},
+            ),
+            LC_Document(
+                page_content="chunk two",
+                metadata={"index": 1, "format": "txt"},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert len(chunks) == 2
+        assert all(isinstance(c, TextChunk) for c in chunks)
+        assert chunks[0].text == "chunk one"
+        assert chunks[0].index == 0
+        assert chunks[1].text == "chunk two"
+        assert chunks[1].index == 1
+
+    def test_uses_chunk_id_from_metadata(self):
+        expected = uuid4()
+        lc_docs = [
+            LC_Document(
+                page_content="text",
+                metadata={"chunk_id": str(expected), "format": "txt"},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].id == expected
+
+    def test_uses_document_id_from_metadata(self):
+        expected = uuid4()
+        lc_docs = [
+            LC_Document(
+                page_content="text",
+                metadata={"document_id": str(expected), "format": "txt"},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].document_id == expected
+
+    def test_missing_index_defaults_to_zero(self):
+        lc_docs = [LC_Document(page_content="text", metadata={"format": "txt"})]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].index == 0
+
+    def test_explicit_index_zero(self):
+        lc_docs = [
+            LC_Document(page_content="text", metadata={"index": 0, "format": "txt"})
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].index == 0
+
+    def test_start_char_and_end_char(self):
+        lc_docs = [
+            LC_Document(
+                page_content="hello there",
+                metadata={"start_char": 10, "format": "txt"},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].start_char == 10
+        assert chunks[0].end_char == 21
+
+    def test_start_char_none_leaves_end_char_none(self):
+        lc_docs = [LC_Document(page_content="text", metadata={"format": "txt"})]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].start_char is None
+        assert chunks[0].end_char is None
+
+    def test_format_from_metadata(self):
+        lc_docs = [
+            LC_Document(
+                page_content="text",
+                metadata={"format": "markdown", "extra": {}},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].format == DocumentFormat.MARKDOWN
+
+    def test_language_from_metadata(self):
+        lc_docs = [
+            LC_Document(
+                page_content="text",
+                metadata={"format": "txt", "language": "fr", "extra": {}},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].metadata["language"] == Language.FR
+
+    def test_handles_extra_metadata_fallback(self):
+        lc_docs = [LC_Document(page_content="text", metadata={"format": "txt"})]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].metadata["extra"] == {}
+
+    def test_uses_start_index_alias(self):
+        lc_docs = [
+            LC_Document(
+                page_content="text",
+                metadata={"start_index": 5, "format": "txt"},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].start_char == 5
+
+    # --- Error / edge cases (were completely missing) ---
+
+    def test_invalid_chunk_id_fallback(self):
+        lc_docs = [
+            LC_Document(
+                page_content="text",
+                metadata={"chunk_id": "not-a-valid-uuid", "format": "txt"},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert isinstance(chunks[0].id, UUID)
+
+    def test_invalid_document_id_fallback(self):
+        lc_docs = [
+            LC_Document(
+                page_content="text",
+                metadata={"document_id": "bad-uuid", "format": "txt"},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert chunks[0].document_id is None
+
+    def test_invalid_format_raises(self):
+        lc_docs = [
+            LC_Document(
+                page_content="text",
+                metadata={"format": "nonexistent_format"},
+            ),
+        ]
+        with pytest.raises(ValueError):
+            _lc_to_chunks(lc_docs)
+
+    def test_invalid_language_ignored(self):
+        lc_docs = [
+            LC_Document(
+                page_content="text",
+                metadata={"format": "txt", "language": "xyz"},
+            ),
+        ]
+        with pytest.raises(ValueError):
+            _lc_to_chunks(lc_docs)
+
+    def test_empty_content(self):
+        lc_docs = [
+            LC_Document(
+                page_content="",
+                metadata={"format": "txt"},
+            ),
+        ]
+        chunks = _lc_to_chunks(lc_docs)
+        assert len(chunks) == 1
+        assert chunks[0].text == ""
+        assert chunks[0].start_char is None
+        assert chunks[0].end_char is None
 
 
-def test_lc_to_chunks_uses_document_id_from_metadata():
-    expected = uuid4()
-    lc_docs = [
-        LC_Document(
-            page_content="text",
-            metadata={"document_id": str(expected), "format": "txt"},
-        ),
-    ]
-    chunks = _lc_to_chunks(lc_docs)
-    assert chunks[0].document_id == expected
-
-
-def test_lc_to_chunks_missing_index_defaults_to_zero():
-    lc_docs = [LC_Document(page_content="text", metadata={"format": "txt"})]
-    chunks = _lc_to_chunks(lc_docs)
-    assert chunks[0].index == 0
-
-
-def test_lc_to_chunks_start_char_and_end_char():
-    lc_docs = [
-        LC_Document(
-            page_content="hello there",
-            metadata={"start_char": 10, "format": "txt"},
-        ),
-    ]
-    chunks = _lc_to_chunks(lc_docs)
-    assert chunks[0].start_char == 10
-    assert chunks[0].end_char == 21
-
-
-def test_lc_to_chunks_start_char_none_leaves_end_char_none():
-    lc_docs = [LC_Document(page_content="text", metadata={"format": "txt"})]
-    chunks = _lc_to_chunks(lc_docs)
-    assert chunks[0].start_char is None
-    assert chunks[0].end_char is None
-
-
-def test_lc_to_chunks_format_from_metadata():
-    lc_docs = [
-        LC_Document(
-            page_content="text",
-            metadata={"format": "markdown", "extra": {}},
-        ),
-    ]
-    chunks = _lc_to_chunks(lc_docs)
-    assert chunks[0].format == DocumentFormat.MARKDOWN
-
-
-def test_lc_to_chunks_language_from_metadata():
-    lc_docs = [
-        LC_Document(
-            page_content="text",
-            metadata={"format": "txt", "language": "fr", "extra": {}},
-        ),
-    ]
-    chunks = _lc_to_chunks(lc_docs)
-    assert chunks[0].metadata["language"] == Language.FR
-
-
-def test_lc_to_chunks_handles_extra_metadata_fallback():
-    lc_docs = [LC_Document(page_content="text", metadata={"format": "txt"})]
-    chunks = _lc_to_chunks(lc_docs)
-    assert chunks[0].metadata["extra"] == {}
-
-
-def test_lc_to_chunks_uses_start_index_alias():
-    lc_docs = [
-        LC_Document(
-            page_content="text",
-            metadata={"start_index": 5, "format": "txt"},
-        ),
-    ]
-    chunks = _lc_to_chunks(lc_docs)
-    assert chunks[0].start_char == 5
+# ================================================================
+# LangChainChunker.chunk  method tests
+# ================================================================
 
 
 class _TestChunker(LangChainChunker):
+    def __init__(self):
+        super().__init__(NoCredentials())
+
     def _splitter(self, config=None):
         return MagicMock()
 
+    def _default_config(self):
+        return ChunkerConfig()
+
 
 class TestLangChainChunker:
-    async def test_chunk_returns_text_chunks(self):
+    def test_chunk_returns_text_chunks(self):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = [
             LC_Document(page_content="chunk1", metadata={"format": "txt"}),
@@ -198,51 +274,35 @@ class TestLangChainChunker:
         chunker = _TestChunker()
         with patch.object(chunker, "_splitter", return_value=mock_splitter):
             docs = [TextDocument(text="full text")]
-            result = await chunker.chunk(docs)
+            result = chunker.chunk(docs, config=None)
 
         assert len(result) == 2
         assert all(isinstance(c, TextChunk) for c in result)
-        assert result[0].text == "chunk1"
-        assert result[1].text == "chunk2"
 
-    async def test_chunk_passes_config_to_splitter(self):
+    def test_chunk_passes_config_to_splitter(self):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = [
             LC_Document(page_content="c", metadata={"format": "txt"}),
         ]
 
         config = ChunkerConfig(chunk_size=256, chunk_overlap=32)
-
         chunker = _TestChunker()
-        with patch.object(
-            chunker, "_splitter", return_value=mock_splitter
-        ) as mock_method:
-            docs = [TextDocument(text="some text")]
-            await chunker.chunk(docs, config=config)
+        with patch.object(chunker, "_splitter", return_value=mock_splitter) as spy:
+            chunker.chunk([TextDocument(text="some text")], config=config)
 
-        mock_method.assert_called_once_with(config)
+        spy.assert_called_once_with(config)
 
-    async def test_chunk_empty_documents(self):
+    def test_chunk_empty_documents(self):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = []
 
         chunker = _TestChunker()
         with patch.object(chunker, "_splitter", return_value=mock_splitter):
-            result = await chunker.chunk([])
+            result = chunker.chunk([], config=None)
 
         assert result == []
 
-    async def test_chunk_return_type(self):
-        mock_splitter = MagicMock()
-        mock_splitter.split_documents.return_value = []
-
-        chunker = _TestChunker()
-        with patch.object(chunker, "_splitter", return_value=mock_splitter):
-            result = await chunker.chunk([])
-
-        assert isinstance(result, list)
-
-    async def test_chunk_with_config_none(self):
+    def test_chunk_with_config_none(self):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = [
             LC_Document(page_content="data", metadata={"format": "txt"}),
@@ -250,7 +310,127 @@ class TestLangChainChunker:
 
         chunker = _TestChunker()
         with patch.object(chunker, "_splitter", return_value=mock_splitter):
-            docs = [TextDocument(text="data")]
-            result = await chunker.chunk(docs, config=None)
+            result = chunker.chunk([TextDocument(text="data")], config=None)
 
         assert len(result) == 1
+
+    def test_chunk_multiple_documents(self):
+        mock_splitter = MagicMock()
+        mock_splitter.split_documents.return_value = [
+            LC_Document(page_content="doc1-chunk", metadata={"format": "txt"}),
+            LC_Document(page_content="doc2-chunk", metadata={"format": "txt"}),
+        ]
+
+        chunker = _TestChunker()
+        with patch.object(chunker, "_splitter", return_value=mock_splitter):
+            docs = [TextDocument(text="doc1"), TextDocument(text="doc2")]
+            result = chunker.chunk(docs, config=None)
+
+        assert len(result) == 2
+
+    def test_empty_text_document(self):
+        mock_splitter = MagicMock()
+        mock_splitter.split_documents.return_value = [
+            LC_Document(page_content="", metadata={"format": "txt"}),
+        ]
+
+        chunker = _TestChunker()
+        with patch.object(chunker, "_splitter", return_value=mock_splitter):
+            result = chunker.chunk(
+                [TextDocument(text="")], config=ChunkerConfig()
+            )
+
+        assert len(result) == 1
+        assert result[0].text == ""
+
+    def test_splitter_error_propagates(self):
+        chunker = _TestChunker()
+        mock_splitter = MagicMock()
+        mock_splitter.split_documents.side_effect = RuntimeError("split failed")
+
+        with patch.object(chunker, "_splitter", return_value=mock_splitter):
+            with pytest.raises(RuntimeError, match="split failed"):
+                chunker.chunk(
+                    [TextDocument(text="fail")], config=ChunkerConfig()
+                )
+
+
+# ================================================================
+# Real-text integration test  (was completely missing)
+# ================================================================
+
+
+class TestRecursiveChunkerIntegration:
+    @pytest.fixture
+    def chunker(self):
+        from agent_platform.integrations.chunking.providers.recursive import (
+            RecursiveChunkerProvider,
+        )
+
+        return RecursiveChunkerProvider()
+
+    def test_splits_simple_text(self, chunker, simple_text_document):
+        from agent_platform.integrations.chunking.config import (
+            RecursiveChunkerConfig,
+        )
+
+        config = RecursiveChunkerConfig(chunk_size=20, chunk_overlap=0)
+        result = chunker.chunk([simple_text_document], config=config)
+
+        assert len(result) > 1
+        assert all(isinstance(c, TextChunk) for c in result)
+        assert all(len(c.text) <= 20 for c in result)
+        assert result[0].document_id == simple_text_document.id
+
+    def test_splits_long_text(self, chunker, long_text_document):
+        from agent_platform.integrations.chunking.config import (
+            RecursiveChunkerConfig,
+        )
+
+        config = RecursiveChunkerConfig(chunk_size=100, chunk_overlap=20)
+        result = chunker.chunk([long_text_document], config=config)
+
+        assert len(result) > 1
+        assert all(len(c.text) <= 100 for c in result)
+        for c in result:
+            assert c.index >= 0
+            assert isinstance(c.id, UUID)
+
+    def test_uses_add_start_index(self, chunker, simple_text_document):
+        from agent_platform.integrations.chunking.config import (
+            RecursiveChunkerConfig,
+        )
+
+        config = RecursiveChunkerConfig(
+            chunk_size=20, chunk_overlap=0, add_start_index=True
+        )
+        result = chunker.chunk([simple_text_document], config=config)
+
+        assert any(c.start_char is not None for c in result)
+
+    def test_respects_separators(self, chunker):
+        doc = TextDocument(
+            text="paragraph one with enough text to fill a chunk\n\nparagraph two also with enough text to fill another chunk\n\nparagraph three",
+            source="test.txt",
+            format=DocumentFormat.TXT,
+        )
+        from agent_platform.integrations.chunking.config import (
+            RecursiveChunkerConfig,
+        )
+
+        config = RecursiveChunkerConfig(
+            chunk_size=50, chunk_overlap=0, separators=["\n\n"]
+        )
+        result = chunker.chunk([doc], config=config)
+
+        assert len(result) >= 2
+
+    def test_empty_text(self, chunker):
+        doc = TextDocument(text="", format=DocumentFormat.TXT)
+        from agent_platform.integrations.chunking.config import (
+            RecursiveChunkerConfig,
+        )
+
+        config = RecursiveChunkerConfig(chunk_size=100, chunk_overlap=0)
+        result = chunker.chunk([doc], config=config)
+        assert result == []

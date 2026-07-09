@@ -1,17 +1,13 @@
-from dataclasses import dataclass
+from pydantic import BaseModel, ConfigDict
 
 
-@dataclass(slots=True, frozen=True)
-class ChunkerConfig:
+class ChunkerConfig(BaseModel):
+    model_config = ConfigDict(populate_by_name=True)
+
     chunk_size: int = 512
     chunk_overlap: int = 64
 
 
-@dataclass(slots=True, frozen=True)
 class RecursiveChunkerConfig(ChunkerConfig):
-    separators: tuple[str, ...] = (
-        "\n\n",
-        "\n",
-        " ",
-        "",
-    )
+    separators: list[str] | None = ["\n\n", "\n", " ", ""]
+    add_start_index: bool = False
