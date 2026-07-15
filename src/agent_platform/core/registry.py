@@ -1,5 +1,7 @@
 from typing import Generic, TypeVar
 
+from agent_platform.core.errors import NotFoundError
+
 T = TypeVar("T")
 
 
@@ -15,7 +17,7 @@ class ProviderRegistry(Generic[T]):
     def get(self, name: str) -> type[T]:
         provider = self._providers.get(name)
         if provider is None:
-            raise KeyError(f"Unknown provider: {name}")
+            raise NotFoundError(f"Unknown provider: {name}")
         return provider
 
     def all(self) -> dict[str, type[T]]:

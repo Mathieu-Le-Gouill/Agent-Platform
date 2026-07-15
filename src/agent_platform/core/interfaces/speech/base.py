@@ -1,0 +1,25 @@
+from abc import ABC, abstractmethod
+from typing import AsyncIterator, Generic, TypeVar
+
+from agent_platform.core.credentials import BaseCredentials
+from agent_platform.core.interfaces.speech.config import SpeechConfig
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.conversation import Transcript
+
+ConfigT = TypeVar("ConfigT", bound=SpeechConfig)
+CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
+
+
+class BaseSpeechToText(ABC, Generic[CredentialsT, ConfigT]):
+    def __init__(self, credentials: CredentialsT) -> None:
+        self._credentials = credentials
+
+    @abstractmethod
+    async def transcribe(
+        self, audio: AudioChunk, config: ConfigT | None = None
+    ) -> Transcript: ...
+
+    @abstractmethod
+    def stream(
+        self, frames: AsyncIterator[AudioChunk], config: ConfigT | None = None
+    ) -> AsyncIterator[Transcript]: ...

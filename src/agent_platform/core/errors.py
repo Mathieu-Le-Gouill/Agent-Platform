@@ -1,5 +1,39 @@
+from __future__ import annotations
+
+import functools
+import logging
+from contextlib import contextmanager
+from typing import Any, Callable, TypeVar
+
+_CompatibleFunc = TypeVar("_CompatibleFunc", bound=Callable[..., Any])
+
+__all__ = [
+    # Exception classes
+    "PlatformError",
+    "ProviderError",
+    "ConfigError",
+    "NotFoundError",
+    "ValidationError",
+    "MissingCredentialError",
+    # Utilities
+    "error_logged",
+    "catch_noraise",
+]
+
+
 class PlatformError(Exception):
-    pass
+    def __init__(
+        self,
+        message: str = "",
+        *,
+        code: str | None = None,
+        retryable: bool = False,
+        context: dict[str, Any] | None = None,
+    ) -> None:
+        self.code = code
+        self.retryable = retryable
+        self.context = context or {}
+        super().__init__(message)
 
 
 class ProviderError(PlatformError):
@@ -18,39 +52,91 @@ class ValidationError(PlatformError):
     pass
 
 
-# --- LLM errors (kept for backward compat) ---
-
-
-class LLMError(PlatformError):
+class MissingCredentialError(PlatformError):
     pass
 
 
-class LLMGenerationError(LLMError):
-    pass
+# --- Utilities ---
 
 
-class LLMTimeoutError(LLMError):
-    pass
+def error_logged(
+    logger_name: str | None = None,
+    *,
+    re_raise: type[PlatformError] | None = None,
+    message: str = "Unhandled error",
+) -> Callable[[_CompatibleFunc], _CompatibleFunc]:
+    def decorate(func: _CompatibleFunc) -> _CompatibleFunc:
+        logger = logging.getLogger(logger_name or func.__module__)
+
+        if re_raise is not None:
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                try:
+                    return await func(*args, **kwargs)  # type: ignore
+                except PlatformError:
+                    raise
+                except Exception as exc:
+                    logger.exception("%s in %s", message, func.__qualname__)
+                    raise re_raise(f"{message}: {exc}") from exc
+
+            @functools.wraps(func)
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                try:
+                    return func(*args, **kwargs)
+                except PlatformError:
+                    raise
+                except Exception as exc:
+                    logger.exception("%s in %s", message, func.__qualname__)
+                    raise re_raise(f"{message}: {exc}") from exc
+
+        else:
+
+            @functools.wraps(func)
+            async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
+                try:
+                    return await func(*args, **kwargs)  # type: ignore
+                except PlatformError:
+                    raise
+                except Exception:
+                    logger.exception("%s in %s", message, func.__qualname__)
+                    raise
+
+            @functools.wraps(func)
+            def sync_wrapper(*args: Any, **kwargs: Any) -> Any:
+                try:
+                    return func(*args, **kwargs)
+                except PlatformError:
+                    raise
+                except Exception:
+                    logger.exception("%s in %s", message, func.__qualname__)
+                    raise
+
+        if asyncio_iscoroutinefunction(func):
+            return async_wrapper  # type: ignore
+        return sync_wrapper  # type: ignore
+
+    return decorate
 
 
-class LLMRateLimitError(LLMError):
-    pass
+@contextmanager
+def catch_noraise(
+    logger: logging.Logger,
+    fallback: Any = None,
+    context_msg: str = "",
+):
+    """Catch any exception, log as warning, yield the fallback value."""
+    try:
+        yield
+    except Exception:
+        logger.warning(
+            "%s failed — using fallback",
+            context_msg or "Operation",
+            exc_info=True,
+        )
 
 
-# --- Agent errors ---
+def asyncio_iscoroutinefunction(func: Callable[..., Any]) -> bool:
+    import asyncio
 
-
-class AgentError(PlatformError):
-    pass
-
-
-class AgentThinkError(AgentError):
-    pass
-
-
-class AgentActError(AgentError):
-    pass
-
-
-class AgentMaxIterations(AgentError):
-    pass
+    return asyncio.iscoroutinefunction(func)
