@@ -1,8 +1,8 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
 from agent_platform.integrations.chunking.langchain_base import LangChainChunker
-from agent_platform.integrations.chunking.config import RecursiveChunkerConfig
-from agent_platform.integrations.credentials import NoCredentials
+from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
+from agent_platform.core.credentials import NoCredentials
 from langchain_text_splitters.base import TextSplitter
 
 
@@ -10,7 +10,7 @@ class RecursiveChunkerProvider(LangChainChunker[NoCredentials, RecursiveChunkerC
     def __init__(self, credentials: NoCredentials | None = None) -> None:
         super().__init__(credentials if credentials is not None else NoCredentials())
 
-    def _default_config(self) -> RecursiveChunkerConfig: 
+    def _default_config(self) -> RecursiveChunkerConfig:
         return RecursiveChunkerConfig()
 
     def _splitter(

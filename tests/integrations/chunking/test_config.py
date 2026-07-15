@@ -1,9 +1,7 @@
 import pytest
 
-from agent_platform.integrations.chunking.config import (
-    ChunkerConfig,
-    RecursiveChunkerConfig,
-)
+from agent_platform.core.interfaces.chunking.config import ChunkerConfig
+from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
 
 
 def test_chunker_config_defaults():
@@ -60,4 +58,5 @@ def test_recursive_chunker_config_is_subclass():
 
 def test_recursive_chunker_config_pydantic():
     from pydantic import BaseModel
+
     assert isinstance(ChunkerConfig(), BaseModel)

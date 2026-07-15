@@ -1,7 +1,7 @@
 import pytest
 
-from agent_platform.models.document import TextDocument
-from agent_platform.models.enums import DocumentFormat
+from agent_platform.core.schemas.document import TextDocument
+from agent_platform.core.schemas.enums import DocumentFormat
 
 
 @pytest.fixture

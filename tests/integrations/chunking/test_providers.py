@@ -2,21 +2,19 @@ import pytest
 
 pytest.importorskip("langchain_text_splitters")
 
-from agent_platform.integrations.chunking.config import (
-    RecursiveChunkerConfig,
-)
-from agent_platform.integrations.chunking.providers.recursive import (
+from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
+from agent_platform.integrations.chunking.recursive.recursive import (
     RecursiveChunkerProvider,
 )
 from agent_platform.integrations.chunking.langchain_base import (
     LangChainChunker,
     _doc_to_lc,
 )
-from agent_platform.integrations.chunking.base import BaseChunker
-from agent_platform.integrations.credentials import NoCredentials
-from agent_platform.models.chunk import TextChunk
-from agent_platform.models.document import TextDocument
-from agent_platform.models.enums import DocumentFormat
+from agent_platform.core.interfaces.chunking.base import BaseChunker
+from agent_platform.core.credentials import NoCredentials
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.document import TextDocument
+from agent_platform.core.schemas.enums import DocumentFormat
 
 
 def test_recursive_chunker_provider_defaults():
@@ -90,12 +88,8 @@ def test_splitter_without_add_start_index():
 
 def test_splitter_different_separators():
     provider = RecursiveChunkerProvider()
-    config = RecursiveChunkerConfig(
-        chunk_size=10, chunk_overlap=0, separators=[" "]
-    )
-    doc = TextDocument(
-        text="one two three four five", format=DocumentFormat.TXT
-    )
+    config = RecursiveChunkerConfig(chunk_size=10, chunk_overlap=0, separators=[" "])
+    doc = TextDocument(text="one two three four five", format=DocumentFormat.TXT)
     splitter = provider._splitter(config)
     result = splitter.split_documents([_doc_to_lc(doc)])
 
@@ -111,7 +105,9 @@ def test_default_config_type():
 
 
 def test_base_chunker_stores_credentials():
-    class _ConcreteChunker(BaseChunker[NoCredentials, TextDocument, TextChunk, RecursiveChunkerConfig]):
+    class _ConcreteChunker(
+        BaseChunker[NoCredentials, TextDocument, TextChunk, RecursiveChunkerConfig]
+    ):
         def chunk(self, documents, config):
             return []
 

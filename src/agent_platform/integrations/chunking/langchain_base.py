@@ -4,18 +4,21 @@ from typing import Sequence, Generic
 from langchain_text_splitters import TextSplitter
 from langchain_core.documents import Document as LC_Document
 
-from agent_platform.models.chunk import TextChunk
-from agent_platform.models.document import TextDocument
-from agent_platform.models.enums import Language, DocumentFormat
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.document import TextDocument
+from agent_platform.core.schemas.enums import Language, DocumentFormat
 
-from agent_platform.integrations.chunking.base import (
-    BaseChunker, 
+from agent_platform.core.interfaces.chunking.base import (
+    BaseChunker,
     ChunkerConfigT,
     CredentialsT,
 )
 
-class LangChainChunker(BaseChunker[CredentialsT, TextDocument, TextChunk, ChunkerConfigT], Generic[CredentialsT, ChunkerConfigT]):
-    
+
+class LangChainChunker(
+    BaseChunker[CredentialsT, TextDocument, TextChunk, ChunkerConfigT],
+    Generic[CredentialsT, ChunkerConfigT],
+):
     @abstractmethod
     def _splitter(self, config: ChunkerConfigT) -> TextSplitter: ...
 
