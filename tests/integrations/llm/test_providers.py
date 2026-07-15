@@ -9,14 +9,12 @@ pytest.importorskip("langchain_mistralai")
 pytest.importorskip("langchain_ollama")
 
 from agent_platform.agents.tools.base import Tool
-from agent_platform.integrations.llm.config import (
-    GenerationConfig,
-    AnthropicGenerationConfig,
-    MistralGenerationConfig,
-    OllamaGenerationConfig,
-    OpenAIGenerationConfig,
-)
-from agent_platform.integrations.llm.response import ResponseFormat
+from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
+from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
+from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
+from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
+from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.integrations.llm.providers.anthropic import (
     AnthropicLLM,
     _to_langchain_anthropic,
@@ -33,12 +31,10 @@ from agent_platform.integrations.llm.providers.ollama import (
     OllamaLLM,
     _to_langchain_ollama,
 )
-from agent_platform.integrations.credentials import (
-    AnthropicCredentials,
-    OpenAICredentials,
-    MistralCredentials,
-    OllamaCredentials,
-)
+from agent_platform.integrations.credentials.anthropic import AnthropicCredentials
+from agent_platform.integrations.credentials.openai import OpenAICredentials
+from agent_platform.integrations.credentials.mistral import MistralCredentials
+from agent_platform.integrations.credentials.ollama import OllamaCredentials
 
 
 class TestToLangchainAnthropic:

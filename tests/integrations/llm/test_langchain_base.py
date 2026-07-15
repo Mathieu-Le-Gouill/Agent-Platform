@@ -13,12 +13,12 @@ from agent_platform.integrations.llm.langchain_base import (
     _from_langchain,
     LangChainLLMProvider,
 )
-from agent_platform.integrations.llm.response import (
+from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     StreamChunk,
 )
-from agent_platform.models.enums import FinishReason
-from agent_platform.models.message import (
+from agent_platform.core.schemas.enums import FinishReason
+from agent_platform.core.schemas.message import (
     SystemMessage,
     UserMessage,
     AssistantMessage,
@@ -27,8 +27,8 @@ from agent_platform.models.message import (
     ToolResult,
     Prompt,
 )
-from agent_platform.models.token import TokenUsage
-from agent_platform.integrations.llm.config import GenerationConfig
+from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 
 
 class TestToLangchain:
@@ -197,7 +197,7 @@ class TestFromLangchain:
         assert result.message.content == ""
 
 
-from agent_platform.integrations.credentials import NoCredentials
+from agent_platform.core.credentials import NoCredentials
 
 
 class _TestLLMProvider(LangChainLLMProvider):

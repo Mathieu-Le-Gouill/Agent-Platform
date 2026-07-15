@@ -5,8 +5,8 @@ import pytest
 
 @pytest.fixture
 def mock_llm_provider():
-    from agent_platform.integrations.credentials import NoCredentials
-    from agent_platform.integrations.llm.config import GenerationConfig
+    from agent_platform.core.credentials import NoCredentials
+    from agent_platform.core.interfaces.llm.config import GenerationConfig
     from agent_platform.integrations.llm.langchain_base import (
         LangChainLLMProvider,
     )

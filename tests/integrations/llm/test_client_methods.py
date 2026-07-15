@@ -8,18 +8,14 @@ pytest.importorskip("langchain_mistralai")
 pytest.importorskip("langchain_ollama")
 pytest.importorskip("langchain_openai")
 
-from agent_platform.integrations.llm.config import (
-    AnthropicGenerationConfig,
-    MistralGenerationConfig,
-    OllamaGenerationConfig,
-    OpenAIGenerationConfig,
-)
-from agent_platform.integrations.credentials import (
-    OpenAICredentials,
-    AnthropicCredentials,
-    MistralCredentials,
-    OllamaCredentials,
-)
+from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
+from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
+from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
+from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
+from agent_platform.integrations.credentials.openai import OpenAICredentials
+from agent_platform.integrations.credentials.anthropic import AnthropicCredentials
+from agent_platform.integrations.credentials.mistral import MistralCredentials
+from agent_platform.integrations.credentials.ollama import OllamaCredentials
 from agent_platform.core.errors import MissingCredentialError
 
 

@@ -4,13 +4,13 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_ollama import ChatOllama
 
-from agent_platform.core.schema import model_schema
-from agent_platform.integrations.llm.config import OllamaGenerationConfig
-from agent_platform.integrations.credentials import (
-    OllamaCredentials,
+from agent_platform.core.schemas import model_schema
+from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
+from agent_platform.integrations.credentials.ollama import OllamaCredentials
+from agent_platform.core.credentials import (
     resolve_timeout,
 )
-from agent_platform.integrations.llm.response import ResponseFormat
+from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 
 if TYPE_CHECKING:
@@ -19,7 +19,9 @@ if TYPE_CHECKING:
 
 class OllamaLLM(LangChainLLMProvider[OllamaCredentials, OllamaGenerationConfig]):
     def __init__(self, credentials: OllamaCredentials | None = None) -> None:
-        super().__init__(credentials if credentials is not None else OllamaCredentials())
+        super().__init__(
+            credentials if credentials is not None else OllamaCredentials()
+        )
 
     def _tool_to_schema(self, tool: "Tool") -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
@@ -40,8 +42,8 @@ class OllamaLLM(LangChainLLMProvider[OllamaCredentials, OllamaGenerationConfig])
             base_url=self._credentials.base_url,
             **_to_langchain_ollama(config, self._credentials),
         )
-    
-    def _default_config(self) -> OllamaGenerationConfig: 
+
+    def _default_config(self) -> OllamaGenerationConfig:
         return OllamaGenerationConfig()
 
 

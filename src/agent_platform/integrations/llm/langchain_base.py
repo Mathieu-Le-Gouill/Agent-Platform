@@ -13,13 +13,13 @@ from langchain_core.messages import (
     ToolMessage as LCToolMessage,
 )
 
-from agent_platform.integrations.llm.response import (
+from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     StreamChunk,
     FinishReason,
 )
-from agent_platform.models.token import TokenUsage
-from agent_platform.models.message import (
+from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.core.schemas.message import (
     AssistantMessage,
     SystemMessage,
     UserMessage,
@@ -27,7 +27,7 @@ from agent_platform.models.message import (
     ToolCall,
     Prompt,
 )
-from agent_platform.integrations.llm.base import (
+from agent_platform.core.interfaces.llm.base import (
     BaseLLMProvider,
     CredentialsT,
     GenerationConfigT,

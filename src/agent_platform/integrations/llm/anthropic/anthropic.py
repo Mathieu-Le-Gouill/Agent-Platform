@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_anthropic import ChatAnthropic
 
-from agent_platform.core.schema import model_schema
-from agent_platform.integrations.llm.config import AnthropicGenerationConfig
-from agent_platform.integrations.credentials import (
-    AnthropicCredentials,
+from agent_platform.core.schemas import model_schema
+from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
+from agent_platform.integrations.credentials.anthropic import AnthropicCredentials
+from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
 )
@@ -24,7 +24,9 @@ class AnthropicLLM(
     LangChainLLMProvider[AnthropicCredentials, AnthropicGenerationConfig]
 ):
     def __init__(self, credentials: AnthropicCredentials | None = None) -> None:
-        super().__init__(credentials if credentials is not None else AnthropicCredentials())
+        super().__init__(
+            credentials if credentials is not None else AnthropicCredentials()
+        )
 
     def _tool_to_schema(self, tool: "Tool") -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
@@ -37,7 +39,9 @@ class AnthropicLLM(
 
     def _client(self, config: AnthropicGenerationConfig) -> ChatAnthropic:
         if self._credentials.api_key is None:
-            raise MissingCredentialError("Anthropic API key is required but was not provided")
+            raise MissingCredentialError(
+                "Anthropic API key is required but was not provided"
+            )
 
         return ChatAnthropic(
             model_name=config.model,
@@ -45,8 +49,8 @@ class AnthropicLLM(
             base_url=self._credentials.base_url,
             **_to_langchain_anthropic(config, self._credentials),
         )
-    
-    def _default_config(self) -> AnthropicGenerationConfig: 
+
+    def _default_config(self) -> AnthropicGenerationConfig:
         return AnthropicGenerationConfig()
 
 

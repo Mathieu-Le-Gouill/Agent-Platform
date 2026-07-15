@@ -4,15 +4,11 @@ from pydantic import SecretStr
 pytest.importorskip("langchain_mistralai")
 pytest.importorskip("langchain_anthropic")
 
-from agent_platform.integrations.llm.config import (
-    GenerationConfig,
-    MistralGenerationConfig,
-)
-from agent_platform.integrations.credentials import (
-    MistralCredentials,
-    AnthropicCredentials,
-)
-from agent_platform.models.message import Prompt, UserMessage
+from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
+from agent_platform.integrations.credentials.mistral import MistralCredentials
+from agent_platform.integrations.credentials.anthropic import AnthropicCredentials
+from agent_platform.core.schemas.message import Prompt, UserMessage
 
 
 def test_mistral_to_langchain_no_max_retries():
@@ -28,7 +24,7 @@ def test_anthropic_to_langchain_no_max_retries():
     from agent_platform.integrations.llm.providers.anthropic import (
         _to_langchain_anthropic,
     )
-    from agent_platform.integrations.llm.config import AnthropicGenerationConfig
+    from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 
     cfg = AnthropicGenerationConfig(max_retries=None)
     creds = AnthropicCredentials()
@@ -40,7 +36,7 @@ def test_anthropic_to_langchain_none_config():
     from agent_platform.integrations.llm.providers.anthropic import (
         _to_langchain_anthropic,
     )
-    from agent_platform.integrations.llm.config import AnthropicGenerationConfig
+    from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 
     creds = AnthropicCredentials()
     cfg = AnthropicGenerationConfig()

@@ -1,12 +1,12 @@
 from uuid import uuid4
 
-from agent_platform.integrations.llm.response import (
+from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     StreamChunk,
     FinishReason,
 )
-from agent_platform.models.message import AssistantMessage, ToolCall
-from agent_platform.models.token import TokenUsage
+from agent_platform.core.schemas.message import AssistantMessage, ToolCall
+from agent_platform.core.schemas.token import TokenUsage
 
 
 class TestFinishReason:

@@ -4,10 +4,10 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
-from agent_platform.core.schema import model_schema
-from agent_platform.integrations.llm.config import HuggingFaceGenerationConfig
-from agent_platform.integrations.credentials import (
-    HuggingFaceCredentials,
+from agent_platform.core.schemas import model_schema
+from agent_platform.integrations.llm.huggingface.config import HuggingFaceGenerationConfig
+from agent_platform.integrations.credentials.huggingface import HuggingFaceCredentials
+from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
 )
@@ -24,7 +24,9 @@ class HuggingFaceLLM(
     LangChainLLMProvider[HuggingFaceCredentials, HuggingFaceGenerationConfig]
 ):
     def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
-        super().__init__(credentials if credentials is not None else HuggingFaceCredentials())
+        super().__init__(
+            credentials if credentials is not None else HuggingFaceCredentials()
+        )
 
     def _tool_to_schema(self, tool: "Tool") -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
@@ -39,9 +41,11 @@ class HuggingFaceLLM(
 
     def _client(self, config: HuggingFaceGenerationConfig) -> ChatHuggingFace:
         if self._credentials.api_key is None:
-            raise MissingCredentialError("Hugging Face Hub API token is required but was not provided")
-        
-        llm=HuggingFaceEndpoint(
+            raise MissingCredentialError(
+                "Hugging Face Hub API token is required but was not provided"
+            )
+
+        llm = HuggingFaceEndpoint(
             task=config.task,
             repo_id=config.repo_id,
             provider=config.provider,
@@ -50,8 +54,8 @@ class HuggingFaceLLM(
         )
 
         return ChatHuggingFace(llm=llm)
-    
-    def _default_config(self) -> HuggingFaceGenerationConfig: 
+
+    def _default_config(self) -> HuggingFaceGenerationConfig:
         return HuggingFaceGenerationConfig()
 
 

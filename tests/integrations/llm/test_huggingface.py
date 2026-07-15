@@ -5,8 +5,8 @@ from pydantic import SecretStr
 
 pytest.importorskip("langchain_huggingface")
 
-from agent_platform.integrations.llm.config import HuggingFaceGenerationConfig
-from agent_platform.integrations.credentials import HuggingFaceCredentials
+from agent_platform.integrations.llm.huggingface.config import HuggingFaceGenerationConfig
+from agent_platform.integrations.credentials.huggingface import HuggingFaceCredentials
 from agent_platform.core.errors import MissingCredentialError
 
 
@@ -72,9 +72,7 @@ class TestHuggingFaceLLMConstruction:
             HuggingFaceLLM,
         )
 
-        provider = HuggingFaceLLM(
-            HuggingFaceCredentials(api_key=SecretStr("hf_test"))
-        )
+        provider = HuggingFaceLLM(HuggingFaceCredentials(api_key=SecretStr("hf_test")))
         assert provider._credentials.api_key.get_secret_value() == "hf_test"
 
     def test_default_config(self):
@@ -106,12 +104,8 @@ class TestHuggingFaceMissingCredential:
 
 
 class TestHuggingFaceClient:
-    @patch(
-        "agent_platform.integrations.llm.providers.huggingface.ChatHuggingFace"
-    )
-    @patch(
-        "agent_platform.integrations.llm.providers.huggingface.HuggingFaceEndpoint"
-    )
+    @patch("agent_platform.integrations.llm.providers.huggingface.ChatHuggingFace")
+    @patch("agent_platform.integrations.llm.providers.huggingface.HuggingFaceEndpoint")
     def test_client_creation(self, mock_endpoint, mock_chat):
         from agent_platform.integrations.llm.providers.huggingface import (
             HuggingFaceLLM,
@@ -122,9 +116,7 @@ class TestHuggingFaceClient:
         mock_chat_instance = MagicMock()
         mock_chat.return_value = mock_chat_instance
 
-        provider = HuggingFaceLLM(
-            HuggingFaceCredentials(api_key=SecretStr("hf_test"))
-        )
+        provider = HuggingFaceLLM(HuggingFaceCredentials(api_key=SecretStr("hf_test")))
         config = HuggingFaceGenerationConfig(
             repo_id="test/model", task="text-generation"
         )

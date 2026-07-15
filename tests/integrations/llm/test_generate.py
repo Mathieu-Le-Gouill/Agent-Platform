@@ -5,9 +5,10 @@ from pydantic import SecretStr
 
 pytest.importorskip("langchain_openai")
 
-from agent_platform.integrations.llm.config import GenerationConfig, OpenAIGenerationConfig
-from agent_platform.integrations.credentials import OpenAICredentials
-from agent_platform.models.message import Prompt, UserMessage
+from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
+from agent_platform.integrations.credentials.openai import OpenAICredentials
+from agent_platform.core.schemas.message import Prompt, UserMessage
 
 
 class _TestConcreteLLM:
@@ -84,9 +85,9 @@ async def test_sync_generate():
 
 async def test_stream_handles_non_str_non_dict_items():
     from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
-    from agent_platform.models.message import UserMessage, Prompt
+    from agent_platform.core.schemas.message import UserMessage, Prompt
 
-    from agent_platform.integrations.credentials import NoCredentials
+    from agent_platform.core.credentials import NoCredentials
 
     class _Provider(LangChainLLMProvider):
         def __init__(self):
@@ -99,7 +100,8 @@ async def test_stream_handles_non_str_non_dict_items():
             raise NotImplementedError
 
         def _default_config(self):
-            from agent_platform.integrations.llm.config import GenerationConfig
+            from agent_platform.core.interfaces.llm.config import GenerationConfig
+
             return GenerationConfig()
 
     chunk = MagicMock(spec=[])
