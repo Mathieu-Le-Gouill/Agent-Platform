@@ -2,9 +2,9 @@ from langchain_mistralai import MistralAIEmbeddings
 from typing import Any
 
 from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
-from agent_platform.integrations.embeddings.config import MistralEmbeddingConfig
-from agent_platform.integrations.credentials import (
-    MistralCredentials,
+from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
+from agent_platform.integrations.credentials.mistral import MistralCredentials
+from agent_platform.core.credentials import (
     resolve_timeout,
     resolve_max_retries,
 )
@@ -12,25 +12,30 @@ from agent_platform.integrations.credentials import (
 from agent_platform.core.errors import MissingCredentialError
 
 
-class MistralEmbeddingProvider(LangChainEmbedder[MistralCredentials, MistralEmbeddingConfig]):
-
+class MistralEmbeddingProvider(
+    LangChainEmbedder[MistralCredentials, MistralEmbeddingConfig]
+):
     def __init__(self, credentials: MistralCredentials | None = None) -> None:
-        super().__init__(credentials if credentials is not None else MistralCredentials())
+        super().__init__(
+            credentials if credentials is not None else MistralCredentials()
+        )
 
     def _client(self, config: MistralEmbeddingConfig) -> MistralAIEmbeddings:
 
         if self._credentials.api_key is None:
-            raise MissingCredentialError("Mistral API key is required but was not provided")
-        
+            raise MissingCredentialError(
+                "Mistral API key is required but was not provided"
+            )
+
         return MistralAIEmbeddings(
             model=config.model,
             api_key=self._credentials.api_key,
-
-            **_to_langchain_mistral(config, self._credentials)
+            **_to_langchain_mistral(config, self._credentials),
         )
-        
-    def _default_config(self) -> MistralEmbeddingConfig: 
+
+    def _default_config(self) -> MistralEmbeddingConfig:
         return MistralEmbeddingConfig()
+
 
 def _to_langchain_mistral(
     config: MistralEmbeddingConfig,
@@ -52,4 +57,3 @@ def _to_langchain_mistral(
         params["max_concurrent_requests"] = config.max_concurrent_requests
 
     return params
-

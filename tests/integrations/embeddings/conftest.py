@@ -3,7 +3,8 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.models.chunk import TextChunk
+from agent_platform.core.schemas.chunk import TextChunk
+
 
 
 @pytest.fixture

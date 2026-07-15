@@ -5,21 +5,23 @@ from typing import Sequence, Generic
 
 from langchain_core.embeddings import Embeddings
 
-from agent_platform.integrations.embeddings.response import EmbeddingResponse
-from agent_platform.integrations.embeddings.base import (
+from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
+from agent_platform.core.interfaces.embeddings.base import (
     BaseEmbeddingProvider,
     EmbeddingConfigT,
     CredentialsT,
 )
-from agent_platform.models.embedding import Embedding
-from agent_platform.models.chunk import TextChunk
+from agent_platform.core.schemas.embedding import Embedding
+from agent_platform.core.schemas.chunk import TextChunk
 
 
-class LangChainEmbedder(BaseEmbeddingProvider[CredentialsT, EmbeddingConfigT], Generic[CredentialsT, EmbeddingConfigT]):
-
+class LangChainEmbedder(
+    BaseEmbeddingProvider[CredentialsT, EmbeddingConfigT],
+    Generic[CredentialsT, EmbeddingConfigT],
+):
     @abstractmethod
     def _client(self, config: EmbeddingConfigT) -> Embeddings: ...
-    
+
     @abstractmethod
     def _default_config(self) -> EmbeddingConfigT: ...
 
@@ -28,7 +30,7 @@ class LangChainEmbedder(BaseEmbeddingProvider[CredentialsT, EmbeddingConfigT], G
         items: Sequence[TextChunk],
         config: EmbeddingConfigT | None = None,
     ) -> EmbeddingResponse:
-        
+
         config = config or self._default_config()
         lc = self._client(config)
 
@@ -44,7 +46,6 @@ class LangChainEmbedder(BaseEmbeddingProvider[CredentialsT, EmbeddingConfigT], G
             embeddings=embeddings,
             model=config.model,
         )
-
 
     async def aembed_document(
         self,
@@ -66,7 +67,6 @@ class LangChainEmbedder(BaseEmbeddingProvider[CredentialsT, EmbeddingConfigT], G
             embeddings=embeddings,
             model=config.model,
         )
-    
 
     def embed_query(
         self,
@@ -85,13 +85,12 @@ class LangChainEmbedder(BaseEmbeddingProvider[CredentialsT, EmbeddingConfigT], G
             model=config.model,
         )
 
-
     async def aembed_query(
         self,
         query: str,
         config: EmbeddingConfigT | None = None,
     ) -> EmbeddingResponse:
-        
+
         config = config or self._default_config()
         lc = self._client(config)
 

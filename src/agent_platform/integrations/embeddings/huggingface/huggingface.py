@@ -4,12 +4,12 @@ from langchain_core.embeddings import Embeddings
 from typing import Any
 
 from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
-from agent_platform.integrations.embeddings.config import (
+from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingConfig,
     HuggingFaceEmbeddingMode,
 )
-from agent_platform.integrations.credentials import (
-    HuggingFaceCredentials,
+from agent_platform.integrations.credentials.huggingface import HuggingFaceCredentials
+from agent_platform.core.credentials import (
     resolve_timeout,
 )
 from agent_platform.core.errors import MissingCredentialError
@@ -18,9 +18,10 @@ from agent_platform.core.errors import MissingCredentialError
 class HuggingFaceEmbeddingProvider(
     LangChainEmbedder[HuggingFaceCredentials, HuggingFaceEmbeddingConfig]
 ):
-
     def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
-        super().__init__(credentials if credentials is not None else HuggingFaceCredentials())
+        super().__init__(
+            credentials if credentials is not None else HuggingFaceCredentials()
+        )
 
     def _client(self, config: HuggingFaceEmbeddingConfig) -> Embeddings:
         if config.mode is HuggingFaceEmbeddingMode.HOSTED:
@@ -39,7 +40,7 @@ class HuggingFaceEmbeddingProvider(
             **_to_langchain_huggingface_local(config),
         )
 
-    def _default_config(self) -> HuggingFaceEmbeddingConfig: 
+    def _default_config(self) -> HuggingFaceEmbeddingConfig:
         return HuggingFaceEmbeddingConfig()
 
 

@@ -1,13 +1,13 @@
 import pytest
 
-from agent_platform.integrations.embeddings.config import (
-    EmbeddingConfig,
-    OpenAIEmbeddingConfig,
+from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
+from agent_platform.integrations.embeddings.openai.config import OpenAIEmbeddingConfig
+from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingConfig,
     HuggingFaceEmbeddingMode,
-    MistralEmbeddingConfig,
-    OllamaEmbeddingConfig,
 )
+from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
+from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
 
 
 class TestEmbeddingConfig:

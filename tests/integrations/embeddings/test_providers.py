@@ -26,25 +26,23 @@ from agent_platform.integrations.embeddings.providers.ollama import (
     OllamaEmbeddingProvider,
     _to_langchain_ollama,
 )
-from agent_platform.integrations.embeddings.config import (
-    OpenAIEmbeddingConfig,
-    MistralEmbeddingConfig,
-    OllamaEmbeddingConfig,
+from agent_platform.integrations.embeddings.openai.config import OpenAIEmbeddingConfig
+from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
+from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
+from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingConfig,
     HuggingFaceEmbeddingMode,
 )
-from agent_platform.integrations.embeddings.response import EmbeddingResponse
-from agent_platform.integrations.embeddings.base import BaseEmbeddingProvider
-from agent_platform.integrations.credentials import (
-    OpenAICredentials,
-    MistralCredentials,
-    OllamaCredentials,
-    HuggingFaceCredentials,
-    NoCredentials,
-)
+from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
+from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
+from agent_platform.integrations.credentials.openai import OpenAICredentials
+from agent_platform.integrations.credentials.mistral import MistralCredentials
+from agent_platform.integrations.credentials.ollama import OllamaCredentials
+from agent_platform.integrations.credentials.huggingface import HuggingFaceCredentials
+from agent_platform.core.credentials import NoCredentials
 from agent_platform.core.errors import MissingCredentialError
-from agent_platform.models.chunk import TextChunk
-from agent_platform.models.embedding import Embedding
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.embedding import Embedding
 
 
 # ================================================================
@@ -288,7 +286,9 @@ class TestMissingCredentialError:
 
 
 class TestHuggingFaceClient:
-    @patch("agent_platform.integrations.embeddings.providers.huggingface.HuggingFaceEmbeddings")
+    @patch(
+        "agent_platform.integrations.embeddings.providers.huggingface.HuggingFaceEmbeddings"
+    )
     def test_local_mode_calls_local_embeddings(self, mock_local):
         cfg = HuggingFaceEmbeddingConfig(mode=HuggingFaceEmbeddingMode.LOCAL)
         provider = HuggingFaceEmbeddingProvider()
@@ -443,9 +443,7 @@ class TestAembedDocument:
             [0.4, 0.5],
         ]
 
-        response = await provider.aembed_document(
-            items, config=MagicMock(model="m")
-        )
+        response = await provider.aembed_document(items, config=MagicMock(model="m"))
 
         assert len(response) == 3
         assert response.embeddings[0].to_list() == [0.0, 0.1]
@@ -489,7 +487,9 @@ class TestProviderDefaults:
 
     def test_huggingface_default_config_model(self):
         provider = HuggingFaceEmbeddingProvider()
-        assert provider._default_config().model == "sentence-transformers/all-MiniLM-L6-v2"
+        assert (
+            provider._default_config().model == "sentence-transformers/all-MiniLM-L6-v2"
+        )
 
     def test_mistral_default_config_model(self):
         provider = MistralEmbeddingProvider()
