@@ -12,7 +12,7 @@ from agent_platform.core.schemas.message import Prompt, UserMessage
 
 
 def test_mistral_to_langchain_no_max_retries():
-    from agent_platform.integrations.llm.providers.mistral import _to_langchain_mistral
+    from agent_platform.integrations.llm.mistral.mistral import _to_langchain_mistral
 
     cfg = MistralGenerationConfig(max_retries=None)
     creds = MistralCredentials()
@@ -21,7 +21,7 @@ def test_mistral_to_langchain_no_max_retries():
 
 
 def test_anthropic_to_langchain_no_max_retries():
-    from agent_platform.integrations.llm.providers.anthropic import (
+    from agent_platform.integrations.llm.anthropic.anthropic import (
         _to_langchain_anthropic,
     )
     from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
@@ -33,7 +33,7 @@ def test_anthropic_to_langchain_no_max_retries():
 
 
 def test_anthropic_to_langchain_none_config():
-    from agent_platform.integrations.llm.providers.anthropic import (
+    from agent_platform.integrations.llm.anthropic.anthropic import (
         _to_langchain_anthropic,
     )
     from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig

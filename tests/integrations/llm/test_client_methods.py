@@ -19,9 +19,9 @@ from agent_platform.integrations.credentials.ollama import OllamaCredentials
 from agent_platform.core.errors import MissingCredentialError
 
 
-@patch("agent_platform.integrations.llm.providers.ollama.ChatOllama")
+@patch("agent_platform.integrations.llm.ollama.ollama.ChatOllama")
 async def test_ollama_client_creation(mock_chat):
-    from agent_platform.integrations.llm.providers.ollama import OllamaLLM
+    from agent_platform.integrations.llm.ollama.ollama import OllamaLLM
 
     provider = OllamaLLM(OllamaCredentials())
     config = OllamaGenerationConfig(model="llama3", temperature=0.5)
@@ -30,9 +30,9 @@ async def test_ollama_client_creation(mock_chat):
     assert client is mock_chat.return_value
 
 
-@patch("agent_platform.integrations.llm.providers.ollama.ChatOllama")
+@patch("agent_platform.integrations.llm.ollama.ollama.ChatOllama")
 async def test_ollama_client_none_config(mock_chat):
-    from agent_platform.integrations.llm.providers.ollama import OllamaLLM
+    from agent_platform.integrations.llm.ollama.ollama import OllamaLLM
 
     provider = OllamaLLM(OllamaCredentials())
     config = OllamaGenerationConfig(model="llama3")
@@ -40,9 +40,9 @@ async def test_ollama_client_none_config(mock_chat):
     mock_chat.assert_called_once()
 
 
-@patch("agent_platform.integrations.llm.providers.mistral.ChatMistralAI")
+@patch("agent_platform.integrations.llm.mistral.mistral.ChatMistralAI")
 async def test_mistral_client_creation(mock_chat):
-    from agent_platform.integrations.llm.providers.mistral import MistralLLM
+    from agent_platform.integrations.llm.mistral.mistral import MistralLLM
 
     provider = MistralLLM(MistralCredentials(api_key=SecretStr("key")))
     config = MistralGenerationConfig(model="mistral-large", temperature=0.3)
@@ -51,9 +51,9 @@ async def test_mistral_client_creation(mock_chat):
     assert client is mock_chat.return_value
 
 
-@patch("agent_platform.integrations.llm.providers.mistral.ChatMistralAI")
+@patch("agent_platform.integrations.llm.mistral.mistral.ChatMistralAI")
 async def test_mistral_client_none_config(mock_chat):
-    from agent_platform.integrations.llm.providers.mistral import MistralLLM
+    from agent_platform.integrations.llm.mistral.mistral import MistralLLM
 
     provider = MistralLLM(MistralCredentials(api_key=SecretStr("key")))
     config = MistralGenerationConfig(model="mistral-large")
@@ -61,9 +61,9 @@ async def test_mistral_client_none_config(mock_chat):
     mock_chat.assert_called_once()
 
 
-@patch("agent_platform.integrations.llm.providers.anthropic.ChatAnthropic")
+@patch("agent_platform.integrations.llm.anthropic.anthropic.ChatAnthropic")
 async def test_anthropic_client_creation(mock_chat):
-    from agent_platform.integrations.llm.providers.anthropic import AnthropicLLM
+    from agent_platform.integrations.llm.anthropic.anthropic import AnthropicLLM
 
     provider = AnthropicLLM(AnthropicCredentials(api_key=SecretStr("key")))
     config = AnthropicGenerationConfig(model="claude-3", temperature=0.5)
@@ -72,9 +72,9 @@ async def test_anthropic_client_creation(mock_chat):
     assert client is mock_chat.return_value
 
 
-@patch("agent_platform.integrations.llm.providers.anthropic.ChatAnthropic")
+@patch("agent_platform.integrations.llm.anthropic.anthropic.ChatAnthropic")
 async def test_anthropic_client_none_config(mock_chat):
-    from agent_platform.integrations.llm.providers.anthropic import AnthropicLLM
+    from agent_platform.integrations.llm.anthropic.anthropic import AnthropicLLM
 
     provider = AnthropicLLM(AnthropicCredentials(api_key=SecretStr("key")))
     config = AnthropicGenerationConfig(model="claude-3")
@@ -82,9 +82,9 @@ async def test_anthropic_client_none_config(mock_chat):
     mock_chat.assert_called_once()
 
 
-@patch("agent_platform.integrations.llm.providers.openai.ChatOpenAI")
+@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
 async def test_openai_client_creation(mock_chat):
-    from agent_platform.integrations.llm.providers.openai import OpenAILLM
+    from agent_platform.integrations.llm.openai.openai import OpenAILLM
 
     provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("key")))
     config = OpenAIGenerationConfig(model="gpt-4", temperature=0.5)
@@ -93,9 +93,9 @@ async def test_openai_client_creation(mock_chat):
     assert client is mock_chat.return_value
 
 
-@patch("agent_platform.integrations.llm.providers.openai.ChatOpenAI")
+@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
 async def test_openai_client_none_config(mock_chat):
-    from agent_platform.integrations.llm.providers.openai import OpenAILLM
+    from agent_platform.integrations.llm.openai.openai import OpenAILLM
 
     provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("key")))
     config = OpenAIGenerationConfig(model="gpt-4")
@@ -103,9 +103,9 @@ async def test_openai_client_none_config(mock_chat):
     mock_chat.assert_called_once()
 
 
-@patch("agent_platform.integrations.llm.providers.openai.ChatOpenAI")
+@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
 async def test_openai_client_no_max_retries(mock_chat):
-    from agent_platform.integrations.llm.providers.openai import _to_langchain_openai
+    from agent_platform.integrations.llm.openai.openai import _to_langchain_openai
 
     cfg = OpenAIGenerationConfig(max_retries=None)
     creds = OpenAICredentials()
@@ -116,9 +116,9 @@ async def test_openai_client_no_max_retries(mock_chat):
 # --- MissingCredentialError tests ---
 
 
-@patch("agent_platform.integrations.llm.providers.anthropic.ChatAnthropic")
+@patch("agent_platform.integrations.llm.anthropic.anthropic.ChatAnthropic")
 async def test_anthropic_missing_credential_error(mock_chat):
-    from agent_platform.integrations.llm.providers.anthropic import AnthropicLLM
+    from agent_platform.integrations.llm.anthropic.anthropic import AnthropicLLM
 
     provider = AnthropicLLM()
     provider._credentials = AnthropicCredentials()
@@ -127,9 +127,9 @@ async def test_anthropic_missing_credential_error(mock_chat):
         provider._client(cfg)
 
 
-@patch("agent_platform.integrations.llm.providers.mistral.ChatMistralAI")
+@patch("agent_platform.integrations.llm.mistral.mistral.ChatMistralAI")
 async def test_mistral_missing_credential_error(mock_chat):
-    from agent_platform.integrations.llm.providers.mistral import MistralLLM
+    from agent_platform.integrations.llm.mistral.mistral import MistralLLM
 
     provider = MistralLLM()
     provider._credentials = MistralCredentials()
@@ -138,9 +138,9 @@ async def test_mistral_missing_credential_error(mock_chat):
         provider._client(cfg)
 
 
-@patch("agent_platform.integrations.llm.providers.openai.ChatOpenAI")
+@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
 async def test_openai_missing_credential_error(mock_chat):
-    from agent_platform.integrations.llm.providers.openai import OpenAILLM
+    from agent_platform.integrations.llm.openai.openai import OpenAILLM
 
     provider = OpenAILLM()
     provider._credentials = OpenAICredentials()
@@ -150,7 +150,7 @@ async def test_openai_missing_credential_error(mock_chat):
 
 
 async def test_ollama_no_credential_needed():
-    from agent_platform.integrations.llm.providers.ollama import OllamaLLM
+    from agent_platform.integrations.llm.ollama.ollama import OllamaLLM
 
     provider = OllamaLLM(OllamaCredentials())
     cfg = OllamaGenerationConfig(model="llama3")

@@ -15,7 +15,7 @@ class _TestConcreteLLM:
     """Helper that patches the langchain base _client to return a mock."""
 
     def __init__(self):
-        from agent_platform.integrations.llm.providers.openai import OpenAILLM
+        from agent_platform.integrations.llm.openai.openai import OpenAILLM
 
         self.provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")))
         self.mock_client = MagicMock()
@@ -38,7 +38,7 @@ async def test_generate():
     assert result.model == "gpt-4"
 
 
-@patch("agent_platform.integrations.llm.providers.openai.ChatOpenAI")
+@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
 async def test_generate_with_openai_client(mock_chat):
     mock_instance = MagicMock()
     mock_chat.return_value = mock_instance
@@ -48,7 +48,7 @@ async def test_generate_with_openai_client(mock_chat):
     mock_response.usage_metadata = None
     mock_instance.ainvoke = AsyncMock(return_value=mock_response)
 
-    from agent_platform.integrations.llm.providers.openai import OpenAILLM
+    from agent_platform.integrations.llm.openai.openai import OpenAILLM
 
     provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")))
 
@@ -62,7 +62,7 @@ async def test_generate_with_openai_client(mock_chat):
 
 
 async def test_sync_generate():
-    from agent_platform.integrations.llm.providers.openai import OpenAILLM
+    from agent_platform.integrations.llm.openai.openai import OpenAILLM
     from unittest.mock import MagicMock
 
     provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")))

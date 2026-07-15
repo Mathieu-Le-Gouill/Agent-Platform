@@ -15,19 +15,19 @@ from agent_platform.integrations.llm.mistral.config import MistralGenerationConf
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 from agent_platform.core.interfaces.llm.response import ResponseFormat
-from agent_platform.integrations.llm.providers.anthropic import (
+from agent_platform.integrations.llm.anthropic.anthropic import (
     AnthropicLLM,
     _to_langchain_anthropic,
 )
-from agent_platform.integrations.llm.providers.openai import (
+from agent_platform.integrations.llm.openai.openai import (
     OpenAILLM,
     _to_langchain_openai,
 )
-from agent_platform.integrations.llm.providers.mistral import (
+from agent_platform.integrations.llm.mistral.mistral import (
     MistralLLM,
     _to_langchain_mistral,
 )
-from agent_platform.integrations.llm.providers.ollama import (
+from agent_platform.integrations.llm.ollama.ollama import (
     OllamaLLM,
     _to_langchain_ollama,
 )
