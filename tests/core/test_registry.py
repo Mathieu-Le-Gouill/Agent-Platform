@@ -1,6 +1,7 @@
 import pytest
 
 from agent_platform.core.registry import ProviderRegistry
+from agent_platform.core.errors import NotFoundError
 
 
 class TestProviderRegistry:
@@ -11,7 +12,7 @@ class TestProviderRegistry:
 
     def test_get_unknown_key_raises(self):
         registry: ProviderRegistry = ProviderRegistry()
-        with pytest.raises(KeyError, match="Unknown provider: missing"):
+        with pytest.raises(NotFoundError, match="Unknown provider: missing"):
             registry.get("missing")
 
     def test_all_empty_on_init(self):
@@ -43,7 +44,7 @@ class TestProviderRegistry:
         r1: ProviderRegistry = ProviderRegistry()
         r2: ProviderRegistry = ProviderRegistry()
         r1.register("x", int)
-        with pytest.raises(KeyError):
+        with pytest.raises(NotFoundError):
             r2.get("x")
 
     def test_generic_type_preserved(self):
