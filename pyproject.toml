@@ -25,25 +25,36 @@ dependencies = [
     "langchain-chroma",
     "langchain-cohere",
     "langchain-qdrant",
+    "langchain-pinecone",
+    "langchain-weaviate",
+    "langchain-voyageai",
+    "faiss-cpu",
 
     # --- OCR ---
     "pytesseract",
     "boto3",
     "google-cloud-vision",
+    "mistralai",
 
     # --- Speech-to-Text ---
     "numpy",
     "whisperx",
+    "faster-whisper",
     "deepgram-sdk",
+    "openai",
 
     # --- Translation ---
     "deepl",
-    "googletrans==4.0.0rc1",
+    "google-cloud-translate",
+    "azure-ai-translation-text",
 
     # --- VAD ---
     "silero-vad",
     "webrtcvad",
     "ten-vad @ git+https://github.com/TEN-framework/ten-vad.git@22a3bcd4509d0faaa8eef4881e8af5f39c178950",
+
+    # --- Reranking ---
+    "flashrank",
 
     # --- Classification ---
     "transformers",
@@ -78,9 +89,3 @@ line-length = 88
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
-testpaths = ["tests"]
-pythonpath = ["src"]
-
-
-[project.scripts]
-platform = "agent_platform.main:main"
