@@ -14,3 +14,4 @@ class VectorStoreConfig(BaseModel):
     dimension: int | None = None
     distance: DistanceMetric = DistanceMetric.COSINE
     top_k: int = 5
+    namespace: str | None = None
