@@ -38,6 +38,7 @@ from agent_platform.core.interfaces.llm.base import (
     CredentialsT,
     GenerationConfigT,
 )
+from agent_platform.core.tracing import TracingBackend, TracingConfig
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
@@ -67,7 +68,9 @@ class LangChainLLMProvider(
         lc = self._client(config)
         if tools:
             lc = lc.bind_tools([self._tool_to_schema(t) for t in tools])
-        response = lc.invoke(_to_langchain(prompt))
+        response = lc.invoke(
+            _to_langchain(prompt), config={"callbacks": get_langchain_callbacks()}
+        )
         return _from_langchain(response, config.model)
 
     async def agenerate(
@@ -81,7 +84,9 @@ class LangChainLLMProvider(
         lc = self._client(config)
         if tools:
             lc = lc.bind_tools([self._tool_to_schema(t) for t in tools])
-        response = await lc.ainvoke(_to_langchain(prompt))
+        response = await lc.ainvoke(
+            _to_langchain(prompt), config={"callbacks": get_langchain_callbacks()}
+        )
         return _from_langchain(response, config.model)
 
     async def stream(
@@ -92,7 +97,9 @@ class LangChainLLMProvider(
         config = config or self._default_config()
         lc = self._client(config)
 
-        async for chunk in lc.astream(_to_langchain(prompt)):
+        async for chunk in lc.astream(
+            _to_langchain(prompt), config={"callbacks": get_langchain_callbacks()}
+        ):
             content = chunk.content
             if isinstance(content, str):
                 if content:
@@ -118,6 +125,22 @@ class LangChainLLMProvider(
                 )
 
         yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
+
+
+def get_langchain_callbacks(config: TracingConfig | None = None) -> list[Any]:
+    config = config or TracingConfig.from_env()
+    match config.backend:
+        case TracingBackend.LANGSMITH:
+            # LangSmith traces automatically via LANGCHAIN_TRACING_V2 / LANGCHAIN_API_KEY
+            # env vars picked up internally by langchain-core; no explicit callback needed.
+            return []
+        case TracingBackend.LANGFUSE:
+            from langfuse.callback import CallbackHandler
+
+            # Reads LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST from env.
+            return [CallbackHandler()]
+        case _:
+            return []
 
 
 # --- Mappers ---
