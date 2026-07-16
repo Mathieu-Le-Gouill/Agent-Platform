@@ -4,6 +4,7 @@ from enum import Enum
 from typing import Union
 from pathlib import Path
 
+
 class MediaType(str, Enum):
     TEXT = "text"
     IMAGE = "image"
@@ -16,6 +17,7 @@ class DocumentFormat(str, Enum):
     PDF = "pdf"
     MARKDOWN = "markdown"
     HTML = "html"
+    LATEX = "latex"
     TXT = "txt"
     CSV = "csv"
     JSON = "json"
@@ -95,6 +97,7 @@ class FileFormat(Enum):
     PDF = (DocumentFormat.PDF, MediaType.TEXT)
     MARKDOWN = (DocumentFormat.MARKDOWN, MediaType.TEXT)
     HTML = (DocumentFormat.HTML, MediaType.TEXT)
+    LATEX = (DocumentFormat.LATEX, MediaType.TEXT)
     TXT = (DocumentFormat.TXT, MediaType.TEXT)
     CSV = (DocumentFormat.CSV, MediaType.TEXT)
     JSON = (DocumentFormat.JSON, MediaType.TEXT)
@@ -143,10 +146,10 @@ class FileFormat(Enum):
     def from_extension(cls, ext: str) -> FileFormat:
         ext = ext.removeprefix(".").lower()
         return _FORMAT_BY_EXTENSION.get(ext, cls.UNKNOWN)
-    
+
     @classmethod
     def from_path(cls, path: str) -> FileFormat:
-         return cls.from_extension(Path(path).suffix)
+        return cls.from_extension(Path(path).suffix)
 
     @classmethod
     def from_mime(cls, mime: str) -> FileFormat:
@@ -175,6 +178,9 @@ _MIME_TO_FORMAT.update(
         "text/html": FileFormat.HTML,
         "text/markdown": FileFormat.MARKDOWN,
         "text/x-markdown": FileFormat.MARKDOWN,
+        "application/x-latex": FileFormat.LATEX,
+        "application/x-tex": FileFormat.LATEX,
+        "text/x-tex": FileFormat.LATEX,
         "text/csv": FileFormat.CSV,
         "application/json": FileFormat.JSON,
         "application/msword": FileFormat.DOCX,
@@ -218,6 +224,8 @@ _FORMAT_BY_EXTENSION.update(
         "json": FileFormat.JSON,
         "html": FileFormat.HTML,
         "markdown": FileFormat.MARKDOWN,
+        "tex": FileFormat.LATEX,
+        "latex": FileFormat.LATEX,
         # Images
         "png": FileFormat.PNG,
         "jpg": FileFormat.JPEG,
@@ -241,6 +249,13 @@ _FORMAT_BY_EXTENSION.update(
         "webm": FileFormat.WEBM,
     }
 )
+
+
+class SimilarityMetric(str, Enum):
+    COSINE = "cosine"
+    DOT = "dot"
+    EUCLIDEAN = "euclidean"
+    MANHATTAN = "manhattan"
 
 
 class FinishReason(str, Enum):
