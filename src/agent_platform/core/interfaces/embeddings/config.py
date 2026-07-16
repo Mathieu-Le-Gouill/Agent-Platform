@@ -1,9 +1,7 @@
-from pydantic import BaseModel, ConfigDict
+from agent_platform.core.schemas.config import ProviderConfig
 
 
-class EmbeddingConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, frozen=True)
-
+class EmbeddingConfig(ProviderConfig):
     model: str = ""
     batch_size: int = 32
     dimensions: int | None = None

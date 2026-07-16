@@ -1,6 +1,5 @@
-from pydantic import BaseModel, ConfigDict
+from agent_platform.core.schemas.config import ProviderConfig
 
 
-class ImageGenConfig(BaseModel, frozen=True):
-    model_config = ConfigDict(populate_by_name=True, frozen=True)
+class ImageGenConfig(ProviderConfig):
     model: str = "dall-e-3"

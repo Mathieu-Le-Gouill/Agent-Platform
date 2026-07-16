@@ -1,6 +1,5 @@
-from pydantic import BaseModel, ConfigDict
+from agent_platform.core.schemas.config import ProviderConfig
 
 
-class TranslationConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, frozen=True)
+class TranslationConfig(ProviderConfig):
     pass

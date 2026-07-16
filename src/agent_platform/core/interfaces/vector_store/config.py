@@ -1,5 +1,6 @@
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict
+
+from agent_platform.core.schemas.config import ProviderConfig
 
 
 class DistanceMetric(str, Enum):
@@ -8,8 +9,7 @@ class DistanceMetric(str, Enum):
     EUCLIDEAN = "euclidean"
 
 
-class VectorStoreConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, frozen=True)
+class VectorStoreConfig(ProviderConfig):
     collection_name: str = "default"
     dimension: int | None = None
     distance: DistanceMetric = DistanceMetric.COSINE

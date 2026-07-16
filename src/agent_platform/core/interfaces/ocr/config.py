@@ -1,5 +1,6 @@
 from enum import Enum
-from pydantic import BaseModel, Field, ConfigDict
+
+from agent_platform.core.schemas.config import ProviderConfig
 
 
 class OCREngine(str, Enum):
@@ -8,7 +9,6 @@ class OCREngine(str, Enum):
     AWS_TEXTRACT = "aws_textract"
 
 
-class OCRConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, frozen=True)
+class OCRConfig(ProviderConfig):
     language: str = "eng"
     min_confidence: float = 0.0

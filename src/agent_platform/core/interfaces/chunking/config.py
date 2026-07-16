@@ -1,8 +1,6 @@
-from pydantic import BaseModel, ConfigDict
+from agent_platform.core.schemas.config import ProviderConfig
 
 
-class ChunkerConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, frozen=True)
-
+class ChunkerConfig(ProviderConfig):
     chunk_size: int = 512
     chunk_overlap: int = 64

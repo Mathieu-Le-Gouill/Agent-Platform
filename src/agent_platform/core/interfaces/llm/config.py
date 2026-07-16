@@ -1,13 +1,10 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict
-
 from agent_platform.core.interfaces.llm.response import ResponseFormat
+from agent_platform.core.schemas.config import ProviderConfig
 
 
-class GenerationConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, frozen=True)
-
+class GenerationConfig(ProviderConfig):
     model: str = ""
     temperature: float = 0.7
     max_tokens: int | None = None

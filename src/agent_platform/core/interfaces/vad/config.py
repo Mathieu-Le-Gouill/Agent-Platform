@@ -1,8 +1,7 @@
-from pydantic import BaseModel, Field, ConfigDict
+from agent_platform.core.schemas.config import ProviderConfig
 
 
-class VADConfig(BaseModel):
-    model_config = ConfigDict(populate_by_name=True, frozen=True)
+class VADConfig(ProviderConfig):
     sample_rate: int = 16000
     max_samples: int = 50
     speech_pad_ms: int = 30
