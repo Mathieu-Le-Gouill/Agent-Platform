@@ -13,6 +13,7 @@ from agent_platform.core.interfaces.vector_store.base import (
     ConfigT,
     CredentialsT,
 )
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
@@ -33,6 +34,11 @@ class LangChainVectorStore(
     @abstractmethod
     def _build_client(self, config: ConfigT) -> VectorStore: ...
 
+    def _search_kwargs(
+        self, config: ConfigT, filter: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        return {"filter": filter}
+
     async def add(
         self, documents: list[TextChunk], config: ConfigT | None = None
     ) -> None:
@@ -49,6 +55,8 @@ class LangChainVectorStore(
         ids = [str(doc_id) for doc_id in document_ids]
         await asyncio.to_thread(client.delete, ids)
 
+    @error_logged(re_raise=ProviderError, message="Vector store search failed")
+    @with_retry()
     async def search(
         self,
         query_vector: list[float],
@@ -59,10 +67,12 @@ class LangChainVectorStore(
         config = config or self._default_config()
         client = self._build_client(config)
         results = await client.asimilarity_search_by_vector(
-            query_vector, k, filter=filter
+            query_vector, k, **self._search_kwargs(config, filter)
         )
         return [_lc_to_chunk(c) for c in results]
 
+    @error_logged(re_raise=ProviderError, message="Vector store search failed")
+    @with_retry()
     async def search_with_scores(
         self,
         query_vector: list[float],
@@ -73,7 +83,7 @@ class LangChainVectorStore(
         config = config or self._default_config()
         client = self._build_client(config)
         results = await client.asimilarity_search_with_score(
-            query_vector, k, filter=filter
+            query_vector, k, **self._search_kwargs(config, filter)
         )
         return [
             (_lc_to_chunk(doc), Score.similarity(float(score)))

@@ -1,6 +1,8 @@
+from typing import Any
+
 from langchain_qdrant import QdrantVectorStore
 from langchain_core.embeddings import Embeddings
-from qdrant_client import QdrantClient
+from qdrant_client import QdrantClient, models
 
 from agent_platform.integrations.credentials.qdrant import QdrantCredentials
 from agent_platform.integrations.vector_store.langchain_base import LangChainVectorStore
@@ -32,3 +34,17 @@ class QdrantVectorStoreProvider(LangChainVectorStore[QdrantCredentials, QdrantCo
             collection_name=config.collection_name,
             embedding=self._embeddings,
         )
+
+    def _search_kwargs(
+        self, config: QdrantConfig, filter: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        if not filter:
+            return {"filter": None}
+        return {
+            "filter": models.Filter(
+                must=[
+                    models.FieldCondition(key=key, match=models.MatchValue(value=value))
+                    for key, value in filter.items()
+                ]
+            )
+        }

@@ -1,9 +1,12 @@
 from __future__ import annotations
 
+from typing import Any
+
 import weaviate
 import weaviate.auth
 from langchain_weaviate import WeaviateVectorStore
 from langchain_core.embeddings import Embeddings
+from weaviate.classes.query import Filter
 
 from agent_platform.integrations.credentials.weaviate import WeaviateCredentials
 from agent_platform.integrations.vector_store.langchain_base import LangChainVectorStore
@@ -47,4 +50,16 @@ class WeaviateStore(LangChainVectorStore[WeaviateCredentials, WeaviateConfig]):
             index_name=config.collection_name,
             text_key=config.text_key,
             embedding=self._embeddings,
+            use_multi_tenancy=bool(config.namespace),
         )
+
+    def _search_kwargs(
+        self, config: WeaviateConfig, filter: dict[str, Any] | None
+    ) -> dict[str, Any]:
+        kwargs: dict[str, Any] = {}
+        if filter:
+            conditions = [Filter.by_property(key).equal(value) for key, value in filter.items()]
+            kwargs["filters"] = conditions[0] if len(conditions) == 1 else Filter.all_of(conditions)
+        if config.namespace:
+            kwargs["tenant"] = config.namespace
+        return kwargs

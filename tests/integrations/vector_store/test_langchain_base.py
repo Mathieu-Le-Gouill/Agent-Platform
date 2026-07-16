@@ -1,14 +1,18 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
+
 from agent_platform.integrations.vector_store.langchain_base import (
     _chunk_to_lc,
     _lc_to_chunk,
     LangChainVectorStore,
 )
-from agent_platform.models.chunk import TextChunk
-from agent_platform.models.enums import DocumentFormat, Language
-from agent_platform.models.score import Score
+from agent_platform.core.errors import ProviderError
+from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.enums import DocumentFormat, Language
+from agent_platform.core.schemas.score import Score
 
 
 def test_chunk_to_lc_basic():
@@ -193,8 +197,11 @@ def test_round_trip():
 
 
 class _TestVectorStore(LangChainVectorStore):
-    def _build_client(self):
-        return MagicMock()
+    def _default_config(self):
+        return VectorStoreConfig(collection_name="test", dimension=768)
+
+    def _build_client(self, config):
+        return self._client
 
     async def delete(self, document_ids):  # type: ignore[override]
         pass
@@ -206,9 +213,11 @@ class TestLangChainVectorStore:
         doc = TextChunk(id=uid, text="hello", index=0)
 
         mock_client = MagicMock()
-        mock_client.aadd_documents = MagicMock()
+        mock_client.aadd_documents = AsyncMock()
 
-        store = _TestVectorStore()
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
         store._client = mock_client
 
         await store.add([doc])
@@ -225,9 +234,11 @@ class TestLangChainVectorStore:
         ]
 
         mock_client = MagicMock()
-        mock_client.aadd_documents = MagicMock()
+        mock_client.aadd_documents = AsyncMock()
 
-        store = _TestVectorStore()
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
         store._client = mock_client
 
         await store.add(docs)
@@ -256,9 +267,11 @@ class TestLangChainVectorStore:
         )()
 
         mock_client = MagicMock()
-        mock_client.similarity_search_by_vector = MagicMock(return_value=[mock_lc_doc])
+        mock_client.asimilarity_search_by_vector = AsyncMock(return_value=[mock_lc_doc])
 
-        store = _TestVectorStore()
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
         store._client = mock_client
 
         results = await store.search(query_vector=[0.1, 0.2, 0.3], k=5)
@@ -270,18 +283,20 @@ class TestLangChainVectorStore:
 
     async def test_search_default_k(self):
         mock_client = MagicMock()
-        mock_client.similarity_search_by_vector = MagicMock(return_value=[])
+        mock_client.asimilarity_search_by_vector = AsyncMock(return_value=[])
 
-        store = _TestVectorStore()
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
         store._client = mock_client
 
         await store.search(query_vector=[0.1, 0.2])
 
-        mock_client.similarity_search_by_vector.assert_called_once()
-        _, kwargs = mock_client.similarity_search_by_vector.call_args
+        mock_client.asimilarity_search_by_vector.assert_called_once()
+        _, kwargs = mock_client.asimilarity_search_by_vector.call_args
         assert (
             kwargs.get("k") == 5
-            or mock_client.similarity_search_by_vector.call_args[0][1] == 5
+            or mock_client.asimilarity_search_by_vector.call_args[0][1] == 5
         )
 
     async def test_search_with_scores_returns_tuples(self):
@@ -305,11 +320,13 @@ class TestLangChainVectorStore:
         )()
 
         mock_client = MagicMock()
-        mock_client.similarity_search_with_score = MagicMock(
+        mock_client.asimilarity_search_with_score = AsyncMock(
             return_value=[(mock_lc_doc, 0.85)],
         )
 
-        store = _TestVectorStore()
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
         store._client = mock_client
 
         results = await store.search_with_scores(query_vector=[0.1, 0.2, 0.3], k=5)
@@ -361,11 +378,13 @@ class TestLangChainVectorStore:
         ]
 
         mock_client = MagicMock()
-        mock_client.similarity_search_with_score = MagicMock(
+        mock_client.asimilarity_search_with_score = AsyncMock(
             return_value=[(mock_docs[0], 0.9), (mock_docs[1], 0.7)],
         )
 
-        store = _TestVectorStore()
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
         store._client = mock_client
 
         results = await store.search_with_scores(query_vector=[0.1, 0.2])
@@ -376,13 +395,82 @@ class TestLangChainVectorStore:
 
     async def test_search_with_scores_default_k(self):
         mock_client = MagicMock()
-        mock_client.similarity_search_with_score = MagicMock(return_value=[])
+        mock_client.asimilarity_search_with_score = AsyncMock(return_value=[])
 
-        store = _TestVectorStore()
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
         store._client = mock_client
 
         await store.search_with_scores(query_vector=[0.1, 0.2])
 
-        mock_client.similarity_search_with_score.assert_called_once()
-        args = mock_client.similarity_search_with_score.call_args
+        mock_client.asimilarity_search_with_score.assert_called_once()
+        args = mock_client.asimilarity_search_with_score.call_args
         assert args[0][1] == 5 or args[1].get("k") == 5
+
+
+class TestSearchRetryAndTranslation:
+    async def test_search_retries_transient_failure_then_succeeds(self, monkeypatch):
+        import agent_platform.core.errors as errors_mod
+
+        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
+
+        calls = {"n": 0}
+
+        async def flaky(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] < 2:
+                raise ConnectionError("transient")
+            return []
+
+        mock_client = MagicMock()
+        mock_client.asimilarity_search_by_vector = flaky
+
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
+        store._client = mock_client
+
+        await store.search(query_vector=[0.1, 0.2])
+
+        assert calls["n"] == 2
+
+    async def test_search_translates_permanent_failure_to_provider_error(
+        self, monkeypatch
+    ):
+        import agent_platform.core.errors as errors_mod
+
+        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
+
+        async def always_fails(*args, **kwargs):
+            raise ConnectionError("boom")
+
+        mock_client = MagicMock()
+        mock_client.asimilarity_search_by_vector = always_fails
+
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
+        store._client = mock_client
+
+        with pytest.raises(ProviderError, match="Vector store search failed"):
+            await store.search(query_vector=[0.1, 0.2])
+
+    async def test_search_with_scores_translates_permanent_failure(self, monkeypatch):
+        import agent_platform.core.errors as errors_mod
+
+        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
+
+        async def always_fails(*args, **kwargs):
+            raise ConnectionError("boom")
+
+        mock_client = MagicMock()
+        mock_client.asimilarity_search_with_score = always_fails
+
+        store = _TestVectorStore(
+            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
+        )
+        store._client = mock_client
+
+        with pytest.raises(ProviderError, match="Vector store search failed"):
+            await store.search_with_scores(query_vector=[0.1, 0.2])

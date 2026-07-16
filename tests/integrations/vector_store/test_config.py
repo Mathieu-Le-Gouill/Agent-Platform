@@ -1,9 +1,11 @@
-from agent_platform.integrations.vector_store.config import (
+from pydantic import ValidationError
+
+from agent_platform.core.interfaces.vector_store.config import (
     VectorStoreConfig,
-    ChromaConfig,
-    QdrantConfig,
     DistanceMetric,
 )
+from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
+from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
 
 
 def test_distance_metric_enum():
@@ -69,6 +71,6 @@ def test_configs_are_frozen():
     cfg = ChromaConfig(collection_name="frozen", dimension=64)
     try:
         cfg.host = "other"  # type: ignore[misc]
-        assert False, "expected FrozenInstanceError"
-    except AttributeError:
+        assert False, "expected ValidationError"
+    except ValidationError:
         pass

@@ -17,7 +17,7 @@ from agent_platform.integrations.vector_store.langchain_base import (
 )
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
-from agent_platform.core.errors import ProviderError
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 
 class FAISSStore(BaseVectorStore[NoCredentials, FAISSConfig]):
@@ -74,6 +74,8 @@ class FAISSStore(BaseVectorStore[NoCredentials, FAISSConfig]):
         ids = [str(doc_id) for doc_id in document_ids]
         await asyncio.to_thread(store.delete, ids)
 
+    @error_logged(re_raise=ProviderError, message="Vector store search failed")
+    @with_retry()
     async def search(
         self,
         query_vector: list[float],
@@ -90,6 +92,8 @@ class FAISSStore(BaseVectorStore[NoCredentials, FAISSConfig]):
         )
         return [_lc_to_chunk(r) for r in results]
 
+    @error_logged(re_raise=ProviderError, message="Vector store search failed")
+    @with_retry()
     async def search_with_scores(
         self,
         query_vector: list[float],
