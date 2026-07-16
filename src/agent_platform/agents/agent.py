@@ -1,15 +1,20 @@
 from __future__ import annotations
 
+import asyncio
+import logging
+
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.core.errors import AgentThinkError
-from agent_platform.integrations.llm.base import BaseLLMProvider
-from agent_platform.integrations.llm.config import GenerationConfig
-from agent_platform.models.message import (
+from agent_platform.agents.errors import AgentThinkError
+from agent_platform.core.interfaces.llm.base import BaseLLMProvider
+from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.core.schemas.message import (
     AssistantMessage,
     Message,
     Prompt,
     ToolMessage,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class Agent:
@@ -51,13 +56,16 @@ class Agent:
         tool_list = list(self._tool_registry)
 
         try:
-            response = await self._llm.generate(
+            response = await self._llm.agenerate(
                 prompt=self._build_prompt(messages),
                 model=self._model,
                 config=self._generation_config,
                 tools=tool_list or None,
             )
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:
+            logger.exception("LLM generation failed in agent '%s'", self._name)
             raise AgentThinkError(f"LLM generation failed: {exc}") from exc
 
         if response.message is None:

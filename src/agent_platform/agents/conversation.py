@@ -5,9 +5,9 @@ from uuid import UUID, uuid4
 from agent_platform.agents.agent import Agent
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.integrations.llm.base import BaseLLMProvider
-from agent_platform.integrations.llm.config import GenerationConfig
-from agent_platform.models.message import (
+from agent_platform.core.interfaces.llm.base import BaseLLMProvider
+from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.core.schemas.message import (
     Message,
     UserMessage,
 )
@@ -56,7 +56,7 @@ class ConversationAgent(Agent):
 
     async def chat(self, user_input: str) -> str:
         self.add_user_message(user_input)
-        
+
         result, accumulated = await self._executor.run_with_messages(
             list(self._history)
         )
@@ -70,9 +70,7 @@ class ConversationAgent(Agent):
             return
 
         user_indices = [
-            i
-            for i, m in enumerate(self._history)
-            if isinstance(m, UserMessage)
+            i for i, m in enumerate(self._history) if isinstance(m, UserMessage)
         ]
         if len(user_indices) <= self._max_history_turns:
             return

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import base64
 import json
 from abc import abstractmethod
 from typing import TYPE_CHECKING, Any, AsyncIterator, Generic
@@ -21,7 +22,12 @@ from agent_platform.core.interfaces.llm.response import (
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.schemas.message import (
     AssistantMessage,
+    AudioBlock,
+    ContentBlock,
+    ContentMessage,
+    ImageBlock,
     SystemMessage,
+    TextBlock,
     UserMessage,
     ToolMessage,
     ToolCall,
@@ -117,15 +123,44 @@ class LangChainLLMProvider(
 # --- Mappers ---
 
 
+def _block_to_langchain(block: ContentBlock) -> dict[str, Any]:
+    match block:
+        case TextBlock():
+            return {"type": "text", "text": block.text}
+        case ImageBlock():
+            if isinstance(block.image, str):
+                url = block.image
+            else:
+                mime = (
+                    f"image/{block.image.format.value}"
+                    if block.image.format
+                    else "image/png"
+                )
+                data = base64.b64encode(block.image.content).decode()
+                url = f"data:{mime};base64,{data}"
+            return {"type": "image_url", "image_url": {"url": url}}
+        case AudioBlock():
+            data = base64.b64encode(block.audio.content).decode()
+            fmt = block.audio.format.value if block.audio.format else "wav"
+            return {"type": "input_audio", "input_audio": {"data": data, "format": fmt}}
+
+
+def _content_to_langchain(m: ContentMessage) -> str | list[dict[str, Any]]:
+    if isinstance(m.content, str):
+        return m.content
+    return [_block_to_langchain(b) for b in m.blocks]
+
+
 def _to_langchain(prompt: Prompt) -> list[LCBaseMessage]:
     result = []
     for m in prompt.messages:
         match m:
             case SystemMessage():
-                result.append(LCSystemMessage(content=m.content))
+                result.append(LCSystemMessage(content=_content_to_langchain(m)))
             case UserMessage():
-                result.append(HumanMessage(content=m.content))
+                result.append(HumanMessage(content=_content_to_langchain(m)))
             case AssistantMessage():
+                content = _content_to_langchain(m)
                 if m.tool_calls:
                     lc_tool_calls: list[dict[str, Any]] = [
                         {
@@ -138,10 +173,10 @@ def _to_langchain(prompt: Prompt) -> list[LCBaseMessage]:
                         for tc in m.tool_calls
                     ]
                     result.append(
-                        AIMessage(content=m.content, tool_calls=lc_tool_calls)
+                        AIMessage(content=content, tool_calls=lc_tool_calls)
                     )
                 else:
-                    result.append(AIMessage(content=m.content))
+                    result.append(AIMessage(content=content))
             case ToolMessage():
                 result.append(
                     LCToolMessage(

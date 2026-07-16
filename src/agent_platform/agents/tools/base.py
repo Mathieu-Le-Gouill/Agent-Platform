@@ -1,18 +1,13 @@
 from __future__ import annotations
 
-from abc import ABC, abstractmethod
-from typing import Any
+from typing import Any, Protocol
 
 from pydantic import BaseModel
 
-from agent_platform.core.errors import PlatformError
+from agent_platform.agents.tools.errors import ToolError as ToolError
 
 
-class ToolError(PlatformError):
-    pass
-
-
-class Tool(ABC):
+class Tool(Protocol):
     name: str = ""
     description: str = ""
     input_schema: type[BaseModel] = BaseModel
@@ -25,5 +20,4 @@ class Tool(ABC):
         if not cls.description:
             raise ToolError(f"{cls.__name__} must define a non-empty 'description'")
 
-    @abstractmethod
     async def run(self, **kwargs: Any) -> Any: ...

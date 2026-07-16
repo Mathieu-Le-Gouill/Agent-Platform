@@ -1,13 +1,14 @@
 from __future__ import annotations
 
 from uuid import UUID, uuid4
-from typing import Union, Any
+from typing import Annotated, Literal, Union, Any
 from datetime import datetime
 from enum import Enum
 
 from pydantic import BaseModel, Field
 
-from agent_platform.core.schemas.enums import Language
+from agent_platform.core.schemas.enums import Language, MediaType
+from agent_platform.core.schemas.document import ImageDocument, AudioDocument
 
 
 class MessageRole(str, Enum):
@@ -30,6 +31,26 @@ class ToolResult(BaseModel, frozen=True):
     is_error: bool = False
 
 
+class TextBlock(BaseModel, frozen=True):
+    media_type: Literal[MediaType.TEXT] = MediaType.TEXT
+    text: str = ""
+
+
+class ImageBlock(BaseModel, frozen=True):
+    media_type: Literal[MediaType.IMAGE] = MediaType.IMAGE
+    image: ImageDocument | str  # str = URL
+
+
+class AudioBlock(BaseModel, frozen=True):
+    media_type: Literal[MediaType.AUDIO] = MediaType.AUDIO
+    audio: AudioDocument
+
+
+ContentBlock = Annotated[
+    Union[TextBlock, ImageBlock, AudioBlock], Field(discriminator="media_type")
+]
+
+
 class BaseMessage(BaseModel):
     role: MessageRole
     id: UUID = Field(default_factory=uuid4)
@@ -38,20 +59,31 @@ class BaseMessage(BaseModel):
     metadata: dict[str, Any] = Field(default_factory=dict)
 
 
-class SystemMessage(BaseMessage):
+class ContentMessage(BaseMessage):
+    content: str | list[ContentBlock] = ""
+
+    @property
+    def blocks(self) -> list[ContentBlock]:
+        if isinstance(self.content, str):
+            return [TextBlock(text=self.content)] if self.content else []
+        return self.content
+
+    @property
+    def text(self) -> str:
+        return "".join(b.text for b in self.blocks if isinstance(b, TextBlock))
+
+
+class SystemMessage(ContentMessage):
     role: MessageRole = MessageRole.SYSTEM
-    content: str = ""
 
 
-class UserMessage(BaseMessage):
+class UserMessage(ContentMessage):
     role: MessageRole = MessageRole.USER
-    content: str = ""
     user_id: UUID | None = None
 
 
-class AssistantMessage(BaseMessage):
+class AssistantMessage(ContentMessage):
     role: MessageRole = MessageRole.ASSISTANT
-    content: str = ""
     tool_calls: list[ToolCall] = Field(default_factory=list)
 
 
@@ -75,6 +107,7 @@ class Prompt(BaseModel):
         system: str | None = None,
         history: list[Message] | None = None,
         user: str | None = None,
+        user_blocks: list[ContentBlock] | None = None,
         language: Language | None = None,
     ) -> Prompt:
         messages: list[Message] = []
@@ -85,7 +118,9 @@ class Prompt(BaseModel):
         if history:
             messages.extend(history)
 
-        if user:
+        if user_blocks:
+            messages.append(UserMessage(content=user_blocks, language=language))
+        elif user:
             messages.append(UserMessage(content=user, language=language))
 
         return cls(messages=messages)
@@ -96,6 +131,10 @@ class Prompt(BaseModel):
 
     def add_user(self, content: str, **kw) -> Prompt:
         self.messages.append(UserMessage(content=content, **kw))
+        return self
+
+    def add_user_content(self, blocks: list[ContentBlock], **kw) -> Prompt:
+        self.messages.append(UserMessage(content=blocks, **kw))
         return self
 
     def add_assistant(
@@ -118,4 +157,4 @@ class Prompt(BaseModel):
 
     def system_prompt(self) -> str | None:
         msg = next((m for m in self.messages if isinstance(m, SystemMessage)), None)
-        return msg.content if msg else None
+        return msg.text if msg else None

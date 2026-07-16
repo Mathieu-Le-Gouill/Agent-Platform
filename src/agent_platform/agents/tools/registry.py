@@ -1,13 +1,18 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from typing import Any
 
 from agent_platform.agents.tools.base import Tool, ToolError
-from agent_platform.models.message import (
+from agent_platform.agents.tools.errors import ToolNotFoundError, ToolRegistrationError
+from agent_platform.core.schemas.message import (
     ToolCall,
     ToolMessage,
     ToolResult,
 )
+
+logger = logging.getLogger(__name__)
 
 
 class ToolRegistry:
@@ -18,13 +23,13 @@ class ToolRegistry:
 
     def register(self, tool: Tool) -> None:
         if tool.name in self._tools:
-            raise ToolError(f"Tool '{tool.name}' is already registered")
+            raise ToolRegistrationError(f"Tool '{tool.name}' is already registered")
         self._tools[tool.name] = tool
 
     def get(self, name: str) -> Tool:
         tool = self._tools.get(name)
         if tool is None:
-            raise ToolError(f"Unknown tool: '{name}'")
+            raise ToolNotFoundError(f"Unknown tool: '{name}'")
         return tool
 
     def all(self) -> dict[str, Tool]:
@@ -32,7 +37,7 @@ class ToolRegistry:
 
     def remove(self, name: str) -> None:
         if name not in self._tools:
-            raise ToolError(f"Unknown tool: '{name}'")
+            raise ToolNotFoundError(f"Unknown tool: '{name}'")
         del self._tools[name]
 
     async def resolve_call(self, call: ToolCall) -> Any:
@@ -44,7 +49,10 @@ class ToolRegistry:
             raw = await self.resolve_call(call)
             content = str(raw) if raw is not None else ""
             is_error = False
+        except asyncio.CancelledError:
+            raise
         except Exception as exc:
+            logger.exception("Tool call '%s' failed", call.name)
             content = str(exc)
             is_error = True
 

@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from agent_platform.agents.agent import Agent
-from agent_platform.core.errors import AgentMaxIterations
-from agent_platform.models.message import Message, UserMessage
+from agent_platform.agents.errors import AgentMaxIterations
+from agent_platform.core.schemas.message import Message, UserMessage
 
 
 class AgentExecutor:
@@ -34,15 +34,13 @@ class AgentExecutor:
     ) -> tuple[str, list[Message]]:
         return await self._execute(list(messages))
 
-    async def _execute(
-        self, messages: list[Message]
-    ) -> tuple[str, list[Message]]:
+    async def _execute(self, messages: list[Message]) -> tuple[str, list[Message]]:
         for _ in range(self._max_iterations):
             assistant_msg = await self._agent.think(messages)
             messages.append(assistant_msg)
 
             if not assistant_msg.tool_calls:
-                return assistant_msg.content, messages
+                return assistant_msg.text, messages
 
             tool_messages = await self._agent.act(assistant_msg)
             messages.extend(tool_messages)

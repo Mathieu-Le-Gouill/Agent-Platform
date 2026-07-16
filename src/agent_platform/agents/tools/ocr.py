@@ -6,9 +6,9 @@ from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools._utils import safe_call
-from agent_platform.integrations.ocr.base import BaseOCR
-from agent_platform.integrations.ocr.config import OCRConfig
-from agent_platform.models.chunk import TextChunk
+from agent_platform.core.interfaces.ocr.base import BaseOCR
+from agent_platform.core.interfaces.ocr.config import OCRConfig
+from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.utils.score import filter_by_score
 
 

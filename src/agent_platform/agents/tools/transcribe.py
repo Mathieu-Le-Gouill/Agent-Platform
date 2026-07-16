@@ -6,10 +6,10 @@ from agent_platform.agents.tools.base import Tool, ToolError
 from uuid import uuid4
 
 from agent_platform.agents.tools._utils import safe_call
-from agent_platform.integrations.speech.base import BaseSpeechToText
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.conversation import Transcript
-from agent_platform.models.enums import AudioFormat, DataType
+from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.conversation import Transcript
+from agent_platform.core.schemas.enums import AudioFormat, DataType
 
 
 class TranscribeInput(BaseModel):

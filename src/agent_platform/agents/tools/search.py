@@ -6,10 +6,10 @@ from agent_platform.agents.tools.base import Tool, ToolError
 from uuid import uuid4
 
 from agent_platform.agents.tools._utils import safe_call
-from agent_platform.integrations.embeddings.base import BaseEmbeddingProvider
-from agent_platform.integrations.vector_store.port import VectorStore
-from agent_platform.models.chunk import TextChunk
-from agent_platform.models.score import Score
+from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
+from agent_platform.core.interfaces.vector_store.port import VectorStore
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.score import Score
 
 
 class SearchInput(BaseModel):
@@ -48,7 +48,7 @@ class SearchTool(Tool):
         validated = SearchInput(**kwargs)
         query_chunk = TextChunk(id=uuid4(), text=validated.query, index=0)
         response = await safe_call(
-            self._embedder.encode([query_chunk]),
+            self._embedder.embed_document([query_chunk]),
             "Embedding failed",
         )
         if not response.embeddings:

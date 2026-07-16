@@ -5,7 +5,9 @@ from typing import TYPE_CHECKING, Any
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
 from agent_platform.core.schemas import model_schema
-from agent_platform.integrations.llm.huggingface.config import HuggingFaceGenerationConfig
+from agent_platform.integrations.llm.huggingface.config import (
+    HuggingFaceGenerationConfig,
+)
 from agent_platform.integrations.credentials.huggingface import HuggingFaceCredentials
 from agent_platform.core.credentials import (
     resolve_max_retries,
