@@ -79,4 +79,5 @@ def _to_langchain_ollama(
                 )
             params["format"] = config.json_schema
 
+    params.update(config.extra_params)
     return params

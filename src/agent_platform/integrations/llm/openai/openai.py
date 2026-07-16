@@ -97,4 +97,6 @@ def _to_langchain_openai(
 
     if model_kwargs:
         params["model_kwargs"] = model_kwargs
+
+    params.update(config.extra_params)
     return params

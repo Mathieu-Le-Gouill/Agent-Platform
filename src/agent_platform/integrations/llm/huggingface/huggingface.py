@@ -82,4 +82,5 @@ def _to_langchain_hugging_face(
         params["timeout"] = int(timeout)
     params["max_retries"] = resolve_max_retries(config.max_retries, credentials)
 
+    params.update(config.extra_params)
     return params

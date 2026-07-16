@@ -82,4 +82,5 @@ def _to_langchain_anthropic(
     if config.cache_control:
         params["cache_control"] = {"type": "ephemeral"}
 
+    params.update(config.extra_params)
     return params
