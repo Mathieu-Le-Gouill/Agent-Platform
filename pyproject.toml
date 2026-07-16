@@ -9,25 +9,26 @@ requires-python = ">=3.11,<3.12"
 
 dependencies = [
     # --- Core ---
-    "langchain",
-    "langgraph",
-    "langsmith",
+    "langchain~=1.3",
+    "langgraph~=1.2",
+    "langsmith~=0.10",
+    "langfuse~=2.0",
     "soundfile",
 
     # --- LLM ---
-    "langchain-openai",
-    "langchain-anthropic",
-    "langchain-mistralai",
-    "langchain-ollama",
-    "langchain-community",
+    "langchain-openai~=1.3",
+    "langchain-anthropic~=1.4",
+    "langchain-mistralai~=1.1",
+    "langchain-ollama~=1.1",
+    "langchain-community~=0.4",
 
     # --- Embeddings / Vector Stores / Reranking ---
-    "langchain-chroma",
-    "langchain-cohere",
-    "langchain-qdrant",
-    "langchain-pinecone",
-    "langchain-weaviate",
-    "langchain-voyageai",
+    "langchain-chroma~=1.1",
+    "langchain-cohere~=0.6",
+    "langchain-qdrant~=1.1",
+    "langchain-pinecone~=0.2",
+    "langchain-weaviate~=0.0.8",
+    "langchain-voyageai~=0.4",
     "faiss-cpu",
 
     # --- OCR ---
@@ -58,6 +59,10 @@ dependencies = [
 
     # --- Classification ---
     "transformers",
+
+    # --- Chunking (structure-based) ---
+    "beautifulsoup4",
+    "unstructured[pdf]",
 
     # --- Clustering ---
     "hdbscan",
