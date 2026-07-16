@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import AsyncIterator
+
 from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool, ToolError
@@ -25,13 +27,13 @@ class TranscribeTool(Tool):
     description = "Transcribe audio content to text using speech-to-text."
     input_schema = TranscribeInput
     output_schema = Transcript
+    supports_streaming = True
 
     def __init__(self, provider: BaseSpeechToText) -> None:
         self._provider = provider
 
-    async def run(self, **kwargs) -> Transcript:
-        validated = TranscribeInput(**kwargs)
-        chunk = AudioChunk(
+    def _build_chunk(self, validated: TranscribeInput) -> AudioChunk:
+        return AudioChunk(
             id=uuid4(),
             data=validated.data,
             sample_rate=validated.sample_rate,
@@ -39,10 +41,27 @@ class TranscribeTool(Tool):
             dtype=DataType.FLOAT32,
             format=AudioFormat.UNKNOWN,
         )
+
+    async def run(self, **kwargs) -> Transcript:
+        validated = TranscribeInput(**kwargs)
         result = await safe_call(
-            self._provider.transcribe(chunk),
+            self._provider.transcribe(self._build_chunk(validated)),
             "Speech-to-text failed",
         )
         if not result.utterances:
             raise ToolError("Speech-to-text returned no utterances")
         return result
+
+    async def astream(self, **kwargs) -> AsyncIterator[str]:
+        validated = TranscribeInput(**kwargs)
+
+        async def frames() -> AsyncIterator[AudioChunk]:
+            yield self._build_chunk(validated)
+
+        try:
+            async for partial in self._provider.stream(frames()):
+                for utterance in partial.utterances:
+                    if utterance.text:
+                        yield utterance.text
+        except Exception as exc:
+            raise ToolError(f"Speech-to-text streaming failed: {exc}") from exc

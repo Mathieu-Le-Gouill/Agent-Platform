@@ -2,7 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from typing import AsyncIterator
 
+from agent_platform.agents.tools.base import ToolStreamChunk
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.agents.errors import AgentThinkError
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
@@ -12,6 +14,7 @@ from agent_platform.core.schemas.message import (
     Message,
     Prompt,
     ToolMessage,
+    ToolResult,
 )
 
 logger = logging.getLogger(__name__)
@@ -78,6 +81,30 @@ class Agent:
             await self._tool_registry.call_and_wrap(tc)
             for tc in assistant_message.tool_calls
         ]
+
+    async def act_stream(
+        self, assistant_message: AssistantMessage
+    ) -> AsyncIterator[ToolStreamChunk | ToolMessage]:
+        for tc in assistant_message.tool_calls:
+            content = ""
+            is_error = False
+            async for chunk in self._tool_registry.call_and_stream(tc):
+                yield chunk
+                if chunk.is_final:
+                    is_error = chunk.is_error
+                    if is_error:
+                        content = chunk.delta
+                elif not chunk.is_error:
+                    content += chunk.delta
+
+            yield ToolMessage(
+                result=ToolResult(
+                    tool_call_id=tc.id,
+                    name=tc.name,
+                    content=content,
+                    is_error=is_error,
+                )
+            )
 
     async def step(
         self, messages: list[Message]

@@ -2,9 +2,9 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any
+from typing import Any, AsyncIterator
 
-from agent_platform.agents.tools.base import Tool, ToolError
+from agent_platform.agents.tools.base import Tool, ToolError, ToolStreamChunk
 from agent_platform.agents.tools.errors import ToolNotFoundError, ToolRegistrationError
 from agent_platform.core.schemas.message import (
     ToolCall,
@@ -64,6 +64,31 @@ class ToolRegistry:
                 is_error=is_error,
             )
         )
+
+    async def call_and_stream(self, call: ToolCall) -> AsyncIterator[ToolStreamChunk]:
+        tool = self.get(call.name)
+
+        if not tool.supports_streaming:
+            message = await self.call_and_wrap(call)
+            yield ToolStreamChunk(
+                tool_call_id=call.id,
+                delta=message.result.content,
+                is_final=True,
+                is_error=message.result.is_error,
+            )
+            return
+
+        try:
+            async for delta in tool.astream(**call.arguments):
+                yield ToolStreamChunk(tool_call_id=call.id, delta=delta)
+            yield ToolStreamChunk(tool_call_id=call.id, delta="", is_final=True)
+        except asyncio.CancelledError:
+            raise
+        except Exception as exc:
+            logger.exception("Tool stream '%s' failed", call.name)
+            yield ToolStreamChunk(
+                tool_call_id=call.id, delta=str(exc), is_final=True, is_error=True
+            )
 
     def __len__(self) -> int:
         return len(self._tools)

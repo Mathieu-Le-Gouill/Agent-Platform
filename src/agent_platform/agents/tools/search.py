@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import AsyncIterator
+
 from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool, ToolError
@@ -35,6 +37,7 @@ class SearchTool(Tool):
     )
     input_schema = SearchInput
     output_schema = SearchResult
+    supports_streaming = True
 
     def __init__(
         self,
@@ -44,8 +47,7 @@ class SearchTool(Tool):
         self._embedder = embedder
         self._store = store
 
-    async def run(self, **kwargs) -> list[SearchResult]:
-        validated = SearchInput(**kwargs)
+    async def _search(self, validated: SearchInput) -> list[SearchResult]:
         query_chunk = TextChunk(id=uuid4(), text=validated.query, index=0)
         response = await safe_call(
             self._embedder.embed_document([query_chunk]),
@@ -59,3 +61,10 @@ class SearchTool(Tool):
             "Vector search failed",
         )
         return [SearchResult(chunk=chunk, score=score) for chunk, score in results]
+
+    async def run(self, **kwargs) -> list[SearchResult]:
+        return await self._search(SearchInput(**kwargs))
+
+    async def astream(self, **kwargs) -> AsyncIterator[str]:
+        for result in await self._search(SearchInput(**kwargs)):
+            yield result.model_dump_json()

@@ -1,8 +1,11 @@
 from __future__ import annotations
 
+from typing import AsyncIterator
+
 from agent_platform.agents.agent import Agent
 from agent_platform.agents.errors import AgentMaxIterations
-from agent_platform.core.schemas.message import Message, UserMessage
+from agent_platform.agents.tools.base import ToolStreamChunk
+from agent_platform.core.schemas.message import Message, ToolMessage, UserMessage
 
 
 class AgentExecutor:
@@ -44,6 +47,30 @@ class AgentExecutor:
 
             tool_messages = await self._agent.act(assistant_msg)
             messages.extend(tool_messages)
+
+        raise AgentMaxIterations(
+            f"Agent '{self._agent.name}' exceeded "
+            f"max iterations ({self._max_iterations})"
+        )
+
+    async def run_streaming(
+        self, user_input: str
+    ) -> AsyncIterator[ToolStreamChunk | str]:
+        messages: list[Message] = [UserMessage(content=user_input)]
+
+        for _ in range(self._max_iterations):
+            assistant_msg = await self._agent.think(messages)
+            messages.append(assistant_msg)
+
+            if not assistant_msg.tool_calls:
+                yield assistant_msg.text
+                return
+
+            async for event in self._agent.act_stream(assistant_msg):
+                if isinstance(event, ToolMessage):
+                    messages.append(event)
+                else:
+                    yield event
 
         raise AgentMaxIterations(
             f"Agent '{self._agent.name}' exceeded "
