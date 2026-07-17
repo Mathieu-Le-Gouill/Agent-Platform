@@ -7,11 +7,13 @@ from pydantic import BaseModel, Field
 from agent_platform.agents.tools.base import Tool, ToolError
 from uuid import uuid4
 
-from agent_platform.agents.tools._utils import safe_call
+from agent_platform.agents.tools._utils import safe_call, safe_stream
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript
+from agent_platform.core.schemas.document import AudioDocument
 from agent_platform.core.schemas.enums import AudioFormat, DataType
+from agent_platform.core.schemas.message import AudioBlock, ContentBlock, TextBlock
 
 
 class TranscribeInput(BaseModel):
@@ -52,16 +54,33 @@ class TranscribeTool(Tool):
             raise ToolError("Speech-to-text returned no utterances")
         return result
 
+    def to_blocks(
+        self, chunk: AudioChunk, transcript: Transcript
+    ) -> list[ContentBlock]:
+        blocks: list[ContentBlock] = [
+            AudioBlock(
+                audio=AudioDocument(
+                    content=chunk.data,
+                    format=chunk.format,
+                    sample_rate=chunk.sample_rate,
+                    channels=chunk.channels,
+                )
+            )
+        ]
+        text = " ".join(u.text for u in transcript.utterances if u.text)
+        if text:
+            blocks.append(TextBlock(text=text))
+        return blocks
+
     async def astream(self, **kwargs) -> AsyncIterator[str]:
         validated = TranscribeInput(**kwargs)
 
         async def frames() -> AsyncIterator[AudioChunk]:
             yield self._build_chunk(validated)
 
-        try:
-            async for partial in self._provider.stream(frames()):
-                for utterance in partial.utterances:
-                    if utterance.text:
-                        yield utterance.text
-        except Exception as exc:
-            raise ToolError(f"Speech-to-text streaming failed: {exc}") from exc
+        async for partial in safe_stream(
+            self._provider.stream(frames()), "Speech-to-text streaming failed"
+        ):
+            for utterance in partial.utterances:
+                if utterance.text:
+                    yield utterance.text
