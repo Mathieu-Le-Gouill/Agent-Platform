@@ -7,6 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
+from agent_platform.core.schemas.dimensions import Dimensions
 from agent_platform.core.schemas.enums import (
     MediaType,
     DocumentFormat,
@@ -49,12 +50,10 @@ class ImageDocument(Document, frozen=True):
     media_type: MediaType = MediaType.IMAGE
     content: bytes = b""
     format: ImageFormat = ImageFormat.UNKNOWN
-    width: int | None = None
-    height: int | None = None
+    dimensions: Dimensions | None = None
     color_space: str | None = None
     has_alpha: bool = False
     channels: int | None = None
-    bit_depth: int | None = None
 
     @staticmethod
     def load_content(path: str) -> ImageDocument:
@@ -72,12 +71,10 @@ class ImageDocument(Document, frozen=True):
             source=path,
             content=content,
             format=fmt,
-            width=width,
-            height=height,
+            dimensions=Dimensions(width=width, height=height, depth=bit_depth),
             color_space=img.mode,
             has_alpha=has_alpha,
             channels=channels,
-            bit_depth=bit_depth,
             metadata=DocumentMetadata(
                 title=os.path.splitext(os.path.basename(path))[0]
             ),
@@ -145,8 +142,7 @@ class VideoDocument(Document, frozen=True):
     format: VideoFormat = VideoFormat.UNKNOWN
     language: Language | None = None
     duration: float | None = None
-    width: int | None = None
-    height: int | None = None
+    dimensions: Dimensions | None = None
     frame_rate: float | None = None
     codec: str | None = None
     bitrate: int | None = None
@@ -192,8 +188,7 @@ class VideoDocument(Document, frozen=True):
             content=content,
             format=fmt,
             duration=duration_sec,
-            width=video_stream.width,
-            height=video_stream.height,
+            dimensions=Dimensions(width=video_stream.width, height=video_stream.height),
             frame_rate=frame_rate,
             codec=codec,
             bitrate=video_bitrate,

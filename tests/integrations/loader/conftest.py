@@ -18,17 +18,16 @@ def mock_pil_image():
 
 @pytest.fixture
 def fake_image_document():
+    from agent_platform.core.schemas.dimensions import Dimensions
     from agent_platform.core.schemas.document import ImageDocument
 
     return ImageDocument(
         id=uuid4(),
         source="/test/image.png",
         content=b"fake_image_bytes",
-        width=640,
-        height=480,
+        dimensions=Dimensions(width=640, height=480, depth=8),
         color_space="RGB",
         channels=3,
-        bit_depth=8,
     )
 
 
@@ -49,14 +48,14 @@ def fake_audio_document():
 
 @pytest.fixture
 def fake_video_document():
+    from agent_platform.core.schemas.dimensions import Dimensions
     from agent_platform.core.schemas.document import VideoDocument
 
     return VideoDocument(
         id=uuid4(),
         source="/test/video.mp4",
         content=b"fake_video_bytes",
-        width=1920,
-        height=1080,
+        dimensions=Dimensions(width=1920, height=1080),
         duration=30.0,
         frame_rate=24.0,
         codec="h264",

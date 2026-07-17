@@ -105,12 +105,12 @@ class TestPILImageLoader:
         doc = results[0]
         assert doc.source == "/test/image.png"
         assert doc.format == ImageFormat.PNG
-        assert doc.width == 800
-        assert doc.height == 600
+        assert doc.dimensions.width == 800
+        assert doc.dimensions.height == 600
         assert doc.color_space == "RGBA"
         assert doc.has_alpha is True
         assert doc.channels == 4
-        assert doc.bit_depth == 8
+        assert doc.dimensions.depth == 8
         assert doc.content == b"fake_image_data"
 
     @patch("agent_platform.integrations.loader.strategies.pil.pil.Image")

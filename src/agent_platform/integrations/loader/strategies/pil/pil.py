@@ -6,6 +6,7 @@ from PIL.ExifTags import TAGS as EXIF_TAGS
 
 from agent_platform.core.interfaces.loader.image.base import BaseImageLoader
 from agent_platform.core.interfaces.loader.image.config import ImageLoaderConfig
+from agent_platform.core.schemas.dimensions import Dimensions
 from agent_platform.core.schemas.document import ImageDocument, DocumentMetadata
 from agent_platform.core.schemas.enums import ImageFormat, FileFormat
 
@@ -60,12 +61,14 @@ class PILImageLoader(BaseImageLoader):
                 ),
                 content=raw_bytes,
                 format=fmt,
-                width=exif_data.get("width") or img_width,
-                height=exif_data.get("height") or img_height,
+                dimensions=Dimensions(
+                    width=exif_data.get("width") or img_width,
+                    height=exif_data.get("height") or img_height,
+                    depth=bit_depth,
+                ),
                 color_space=color_space,
                 has_alpha=has_alpha,
                 channels=channels,
-                bit_depth=bit_depth,
             )
         ]
 

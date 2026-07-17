@@ -115,8 +115,8 @@ async def test_generate_success(mock_pipe_cls):
     with patch("torch.no_grad"):
         result = await gen.generate("test", size="256x256")
 
-    assert result.width == 512
-    assert result.height == 512
+    assert result.dimensions.width == 512
+    assert result.dimensions.height == 512
     assert result.format == ImageFormat.PNG
 
 

@@ -15,6 +15,7 @@ from agent_platform.integrations.image_generation.stable_diffusion.config import
     StableDiffusionConfig,
 )
 from agent_platform.core.errors import ProviderError
+from agent_platform.core.schemas.dimensions import Dimensions
 from agent_platform.core.schemas.document import DocumentMetadata, ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat
 
@@ -96,8 +97,7 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
         return ImageDocument(
             content=image_bytes,
             format=format,
-            width=pil_image.width,
-            height=pil_image.height,
+            dimensions=Dimensions(width=pil_image.width, height=pil_image.height),
             metadata=DocumentMetadata(
                 description=prompt,
                 extra={

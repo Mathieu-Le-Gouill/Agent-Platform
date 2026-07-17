@@ -5,6 +5,7 @@ import av
 
 from agent_platform.core.interfaces.loader.video.base import BaseVideoLoader
 from agent_platform.core.interfaces.loader.video.config import VideoLoaderConfig
+from agent_platform.core.schemas.dimensions import Dimensions
 from agent_platform.core.schemas.document import VideoDocument, DocumentMetadata
 from agent_platform.core.schemas.enums import VideoFormat, FileFormat
 
@@ -70,8 +71,7 @@ class PyAVLoader(BaseVideoLoader):
                 content=raw_bytes,
                 format=video_fmt,
                 duration=duration_sec,
-                width=width,
-                height=height,
+                dimensions=Dimensions(width=width, height=height),
                 frame_rate=frame_rate,
                 codec=codec,
                 bitrate=bitrate,

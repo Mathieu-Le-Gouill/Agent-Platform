@@ -452,8 +452,8 @@ class TestStableDiffusionGenerate:
         gen = StableDiffusionGenerator(StableDiffusionConfig())
         result = await gen.generate("test", size="128x64")
 
-        assert result.width == 128
-        assert result.height == 64
+        assert result.dimensions.width == 128
+        assert result.dimensions.height == 64
 
     @patch(
         "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"

@@ -46,8 +46,8 @@ class TestPyAVLoader:
         doc = results[0]
         assert doc.source == "/test/video.mp4"
         assert doc.format == VideoFormat.MP4
-        assert doc.width == 1920
-        assert doc.height == 1080
+        assert doc.dimensions.width == 1920
+        assert doc.dimensions.height == 1080
         assert doc.duration == 30.0
         assert doc.frame_rate == 24.0
         assert doc.codec == "h264"
