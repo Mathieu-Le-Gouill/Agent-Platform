@@ -5,7 +5,10 @@ import pytest
 from pydantic import ValidationError
 
 from agent_platform.agents.tools import TranscribeInput, TranscribeTool, ToolError
-from agent_platform.models.conversation import Transcript, Utterance
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.conversation import Transcript, Utterance
+from agent_platform.core.schemas.enums import AudioFormat, DataType
+from agent_platform.core.schemas.message import AudioBlock, TextBlock
 
 
 @pytest.fixture
@@ -109,3 +112,40 @@ class TestTranscribeTool:
     async def test_run_missing_data_raises(self, tool):
         with pytest.raises(ValidationError):
             await tool.run(sample_rate=16000)
+
+
+class TestTranscribeToolToBlocks:
+    def _chunk(self) -> AudioChunk:
+        return AudioChunk(
+            id=uuid4(),
+            data=b"\x00\x01\x02",
+            sample_rate=16000,
+            channels=1,
+            dtype=DataType.FLOAT32,
+            format=AudioFormat.WAV,
+        )
+
+    def test_builds_audio_block_from_chunk(self, tool):
+        chunk = self._chunk()
+        transcript = Transcript(utterances=[Utterance(text="hello world")])
+        blocks = tool.to_blocks(chunk, transcript)
+        assert isinstance(blocks[0], AudioBlock)
+        assert blocks[0].audio.content == b"\x00\x01\x02"
+        assert blocks[0].audio.sample_rate == 16000
+        assert blocks[0].audio.channels == 1
+        assert blocks[0].audio.format == AudioFormat.WAV
+
+    def test_joins_utterances_into_text_block(self, tool):
+        chunk = self._chunk()
+        transcript = Transcript(
+            utterances=[Utterance(text="hello"), Utterance(text="world")]
+        )
+        blocks = tool.to_blocks(chunk, transcript)
+        assert blocks[1] == TextBlock(text="hello world")
+
+    def test_no_utterances_omits_text_block(self, tool):
+        chunk = self._chunk()
+        transcript = Transcript(utterances=[])
+        blocks = tool.to_blocks(chunk, transcript)
+        assert len(blocks) == 1
+        assert isinstance(blocks[0], AudioBlock)

@@ -1,11 +1,15 @@
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 from pydantic import ValidationError
 
 from agent_platform.agents.tools import OCRInput, OCRTool, ToolError
-from agent_platform.models.chunk import TextChunk
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.document import ImageDocument
+from agent_platform.core.schemas.enums import ImageFormat
+from agent_platform.core.schemas.message import ImageBlock, TextBlock
+from agent_platform.core.schemas.score import Score
 
 
 @pytest.fixture
@@ -13,8 +17,8 @@ def mock_provider():
     provider = AsyncMock()
     provider.extract = AsyncMock(
         return_value=[
-            TextChunk(id=uuid4(), text="Hello", index=0, metadata={"confidence": 0.95}),
-            TextChunk(id=uuid4(), text="World", index=1, metadata={"confidence": 0.87}),
+            TextChunk(id=uuid4(), text="Hello", index=0, confidence=Score.confidence(0.95)),
+            TextChunk(id=uuid4(), text="World", index=1, confidence=Score.confidence(0.87)),
         ]
     )
     return provider
@@ -83,13 +87,13 @@ class TestOCRTool:
                     id=uuid4(),
                     text="Low",
                     index=0,
-                    metadata={"confidence": 0.3},
+                    confidence=Score.confidence(0.3),
                 ),
                 TextChunk(
                     id=uuid4(),
                     text="High",
                     index=1,
-                    metadata={"confidence": 0.9},
+                    confidence=Score.confidence(0.9),
                 ),
             ]
         )
@@ -111,7 +115,7 @@ class TestOCRTool:
                     id=uuid4(),
                     text="Low",
                     index=0,
-                    metadata={"confidence": 0.1},
+                    confidence=Score.confidence(0.1),
                 ),
             ]
         )
@@ -128,3 +132,34 @@ class TestOCRTool:
     async def test_run_missing_source_raises(self, tool):
         with pytest.raises(ValidationError):
             await tool.run(language="eng")
+
+
+class TestOCRToolToBlocks:
+    def test_url_source_builds_image_url_block(self, tool):
+        chunks = [TextChunk(id=uuid4(), text="Hello", index=0)]
+        blocks = tool.to_blocks("https://example.com/img.png", chunks)
+        assert isinstance(blocks[0], ImageBlock)
+        assert blocks[0].image == "https://example.com/img.png"
+        assert blocks[1] == TextBlock(text="Hello")
+
+    def test_local_source_loads_image_document(self, tool):
+        chunks = [TextChunk(id=uuid4(), text="Hello", index=0)]
+        fake_doc = ImageDocument(content=b"\x89PNG", format=ImageFormat.PNG)
+        with patch.object(ImageDocument, "load_content", return_value=fake_doc):
+            blocks = tool.to_blocks("/path/to/image.png", chunks)
+        assert isinstance(blocks[0], ImageBlock)
+        assert blocks[0].image is fake_doc
+
+    def test_joins_multiple_chunks_into_one_text_block(self, tool):
+        chunks = [
+            TextChunk(id=uuid4(), text="Hello", index=0),
+            TextChunk(id=uuid4(), text="World", index=1),
+        ]
+        blocks = tool.to_blocks("https://example.com/img.png", chunks)
+        assert len(blocks) == 2
+        assert blocks[1].text == "Hello\nWorld"
+
+    def test_no_chunks_omits_text_block(self, tool):
+        blocks = tool.to_blocks("https://example.com/img.png", [])
+        assert len(blocks) == 1
+        assert isinstance(blocks[0], ImageBlock)

@@ -10,21 +10,19 @@ from agent_platform.agents.tools import (
     SearchTool,
     ToolError,
 )
-from agent_platform.integrations.embeddings.response import EmbeddingResponse
-from agent_platform.models.chunk import TextChunk
-from agent_platform.models.embedding import Embedding
-from agent_platform.models.score import Score
-from agent_platform.models.token import TokenUsage
+from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.embedding import Embedding
+from agent_platform.core.schemas.score import Score
 
 
 @pytest.fixture
 def mock_embedder():
     embedder = AsyncMock()
-    embedder.encode = AsyncMock(
+    embedder.embed_document = AsyncMock(
         return_value=EmbeddingResponse(
             embeddings=[Embedding.from_list([0.1, 0.2, 0.3])],
             model="test-model",
-            usage=TokenUsage(),
         )
     )
     return embedder
@@ -103,7 +101,7 @@ class TestSearchTool:
         assert isinstance(results[0], SearchResult)
         assert results[0].chunk.text == "result 1"
         assert results[0].score.value == 0.95
-        mock_embedder.encode.assert_awaited_once()
+        mock_embedder.embed_document.assert_awaited_once()
         mock_store.search_with_scores.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -114,10 +112,8 @@ class TestSearchTool:
 
     @pytest.mark.asyncio
     async def test_run_empty_embeddings_raises(self, tool, mock_embedder, mock_store):
-        mock_embedder.encode = AsyncMock(
-            return_value=EmbeddingResponse(
-                embeddings=[], model="test", usage=TokenUsage()
-            )
+        mock_embedder.embed_document = AsyncMock(
+            return_value=EmbeddingResponse(embeddings=[], model="test")
         )
         with pytest.raises(ToolError, match="no vectors"):
             await tool.run(query="test")
@@ -130,7 +126,9 @@ class TestSearchTool:
 
     @pytest.mark.asyncio
     async def test_run_embedder_error_wrapped(self, tool, mock_embedder, mock_store):
-        mock_embedder.encode = AsyncMock(side_effect=RuntimeError("embed failed"))
+        mock_embedder.embed_document = AsyncMock(
+            side_effect=RuntimeError("embed failed")
+        )
         with pytest.raises(ToolError, match="Embedding failed"):
             await tool.run(query="test")
 

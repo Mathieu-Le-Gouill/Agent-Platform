@@ -4,7 +4,7 @@ import pytest
 from pydantic import BaseModel
 
 from agent_platform.agents.tools import Tool, ToolError, ToolRegistry
-from agent_platform.models.message import ToolCall
+from agent_platform.core.schemas.message import ToolCall
 
 
 class _DummyTool(Tool):

@@ -3,7 +3,7 @@ from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools._utils import safe_call
 from agent_platform.agents.tools.base import Tool, ToolError
-from agent_platform.core.schema import model_schema
+from agent_platform.core.schemas import model_schema
 
 
 # ---------------------------------------------------------------------------
