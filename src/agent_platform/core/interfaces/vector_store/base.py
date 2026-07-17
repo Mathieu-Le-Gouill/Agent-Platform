@@ -5,20 +5,15 @@ from abc import ABC, abstractmethod
 from typing import Any, Generic, TypeVar
 from uuid import UUID
 
-from agent_platform.core.credentials import BaseCredentials
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 from agent_platform.core.schemas.vector import SparseVector
 
 ConfigT = TypeVar("ConfigT", bound=VectorStoreConfig)
-CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
 
 
-class BaseVectorStore(ABC, Generic[CredentialsT, ConfigT]):
-    def __init__(self, credentials: CredentialsT) -> None:
-        self._credentials = credentials
-
+class BaseVectorStore(ABC, Generic[ConfigT]):
     @abstractmethod
     async def add(
         self, documents: list[TextChunk], config: ConfigT | None = None

@@ -2,7 +2,7 @@
 
 ## Design
 
-`core/` is the **zero-dependency foundation** of the platform. It defines everything that does not depend on an external library — pure Python ABCs, Pydantic schemas, enums, error types, and the provider registry. No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
+`core/` is the **zero-dependency foundation** of the platform. It defines everything that does not depend on an external library — pure Python ABCs, Pydantic schemas, enums, and error types. No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
 
 ## Directory Layout
 
@@ -10,8 +10,7 @@
 core/
 ├── base.py           # Entity (UUID mixin), Timestamped
 ├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
-├── registry.py       # ProviderRegistry[T] — generic name→provider lookup
-├── credentials.py    # BaseCredentials, NoCredentials, ProviderCredentials
+├── credentials.py    # BaseCredentials, ProviderCredentials
 ├── interfaces/       # ABCs for every capability (the "contract" layer)
 │   ├── llm/
 │   ├── embeddings/
@@ -77,10 +76,6 @@ PlatformError
 ```
 
 Every error carries `code`, `retryable`, and `context` fields.
-
-### `registry.py` — ProviderRegistry
-
-A generic `dict[str, type[T]]` with `register()`, `get()`, `all()`. Used by Integrations to register themselves.
 
 ## How to Extend
 

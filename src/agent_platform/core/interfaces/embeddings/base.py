@@ -6,17 +6,12 @@ from typing import Generic, Sequence, TypeVar
 
 from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
-from agent_platform.core.credentials import BaseCredentials
 from agent_platform.core.schemas.chunk import TextChunk
 
 EmbeddingConfigT = TypeVar("EmbeddingConfigT", bound=EmbeddingConfig)
-CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials, covariant=True)
 
 
-class BaseEmbeddingProvider(ABC, Generic[CredentialsT, EmbeddingConfigT]):
-    def __init__(self, credentials: CredentialsT) -> None:
-        self._credentials = credentials
-
+class BaseEmbeddingProvider(ABC, Generic[EmbeddingConfigT]):
     @abstractmethod
     def embed_document(
         self,

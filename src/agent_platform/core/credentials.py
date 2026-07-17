@@ -7,10 +7,6 @@ class BaseCredentials(BaseModel, frozen=True):
     model_config = ConfigDict(extra="ignore")
 
 
-class NoCredentials(BaseCredentials, frozen=True):
-    pass
-
-
 class ProviderCredentials(BaseCredentials, frozen=True):
     api_key: SecretStr | None = None
     base_url: str | None = None

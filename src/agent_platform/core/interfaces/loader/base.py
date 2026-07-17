@@ -2,19 +2,14 @@ from abc import ABC, abstractmethod
 from typing import AsyncIterator, Sequence, TypeVar, Generic
 import asyncio
 
-from agent_platform.core.credentials import BaseCredentials
 from agent_platform.core.interfaces.loader.config import LoaderConfig
 from agent_platform.core.schemas.document import Document
 
 T_co = TypeVar("T_co", covariant=True, bound=Document)
 ConfigT = TypeVar("ConfigT", bound=LoaderConfig)
-CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
 
 
-class BaseMediaLoader(ABC, Generic[CredentialsT, T_co, ConfigT]):
-    def __init__(self, credentials: CredentialsT) -> None:
-        self._credentials = credentials
-
+class BaseMediaLoader(ABC, Generic[T_co, ConfigT]):
     @abstractmethod
     async def load(
         self, source: str, config: ConfigT | None = None

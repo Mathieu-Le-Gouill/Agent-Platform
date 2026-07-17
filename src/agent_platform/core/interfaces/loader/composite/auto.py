@@ -1,7 +1,6 @@
 import os
 from typing import AsyncIterator, Sequence
 
-from agent_platform.core.credentials import NoCredentials
 from agent_platform.core.interfaces.loader.config import LoaderConfig
 from agent_platform.core.interfaces.loader.text.strategies.unstructured import (
     UnstructuredFileLoader,
@@ -18,12 +17,11 @@ from agent_platform.core.schemas.enums import FileFormat, MediaType
 class AutoLoader:
     """Dispatches to the correct loader based on file extension / media type."""
 
-    def __init__(self, credentials: NoCredentials | None = None) -> None:
-        self._credentials = credentials if credentials is not None else NoCredentials()
-        self._text_loader = UnstructuredFileLoader(self._credentials)
-        self._image_loader = PILImageLoader(self._credentials)
-        self._audio_loader = SoundFileLoader(self._credentials)
-        self._video_loader = PyAVLoader(self._credentials)
+    def __init__(self) -> None:
+        self._text_loader = UnstructuredFileLoader()
+        self._image_loader = PILImageLoader()
+        self._audio_loader = SoundFileLoader()
+        self._video_loader = PyAVLoader()
 
     def _loader_for(self, source: str):
         ext = os.path.splitext(source)[1].lstrip(".")

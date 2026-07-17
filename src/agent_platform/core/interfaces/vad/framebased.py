@@ -2,13 +2,13 @@ from __future__ import annotations
 
 from typing import Generic
 
-from agent_platform.core.interfaces.vad.base import BaseVAD, ConfigT, CredentialsT
+from agent_platform.core.interfaces.vad.base import BaseVAD, ConfigT
 from agent_platform.core.schemas.span import SampleSpan
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.interfaces.vad.state import VADState
 
 
-class FrameBasedVAD(BaseVAD[CredentialsT, ConfigT], Generic[CredentialsT, ConfigT]):
+class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
     def _on_speech(
         self,
         state: VADState,

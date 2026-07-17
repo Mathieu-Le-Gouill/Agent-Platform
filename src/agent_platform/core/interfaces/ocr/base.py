@@ -2,18 +2,13 @@ from abc import ABC, abstractmethod
 from typing import Generic, Sequence, TypeVar
 from uuid import UUID
 
-from agent_platform.core.credentials import BaseCredentials
 from agent_platform.core.interfaces.ocr.config import OCRConfig
 from agent_platform.core.schemas.chunk import TextChunk
 
 OCRConfigT = TypeVar("OCRConfigT", bound=OCRConfig)
-CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
 
 
-class BaseOCR(ABC, Generic[CredentialsT, OCRConfigT]):
-    def __init__(self, credentials: CredentialsT) -> None:
-        self._credentials = credentials
-
+class BaseOCR(ABC, Generic[OCRConfigT]):
     @abstractmethod
     async def extract(
         self,

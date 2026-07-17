@@ -3,20 +3,15 @@ from __future__ import annotations
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar, Sequence, AsyncIterator
 
-from agent_platform.core.credentials import BaseCredentials
 from agent_platform.core.interfaces.vad.config import VADConfig
 from agent_platform.core.schemas.span import SampleSpan
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
 
 ConfigT = TypeVar("ConfigT", bound="VADConfig")
-CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
 
 
-class BaseVAD(ABC, Generic[CredentialsT, ConfigT]):
-    def __init__(self, credentials: CredentialsT) -> None:
-        self._credentials = credentials
-
+class BaseVAD(ABC, Generic[ConfigT]):
     @property
     def requirements(self) -> AudioRequirements: ...
 

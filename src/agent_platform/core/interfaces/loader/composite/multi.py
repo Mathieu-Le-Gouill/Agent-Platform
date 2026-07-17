@@ -1,6 +1,5 @@
 from typing import AsyncIterator, Sequence
 
-from agent_platform.core.credentials import NoCredentials
 from agent_platform.core.interfaces.loader.composite.auto import AutoLoader
 from agent_platform.core.interfaces.loader.config import LoaderConfig
 from agent_platform.core.schemas.document import Document
@@ -9,8 +8,8 @@ from agent_platform.core.schemas.document import Document
 class MultiLoader:
     """Loads heterogeneous document sources (mixed media types) in one call."""
 
-    def __init__(self, credentials: NoCredentials | None = None) -> None:
-        self._auto = AutoLoader(credentials)
+    def __init__(self) -> None:
+        self._auto = AutoLoader()
 
     async def load(
         self, source: str, config: LoaderConfig | None = None
