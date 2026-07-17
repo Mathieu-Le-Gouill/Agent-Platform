@@ -14,7 +14,6 @@ from agent_platform.integrations.chunking.langchain_base import (
     LangChainChunker,
 )
 from agent_platform.core.interfaces.chunking.config import ChunkerConfig
-from agent_platform.core.credentials import NoCredentials
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument, DocumentMetadata
 from agent_platform.core.schemas.enums import DocumentFormat, Language
@@ -253,9 +252,6 @@ class TestLcToChunks:
 
 
 class _TestChunker(LangChainChunker):
-    def __init__(self):
-        super().__init__(NoCredentials())
-
     def _splitter(self, config=None):
         return MagicMock()
 
@@ -366,7 +362,9 @@ class TestRecursiveChunkerIntegration:
         return RecursiveChunkerProvider()
 
     def test_splits_simple_text(self, chunker, simple_text_document):
-        from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
+        from agent_platform.integrations.chunking.recursive.config import (
+            RecursiveChunkerConfig,
+        )
 
         config = RecursiveChunkerConfig(chunk_size=20, chunk_overlap=0)
         result = chunker.chunk([simple_text_document], config=config)
@@ -377,7 +375,9 @@ class TestRecursiveChunkerIntegration:
         assert result[0].document_id == simple_text_document.id
 
     def test_splits_long_text(self, chunker, long_text_document):
-        from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
+        from agent_platform.integrations.chunking.recursive.config import (
+            RecursiveChunkerConfig,
+        )
 
         config = RecursiveChunkerConfig(chunk_size=100, chunk_overlap=20)
         result = chunker.chunk([long_text_document], config=config)
@@ -389,7 +389,9 @@ class TestRecursiveChunkerIntegration:
             assert isinstance(c.id, UUID)
 
     def test_uses_add_start_index(self, chunker, simple_text_document):
-        from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
+        from agent_platform.integrations.chunking.recursive.config import (
+            RecursiveChunkerConfig,
+        )
 
         config = RecursiveChunkerConfig(
             chunk_size=20, chunk_overlap=0, add_start_index=True
@@ -404,7 +406,9 @@ class TestRecursiveChunkerIntegration:
             source="test.txt",
             format=DocumentFormat.TXT,
         )
-        from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
+        from agent_platform.integrations.chunking.recursive.config import (
+            RecursiveChunkerConfig,
+        )
 
         config = RecursiveChunkerConfig(
             chunk_size=50, chunk_overlap=0, separators=["\n\n"]
@@ -415,7 +419,9 @@ class TestRecursiveChunkerIntegration:
 
     def test_empty_text(self, chunker):
         doc = TextDocument(text="", format=DocumentFormat.TXT)
-        from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
+        from agent_platform.integrations.chunking.recursive.config import (
+            RecursiveChunkerConfig,
+        )
 
         config = RecursiveChunkerConfig(chunk_size=100, chunk_overlap=0)
         result = chunker.chunk([doc], config=config)

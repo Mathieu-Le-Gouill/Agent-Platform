@@ -215,9 +215,7 @@ class TestLangChainVectorStore:
         mock_client = MagicMock()
         mock_client.aadd_documents = AsyncMock()
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         await store.add([doc])
@@ -236,9 +234,7 @@ class TestLangChainVectorStore:
         mock_client = MagicMock()
         mock_client.aadd_documents = AsyncMock()
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         await store.add(docs)
@@ -269,9 +265,7 @@ class TestLangChainVectorStore:
         mock_client = MagicMock()
         mock_client.asimilarity_search_by_vector = AsyncMock(return_value=[mock_lc_doc])
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         results = await store.search(query_vector=[0.1, 0.2, 0.3], k=5)
@@ -285,9 +279,7 @@ class TestLangChainVectorStore:
         mock_client = MagicMock()
         mock_client.asimilarity_search_by_vector = AsyncMock(return_value=[])
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         await store.search(query_vector=[0.1, 0.2])
@@ -324,9 +316,7 @@ class TestLangChainVectorStore:
             return_value=[(mock_lc_doc, 0.85)],
         )
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         results = await store.search_with_scores(query_vector=[0.1, 0.2, 0.3], k=5)
@@ -382,9 +372,7 @@ class TestLangChainVectorStore:
             return_value=[(mock_docs[0], 0.9), (mock_docs[1], 0.7)],
         )
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         results = await store.search_with_scores(query_vector=[0.1, 0.2])
@@ -397,9 +385,7 @@ class TestLangChainVectorStore:
         mock_client = MagicMock()
         mock_client.asimilarity_search_with_score = AsyncMock(return_value=[])
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         await store.search_with_scores(query_vector=[0.1, 0.2])
@@ -426,9 +412,7 @@ class TestSearchRetryAndTranslation:
         mock_client = MagicMock()
         mock_client.asimilarity_search_by_vector = flaky
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         await store.search(query_vector=[0.1, 0.2])
@@ -448,9 +432,7 @@ class TestSearchRetryAndTranslation:
         mock_client = MagicMock()
         mock_client.asimilarity_search_by_vector = always_fails
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         with pytest.raises(ProviderError, match="Vector store search failed"):
@@ -467,9 +449,7 @@ class TestSearchRetryAndTranslation:
         mock_client = MagicMock()
         mock_client.asimilarity_search_with_score = always_fails
 
-        store = _TestVectorStore(
-            VectorStoreConfig(collection_name="test", dimension=768), MagicMock()
-        )
+        store = _TestVectorStore(MagicMock())
         store._client = mock_client
 
         with pytest.raises(ProviderError, match="Vector store search failed"):

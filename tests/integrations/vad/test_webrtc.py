@@ -2,10 +2,12 @@ import pytest
 from unittest.mock import patch, MagicMock
 from uuid import uuid4
 
-from agent_platform.integrations.vad.configuration import WebrtcVadConfig
-from agent_platform.models.enums import DataType
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.span import SampleSpan
+pytest.importorskip("webrtcvad")
+
+from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
+from agent_platform.core.schemas.enums import DataType
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.span import SampleSpan
 
 
 def test_config_defaults():
@@ -22,7 +24,7 @@ def test_requirements():
         from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
     except ImportError:
         pytest.skip("webrtcvad not installed")
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
     req = vad.requirements
     assert req.sample_rates == (8000, 16000, 32000, 48000)
     assert req.channels == 1
@@ -35,7 +37,7 @@ def test_empty_sequence_detect():
         from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
     except ImportError:
         pytest.skip("webrtcvad not installed")
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
     result = vad.detect([])
     assert result == []
 
@@ -53,7 +55,7 @@ def test_constructor(mock_webrtcvad):
     mock_webrtcvad.Vad.return_value = mock_vad
     from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
 
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
     assert vad.model is mock_vad
     mock_webrtcvad.Vad.assert_called_once_with()
 
@@ -66,7 +68,7 @@ def test_detect_with_speech_spans(mock_webrtcvad):
 
     from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
 
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
 
     chunks = [
         AudioChunk(
@@ -111,7 +113,7 @@ def test_detect_sample_rate_mismatch_raises_value_error(mock_webrtcvad):
 
     from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
 
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
 
     chunks = [
         AudioChunk(
@@ -137,7 +139,7 @@ def test_is_speech(mock_webrtcvad):
 
     from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
 
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
 
     chunk = AudioChunk(
         id=uuid4(),
@@ -161,7 +163,7 @@ def test_detect_no_span_when_silence_before_speech(mock_webrtcvad):
 
     from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
 
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
 
     chunks = [
         AudioChunk(
@@ -187,7 +189,7 @@ async def test_adetect_yields_span(mock_webrtcvad):
 
     from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
 
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
 
     async def _gen():
         yield AudioChunk(
@@ -222,7 +224,7 @@ async def test_adetect_validate_chunk_raises(mock_webrtcvad):
 
     from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
 
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
 
     async def _gen():
         yield AudioChunk(

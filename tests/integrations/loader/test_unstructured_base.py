@@ -2,15 +2,19 @@ from datetime import datetime
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+import pytest
+
+pytest.importorskip("langchain_community")
+
 from langchain_core.documents import Document as LCDocument
 
-from agent_platform.integrations.loader.unstructured_base import (
+from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
     _extract_format,
     _extract_title,
     _text_from_langchain,
     UnstructuredBaseLoader,
 )
-from agent_platform.models.enums import DocumentFormat, Language
+from agent_platform.core.schemas.enums import DocumentFormat, Language
 
 
 class TestExtractFormat:
@@ -134,7 +138,7 @@ class TestTextFromLangchain:
 
 
 class _ConcreteLoader(UnstructuredBaseLoader):
-    def _loader(self, source, **kwargs):
+    def _loader(self, source, config=None):
         return MagicMock()
 
 
@@ -147,7 +151,7 @@ class TestLoad:
         loader = _ConcreteLoader()
 
         with patch(
-            "agent_platform.integrations.loader.unstructured_base.asyncio.to_thread",
+            "agent_platform.integrations.loader.strategies.unstructured.unstructured.asyncio.to_thread",
             return_value=[mock_doc],
         ):
             results = await loader.load("test.txt")
@@ -161,7 +165,7 @@ class TestLoad:
         loader = _ConcreteLoader()
 
         with patch(
-            "agent_platform.integrations.loader.unstructured_base.asyncio.to_thread",
+            "agent_platform.integrations.loader.strategies.unstructured.unstructured.asyncio.to_thread",
             return_value=[],
         ):
             results = await loader.load("test.txt")
@@ -182,7 +186,7 @@ class TestLoadMany:
             metadata={"source": "/b.txt", "filetype": "text/plain"},
         )
 
-        async def fake_load(source: str, **kwargs):
+        async def fake_load(source: str, config=None):
             return [_text_from_langchain(mock_doc1 if "a" in source else mock_doc2)]
 
         with patch.object(loader, "load", side_effect=fake_load):
@@ -200,7 +204,7 @@ class TestLoadMany:
             metadata={"source": "/a.txt", "filetype": "text/plain"},
         )
 
-        async def fake_load(source: str, **kwargs):
+        async def fake_load(source: str, config=None):
             if "fail" in source:
                 raise ValueError("Failed")
             return [_text_from_langchain(mock_doc)]

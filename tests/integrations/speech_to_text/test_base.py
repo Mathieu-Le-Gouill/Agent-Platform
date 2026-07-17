@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.integrations.speech.base import BaseSpeechToText
+from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 
 
 def test_base_speech_to_text_cannot_instantiate():

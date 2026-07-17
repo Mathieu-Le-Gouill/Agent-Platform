@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
-from agent_platform.core.credentials import NoCredentials
 from agent_platform.core.errors import ProviderError
 from agent_platform.integrations.vector_store.faiss.config import FAISSConfig
 from agent_platform.integrations.vector_store.faiss.faiss import FAISSStore
@@ -10,7 +9,7 @@ from agent_platform.integrations.vector_store.faiss.faiss import FAISSStore
 
 @pytest.fixture
 def store():
-    s = FAISSStore(NoCredentials(), MagicMock())
+    s = FAISSStore(MagicMock())
     s._store = MagicMock()
     return s
 
@@ -65,4 +64,6 @@ class TestFAISSSearchRetryAndTranslation:
         store._store.similarity_search_by_vector_with_relevance_scores = always_fails
 
         with pytest.raises(ProviderError, match="Vector store search failed"):
-            await store.search_with_scores(query_vector=[0.1, 0.2], config=FAISSConfig())
+            await store.search_with_scores(
+                query_vector=[0.1, 0.2], config=FAISSConfig()
+            )

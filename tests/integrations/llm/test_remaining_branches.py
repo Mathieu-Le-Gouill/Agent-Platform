@@ -2,7 +2,6 @@ from unittest.mock import AsyncMock, MagicMock
 
 from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
-from agent_platform.core.credentials import NoCredentials
 from agent_platform.core.schemas.message import Prompt, UserMessage
 
 
@@ -10,9 +9,6 @@ async def test_stream_content_is_none():
     """Cover langchain_base branch: content is neither str nor list."""
 
     class _Provider(LangChainLLMProvider):
-        def __init__(self):
-            super().__init__(NoCredentials())
-
         def _client(self, config):
             raise NotImplementedError
 

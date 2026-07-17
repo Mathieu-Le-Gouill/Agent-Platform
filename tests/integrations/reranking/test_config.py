@@ -1,9 +1,9 @@
-from pydantic import SecretStr
+from pydantic import SecretStr, ValidationError
 
-from agent_platform.integrations.reranking.config import (
-    RerankerConfig,
-    CohereRerankerConfig,
-    JinaRerankerConfig,
+from agent_platform.core.interfaces.reranking.config import RerankerConfig
+from agent_platform.integrations.reranking.cohere.config import CohereRerankerConfig
+from agent_platform.integrations.reranking.jina.config import JinaRerankerConfig
+from agent_platform.integrations.reranking.huggingface.config import (
     HuggingFaceRerankerConfig,
 )
 
@@ -33,9 +33,9 @@ def test_cohere_reranker_config_defaults():
     assert cfg.batch_size == 32
 
 
-def test_cohere_reranker_config_explicit_api_key():
-    cfg = CohereRerankerConfig(api_key=SecretStr("test-key"))
-    assert cfg.api_key.get_secret_value() == "test-key"
+def test_cohere_reranker_config_model():
+    cfg = CohereRerankerConfig()
+    assert cfg.model == "rerank-v3.5"
 
 
 def test_jina_reranker_config_defaults():
@@ -43,15 +43,15 @@ def test_jina_reranker_config_defaults():
     assert isinstance(cfg, RerankerConfig)
 
 
-def test_jina_reranker_config_explicit_api_key():
-    cfg = JinaRerankerConfig(api_key=SecretStr("jina-key"))
-    assert cfg.api_key.get_secret_value() == "jina-key"
+def test_jina_reranker_config_model():
+    cfg = JinaRerankerConfig()
+    assert cfg.model == "jina-reranker-v2-base-multilingual"
 
 
 def test_huggingface_reranker_config_defaults():
     cfg = HuggingFaceRerankerConfig()
     assert isinstance(cfg, RerankerConfig)
-    assert cfg.device is None
+    assert cfg.device == "cpu"
 
 
 def test_huggingface_reranker_config_device():
@@ -63,6 +63,6 @@ def test_configs_are_frozen():
     cfg = RerankerConfig(top_k=3)
     try:
         cfg.top_k = 5  # type: ignore[misc]
-        assert False, "expected FrozenInstanceError"
-    except AttributeError:
+        assert False, "expected ValidationError"
+    except ValidationError:
         pass

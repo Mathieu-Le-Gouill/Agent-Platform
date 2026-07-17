@@ -1,8 +1,12 @@
 from unittest.mock import patch
 from uuid import uuid4
 
-from agent_platform.integrations.ocr.providers.tesseract import _from_tesseract
-from agent_platform.models.chunk import TextChunk
+import pytest
+
+pytest.importorskip("pytesseract")
+
+from agent_platform.integrations.ocr.tesseract.tesseract import _from_tesseract
+from agent_platform.core.schemas.chunk import TextChunk
 
 
 def test_from_tesseract_missing_block_num():
@@ -22,3 +26,24 @@ def test_from_tesseract_missing_block_num():
     assert result[1].text == "World"
     assert result[0].metadata["block_num"] is None
     assert result[1].metadata["block_num"] is None
+
+
+def test_from_tesseract_skips_blank_and_low_confidence():
+    document_id = uuid4()
+
+    data = {
+        "text": ["Hello", "", "world", "junk"],
+        "conf": ["95", "-1", "88", "10"],
+        "left": [0, 0, 10, 20],
+        "top": [0, 0, 5, 5],
+        "width": [50, 0, 40, 30],
+        "height": [12, 0, 12, 12],
+        "page_num": [1, 1, 1, 1],
+    }
+
+    chunks = _from_tesseract(data, document_id=document_id, min_confidence=50.0)
+
+    assert [c.text for c in chunks] == ["Hello", "world"]
+    assert all(c.document_id == document_id for c in chunks)
+    assert chunks[0].metadata["confidence"] == pytest.approx(95.0)
+    assert chunks[0].metadata["bbox"]["x"] == 0

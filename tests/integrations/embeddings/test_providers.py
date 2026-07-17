@@ -35,11 +35,10 @@ from agent_platform.integrations.embeddings.huggingface.config import (
 )
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
-from agent_platform.integrations.credentials.openai import OpenAICredentials
-from agent_platform.integrations.credentials.mistral import MistralCredentials
-from agent_platform.integrations.credentials.ollama import OllamaCredentials
-from agent_platform.integrations.credentials.huggingface import HuggingFaceCredentials
-from agent_platform.core.credentials import NoCredentials
+from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.credentials import MistralCredentials
+from agent_platform.integrations.credentials import OllamaCredentials
+from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.core.errors import MissingCredentialError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.embedding import Embedding
@@ -534,7 +533,12 @@ class TestEmbeddingResponse:
 
 class TestBaseEmbeddingProvider:
     def test_stores_credentials(self):
-        class _Concrete(BaseEmbeddingProvider[NoCredentials, OpenAIEmbeddingConfig]):
+        marker = object()
+
+        class _Concrete(BaseEmbeddingProvider[OpenAIEmbeddingConfig]):
+            def __init__(self, credentials):
+                self._credentials = credentials
+
             def embed_document(self, items, config=None):
                 return EmbeddingResponse(embeddings=[], model="")
 
@@ -547,6 +551,5 @@ class TestBaseEmbeddingProvider:
             async def aembed_query(self, query, config=None):
                 return EmbeddingResponse(embeddings=[], model="")
 
-        creds = NoCredentials()
-        provider = _Concrete(creds)
-        assert provider._credentials is creds
+        provider = _Concrete(marker)
+        assert provider._credentials is marker

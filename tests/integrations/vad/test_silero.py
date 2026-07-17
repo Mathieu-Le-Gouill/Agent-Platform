@@ -2,11 +2,13 @@ import pytest
 from unittest.mock import patch, MagicMock
 from uuid import uuid4
 
-from agent_platform.integrations.vad.configuration import SileroVadConfig
-from agent_platform.integrations.vad.requirements import AudioRequirements
-from agent_platform.models.enums import DataType
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.span import SampleSpan
+pytest.importorskip("silero_vad")
+
+from agent_platform.integrations.vad.silero.config import SileroVadConfig
+from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.schemas.enums import DataType
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.span import SampleSpan
 
 
 def test_config_defaults():
@@ -27,15 +29,15 @@ def test_requirements():
     assert req.dtype == DataType.FLOAT32
 
 
-@patch("agent_platform.integrations.vad.providers.silero.load_silero_vad")
-@patch("agent_platform.integrations.vad.providers.silero.get_speech_timestamps")
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.get_speech_timestamps")
 def test_detect_with_non_empty_audio(mock_get_speech_timestamps, mock_load_silero_vad):
     mock_load_silero_vad.return_value = MagicMock()
     mock_get_speech_timestamps.return_value = [
         {"start": 0, "end": 16000},
     ]
 
-    from agent_platform.integrations.vad.providers.silero import SileroVAD
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
 
     vad = SileroVAD()
     chunks = [
@@ -53,8 +55,8 @@ def test_detect_with_non_empty_audio(mock_get_speech_timestamps, mock_load_siler
     assert spans == [SampleSpan(start=0, end=16000)]
 
 
-@patch("agent_platform.integrations.vad.providers.silero.load_silero_vad")
-@patch("agent_platform.integrations.vad.providers.silero.get_speech_timestamps")
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.get_speech_timestamps")
 def test_detect_produces_correct_sample_spans(
     mock_get_speech_timestamps, mock_load_silero_vad
 ):
@@ -64,7 +66,7 @@ def test_detect_produces_correct_sample_spans(
         {"start": 1000, "end": 2000},
     ]
 
-    from agent_platform.integrations.vad.providers.silero import SileroVAD
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
 
     vad = SileroVAD()
     chunks = [
@@ -85,15 +87,15 @@ def test_detect_produces_correct_sample_spans(
     ]
 
 
-@patch("agent_platform.integrations.vad.providers.silero.load_silero_vad")
-@patch("agent_platform.integrations.vad.providers.silero.get_speech_timestamps")
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.get_speech_timestamps")
 async def test_adetect_async_flow(mock_get_speech_timestamps, mock_load_silero_vad):
     mock_load_silero_vad.return_value = MagicMock()
     mock_get_speech_timestamps.return_value = [
         {"start": 0, "end": 16000},
     ]
 
-    from agent_platform.integrations.vad.providers.silero import SileroVAD
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
 
     vad = SileroVAD()
 
@@ -112,11 +114,11 @@ async def test_adetect_async_flow(mock_get_speech_timestamps, mock_load_silero_v
     assert results == [SampleSpan(start=0, end=16000)]
 
 
-@patch("agent_platform.integrations.vad.providers.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
 async def test_adetect_sample_rate_mismatch_raises_value_error(mock_load_silero_vad):
     mock_load_silero_vad.return_value = MagicMock()
 
-    from agent_platform.integrations.vad.providers.silero import SileroVAD
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
 
     vad = SileroVAD()
 
@@ -136,19 +138,19 @@ async def test_adetect_sample_rate_mismatch_raises_value_error(mock_load_silero_
             pass
 
 
-@patch("agent_platform.integrations.vad.providers.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
 def test_detect_empty_returns_empty(mock_load):
     mock_load.return_value = MagicMock()
-    from agent_platform.integrations.vad.providers.silero import SileroVAD
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
 
     vad = SileroVAD()
     assert vad.detect([]) == []
 
 
-@patch("agent_platform.integrations.vad.providers.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
 def test_is_speech_raises_not_implemented(mock_load):
     mock_load.return_value = MagicMock()
-    from agent_platform.integrations.vad.providers.silero import SileroVAD
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
 
     vad = SileroVAD()
     chunk = AudioChunk(
@@ -164,13 +166,13 @@ def test_is_speech_raises_not_implemented(mock_load):
         vad._is_speech(chunk, SileroVadConfig())
 
 
-@patch("agent_platform.integrations.vad.providers.silero.load_silero_vad")
-@patch("agent_platform.integrations.vad.providers.silero.get_speech_timestamps")
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.get_speech_timestamps")
 async def test_adetect_buffer_management(mock_get_speech_timestamps, mock_load):
     mock_load.return_value = MagicMock()
     mock_get_speech_timestamps.return_value = [{"start": 0, "end": 80}]
 
-    from agent_platform.integrations.vad.providers.silero import SileroVAD
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
 
     vad = SileroVAD()
 

@@ -2,15 +2,21 @@ import pytest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from agent_platform.integrations.vad.configuration import (
-    WebrtcVadConfig,
-    PvcobraVadConfig,
-    SileroVadConfig,
-    TenVadConfig,
-)
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.span import SampleSpan
-from agent_platform.models.enums import DataType
+pytest.importorskip("webrtcvad")
+
+from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
+from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
+from agent_platform.integrations.vad.silero.config import SileroVadConfig
+from agent_platform.integrations.vad.ten.config import TenVadConfig
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.core.schemas.enums import DataType
+
+_HAS_TEN_VAD = True
+try:
+    __import__("ten_vad")
+except ImportError:
+    _HAS_TEN_VAD = False
 
 
 @patch("agent_platform.integrations.vad.providers.webrtc.webrtcvad")
@@ -21,7 +27,7 @@ async def test_webrtc_adetect_yields_span(mock_webrtcvad):
 
     from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
 
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
 
     async def _gen():
         yield AudioChunk(
@@ -65,7 +71,7 @@ async def test_webrtc_adetect_all_silence(mock_webrtcvad):
 
     from agent_platform.integrations.vad.providers.webrtc import Webrtcvad
 
-    vad = Webrtcvad()
+    vad = Webrtcvad(WebrtcVadConfig())
 
     async def _gen():
         yield AudioChunk(
@@ -91,7 +97,7 @@ async def test_pvcobra_adetect_yields_span(mock_pvcobra):
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
     from pydantic import SecretStr
 
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
 
     async def _gen():
         yield AudioChunk(
@@ -127,7 +133,7 @@ async def test_pvcobra_adetect_all_silence(mock_pvcobra):
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
     from pydantic import SecretStr
 
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
 
     async def _gen():
         yield AudioChunk(
@@ -144,6 +150,7 @@ async def test_pvcobra_adetect_all_silence(mock_pvcobra):
     assert results == []
 
 
+@pytest.mark.skipif(not _HAS_TEN_VAD, reason="ten-vad not installed")
 @patch("agent_platform.integrations.vad.providers.ten.TenVad")
 async def test_ten_adetect_all_silence(mock_ten_vad_cls):
     mock_handle = MagicMock()
@@ -152,7 +159,7 @@ async def test_ten_adetect_all_silence(mock_ten_vad_cls):
 
     from agent_platform.integrations.vad.providers.ten import TenVAD
 
-    vad = TenVAD()
+    vad = TenVAD(TenVadConfig())
     vad.handle = mock_handle
 
     async def _gen():
@@ -178,7 +185,7 @@ async def test_silero_adetect_buffer_flush(mock_get_speech_timestamps, mock_load
 
     from agent_platform.integrations.vad.providers.silero import SileroVAD
 
-    vad = SileroVAD()
+    vad = SileroVAD(SileroVadConfig())
 
     async def _gen():
         yield AudioChunk(

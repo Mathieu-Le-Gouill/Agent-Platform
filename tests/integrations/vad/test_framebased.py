@@ -1,13 +1,13 @@
 import pytest
 from uuid import uuid4
 
-from agent_platform.integrations.vad.framebased import FrameBasedVAD
-from agent_platform.integrations.vad.configuration import VADConfig
-from agent_platform.integrations.vad.state import VADState
-from agent_platform.integrations.vad.requirements import AudioRequirements
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.span import SampleSpan
-from agent_platform.models.enums import DataType
+from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
+from agent_platform.core.interfaces.vad.config import VADConfig
+from agent_platform.core.interfaces.vad.state import VADState
+from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.core.schemas.enums import DataType
 
 
 class _TestableVAD(FrameBasedVAD[VADConfig]):
@@ -19,6 +19,13 @@ class _TestableVAD(FrameBasedVAD[VADConfig]):
             dtype=DataType.FLOAT32,
             normalized=True,
         )
+
+    def _validate_chunk(
+        self,
+        chunk: AudioChunk,
+        config_sample_rate: int,
+    ) -> None:
+        pass
 
     def _is_speech(self, chunk, config):
         return True

@@ -1,6 +1,6 @@
 from uuid import uuid4
 
-from agent_platform.integrations.vad.state import VADState
+from agent_platform.core.interfaces.vad.state import VADState
 
 
 def test_defaults():

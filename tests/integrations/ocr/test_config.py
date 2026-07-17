@@ -1,9 +1,7 @@
-from agent_platform.integrations.ocr.config import (
-    OCRConfig,
-    TesseractConfig,
-    GoogleVisionConfig,
-    AWSTextractConfig,
-)
+from agent_platform.core.interfaces.ocr.config import OCRConfig
+from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
+from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
+from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
 
 
 def test_tesseract_config_inherits_base_defaults():
@@ -26,12 +24,15 @@ def test_google_vision_config_overrides():
     assert cfg.feature_type == "DOCUMENT_TEXT_DETECTION"
 
 
+from pydantic import ValidationError
+
+
 def test_configs_are_frozen():
 
     cfg = AWSTextractConfig()
 
     try:
         cfg.region_name = "eu-west-1"  # type: ignore[misc]
-        assert False, "expected FrozenInstanceError"
-    except AttributeError:
+        assert False, "expected ValidationError"
+    except ValidationError:
         pass

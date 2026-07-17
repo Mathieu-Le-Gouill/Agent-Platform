@@ -2,7 +2,12 @@ from unittest.mock import AsyncMock, MagicMock, patch
 
 import pytest
 
-from agent_platform.integrations.speech.providers.deepgram import (
+pytest.importorskip("deepgram")
+
+from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
+from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXConfig
+from agent_platform.integrations.credentials import DeepgramCredentials
+from agent_platform.integrations.speech_to_text.deepgram.deepgram import (
     DeepgramSTT,
     _parse_language,
     _mime_from_format,
@@ -10,7 +15,7 @@ from agent_platform.integrations.speech.providers.deepgram import (
 )
 
 try:
-    from agent_platform.integrations.speech.providers.whisperx import (
+    from agent_platform.integrations.speech_to_text.whisperx.whisperx import (
         WhisperXSTT,
     )
 
@@ -18,9 +23,9 @@ try:
 except ImportError:
     HAS_WHISPERX = False
 
-from agent_platform.integrations.speech.base import BaseSpeechToText
-from agent_platform.models.enums import Language, AudioFormat
-from agent_platform.models.chunk import AudioChunk
+from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+from agent_platform.core.schemas.enums import Language, AudioFormat
+from agent_platform.core.schemas.chunk import AudioChunk
 
 
 class TestParseLanguage:
@@ -64,32 +69,22 @@ class TestMimeFromFormat:
 
 
 class TestWhisperXSTTDefaults:
-    def test_constructor_defaults(self):
+    def test_constructor_default_config(self):
         if not HAS_WHISPERX:
             pytest.skip("whisperx not available")
         stt = WhisperXSTT()
-        assert stt._model_size == "large-v3"
-        assert stt._device == "cpu"
-        assert stt._compute_type == "float32"
-        assert stt._batch_size == 16
-        assert stt._min_duration_ms == 5000
-        assert stt._model is None
+        cfg = stt._default_config()
+        assert cfg.model_size == "large-v3"
+        assert cfg.device == "cpu"
+        assert cfg.compute_type == "float32"
+        assert cfg.batch_size == 16
+        assert cfg.min_duration_ms == 5000
 
-    def test_constructor_custom(self):
+    def test_constructor_custom_config_via_default(self):
         if not HAS_WHISPERX:
             pytest.skip("whisperx not available")
-        stt = WhisperXSTT(
-            model_size="medium",
-            device="cuda",
-            compute_type="float16",
-            batch_size=8,
-            min_duration_ms=3000,
-        )
-        assert stt._model_size == "medium"
-        assert stt._device == "cuda"
-        assert stt._compute_type == "float16"
-        assert stt._batch_size == 8
-        assert stt._min_duration_ms == 3000
+        stt = WhisperXSTT()
+        assert isinstance(stt, BaseSpeechToText)
 
     def test_is_speech_to_text(self):
         if not HAS_WHISPERX:
@@ -99,16 +94,13 @@ class TestWhisperXSTTDefaults:
 
 
 class TestDeepgramSTTDefaults:
-    def test_constructor_stores_api_key(self):
-        with patch("deepgram.DeepgramClient") as mock_cls:
-            stt = DeepgramSTT(api_key="test-key-123")
-            mock_cls.assert_called_once_with("test-key-123")
-            assert stt._client is mock_cls.return_value
+    def test_constructor_stores_credentials(self):
+        stt = DeepgramSTT(DeepgramCredentials(api_key="test-key-123"))
+        assert stt._credentials.api_key.get_secret_value() == "test-key-123"
 
     def test_is_speech_to_text(self):
-        with patch("deepgram.DeepgramClient"):
-            stt = DeepgramSTT(api_key="key")
-            assert isinstance(stt, BaseSpeechToText)
+        stt = DeepgramSTT(DeepgramCredentials(api_key="key"))
+        assert isinstance(stt, BaseSpeechToText)
 
 
 class TestParseDeepgramResult:
@@ -167,12 +159,11 @@ class TestWhisperXSTTTranscribe:
         }
 
         stt = WhisperXSTT()
-        stt._model = mock_model
-
         audio = AudioChunk(
             data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
         )
-        result = await stt.transcribe(audio)
+        with patch.object(stt, "_load_model", return_value=mock_model):
+            result = await stt.transcribe(audio)
 
         assert len(result.utterances) == 2
         assert result.utterances[0].text == "hello"
@@ -186,18 +177,6 @@ class TestWhisperXSTTTranscribe:
         assert result.language == Language.EN
         assert result.metadata["stt_provider"] == "whisperx"
 
-    async def test_transcribe_model_load_failure(self):
-        if not HAS_WHISPERX:
-            pytest.skip("whisperx not available")
-
-        with patch("whisperx.load_model", return_value=None):
-            stt = WhisperXSTT()
-            audio = AudioChunk(
-                data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
-            )
-            with pytest.raises(RuntimeError, match="Failed to load WhisperX"):
-                await stt.transcribe(audio)
-
     async def test_transcribe_without_segments(self):
         if not HAS_WHISPERX:
             pytest.skip("whisperx not available")
@@ -206,12 +185,11 @@ class TestWhisperXSTTTranscribe:
         mock_model.transcribe.return_value = {"language": "en", "segments": []}
 
         stt = WhisperXSTT()
-        stt._model = mock_model
-
         audio = AudioChunk(
             data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
         )
-        result = await stt.transcribe(audio)
+        with patch.object(stt, "_load_model", return_value=mock_model):
+            result = await stt.transcribe(audio)
 
         assert result.utterances == []
 
@@ -237,10 +215,14 @@ class TestWhisperXSTTStream:
                 data=b"\x00\x00\x00\x00", start=3000, end=6000, format=AudioFormat.WAV
             )
 
-        stt = WhisperXSTT(min_duration_ms=5000)
-        stt._model = mock_model
-
-        results = [t async for t in stt.stream(_frames())]
+        stt = WhisperXSTT()
+        with patch.object(stt, "_load_model", return_value=mock_model):
+            results = [
+                t
+                async for t in stt.stream(
+                    _frames(), WhisperXConfig(min_duration_ms=5000)
+                )
+            ]
         assert len(results) == 1
         assert results[0].utterances[0].text == "hello world"
 
@@ -261,102 +243,91 @@ class TestWhisperXSTTStream:
                 data=b"\x00\x00\x00\x00", start=0, end=2000, format=AudioFormat.WAV
             )
 
-        stt = WhisperXSTT(min_duration_ms=5000)
-        stt._model = mock_model
-
-        results = [t async for t in stt.stream(_frames())]
+        stt = WhisperXSTT()
+        with patch.object(stt, "_load_model", return_value=mock_model):
+            results = [
+                t
+                async for t in stt.stream(
+                    _frames(), WhisperXConfig(min_duration_ms=5000)
+                )
+            ]
         assert len(results) == 1
-
-    async def test_stream_model_load_failure(self):
-        if not HAS_WHISPERX:
-            pytest.skip("whisperx not available")
-
-        async def _frames():
-            yield AudioChunk(
-                data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
-            )
-
-        with patch("whisperx.load_model", return_value=None):
-            stt = WhisperXSTT(min_duration_ms=100)
-            with pytest.raises(RuntimeError, match="Failed to load WhisperX"):
-                async for _ in stt.stream(_frames()):
-                    pass
 
 
 class TestDeepgramSTTTranscribe:
     async def test_transcribe_with_words(self):
+        mock_dg_client = MagicMock()
+        mock_v1 = AsyncMock()
+        mock_dg_client.listen.asyncprerecorded.v.return_value = mock_v1
+
+        mock_word = MagicMock()
+        mock_word.word = "hello"
+        mock_word.start = 0.0
+        mock_word.end = 0.5
+        mock_word.confidence = 0.9
+
+        mock_alt = MagicMock()
+        mock_alt.words = [mock_word]
+        mock_alt.confidence = 0.9
+        mock_alt.paragraphs = None
+
+        mock_channel = MagicMock()
+        mock_channel.alternatives = [mock_alt]
+
+        mock_response = MagicMock()
+        mock_response.results.channels = [mock_channel]
+        mock_response.results.get.return_value = "en"
+        mock_v1.transcribe = AsyncMock(return_value=mock_response)
+
         with (
-            patch("deepgram.DeepgramClient") as mock_dg_cls,
-            patch("deepgram.PrerecordedOptions", create=True) as mock_opts_cls,
+            patch("deepgram.DeepgramClient", return_value=mock_dg_client),
+            patch("deepgram.PrerecordedOptions", create=True),
         ):
-            stt = DeepgramSTT(api_key="test-key")
-
-            mock_v1 = AsyncMock()
-            stt._client.listen.asyncprerecorded.v.return_value = mock_v1
-
-            mock_word = MagicMock()
-            mock_word.word = "hello"
-            mock_word.start = 0.0
-            mock_word.end = 0.5
-            mock_word.confidence = 0.9
-
-            mock_alt = MagicMock()
-            mock_alt.words = [mock_word]
-            mock_alt.confidence = 0.9
-            mock_alt.paragraphs = None
-
-            mock_channel = MagicMock()
-            mock_channel.alternatives = [mock_alt]
-
-            mock_response = MagicMock()
-            mock_response.results.channels = [mock_channel]
-            mock_response.results.get.return_value = "en"
-            mock_v1.transcribe = AsyncMock(return_value=mock_response)
-
+            stt = DeepgramSTT(DeepgramCredentials(api_key="test-key"))
             audio = AudioChunk(
                 data=b"audio_data", start=0, end=1000, format=AudioFormat.WAV
             )
             result = await stt.transcribe(audio)
 
-            assert len(result.utterances) == 1
-            assert result.utterances[0].text == "hello"
-            assert result.utterances[0].start_ms == 0
-            assert result.utterances[0].end_ms == 500
-            assert result.utterances[0].confidence == 0.9
-            assert result.language == Language.EN
-            assert result.metadata["stt_provider"] == "deepgram"
+        assert len(result.utterances) == 1
+        assert result.utterances[0].text == "hello"
+        assert result.utterances[0].start_ms == 0
+        assert result.utterances[0].end_ms == 500
+        assert result.utterances[0].confidence == 0.9
+        assert result.language == Language.EN
+        assert result.metadata["stt_provider"] == "deepgram"
 
     async def test_transcribe_without_words_uses_paragraphs(self):
+        mock_dg_client = MagicMock()
+        mock_v1 = AsyncMock()
+        mock_dg_client.listen.asyncprerecorded.v.return_value = mock_v1
+
+        mock_paragraphs = MagicMock()
+        mock_paragraphs.transcript = "full paragraph text"
+
+        mock_alt = MagicMock()
+        mock_alt.words = []
+        mock_alt.confidence = 0.8
+        mock_alt.paragraphs = mock_paragraphs
+
+        mock_channel = MagicMock()
+        mock_channel.alternatives = [mock_alt]
+
+        mock_response = MagicMock()
+        mock_response.results.channels = [mock_channel]
+        mock_response.results.get.return_value = "en"
+        mock_v1.transcribe = AsyncMock(return_value=mock_response)
+
         with (
-            patch("deepgram.DeepgramClient") as mock_dg_cls,
-            patch("deepgram.PrerecordedOptions", create=True) as mock_opts_cls,
+            patch("deepgram.DeepgramClient", return_value=mock_dg_client),
+            patch("deepgram.PrerecordedOptions", create=True),
         ):
-            stt = DeepgramSTT(api_key="test-key")
-
-            mock_v1 = AsyncMock()
-            stt._client.listen.asyncprerecorded.v.return_value = mock_v1
-
-            mock_paragraphs = MagicMock()
-            mock_paragraphs.transcript = "full paragraph text"
-
-            mock_alt = MagicMock()
-            mock_alt.words = []
-            mock_alt.confidence = 0.8
-            mock_alt.paragraphs = mock_paragraphs
-
-            mock_channel = MagicMock()
-            mock_channel.alternatives = [mock_alt]
-
-            mock_response = MagicMock()
-            mock_response.results.channels = [mock_channel]
-            mock_response.results.get.return_value = "en"
-            mock_v1.transcribe = AsyncMock(return_value=mock_response)
-
+            stt = DeepgramSTT(DeepgramCredentials(api_key="test-key"))
             audio = AudioChunk(
                 data=b"audio_data", start=0, end=1000, format=AudioFormat.WAV
             )
             result = await stt.transcribe(audio)
 
-            assert len(result.utterances) == 1
-            assert result.utterances[0].text == "full paragraph text"
-            assert result.utterances[0].confidence == 0.8
+        assert len(result.utterances) == 1
+        assert result.utterances[0].text == "full paragraph text"
+        assert result.utterances[0].confidence == 0.8

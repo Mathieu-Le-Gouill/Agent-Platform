@@ -1,148 +1,160 @@
-from unittest.mock import MagicMock, patch
+from types import SimpleNamespace
+from unittest.mock import MagicMock, AsyncMock, patch
 from uuid import uuid4
 
 import pytest
 
-from agent_platform.integrations.ocr.config import GoogleVisionConfig
-from agent_platform.models.chunk import TextChunk
+pytest.importorskip("google.cloud")
+
+from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
+from agent_platform.integrations.ocr.google_vision.google_vision import GoogleVisionOCR
+from agent_platform.integrations.credentials import (
+    GoogleVisionCredentials,
+)
+from agent_platform.core.errors import ProviderError
+from agent_platform.core.schemas.chunk import TextChunk
 
 
-@patch("agent_platform.integrations.ocr.providers.google_vision.vision")
-async def test_extract_returns_chunks(mock_vision):
-    mock_symbol = MagicMock()
-    mock_symbol.text = "H"
-    mock_symbol.confidence = 0.95
-    mock_word = MagicMock()
-    mock_word.symbols = [mock_symbol]
-    mock_paragraph = MagicMock()
-    mock_paragraph.words = [mock_word]
-    mock_block = MagicMock()
-    mock_block.paragraphs = [mock_paragraph]
-    mock_page = MagicMock()
-    mock_page.blocks = [mock_block]
-    mock_page.page_number = 1
-    mock_annotation = MagicMock()
-    mock_annotation.pages = [mock_page]
-    mock_response = MagicMock()
-    mock_response.full_text_annotation = mock_annotation
-    mock_response.error.message = ""
+def _make_response(words_per_paragraph):
+    paragraphs = []
+    for words in words_per_paragraph:
+        paragraph = MagicMock()
+        paragraph.words = words
+        paragraphs.append(paragraph)
+    block = MagicMock()
+    block.paragraphs = paragraphs
+    page = MagicMock()
+    page.blocks = [block]
+    full_text_annotation = MagicMock()
+    full_text_annotation.pages = [page]
+    response = MagicMock()
+    response.full_text_annotation = full_text_annotation
+    return response
 
+
+def _make_word(text, confidence):
+    symbols = []
+    for ch in text:
+        sym = MagicMock()
+        sym.text = ch
+        sym.confidence = confidence
+        symbols.append(sym)
+    word = MagicMock()
+    word.symbols = symbols
+    return word
+
+
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread")
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.vision")
+async def test_extract_returns_chunks(mock_vision, mock_to_thread):
     mock_client = MagicMock()
-    mock_client.annotate_image.return_value = mock_response
     mock_vision.ImageAnnotatorClient.return_value = mock_client
+    mock_vision.Image.return_value = MagicMock()
 
-    from agent_platform.integrations.ocr.providers.google_vision import GoogleVisionOCR
+    word = _make_word("H", 0.95)
+    response = _make_response([[word]])
 
+    async def fake_to_thread(fn, *args, **kwargs):
+        if fn == GoogleVisionOCR._load_bytes:
+            return b"fake-bytes"
+        return fn(*args, **kwargs) if args else response
+
+    mock_to_thread.side_effect = fake_to_thread
+
+    # Patch _load_bytes directly
     ocr = GoogleVisionOCR()
-
     doc_id = uuid4()
-    result = await ocr.extract("http://example.com/img.jpg", document_id=doc_id)
+
+    with patch.object(GoogleVisionOCR, "_load_bytes", return_value=b"fake-bytes"):
+        with patch(
+            "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
+            side_effect=[b"fake-bytes", response],
+        ):
+            result = await ocr.extract("http://example.com/img.jpg", document_id=doc_id)
 
     assert len(result) == 1
     assert result[0].text == "H"
     assert result[0].document_id == doc_id
 
 
-@patch("agent_platform.integrations.ocr.providers.google_vision.vision")
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.vision")
 async def test_extract_no_pages_returns_empty(mock_vision):
-    mock_response = MagicMock()
-    mock_response.full_text_annotation.pages = []
-    mock_response.error.message = ""
-
     mock_client = MagicMock()
-    mock_client.annotate_image.return_value = mock_response
     mock_vision.ImageAnnotatorClient.return_value = mock_client
+    mock_vision.Image.return_value = MagicMock()
 
-    from agent_platform.integrations.ocr.providers.google_vision import GoogleVisionOCR
+    full_text_annotation = MagicMock()
+    full_text_annotation.pages = []
+    response = MagicMock()
+    response.full_text_annotation = full_text_annotation
 
     ocr = GoogleVisionOCR()
-
-    result = await ocr.extract("http://example.com/img.jpg")
+    with patch.object(GoogleVisionOCR, "_load_bytes", return_value=b"fake-bytes"):
+        with patch(
+            "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
+            side_effect=[b"fake-bytes", response],
+        ):
+            result = await ocr.extract("http://example.com/img.jpg")
     assert result == []
 
 
-@patch("agent_platform.integrations.ocr.providers.google_vision.vision")
-async def test_extract_raises_on_api_error(mock_vision):
-    mock_response = MagicMock()
-    mock_response.full_text_annotation.pages = []
-    mock_response.error.message = "API error occurred"
-
-    mock_client = MagicMock()
-    mock_client.annotate_image.return_value = mock_response
-    mock_vision.ImageAnnotatorClient.return_value = mock_client
-
-    from agent_platform.integrations.ocr.providers.google_vision import GoogleVisionOCR
-
-    ocr = GoogleVisionOCR()
-
-    with pytest.raises(RuntimeError, match="API error occurred"):
-        await ocr.extract("http://example.com/img.jpg")
-
-
-@patch("agent_platform.integrations.ocr.providers.google_vision.vision")
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.vision")
 async def test_extract_filters_by_min_confidence(mock_vision):
-    mock_low_symbol = MagicMock()
-    mock_low_symbol.text = "L"
-    mock_low_symbol.confidence = 0.3
-    mock_low_word = MagicMock()
-    mock_low_word.symbols = [mock_low_symbol]
-    mock_low_paragraph = MagicMock()
-    mock_low_paragraph.words = [mock_low_word]
-    mock_low_block = MagicMock()
-    mock_low_block.paragraphs = [mock_low_paragraph]
-    mock_page = MagicMock()
-    mock_page.blocks = [mock_low_block]
-    mock_page.page_number = 1
-    mock_annotation = MagicMock()
-    mock_annotation.pages = [mock_page]
-    mock_response = MagicMock()
-    mock_response.full_text_annotation = mock_annotation
-    mock_response.error.message = ""
-
     mock_client = MagicMock()
-    mock_client.annotate_image.return_value = mock_response
     mock_vision.ImageAnnotatorClient.return_value = mock_client
+    mock_vision.Image.return_value = MagicMock()
 
-    from agent_platform.integrations.ocr.providers.google_vision import GoogleVisionOCR
+    word = _make_word("L", 0.3)
+    response = _make_response([[word]])
 
     ocr = GoogleVisionOCR()
-
-    result = await ocr.extract(
-        "http://example.com/img.jpg",
-        config=GoogleVisionConfig(min_confidence=0.5),
-    )
+    with patch.object(GoogleVisionOCR, "_load_bytes", return_value=b"fake-bytes"):
+        with patch(
+            "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
+            side_effect=[b"fake-bytes", response],
+        ):
+            result = await ocr.extract(
+                "http://example.com/img.jpg",
+                config=GoogleVisionConfig(min_confidence=0.5),
+            )
     assert result == []
 
 
-@patch("agent_platform.integrations.ocr.providers.google_vision.vision")
-async def test_extract_handles_missing_confidence(mock_vision):
-    mock_symbol = MagicMock()
-    mock_symbol.text = "T"
-    mock_symbol.confidence = None
-    mock_word = MagicMock()
-    mock_word.symbols = [mock_symbol]
-    mock_paragraph = MagicMock()
-    mock_paragraph.words = [mock_word]
-    mock_block = MagicMock()
-    mock_block.paragraphs = [mock_paragraph]
-    mock_page = MagicMock()
-    mock_page.blocks = [mock_block]
-    mock_page.page_number = 1
-    mock_annotation = MagicMock()
-    mock_annotation.pages = [mock_page]
-    mock_response = MagicMock()
-    mock_response.full_text_annotation = mock_annotation
-    mock_response.error.message = ""
-
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.vision")
+async def test_extract_raises_on_api_error(mock_vision):
     mock_client = MagicMock()
-    mock_client.annotate_image.return_value = mock_response
     mock_vision.ImageAnnotatorClient.return_value = mock_client
 
-    from agent_platform.integrations.ocr.providers.google_vision import GoogleVisionOCR
+    ocr = GoogleVisionOCR()
+    with patch.object(GoogleVisionOCR, "_load_bytes", return_value=b"fake-bytes"):
+        with patch(
+            "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
+            side_effect=RuntimeError("API error occurred"),
+        ):
+            with pytest.raises(ProviderError, match="API error occurred"):
+                await ocr.extract("http://example.com/img.jpg")
+
+
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.vision")
+async def test_extract_handles_missing_confidence(mock_vision):
+    mock_client = MagicMock()
+    mock_vision.ImageAnnotatorClient.return_value = mock_client
+    mock_vision.Image.return_value = MagicMock()
+
+    sym = MagicMock()
+    sym.text = "T"
+    sym.confidence = None
+    word = MagicMock()
+    word.symbols = [sym]
+    response = _make_response([[word]])
 
     ocr = GoogleVisionOCR()
-
-    result = await ocr.extract("http://example.com/img.jpg")
+    with patch.object(GoogleVisionOCR, "_load_bytes", return_value=b"fake-bytes"):
+        with patch(
+            "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
+            side_effect=[b"fake-bytes", response],
+        ):
+            result = await ocr.extract("http://example.com/img.jpg")
     assert len(result) == 1
     assert result[0].text == "T"
     assert result[0].metadata["confidence"] == 0.0

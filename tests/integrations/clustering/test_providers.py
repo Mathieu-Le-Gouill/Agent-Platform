@@ -1,24 +1,20 @@
-import sys
 from unittest.mock import MagicMock, patch
 
 import numpy as np
 import pytest
 
-# hdbscan is not installed in this environment; mock at module level so the
-# package __init__.py does not fail at import time.
-sys.modules["hdbscan"] = MagicMock()
 
-from agent_platform.integrations.clustering.config import KMeansConfig
-from agent_platform.integrations.clustering.providers.hdbscan import (
+pytest.importorskip("sklearn")
+
+from agent_platform.integrations.clustering.kmeans.config import KMeansConfig
+from agent_platform.integrations.clustering.hdbscan.hdbscan import (
     HDBSCANClusterer,
-    _build_label_names as hdb_build_label_names,
 )
-from agent_platform.integrations.clustering.providers.kmeans import (
+from agent_platform.integrations.clustering.kmeans.kmeans import (
     KMeansClusterer,
     _softmax,
-    _build_label_names as km_build_label_names,
 )
-from agent_platform.models.chunk import TextChunk
+from agent_platform.core.schemas.chunk import TextChunk
 
 
 # ---------------------------------------------------------------------------
@@ -26,7 +22,7 @@ from agent_platform.models.chunk import TextChunk
 # ---------------------------------------------------------------------------
 
 
-@patch("agent_platform.integrations.clustering.providers.hdbscan.hdbscan.HDBSCAN")
+@patch("hdbscan.HDBSCAN")
 async def test_hdbscan_empty_items(mock_hdbscan):
     clusterer = HDBSCANClusterer()
     result = await clusterer.clusterize([])
@@ -35,7 +31,7 @@ async def test_hdbscan_empty_items(mock_hdbscan):
     mock_hdbscan.assert_not_called()
 
 
-@patch("agent_platform.integrations.clustering.providers.kmeans.KMeans")
+@patch("agent_platform.integrations.clustering.kmeans.kmeans.KMeans")
 async def test_kmeans_empty_items(mock_kmeans):
     clusterer = KMeansClusterer()
     result = await clusterer.clusterize([])
@@ -99,12 +95,11 @@ async def test_kmeans_n_clusters_exceeds_items():
 # ---------------------------------------------------------------------------
 
 
-@patch("agent_platform.integrations.clustering.providers.hdbscan.hdbscan.HDBSCAN")
+@patch("hdbscan.HDBSCAN")
 async def test_hdbscan_clusterize(mock_hdbscan_cls):
     mock_instance = MagicMock()
-    mock_instance.labels_ = np.array([0, 0, -1])
+    mock_instance.fit_predict.return_value = np.array([0, 0, -1])
     mock_instance.probabilities_ = np.array([0.95, 0.92, 0.0])
-    mock_instance.fit.return_value = mock_instance
     mock_hdbscan_cls.return_value = mock_instance
 
     clusterer = HDBSCANClusterer()
@@ -131,10 +126,10 @@ async def test_hdbscan_clusterize(mock_hdbscan_cls):
     assert result.items[2].probability == 0.0
 
 
-@patch("agent_platform.integrations.clustering.providers.kmeans.KMeans")
+@patch("agent_platform.integrations.clustering.kmeans.kmeans.KMeans")
 async def test_kmeans_clusterize(mock_kmeans_cls):
     mock_instance = MagicMock()
-    mock_instance.labels_ = np.array([0, 0, 1, 1])
+    mock_instance.fit_predict.return_value = np.array([0, 0, 1, 1])
     mock_instance.cluster_centers_ = np.array([[0.1, 0.2], [0.3, 0.4]])
     mock_instance.transform.return_value = np.array(
         [
@@ -165,7 +160,7 @@ async def test_kmeans_clusterize(mock_kmeans_cls):
     assert result.items[2].cluster_id == 1
     assert result.items[2].label == "cluster_1"
 
-    mock_instance.fit.assert_called_once()
+    mock_instance.fit_predict.assert_called_once()
     mock_instance.transform.assert_called_once()
 
 
@@ -199,51 +194,3 @@ def test_softmax_against_definition():
     e_x = np.exp(x - x.max(axis=1, keepdims=True))
     expected = e_x / e_x.sum(axis=1, keepdims=True)
     np.testing.assert_allclose(_softmax(x), expected, rtol=1e-6)
-
-
-# ---------------------------------------------------------------------------
-# _build_label_names utility (kmeans flavour)
-# ---------------------------------------------------------------------------
-
-
-def test_build_label_names_none():
-    labels = np.array([0, 0, 1, 1])
-    assert km_build_label_names(labels, None) == {}
-
-
-def test_build_label_names_empty_list():
-    labels = np.array([0, 0, 1, 1])
-    assert km_build_label_names(labels, []) == {}
-
-
-def test_build_label_names_matching():
-    labels = np.array([0, 0, 1, 1])
-    assert km_build_label_names(labels, ["cat", "dog"]) == {0: "cat", 1: "dog"}
-
-
-def test_build_label_names_fewer_user_labels():
-    labels = np.array([0, 0, 1, 1, 2])
-    result = km_build_label_names(labels, ["cat"])
-    assert result == {0: "cat", 1: "cluster_1", 2: "cluster_2"}
-
-
-def test_build_label_names_non_contiguous():
-    labels = np.array([0, 0, 2, 3])
-    result = km_build_label_names(labels, ["a", "b", "c"])
-    assert result == {0: "a", 2: "b", 3: "c"}
-
-
-# ---------------------------------------------------------------------------
-# _build_label_names utility (hdbscan flavour — excludes -1)
-# ---------------------------------------------------------------------------
-
-
-def test_hdb_build_label_names_excludes_noise():
-    labels = np.array([-1, 0, 0, 1, 1])
-    result = hdb_build_label_names(labels, ["a", "b"])
-    assert result == {0: "a", 1: "b"}
-
-
-def test_hdb_build_label_names_none():
-    labels = np.array([0, 0, 1, 1])
-    assert hdb_build_label_names(labels, None) == {}

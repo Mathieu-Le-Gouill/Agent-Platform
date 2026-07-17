@@ -37,9 +37,7 @@ class TestWeaviateSearchKwargs:
         assert isinstance(kwargs["filters"], _Filters)
 
     def test_namespace_maps_to_tenant_kwarg(self, provider):
-        kwargs = provider._search_kwargs(
-            WeaviateConfig(namespace="tenant-a"), None
-        )
+        kwargs = provider._search_kwargs(WeaviateConfig(namespace="tenant-a"), None)
         assert kwargs == {"tenant": "tenant-a"}
 
     def test_no_namespace_omits_tenant(self, provider):

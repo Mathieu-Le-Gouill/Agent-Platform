@@ -1,6 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
+
 from langchain_core.messages import (
     HumanMessage as LCHumanMessage,
     SystemMessage as LCSystemMessage,
@@ -11,15 +13,21 @@ from langchain_core.messages import (
 from agent_platform.integrations.llm.langchain_base import (
     _to_langchain,
     _from_langchain,
+    _block_to_langchain,
+    _content_to_langchain,
     LangChainLLMProvider,
 )
 from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     StreamChunk,
 )
-from agent_platform.core.schemas.enums import FinishReason
+from agent_platform.core.schemas.document import AudioDocument, ImageDocument
+from agent_platform.core.schemas.enums import AudioFormat, FinishReason, ImageFormat
 from agent_platform.core.schemas.message import (
+    AudioBlock,
+    ImageBlock,
     SystemMessage,
+    TextBlock,
     UserMessage,
     AssistantMessage,
     ToolMessage,
@@ -29,6 +37,67 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.interfaces.llm.config import GenerationConfig
+
+
+class TestBlockToLangchain:
+    def test_text_block(self):
+        result = _block_to_langchain(TextBlock(text="hello"))
+        assert result == {"type": "text", "text": "hello"}
+
+    def test_image_block_url(self):
+        result = _block_to_langchain(ImageBlock(image="https://example.com/a.png"))
+        assert result == {
+            "type": "image_url",
+            "image_url": {"url": "https://example.com/a.png"},
+        }
+
+    def test_image_block_document_base64(self):
+        doc = ImageDocument(content=b"\x89PNG", format=ImageFormat.PNG)
+        result = _block_to_langchain(ImageBlock(image=doc))
+        assert result["type"] == "image_url"
+        assert result["image_url"]["url"].startswith("data:image/png;base64,")
+
+    def test_image_block_document_unknown_format_mime(self):
+        doc = ImageDocument(content=b"\x89PNG", format=ImageFormat.UNKNOWN)
+        result = _block_to_langchain(ImageBlock(image=doc))
+        assert result["image_url"]["url"].startswith("data:image/unknown;base64,")
+
+    def test_audio_block(self):
+        doc = AudioDocument(content=b"RIFF....", format=AudioFormat.WAV)
+        result = _block_to_langchain(AudioBlock(audio=doc))
+        assert result["type"] == "input_audio"
+        assert result["input_audio"]["format"] == "wav"
+        assert result["input_audio"]["data"]
+
+
+class TestContentToLangchain:
+    def test_plain_string_content_passthrough(self):
+        msg = UserMessage(content="hi there")
+        assert _content_to_langchain(msg) == "hi there"
+
+    def test_block_list_content_maps_each_block(self):
+        msg = UserMessage(
+            content=[
+                TextBlock(text="describe this"),
+                ImageBlock(image="https://x/y.png"),
+            ]
+        )
+        result = _content_to_langchain(msg)
+        assert result == [
+            {"type": "text", "text": "describe this"},
+            {"type": "image_url", "image_url": {"url": "https://x/y.png"}},
+        ]
+
+    def test_multimodal_message_reaches_to_langchain(self):
+        prompt = Prompt().add_user_content(
+            [TextBlock(text="what is this?"), ImageBlock(image="https://x/y.png")]
+        )
+        result = _to_langchain(prompt)
+        assert len(result) == 1
+        assert result[0].content == [
+            {"type": "text", "text": "what is this?"},
+            {"type": "image_url", "image_url": {"url": "https://x/y.png"}},
+        ]
 
 
 class TestToLangchain:
@@ -197,13 +266,7 @@ class TestFromLangchain:
         assert result.message.content == ""
 
 
-from agent_platform.core.credentials import NoCredentials
-
-
 class _TestLLMProvider(LangChainLLMProvider):
-    def __init__(self):
-        super().__init__(NoCredentials())
-
     def _client(self, config):
         raise NotImplementedError
 
@@ -242,6 +305,57 @@ class TestLangChainLLMProviderStream:
         assert results[1].delta == " World"
         assert results[2].delta == ""
         assert results[2].finish_reason == FinishReason.STOP
+
+
+class TestLangChainLLMProviderAgenerateRetryAndTranslation:
+    async def test_retries_transient_failure_then_succeeds(self, monkeypatch):
+        import agent_platform.core.errors as errors_mod
+
+        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
+
+        calls = {"n": 0}
+        lc_response = LCAIMessage(content="ok")
+
+        mock_model = MagicMock()
+
+        async def flaky_ainvoke(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] < 2:
+                raise ConnectionError("transient network error")
+            return lc_response
+
+        mock_model.ainvoke = flaky_ainvoke
+
+        provider = _TestLLMProvider()
+        provider._client = MagicMock(return_value=mock_model)
+
+        prompt = Prompt(messages=[UserMessage(content="Hi")])
+        result = await provider.agenerate(
+            prompt, config=GenerationConfig(model="gpt-4")
+        )
+
+        assert calls["n"] == 2
+        assert result.message.content == "ok"
+
+    async def test_translates_permanent_failure_to_provider_error(self, monkeypatch):
+        import agent_platform.core.errors as errors_mod
+        from agent_platform.core.errors import ProviderError
+
+        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
+
+        mock_model = MagicMock()
+
+        async def always_fails(*args, **kwargs):
+            raise ConnectionError("boom")
+
+        mock_model.ainvoke = always_fails
+
+        provider = _TestLLMProvider()
+        provider._client = MagicMock(return_value=mock_model)
+
+        prompt = Prompt(messages=[UserMessage(content="Hi")])
+        with pytest.raises(ProviderError, match="LLM generation failed"):
+            await provider.agenerate(prompt, config=GenerationConfig(model="gpt-4"))
 
     async def test_stream_skips_empty_string_content(self):
         chunk1 = MagicMock(spec=[])

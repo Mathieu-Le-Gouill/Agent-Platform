@@ -6,7 +6,6 @@ import pytest
 from agent_platform.core.schemas.chunk import TextChunk
 
 
-
 @pytest.fixture
 def openai_provider():
     from agent_platform.integrations.embeddings.providers.openai import (

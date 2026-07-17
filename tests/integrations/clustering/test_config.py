@@ -1,8 +1,8 @@
-from agent_platform.integrations.clustering.config import (
-    ClusteringConfig,
-    HDBSCANConfig,
-    KMeansConfig,
-)
+from pydantic import ValidationError
+
+from agent_platform.core.interfaces.clustering.config import ClusteringConfig
+from agent_platform.integrations.clustering.hdbscan.config import HDBSCANConfig
+from agent_platform.integrations.clustering.kmeans.config import KMeansConfig
 
 
 def test_clustering_config_defaults():
@@ -38,7 +38,7 @@ def test_hdbscan_config_construction():
 def test_kmeans_config_defaults():
     cfg = KMeansConfig()
     assert isinstance(cfg, ClusteringConfig)
-    assert cfg.n_init == "auto"
+    assert cfg.n_init == 10
     assert cfg.max_iter == 300
     assert cfg.tol == 1e-4
     assert cfg.algorithm == "lloyd"
@@ -55,20 +55,20 @@ def test_configs_are_frozen():
     cfg = ClusteringConfig()
     try:
         cfg.n_clusters = 1
-        assert False, "expected FrozenInstanceError"
-    except AttributeError:
+        assert False, "expected ValidationError"
+    except ValidationError:
         pass
 
     hcfg = HDBSCANConfig()
     try:
         hcfg.min_cluster_size = 10
-        assert False, "expected FrozenInstanceError"
-    except AttributeError:
+        assert False, "expected ValidationError"
+    except ValidationError:
         pass
 
     kcfg = KMeansConfig()
     try:
         kcfg.max_iter = 100
-        assert False, "expected FrozenInstanceError"
-    except AttributeError:
+        assert False, "expected ValidationError"
+    except ValidationError:
         pass

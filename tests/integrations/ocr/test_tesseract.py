@@ -3,8 +3,10 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.integrations.ocr.providers.tesseract import TesseractOCR
-from agent_platform.integrations.ocr.config import TesseractConfig
+pytest.importorskip("pytesseract")
+
+from agent_platform.integrations.ocr.tesseract.tesseract import TesseractOCR
+from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
 
 
 FAKE_TESSERACT_DATA = {
@@ -21,13 +23,13 @@ FAKE_TESSERACT_DATA = {
 @pytest.mark.asyncio
 async def test_extract_returns_chunks_for_given_document_id():
 
-    ocr = TesseractOCR(TesseractConfig())
+    ocr = TesseractOCR()
     document_id = uuid4()
 
     with (
         patch.object(TesseractOCR, "_load_image", return_value="fake-image"),
         patch(
-            "agent_platform.integrations.ocr.providers.tesseract.pytesseract.image_to_data",
+            "agent_platform.integrations.ocr.tesseract.tesseract.pytesseract.image_to_data",
             return_value=FAKE_TESSERACT_DATA,
         ),
     ):
@@ -40,12 +42,12 @@ async def test_extract_returns_chunks_for_given_document_id():
 @pytest.mark.asyncio
 async def test_extract_mints_document_id_when_not_provided():
 
-    ocr = TesseractOCR(TesseractConfig())
+    ocr = TesseractOCR()
 
     with (
         patch.object(TesseractOCR, "_load_image", return_value="fake-image"),
         patch(
-            "agent_platform.integrations.ocr.providers.tesseract.pytesseract.image_to_data",
+            "agent_platform.integrations.ocr.tesseract.tesseract.pytesseract.image_to_data",
             return_value=FAKE_TESSERACT_DATA,
         ),
     ):
@@ -57,23 +59,29 @@ async def test_extract_mints_document_id_when_not_provided():
 @pytest.mark.asyncio
 async def test_extract_applies_min_confidence_from_config():
 
-    ocr = TesseractOCR(TesseractConfig(min_confidence=90.0))
+    ocr = TesseractOCR()
 
     with (
         patch.object(TesseractOCR, "_load_image", return_value="fake-image"),
         patch(
-            "agent_platform.integrations.ocr.providers.tesseract.pytesseract.image_to_data",
+            "agent_platform.integrations.ocr.tesseract.tesseract.pytesseract.image_to_data",
             return_value=FAKE_TESSERACT_DATA,
         ),
     ):
-        chunks = await ocr.extract("some/path.png")
+        chunks = await ocr.extract(
+            "some/path.png", config=TesseractConfig(min_confidence=90.0)
+        )
 
     # only "Total:" (conf=91) clears the 90 threshold, "42.00" (conf=87) is dropped
     assert [c.text for c in chunks] == ["Total:"]
 
 
-@patch("agent_platform.integrations.ocr.providers.tesseract.pytesseract")
-def test_custom_tesseract_cmd(mock_pytesseract):
+@patch("agent_platform.integrations.ocr.tesseract.tesseract.pytesseract")
+async def test_custom_tesseract_cmd(mock_pytesseract):
+    mock_pytesseract.image_to_data.return_value = FAKE_TESSERACT_DATA
+    mock_pytesseract.Output.DICT = "dict"
     config = TesseractConfig(tesseract_cmd="/usr/local/bin/tesseract")
-    TesseractOCR(config)
+    ocr = TesseractOCR()
+    with patch.object(TesseractOCR, "_load_image", return_value="fake-image"):
+        await ocr.extract("some/path.png", config=config)
     assert mock_pytesseract.pytesseract.tesseract_cmd == "/usr/local/bin/tesseract"

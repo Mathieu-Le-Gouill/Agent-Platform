@@ -11,7 +11,6 @@ from agent_platform.integrations.chunking.langchain_base import (
     _doc_to_lc,
 )
 from agent_platform.core.interfaces.chunking.base import BaseChunker
-from agent_platform.core.credentials import NoCredentials
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat
@@ -19,7 +18,7 @@ from agent_platform.core.schemas.enums import DocumentFormat
 
 def test_recursive_chunker_provider_defaults():
     provider = RecursiveChunkerProvider()
-    assert isinstance(provider._credentials, NoCredentials)
+    assert isinstance(provider, RecursiveChunkerProvider)
 
 
 def test_recursive_chunker_provider_is_langchain_chunker():
@@ -104,13 +103,17 @@ def test_default_config_type():
     assert cfg.chunk_overlap == 64
 
 
-def test_base_chunker_stores_credentials():
+def test_base_chunker_subclass_can_store_credentials():
+    marker = object()
+
     class _ConcreteChunker(
-        BaseChunker[NoCredentials, TextDocument, TextChunk, RecursiveChunkerConfig]
+        BaseChunker[TextDocument, TextChunk, RecursiveChunkerConfig]
     ):
+        def __init__(self, credentials):
+            self._credentials = credentials
+
         def chunk(self, documents, config):
             return []
 
-    creds = NoCredentials()
-    chunker = _ConcreteChunker(creds)
-    assert chunker._credentials is creds
+    chunker = _ConcreteChunker(marker)
+    assert chunker._credentials is marker

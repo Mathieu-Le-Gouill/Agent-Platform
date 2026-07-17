@@ -1,12 +1,12 @@
 import pytest
 from uuid import uuid4
 
-from agent_platform.integrations.vad.base import BaseVAD
-from agent_platform.integrations.vad.configuration import VADConfig
-from agent_platform.integrations.vad.requirements import AudioRequirements
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.span import SampleSpan
-from agent_platform.models.enums import DataType
+from agent_platform.core.interfaces.vad.base import BaseVAD
+from agent_platform.core.interfaces.vad.config import VADConfig
+from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.core.schemas.enums import DataType
 
 
 class _ConcreteVAD(BaseVAD[VADConfig]):
@@ -18,6 +18,13 @@ class _ConcreteVAD(BaseVAD[VADConfig]):
             dtype=DataType.FLOAT32,
             normalized=True,
         )
+
+    def _validate_chunk(
+        self,
+        chunk: AudioChunk,
+        config_sample_rate: int,
+    ) -> None:
+        return super()._validate_chunk(chunk, config_sample_rate)
 
     def detect(self, audio_sequence, config=None) -> list[SampleSpan]:
         return []

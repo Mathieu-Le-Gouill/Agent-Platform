@@ -2,14 +2,14 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.integrations.speech.providers.deepgram import (
+from agent_platform.integrations.speech_to_text.deepgram.deepgram import (
     _parse_deepgram_result,
     _parse_language,
     _mime_from_format,
 )
 
-from agent_platform.models.conversation import Utterance
-from agent_platform.models.enums import Language
+from agent_platform.core.schemas.conversation import Utterance
+from agent_platform.core.schemas.enums import Language
 
 
 class TestParseDeepgramResult:

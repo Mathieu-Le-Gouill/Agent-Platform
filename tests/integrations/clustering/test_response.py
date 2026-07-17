@@ -1,7 +1,10 @@
 from uuid import uuid4
 
-from agent_platform.models.cluster import Cluster
-from agent_platform.integrations.clustering.response import ClusterResult, ClusteredItem
+from agent_platform.core.schemas.cluster import Cluster
+from agent_platform.core.interfaces.clustering.response import (
+    ClusterResult,
+    ClusteredItem,
+)
 
 
 def test_clustered_item_construction():
@@ -12,12 +15,15 @@ def test_clustered_item_construction():
     assert item.probability == 0.95
 
 
+from dataclasses import FrozenInstanceError
+
+
 def test_clustered_item_is_frozen():
     item = ClusteredItem(index=0, cluster_id=1, label="test", probability=0.95)
     try:
         item.label = "changed"
         assert False, "expected FrozenInstanceError"
-    except AttributeError:
+    except FrozenInstanceError:
         pass
 
 
@@ -43,5 +49,5 @@ def test_cluster_result_is_frozen():
     try:
         result.clusters = [Cluster(label="x")]
         assert False, "expected FrozenInstanceError"
-    except AttributeError:
+    except FrozenInstanceError:
         pass

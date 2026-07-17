@@ -31,10 +31,10 @@ from agent_platform.integrations.llm.ollama.ollama import (
     OllamaLLM,
     _to_langchain_ollama,
 )
-from agent_platform.integrations.credentials.anthropic import AnthropicCredentials
-from agent_platform.integrations.credentials.openai import OpenAICredentials
-from agent_platform.integrations.credentials.mistral import MistralCredentials
-from agent_platform.integrations.credentials.ollama import OllamaCredentials
+from agent_platform.integrations.credentials import AnthropicCredentials
+from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.credentials import MistralCredentials
+from agent_platform.integrations.credentials import OllamaCredentials
 
 
 class TestToLangchainAnthropic:

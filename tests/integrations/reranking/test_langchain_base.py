@@ -1,6 +1,8 @@
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
+import pytest
+
 from langchain_core.documents import Document as LC_Document
 
 from agent_platform.integrations.reranking.langchain_base import (
@@ -8,9 +10,10 @@ from agent_platform.integrations.reranking.langchain_base import (
     _lc_to_chunks,
     LangChainReranker,
 )
-from agent_platform.integrations.reranking.config import RerankerConfig
-from agent_platform.models.chunk import TextChunk
-from agent_platform.models.enums import DocumentFormat, Language
+from agent_platform.core.errors import ProviderError
+from agent_platform.core.interfaces.reranking.config import RerankerConfig
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.enums import DocumentFormat, Language
 
 
 def test_chunk_to_lc_basic():
@@ -188,7 +191,12 @@ def test_round_trip():
 
 
 class _TestReranker(LangChainReranker):
-    def _client(self):
+    def _default_config(self):
+        from agent_platform.core.interfaces.reranking.config import RerankerConfig
+
+        return RerankerConfig()
+
+    def _client(self, config):
         return MagicMock()
 
 
@@ -310,3 +318,43 @@ class TestLangChainReranker:
             results = await reranker.rerank(query="q", items=items, config=config)
 
         assert len(results) == 3
+
+
+class TestRerankRetryAndTranslation:
+    async def test_retries_transient_failure_then_succeeds(self, monkeypatch):
+        import agent_platform.core.errors as errors_mod
+
+        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
+
+        calls = {"n": 0}
+
+        async def flaky(*args, **kwargs):
+            calls["n"] += 1
+            if calls["n"] < 2:
+                raise ConnectionError("transient")
+            return []
+
+        mock_client = MagicMock()
+        mock_client.acompress_documents = flaky
+
+        reranker = _TestReranker()
+        with patch.object(reranker, "_client", return_value=mock_client):
+            await reranker.rerank(query="q", items=[])
+
+        assert calls["n"] == 2
+
+    async def test_translates_permanent_failure_to_provider_error(self, monkeypatch):
+        import agent_platform.core.errors as errors_mod
+
+        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
+
+        async def always_fails(*args, **kwargs):
+            raise ConnectionError("boom")
+
+        mock_client = MagicMock()
+        mock_client.acompress_documents = always_fails
+
+        reranker = _TestReranker()
+        with patch.object(reranker, "_client", return_value=mock_client):
+            with pytest.raises(ProviderError, match="Reranking failed"):
+                await reranker.rerank(query="q", items=[])

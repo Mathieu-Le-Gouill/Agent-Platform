@@ -5,16 +5,12 @@ import pytest
 
 @pytest.fixture
 def mock_llm_provider():
-    from agent_platform.core.credentials import NoCredentials
     from agent_platform.core.interfaces.llm.config import GenerationConfig
     from agent_platform.integrations.llm.langchain_base import (
         LangChainLLMProvider,
     )
 
     class _TestLLMProvider(LangChainLLMProvider):
-        def __init__(self):
-            super().__init__(NoCredentials())
-
         def _client(self, config):
             raise NotImplementedError
 

@@ -3,11 +3,12 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.integrations.ocr.providers.google_vision import (
+pytest.importorskip("google.cloud")
+
+from agent_platform.integrations.ocr.google_vision.google_vision import (
     _from_google_vision,
-    _feature_type,
 )
-from agent_platform.integrations.ocr.config import GoogleVisionConfig
+from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
 
 
 def _symbol(text):
@@ -79,12 +80,4 @@ class TestFromGoogleVision:
         chunks = _from_google_vision(
             response, document_id=document_id, min_confidence=0.0
         )
-        assert chunks[0].metadata["page"] == 1
-
-
-class TestFeatureType:
-    def test_known_type(self):
-        assert _feature_type("DOCUMENT_TEXT_DETECTION") is not None
-
-    def test_unknown_type_falls_back(self):
-        assert _feature_type("NONEXISTENT") is not None
+        assert chunks[0].metadata["page"] == 0

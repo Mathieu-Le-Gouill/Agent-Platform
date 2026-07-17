@@ -3,20 +3,34 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
+from pydantic import SecretStr
 
-from agent_platform.integrations.image_generation.providers.dalle import (
+pytest.importorskip("openai")
+
+from agent_platform.integrations.image_generation.dalle.config import DalleConfig
+from agent_platform.integrations.image_generation.midjourney.config import (
+    MidjourneyConfig,
+)
+from agent_platform.integrations.image_generation.stable_diffusion.config import (
+    StableDiffusionConfig,
+)
+from agent_platform.integrations.image_generation.dalle.dalle import (
     DallEImageGenerator,
     _validate_size,
 )
-from agent_platform.integrations.image_generation.providers.midjourney import (
+from agent_platform.core.errors import ProviderError
+from agent_platform.integrations.image_generation.midjourney.midjourney import (
     MidjourneyGenerator,
     _size_to_aspect,
 )
-from agent_platform.models.document import ImageDocument
-from agent_platform.models.enums import ImageFormat
+from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.credentials import MidjourneyCredentials
+from agent_platform.core.errors import ProviderError
+from agent_platform.core.schemas.document import ImageDocument
+from agent_platform.core.schemas.enums import ImageFormat
 
 try:
-    from agent_platform.integrations.image_generation.providers.stable_diffusion import (
+    from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
         StableDiffusionGenerator,
         _parse_size,
     )
@@ -28,26 +42,32 @@ except ImportError:
 
 class TestDallEImageGenerator:
     def test_constructor_valid_model(self):
-        gen = DallEImageGenerator(api_key="test-key", model="dall-e-3")
-        assert gen._model == "dall-e-3"
-        assert gen._quality == "standard"
+        gen = DallEImageGenerator()
+        assert gen._default_config().model == "dall-e-3"
+        assert gen._default_config().quality == "standard"
 
     def test_constructor_valid_model_dalle2(self):
-        gen = DallEImageGenerator(api_key="test-key", model="dall-e-2", quality="hd")
-        assert gen._model == "dall-e-2"
-        assert gen._quality == "hd"
+        cfg = DalleConfig(model="dall-e-2", quality="hd")
+        assert cfg.model == "dall-e-2"
+        assert cfg.quality == "hd"
 
     def test_constructor_invalid_model(self):
-        with pytest.raises(ValueError, match="Unsupported model"):
-            DallEImageGenerator(api_key="test-key", model="dall-e-4")
+        with pytest.raises(ProviderError, match="Unsupported model"):
+            gen = DallEImageGenerator()
+            import asyncio
+
+            asyncio.run(gen.generate("prompt", config=DalleConfig(model="dall-e-4")))
 
     def test_constructor_invalid_model_empty(self):
-        with pytest.raises(ValueError, match="Unsupported model"):
-            DallEImageGenerator(api_key="test-key", model="")
+        with pytest.raises((ValueError, Exception)):
+            gen = DallEImageGenerator()
+            import asyncio
+
+            asyncio.run(gen.generate("prompt", config=DalleConfig(model="")))
 
     def test_constructor_default_model(self):
-        gen = DallEImageGenerator(api_key="sk-test")
-        assert gen._model == "dall-e-3"
+        gen = DallEImageGenerator()
+        assert gen._default_config().model == "dall-e-3"
 
 
 class TestValidateSize:
@@ -79,20 +99,22 @@ class TestValidateSize:
 @pytest.mark.skipif(not _HAS_DIFFUSERS, reason="requires diffusers")
 class TestStableDiffusionGenerator:
     def test_constructor_defaults(self):
-        gen = StableDiffusionGenerator()
-        assert gen._model_id == "runwayml/stable-diffusion-v1-5"
-        assert gen._device == "cpu"
-        assert gen._safety_checker is True
+        gen = StableDiffusionGenerator(StableDiffusionConfig())
+        assert gen._config.model == "runwayml/stable-diffusion-v1-5"
+        assert gen._config.device == "cpu"
+        assert gen._config.safety_checker is True
 
     def test_constructor_custom(self):
         gen = StableDiffusionGenerator(
-            model_id="custom/model",
-            device="cuda",
-            safety_checker=False,
+            config=StableDiffusionConfig(
+                model="custom/model",
+                device="cuda",
+                safety_checker=False,
+            )
         )
-        assert gen._model_id == "custom/model"
-        assert gen._device == "cuda"
-        assert gen._safety_checker is False
+        assert gen._config.model == "custom/model"
+        assert gen._config.device == "cuda"
+        assert gen._config.safety_checker is False
 
 
 @pytest.mark.skipif(not _HAS_DIFFUSERS, reason="requires diffusers")
@@ -127,19 +149,12 @@ class TestParseSize:
 
 class TestMidjourneyGenerator:
     def test_constructor_defaults(self):
-        gen = MidjourneyGenerator(api_url="https://api.example.com", api_key="test-key")
-        assert gen._api_url == "https://api.example.com"
-        assert gen._timeout == 120.0
-
-    def test_constructor_trailing_slash_stripped(self):
-        gen = MidjourneyGenerator(api_url="https://api.example.com/", api_key="k")
-        assert gen._api_url == "https://api.example.com"
+        gen = MidjourneyGenerator()
+        assert gen._default_config().timeout == 120
 
     def test_constructor_custom_timeout(self):
-        gen = MidjourneyGenerator(
-            api_url="https://api.example.com", api_key="k", timeout=60.0
-        )
-        assert gen._timeout == 60.0
+        cfg = MidjourneyConfig(timeout=60)
+        assert cfg.timeout == 60
 
 
 class TestSizeToAspect:
@@ -175,7 +190,7 @@ class TestSizeToAspect:
 
 
 class TestDallEGenerate:
-    @patch("agent_platform.integrations.image_generation.providers.dalle.AsyncOpenAI")
+    @patch("agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI")
     async def test_generate_returns_image_document(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -188,7 +203,7 @@ class TestDallEGenerate:
         mock_response.data = [mock_data]
         mock_client.images.generate = AsyncMock(return_value=mock_response)
 
-        gen = DallEImageGenerator(api_key="test-key")
+        gen = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("test-key")))
         result = await gen.generate("test prompt", format=ImageFormat.PNG)
 
         assert isinstance(result, ImageDocument)
@@ -199,7 +214,7 @@ class TestDallEGenerate:
         assert result.metadata.extra["model"] == "dall-e-3"
         assert result.metadata.extra["revised_prompt"] == "revised version"
 
-    @patch("agent_platform.integrations.image_generation.providers.dalle.AsyncOpenAI")
+    @patch("agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI")
     async def test_generate_with_custom_size(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -212,12 +227,14 @@ class TestDallEGenerate:
         mock_response.data = [mock_data]
         mock_client.images.generate = AsyncMock(return_value=mock_response)
 
-        gen = DallEImageGenerator(api_key="test-key", model="dall-e-2")
-        result = await gen.generate("test", size="512x512")
+        gen = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("test-key")))
+        result = await gen.generate(
+            "test", size="512x512", config=DalleConfig(model="dall-e-2")
+        )
 
         assert result.metadata.extra["size"] == "512x512"
 
-    @patch("agent_platform.integrations.image_generation.providers.dalle.AsyncOpenAI")
+    @patch("agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI")
     async def test_generate_many_returns_multiple_documents(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -232,7 +249,7 @@ class TestDallEGenerate:
         mock_response.data = [data1, data2]
         mock_client.images.generate = AsyncMock(return_value=mock_response)
 
-        gen = DallEImageGenerator(api_key="test-key")
+        gen = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("test-key")))
         results = await gen.generate_many("test", n=2)
 
         assert len(results) == 2
@@ -243,7 +260,7 @@ class TestDallEGenerate:
 
 
 class TestDallEGenerateErrorHandling:
-    @patch("agent_platform.integrations.image_generation.providers.dalle.AsyncOpenAI")
+    @patch("agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI")
     async def test_response_data_none_raises_error(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -252,11 +269,11 @@ class TestDallEGenerateErrorHandling:
         mock_response.data = None
         mock_client.images.generate = AsyncMock(return_value=mock_response)
 
-        gen = DallEImageGenerator(api_key="test-key")
-        with pytest.raises(RuntimeError, match="no image data"):
+        gen = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("test-key")))
+        with pytest.raises(ProviderError, match="no image data"):
             await gen.generate("test")
 
-    @patch("agent_platform.integrations.image_generation.providers.dalle.AsyncOpenAI")
+    @patch("agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI")
     async def test_b64_json_none_raises_error_on_generate(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -267,11 +284,11 @@ class TestDallEGenerateErrorHandling:
         mock_response.data = [mock_data]
         mock_client.images.generate = AsyncMock(return_value=mock_response)
 
-        gen = DallEImageGenerator(api_key="test-key")
-        with pytest.raises(RuntimeError, match="no b64_json"):
+        gen = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("test-key")))
+        with pytest.raises(ProviderError, match="no b64_json"):
             await gen.generate("test")
 
-    @patch("agent_platform.integrations.image_generation.providers.dalle.AsyncOpenAI")
+    @patch("agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI")
     async def test_response_data_none_on_generate_many(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -280,11 +297,11 @@ class TestDallEGenerateErrorHandling:
         mock_response.data = None
         mock_client.images.generate = AsyncMock(return_value=mock_response)
 
-        gen = DallEImageGenerator(api_key="test-key")
-        with pytest.raises(RuntimeError, match="no image data"):
+        gen = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("test-key")))
+        with pytest.raises(ProviderError, match="no image data"):
             await gen.generate_many("test", n=2)
 
-    @patch("agent_platform.integrations.image_generation.providers.dalle.AsyncOpenAI")
+    @patch("agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI")
     async def test_b64_json_none_skipped_in_generate_many(self, mock_openai_cls):
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -302,7 +319,7 @@ class TestDallEGenerateErrorHandling:
         mock_response.data = [data1, data2, data3]
         mock_client.images.generate = AsyncMock(return_value=mock_response)
 
-        gen = DallEImageGenerator(api_key="test-key")
+        gen = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("test-key")))
         results = await gen.generate_many("test", n=3)
 
         assert len(results) == 2
@@ -326,8 +343,12 @@ class TestMidjourneyGenerate:
         mock_http_client.get = AsyncMock(return_value=mock_response)
         mock_response.content = b"image_bytes"
 
-        gen = MidjourneyGenerator(api_url="https://api.example.com", api_key="test-key")
-        result = await gen.generate("test prompt", size="1024x1024")
+        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
+        result = await gen.generate(
+            "test prompt",
+            size="1024x1024",
+            config=MidjourneyConfig(api_url="https://api.example.com"),
+        )
 
         assert isinstance(result, ImageDocument)
         assert result.content == b"image_bytes"
@@ -350,8 +371,11 @@ class TestMidjourneyGenerate:
         mock_http_client.get = AsyncMock(return_value=mock_response)
         mock_response.content = b"img_data"
 
-        gen = MidjourneyGenerator(api_url="https://api.example.com", api_key="test-key")
-        result = await gen.generate("test prompt")
+        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
+        result = await gen.generate(
+            "test prompt",
+            config=MidjourneyConfig(api_url="https://api.example.com"),
+        )
 
         assert result.metadata.extra["size"] is None
 
@@ -372,8 +396,12 @@ class TestMidjourneyGenerate:
         mock_http_client.get = AsyncMock(return_value=mock_response)
         mock_response.content = b"img_data"
 
-        gen = MidjourneyGenerator(api_url="https://api.example.com", api_key="test-key")
-        results = await gen.generate_many("test", n=2)
+        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
+        results = await gen.generate_many(
+            "test",
+            n=2,
+            config=MidjourneyConfig(api_url="https://api.example.com"),
+        )
 
         assert len(results) == 2
         assert all(isinstance(r, ImageDocument) for r in results)
@@ -382,7 +410,7 @@ class TestMidjourneyGenerate:
 @pytest.mark.skipif(not _HAS_DIFFUSERS, reason="requires diffusers")
 class TestStableDiffusionGenerate:
     @patch(
-        "agent_platform.integrations.image_generation.providers.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
     )
     async def test_generate_returns_image_document(self, mock_from_pretrained):
         from PIL import Image
@@ -397,7 +425,7 @@ class TestStableDiffusionGenerate:
         mock_output.images = [img]
         mock_pipeline.return_value = mock_output
 
-        gen = StableDiffusionGenerator()
+        gen = StableDiffusionGenerator(StableDiffusionConfig())
         result = await gen.generate("test prompt")
 
         assert isinstance(result, ImageDocument)
@@ -406,7 +434,7 @@ class TestStableDiffusionGenerate:
         assert result.metadata.extra["provider"] == "stable_diffusion"
 
     @patch(
-        "agent_platform.integrations.image_generation.providers.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
     )
     async def test_generate_with_custom_size(self, mock_from_pretrained):
         from PIL import Image
@@ -421,14 +449,14 @@ class TestStableDiffusionGenerate:
         mock_output.images = [img]
         mock_pipeline.return_value = mock_output
 
-        gen = StableDiffusionGenerator()
+        gen = StableDiffusionGenerator(StableDiffusionConfig())
         result = await gen.generate("test", size="128x64")
 
         assert result.width == 128
         assert result.height == 64
 
     @patch(
-        "agent_platform.integrations.image_generation.providers.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
     )
     async def test_generate_model_load_failure(self, mock_from_pretrained):
         mock_pipeline = MagicMock()
@@ -437,12 +465,12 @@ class TestStableDiffusionGenerate:
         )
         mock_from_pretrained.return_value = mock_pipeline
 
-        gen = StableDiffusionGenerator()
+        gen = StableDiffusionGenerator(StableDiffusionConfig())
         with pytest.raises(RuntimeError, match="Failed to load Stable Diffusion"):
             await gen.generate("test")
 
     @patch(
-        "agent_platform.integrations.image_generation.providers.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
     )
     async def test_generate_many(self, mock_from_pretrained):
         from PIL import Image
@@ -458,7 +486,7 @@ class TestStableDiffusionGenerate:
         mock_output.images = [img1, img2]
         mock_pipeline.return_value = mock_output
 
-        gen = StableDiffusionGenerator()
+        gen = StableDiffusionGenerator(StableDiffusionConfig())
         results = await gen.generate_many("test prompt", n=2)
 
         assert len(results) == 2

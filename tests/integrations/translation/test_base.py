@@ -2,7 +2,7 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.integrations.translation.base import BaseTranslator
+from agent_platform.core.interfaces.translation.base import BaseTranslator
 
 
 def test_base_translator_cannot_instantiate():

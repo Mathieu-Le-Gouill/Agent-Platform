@@ -3,10 +3,12 @@ from unittest.mock import MagicMock, patch
 from uuid import uuid4
 from pydantic import SecretStr
 
-from agent_platform.integrations.vad.configuration import PvcobraVadConfig
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.span import SampleSpan
-from agent_platform.models.enums import DataType
+pytest.importorskip("pvcobra")
+
+from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.core.schemas.enums import DataType
 
 
 def test_config_defaults():
@@ -20,7 +22,7 @@ def test_provider_requirements(mock_pvcobra):
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = MagicMock()
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
     req = vad.requirements
     assert req.sample_rates == (16000,)
     assert req.channels == 1
@@ -32,7 +34,7 @@ def test_requirements_rejects_invalid_sample_rate(mock_pvcobra):
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = MagicMock()
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
     chunk = AudioChunk(
         id=uuid4(),
         data=bytes(),
@@ -51,7 +53,7 @@ def test_requirements_rejects_invalid_dtype(mock_pvcobra):
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = MagicMock()
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
     chunk = AudioChunk(
         id=uuid4(),
         data=bytes(),
@@ -70,7 +72,7 @@ def test_requirements_rejects_invalid_channels(mock_pvcobra):
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = MagicMock()
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
     chunk = AudioChunk(
         id=uuid4(),
         data=bytes(),
@@ -89,7 +91,7 @@ def test_requirements_accepts_valid(mock_pvcobra):
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = MagicMock()
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
     chunk = AudioChunk(
         id=uuid4(),
         data=bytes(),
@@ -110,7 +112,7 @@ def test_detect_with_speech_spans(mock_pvcobra):
 
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
 
     chunks = [
         AudioChunk(
@@ -155,7 +157,7 @@ def test_is_speech_above_threshold(mock_pvcobra):
 
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
 
     chunk = AudioChunk(
         id=uuid4(),
@@ -179,7 +181,7 @@ def test_is_speech_below_threshold(mock_pvcobra):
 
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
 
     chunk = AudioChunk(
         id=uuid4(),
@@ -199,7 +201,7 @@ def test_detect_empty_returns_empty(mock_pvcobra):
     mock_pvcobra.create.return_value = MagicMock()
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
     assert vad.detect([]) == []
 
 
@@ -211,7 +213,7 @@ def test_detect_no_span_when_silence_before_speech(mock_pvcobra):
 
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
 
     chunks = [
         AudioChunk(
@@ -246,7 +248,7 @@ async def test_adetect_yields_span(mock_pvcobra):
 
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
 
     async def _gen():
         yield AudioChunk(
@@ -281,7 +283,7 @@ async def test_adetect_validate_chunk_raises(mock_pvcobra):
 
     from agent_platform.integrations.vad.providers.pvcobra import PvcobraVAD
 
-    vad = PvcobraVAD(SecretStr("mock_access_key"))
+    vad = PvcobraVAD(PvcobraVadConfig(access_key=SecretStr("mock_access_key")))
 
     async def _gen():
         yield AudioChunk(

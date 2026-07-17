@@ -5,8 +5,10 @@ from pydantic import SecretStr
 
 pytest.importorskip("langchain_huggingface")
 
-from agent_platform.integrations.llm.huggingface.config import HuggingFaceGenerationConfig
-from agent_platform.integrations.credentials.huggingface import HuggingFaceCredentials
+from agent_platform.integrations.llm.huggingface.config import (
+    HuggingFaceGenerationConfig,
+)
+from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.core.errors import MissingCredentialError
 
 

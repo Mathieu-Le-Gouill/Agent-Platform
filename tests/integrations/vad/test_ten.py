@@ -2,11 +2,13 @@ import pytest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
-from agent_platform.integrations.vad.configuration import TenVadConfig
-from agent_platform.integrations.vad.requirements import AudioRequirements
-from agent_platform.models.enums import DataType
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.span import SampleSpan
+pytest.importorskip("ten_vad")
+
+from agent_platform.integrations.vad.ten.config import TenVadConfig
+from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.schemas.enums import DataType
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.span import SampleSpan
 
 
 def test_config_defaults():
@@ -27,13 +29,13 @@ def test_provider_requirements():
     assert req.dtype == DataType.INT16
 
 
-@patch("agent_platform.integrations.vad.providers.ten.TenVad")
+@patch("agent_platform.integrations.vad.ten.ten.TenVad")
 def test_detect_with_speech(mock_ten_vad_cls):
     mock_handle = MagicMock()
     mock_handle.process.side_effect = [(0.9, 1), (0.8, 1), (0.1, 0)]
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.providers.ten import TenVAD
+    from agent_platform.integrations.vad.ten.ten import TenVAD
 
     vad = TenVAD()
 
@@ -72,13 +74,13 @@ def test_detect_with_speech(mock_ten_vad_cls):
     assert result[0] == SampleSpan(start=0, end=630)
 
 
-@patch("agent_platform.integrations.vad.providers.ten.TenVad")
+@patch("agent_platform.integrations.vad.ten.ten.TenVad")
 def test_is_speech_above_threshold(mock_ten_vad_cls):
     mock_handle = MagicMock()
     mock_handle.process.return_value = (0.9, 1)
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.providers.ten import TenVAD
+    from agent_platform.integrations.vad.ten.ten import TenVAD
 
     vad = TenVAD()
     vad.handle = mock_handle
@@ -96,13 +98,13 @@ def test_is_speech_above_threshold(mock_ten_vad_cls):
     assert vad._is_speech(chunk, config) is True
 
 
-@patch("agent_platform.integrations.vad.providers.ten.TenVad")
+@patch("agent_platform.integrations.vad.ten.ten.TenVad")
 def test_is_speech_below_threshold(mock_ten_vad_cls):
     mock_handle = MagicMock()
     mock_handle.process.return_value = (0.1, 0)
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.providers.ten import TenVAD
+    from agent_platform.integrations.vad.ten.ten import TenVAD
 
     vad = TenVAD()
     vad.handle = mock_handle
@@ -120,13 +122,13 @@ def test_is_speech_below_threshold(mock_ten_vad_cls):
     assert vad._is_speech(chunk, config) is False
 
 
-@patch("agent_platform.integrations.vad.providers.ten.TenVad")
+@patch("agent_platform.integrations.vad.ten.ten.TenVad")
 async def test_adetect_async_flow(mock_ten_vad_cls):
     mock_handle = MagicMock()
     mock_handle.process.side_effect = [(0.9, 1), (0.1, 0)]
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.providers.ten import TenVAD
+    from agent_platform.integrations.vad.ten.ten import TenVAD
 
     vad = TenVAD()
     vad.handle = mock_handle
@@ -156,22 +158,22 @@ async def test_adetect_async_flow(mock_ten_vad_cls):
     assert results[0] == SampleSpan(start=0, end=330)
 
 
-@patch("agent_platform.integrations.vad.providers.ten.TenVad")
+@patch("agent_platform.integrations.vad.ten.ten.TenVad")
 def test_detect_empty_returns_empty(mock_ten_vad_cls):
     mock_ten_vad_cls.return_value = MagicMock()
-    from agent_platform.integrations.vad.providers.ten import TenVAD
+    from agent_platform.integrations.vad.ten.ten import TenVAD
 
     vad = TenVAD()
     assert vad.detect([]) == []
 
 
-@patch("agent_platform.integrations.vad.providers.ten.TenVad")
+@patch("agent_platform.integrations.vad.ten.ten.TenVad")
 def test_detect_all_silence_returns_empty(mock_ten_vad_cls):
     mock_handle = MagicMock()
     mock_handle.process.return_value = (0.1, 0)
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.providers.ten import TenVAD
+    from agent_platform.integrations.vad.ten.ten import TenVAD
 
     vad = TenVAD()
     vad.handle = mock_handle
