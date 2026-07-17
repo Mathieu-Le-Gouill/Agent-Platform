@@ -13,6 +13,7 @@ from agent_platform.integrations.speech_to_text.openai.config import OpenAIWhisp
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.core.schemas.enums import Language
+from agent_platform.integrations.speech_to_text.utils import parse_language
 from agent_platform.core.errors import (
     MissingCredentialError,
     ProviderError,
@@ -70,7 +71,7 @@ class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
         else:
             utterances = [Utterance(text=response.text)]
 
-        lang = _parse_language(getattr(response, "language", "") or "")
+        lang = parse_language(getattr(response, "language", "") or "")
 
         return Transcript(
             utterances=utterances,
@@ -121,9 +122,3 @@ class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
 
         return _stream()
 
-
-def _parse_language(code: str) -> Language | None:
-    try:
-        return Language(code)
-    except ValueError:
-        return None

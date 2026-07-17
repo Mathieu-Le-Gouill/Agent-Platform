@@ -13,6 +13,7 @@ from agent_platform.integrations.speech_to_text.faster_whisper.config import (
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.core.schemas.enums import Language
+from agent_platform.integrations.speech_to_text.utils import parse_language
 
 
 class FasterWhisperSTT(BaseSpeechToText[FasterWhisperConfig]):
@@ -57,7 +58,7 @@ class FasterWhisperSTT(BaseSpeechToText[FasterWhisperConfig]):
 
         return Transcript(
             utterances=utterances,
-            language=_parse_language(info.language),
+            language=parse_language(info.language),
             metadata={"stt_provider": "faster-whisper", "model": config.model_size},
         )
 
@@ -113,13 +114,7 @@ async def _transcribe_buffer(
     ]
     return Transcript(
         utterances=utterances,
-        language=_parse_language(info.language),
+        language=parse_language(info.language),
         metadata={"stt_provider": "faster-whisper", "model": config.model_size},
     )
 
-
-def _parse_language(code: str) -> Language | None:
-    try:
-        return Language(code)
-    except ValueError:
-        return None

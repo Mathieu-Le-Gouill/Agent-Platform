@@ -11,6 +11,7 @@ from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXC
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.core.schemas.enums import Language
+from agent_platform.integrations.speech_to_text.utils import parse_language
 
 
 class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
@@ -46,7 +47,7 @@ class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
             lambda: model.transcribe(audio_np, batch_size=config.batch_size),
         )
 
-        language = _parse_language(result.get("language", ""))
+        language = parse_language(result.get("language", ""))
 
         utterances = [
             Utterance(
@@ -104,7 +105,7 @@ class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
             lambda: model.transcribe(audio_np, batch_size=config.batch_size),
         )
 
-        language = _parse_language(result.get("language", ""))
+        language = parse_language(result.get("language", ""))
         utterances = [
             Utterance(
                 text=seg["text"].strip(),
@@ -121,9 +122,3 @@ class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
             metadata={"stt_provider": "whisperx", "model": config.model_size},
         )
 
-
-def _parse_language(code: str) -> Language | None:
-    try:
-        return Language(code)
-    except ValueError:
-        return None

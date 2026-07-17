@@ -9,6 +9,7 @@ from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramC
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.core.schemas.enums import Language
+from agent_platform.integrations.speech_to_text.utils import parse_language
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 
@@ -50,7 +51,7 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
 
         results = response.results
         channels = results.channels[0]
-        language = _parse_language(results.get("language") or "en")
+        language = parse_language(results.get("language") or "en")
 
         utterances = []
         for alt in channels.alternatives:
@@ -154,12 +155,6 @@ def _parse_deepgram_result(raw: str) -> list[Utterance]:
 
     return [Utterance(text=transcript_text)]
 
-
-def _parse_language(code: str) -> Language | None:
-    try:
-        return Language(code.split("-")[0].split("_")[0])
-    except ValueError:
-        return None
 
 
 def _mime_from_format(fmt: str) -> str:
