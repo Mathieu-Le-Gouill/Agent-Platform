@@ -1,4 +1,4 @@
-from agent_platform.models.chunk import TextChunk
+from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.utils.score import filter_by_score, sort_by_score
 
 
