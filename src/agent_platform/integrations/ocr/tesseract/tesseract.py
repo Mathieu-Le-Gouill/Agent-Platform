@@ -10,6 +10,8 @@ from PIL import Image
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
 from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.bounding_box import BoundingBox
+from agent_platform.core.schemas.score import Score, ScoreKind
 
 
 def _from_tesseract(
@@ -32,14 +34,15 @@ def _from_tesseract(
                 id=uuid4(),
                 document_id=document_id,
                 text=text.strip(),
+                confidence=Score(value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100),
+                bbox=BoundingBox(
+                    x=float((data.get("left") or [0])[i]),
+                    y=float((data.get("top") or [0])[i]),
+                    width=float((data.get("width") or [0])[i]),
+                    height=float((data.get("height") or [0])[i]),
+                    normalized=False,
+                ),
                 metadata={
-                    "confidence": conf,
-                    "bbox": {
-                        "x": int((data.get("left") or [0])[i]),
-                        "y": int((data.get("top") or [0])[i]),
-                        "w": int((data.get("width") or [0])[i]),
-                        "h": int((data.get("height") or [0])[i]),
-                    },
                     "page": (data.get("page_num") or [None] * n)[i],
                     "block_num": (data.get("block_num") or [None] * n)[i],
                 },

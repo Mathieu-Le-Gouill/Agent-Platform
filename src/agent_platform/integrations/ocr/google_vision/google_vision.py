@@ -9,7 +9,9 @@ from agent_platform.integrations.credentials import (
 )
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
+from agent_platform.integrations.ocr.utils import load_bytes
 from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.score import Score
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 
@@ -45,8 +47,8 @@ def _from_google_vision(
                         id=uuid4(),
                         document_id=document_id,
                         text=text.strip(),
+                        confidence=Score.confidence(avg_conf),
                         metadata={
-                            "confidence": avg_conf,
                             "page": page_num,
                         },
                     )
@@ -82,7 +84,7 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
         else:
             client = vision.ImageAnnotatorClient()
 
-        document_bytes = await asyncio.to_thread(self._load_bytes, source)
+        document_bytes = await asyncio.to_thread(load_bytes, source)
         image = vision.Image(content=document_bytes)
 
         response = await asyncio.to_thread(client.document_text_detection, image=image)
@@ -90,13 +92,3 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
         return _from_google_vision(
             response, document_id=doc_id, min_confidence=config.min_confidence
         )
-
-    @staticmethod
-    def _load_bytes(source: str) -> bytes:
-        if source.startswith("http://") or source.startswith("https://"):
-            import urllib.request
-
-            with urllib.request.urlopen(source) as resp:
-                return resp.read()
-        with open(source, "rb") as f:
-            return f.read()

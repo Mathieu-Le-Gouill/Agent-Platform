@@ -1,5 +1,4 @@
 from typing import Sequence
-from urllib.request import urlopen
 from uuid import UUID, uuid4
 import asyncio
 
@@ -8,7 +7,10 @@ import boto3
 from agent_platform.integrations.credentials import AWSTextractCredentials
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
+from agent_platform.integrations.ocr.utils import load_bytes
 from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.bounding_box import BoundingBox
+from agent_platform.core.schemas.score import Score, ScoreKind
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 
@@ -33,14 +35,15 @@ def _from_textract(
                 id=uuid4(),
                 document_id=document_id,
                 text=text.strip(),
+                confidence=Score(value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100),
+                bbox=BoundingBox(
+                    x=bbox.get("Left", 0.0),
+                    y=bbox.get("Top", 0.0),
+                    width=bbox.get("Width", 0.0),
+                    height=bbox.get("Height", 0.0),
+                    normalized=True,
+                ),
                 metadata={
-                    "confidence": conf,
-                    "bbox": {
-                        "left": bbox.get("Left"),
-                        "top": bbox.get("Top"),
-                        "width": bbox.get("Width"),
-                        "height": bbox.get("Height"),
-                    },
                     "page": block.get("Page"),
                 },
             )
@@ -68,7 +71,7 @@ class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
     ) -> Sequence[TextChunk]:
         config = config or self._default_config()
         doc_id = document_id or uuid4()
-        document_bytes = await asyncio.to_thread(self._load_bytes, source)
+        document_bytes = await asyncio.to_thread(load_bytes, source)
 
         client = boto3.client(
             "textract",
@@ -85,11 +88,3 @@ class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
         return _from_textract(
             response, document_id=doc_id, min_confidence=config.min_confidence
         )
-
-    @staticmethod
-    def _load_bytes(source: str) -> bytes:
-        if source.startswith("http://") or source.startswith("https://"):
-            with urlopen(source) as response:
-                return response.read()
-        with open(source, "rb") as f:
-            return f.read()
