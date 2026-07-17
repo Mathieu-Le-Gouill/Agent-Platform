@@ -7,7 +7,7 @@ from agent_platform.agents.conversation import ConversationAgent
 from tests.helpers import make_fake_llm_response
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.models.message import (
+from agent_platform.core.schemas.message import (
     AssistantMessage,
     UserMessage,
 )
@@ -52,6 +52,7 @@ class TestConversationConstruction:
 
     def test_conversation_id_custom(self, mock_llm):
         from uuid import uuid4
+
         cid = uuid4()
         agent = ConversationAgent(name="conv", llm=mock_llm, conversation_id=cid)
         assert agent.conversation_id == cid
@@ -88,7 +89,7 @@ class TestConversationHistory:
 class TestConversationChat:
     @pytest.mark.asyncio
     async def test_simple_chat_appends_to_history(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="Hello back")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hello back")
         agent = ConversationAgent(name="conv", llm=mock_llm)
         result = await agent.chat("Hi")
         assert result == "Hello back"
@@ -98,25 +99,29 @@ class TestConversationChat:
 
     @pytest.mark.asyncio
     async def test_chat_with_system_prompt(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="Sure")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Sure")
         agent = ConversationAgent(
             name="sys",
             llm=mock_llm,
             system_prompt="You are helpful.",
         )
         await agent.chat("Do something")
-        call_kwargs = mock_llm.generate.call_args[1]
+        call_kwargs = mock_llm.agenerate.call_args[1]
         prompt = call_kwargs["prompt"]
         assert prompt.system_prompt() == "You are helpful."
 
     @pytest.mark.asyncio
     async def test_chat_accumulates_history(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="First response")
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content="First response"
+        )
         agent = ConversationAgent(name="conv", llm=mock_llm)
         await agent.chat("First message")
         assert len(agent.history) == 2
 
-        mock_llm.generate.return_value = make_fake_llm_response(content="Second response")
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content="Second response"
+        )
         await agent.chat("Second message")
         assert len(agent.history) == 4
         assert agent.history[2].content == "Second message"
@@ -124,14 +129,14 @@ class TestConversationChat:
 
     @pytest.mark.asyncio
     async def test_chat_includes_history_in_prompt(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="R1")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="R1")
         agent = ConversationAgent(name="conv", llm=mock_llm)
         await agent.chat("First")
 
-        mock_llm.generate.return_value = make_fake_llm_response(content="R2")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="R2")
         await agent.chat("Second")
 
-        call_kwargs = mock_llm.generate.call_args[1]
+        call_kwargs = mock_llm.agenerate.call_args[1]
         prompt = call_kwargs["prompt"]
         messages = prompt.messages
         assert len(messages) == 3
@@ -141,7 +146,7 @@ class TestConversationChat:
 
     @pytest.mark.asyncio
     async def test_chat_clear_history(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="R1")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="R1")
         agent = ConversationAgent(name="conv", llm=mock_llm)
         await agent.chat("First")
         agent.clear_history()
@@ -163,7 +168,7 @@ class TestConversationChat:
                 )
             return make_fake_llm_response(content="Echoed: hello")
 
-        mock_llm.generate.side_effect = gen
+        mock_llm.agenerate.side_effect = gen
 
         agent = ConversationAgent(
             name="tool-conv",
@@ -178,7 +183,7 @@ class TestConversationChat:
 class TestConversationTruncation:
     @pytest.mark.asyncio
     async def test_truncation_drops_oldest_turns(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="Response")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Response")
         agent = ConversationAgent(
             name="trunc",
             llm=mock_llm,
@@ -195,7 +200,7 @@ class TestConversationTruncation:
 
     @pytest.mark.asyncio
     async def test_truncation_preserves_system_prompt(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="Response")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Response")
         agent = ConversationAgent(
             name="trunc-sys",
             llm=mock_llm,
@@ -211,7 +216,7 @@ class TestConversationTruncation:
 
     @pytest.mark.asyncio
     async def test_no_truncation_when_not_set(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="R")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="R")
         agent = ConversationAgent(name="no-trunc", llm=mock_llm)
 
         for i in range(5):
@@ -222,36 +227,43 @@ class TestConversationTruncation:
 @pytest.mark.asyncio
 async def test_transcribe_search_summarize_integration():
     from agent_platform.agents.tools import TranscribeTool, SearchTool
-    from agent_platform.integrations.speech.base import BaseSpeechToText
-    from agent_platform.integrations.embeddings.base import BaseEmbeddingProvider
-    from agent_platform.integrations.vector_store.base import BaseVectorStore
-    from agent_platform.models.conversation import Transcript, Utterance
-    from agent_platform.models.chunk import TextChunk
-    from agent_platform.models.score import Score
-    from agent_platform.integrations.embeddings.response import EmbeddingResponse
-    from agent_platform.models.embedding import Embedding
+    from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+    from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
+    from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
+    from agent_platform.core.schemas.conversation import Transcript, Utterance
+    from agent_platform.core.schemas.chunk import TextChunk
+    from agent_platform.core.schemas.score import Score
+    from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
+    from agent_platform.core.schemas.embedding import Embedding
 
     stt = AsyncMock(spec=BaseSpeechToText)
     stt.transcribe = AsyncMock(
         return_value=Transcript(
-            utterances=[Utterance(text="What is the capital of France?", confidence=0.98)],
+            utterances=[
+                Utterance(text="What is the capital of France?", confidence=0.98)
+            ],
         )
     )
 
     embedder = AsyncMock(spec=BaseEmbeddingProvider)
-    embedder.encode = AsyncMock(
+    embedder.embed_document = AsyncMock(
         return_value=EmbeddingResponse(
             embeddings=[Embedding.from_list([0.1, 0.2, 0.3])],
             model="test",
-            usage=MagicMock(),
         )
     )
 
     store = AsyncMock(spec=BaseVectorStore)
     store.search_with_scores = AsyncMock(
         return_value=[
-            (TextChunk(text="Paris is the capital of France.", index=0), Score.similarity(0.95)),
-            (TextChunk(text="France is in Western Europe.", index=1), Score.similarity(0.85)),
+            (
+                TextChunk(text="Paris is the capital of France.", index=0),
+                Score.similarity(0.95),
+            ),
+            (
+                TextChunk(text="France is in Western Europe.", index=1),
+                Score.similarity(0.85),
+            ),
         ]
     )
 
@@ -263,7 +275,7 @@ async def test_transcribe_search_summarize_integration():
     registry.register(search_tool)
 
     llm = MagicMock()
-    llm.generate = AsyncMock()
+    llm.agenerate = AsyncMock()
 
     call_count = 0
 
@@ -293,7 +305,7 @@ async def test_transcribe_search_summarize_integration():
             "The search results show that Paris is the capital of France."
         )
 
-    llm.generate.side_effect = generate_side_effect
+    llm.agenerate.side_effect = generate_side_effect
 
     agent = ConversationAgent(
         name="audio-search-summarize",
@@ -303,11 +315,13 @@ async def test_transcribe_search_summarize_integration():
         "searches for relevant information, and summarizes.",
     )
 
-    result = await agent.chat("Please transcribe and find info about the capital of France")
+    result = await agent.chat(
+        "Please transcribe and find info about the capital of France"
+    )
 
     assert "Summary" in result
     assert "Paris" in result
-    assert llm.generate.await_count == 3
+    assert llm.agenerate.await_count == 3
     assert stt.transcribe.await_count == 1
-    assert embedder.encode.await_count == 1
+    assert embedder.embed_document.await_count == 1
     assert store.search_with_scores.await_count == 1

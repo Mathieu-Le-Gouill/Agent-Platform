@@ -5,8 +5,8 @@ import pytest
 from agent_platform.agents.agent import Agent
 from tests.helpers import make_fake_llm_response
 from agent_platform.agents.executor import AgentExecutor
-from agent_platform.core.errors import AgentMaxIterations, AgentThinkError
-from agent_platform.models.message import (
+from agent_platform.agents.errors import AgentMaxIterations, AgentThinkError
+from agent_platform.core.schemas.message import (
     UserMessage,
 )
 
@@ -41,12 +41,12 @@ class TestExecutorConstruction:
 class TestExecutorRun:
     @pytest.mark.asyncio
     async def test_simple_response(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="Hello world")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hello world")
         agent = Agent(name="test", llm=mock_llm)
         ex = AgentExecutor(agent)
         result = await ex.run("Hi")
         assert result == "Hello world"
-        assert mock_llm.generate.await_count == 1
+        assert mock_llm.agenerate.await_count == 1
 
     @pytest.mark.asyncio
     async def test_single_tool_round(self, mock_llm):
@@ -59,12 +59,16 @@ class TestExecutorRun:
                 return make_fake_llm_response(
                     content="",
                     tool_calls=[
-                        {"id": "c1", "name": "get_weather", "args": {"location": "Paris"}},
+                        {
+                            "id": "c1",
+                            "name": "get_weather",
+                            "args": {"location": "Paris"},
+                        },
                     ],
                 )
             return make_fake_llm_response(content="It's 22°C and sunny in Paris!")
 
-        mock_llm.generate.side_effect = generate_side_effect
+        mock_llm.agenerate.side_effect = generate_side_effect
 
         from agent_platform.agents.tools.base import Tool
         from agent_platform.agents.tools.registry import ToolRegistry
@@ -85,11 +89,11 @@ class TestExecutorRun:
         ex = AgentExecutor(agent)
         result = await ex.run("What's the weather in Paris?")
         assert "22°C" in result
-        assert mock_llm.generate.await_count == 2
+        assert mock_llm.agenerate.await_count == 2
 
     @pytest.mark.asyncio
     async def test_max_iterations_reached(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(
+        mock_llm.agenerate.return_value = make_fake_llm_response(
             content="",
             tool_calls=[
                 {"id": "c1", "name": "get_weather", "args": {"location": "Paris"}},
@@ -117,11 +121,11 @@ class TestExecutorRun:
         with pytest.raises(AgentMaxIterations, match="exceeded max iterations"):
             await ex.run("Weather?")
 
-        assert mock_llm.generate.await_count == 3
+        assert mock_llm.agenerate.await_count == 3
 
     @pytest.mark.asyncio
     async def test_think_error_propagates(self, mock_llm):
-        mock_llm.generate.side_effect = RuntimeError("crash")
+        mock_llm.agenerate.side_effect = RuntimeError("crash")
         agent = Agent(name="test", llm=mock_llm)
         ex = AgentExecutor(agent)
 
@@ -139,13 +143,21 @@ class TestExecutorRun:
                 return make_fake_llm_response(
                     content="",
                     tool_calls=[
-                        {"id": "c1", "name": "get_weather", "args": {"location": "Paris"}},
-                        {"id": "c2", "name": "get_weather", "args": {"location": "London"}},
+                        {
+                            "id": "c1",
+                            "name": "get_weather",
+                            "args": {"location": "Paris"},
+                        },
+                        {
+                            "id": "c2",
+                            "name": "get_weather",
+                            "args": {"location": "London"},
+                        },
                     ],
                 )
             return make_fake_llm_response(content="Here are both forecasts.")
 
-        mock_llm.generate.side_effect = generate_side_effect
+        mock_llm.agenerate.side_effect = generate_side_effect
 
         from agent_platform.agents.tools.base import Tool
         from agent_platform.agents.tools.registry import ToolRegistry
@@ -166,11 +178,11 @@ class TestExecutorRun:
         ex = AgentExecutor(agent)
         result = await ex.run("Weather in two cities?")
         assert "Here are both forecasts" in result
-        assert mock_llm.generate.await_count == 2
+        assert mock_llm.agenerate.await_count == 2
 
     @pytest.mark.asyncio
     async def test_empty_content_result(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="")
         agent = Agent(name="empty", llm=mock_llm)
         ex = AgentExecutor(agent)
         result = await ex.run("Say nothing")
@@ -180,7 +192,7 @@ class TestExecutorRun:
 class TestExecutorRunWithMessages:
     @pytest.mark.asyncio
     async def test_returns_accumulated_messages(self, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(
+        mock_llm.agenerate.return_value = make_fake_llm_response(
             content="Prebuilt answer"
         )
         agent = Agent(name="test", llm=mock_llm)

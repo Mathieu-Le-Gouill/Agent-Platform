@@ -7,15 +7,15 @@ from agent_platform.agents.agent import Agent
 from tests.helpers import make_fake_llm_response
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.core.errors import AgentThinkError
-from agent_platform.integrations.llm.response import LLMResponse
-from agent_platform.models.message import (
+from agent_platform.agents.errors import AgentThinkError
+from agent_platform.core.interfaces.llm.response import LLMResponse
+from agent_platform.core.schemas.message import (
     AssistantMessage,
     ToolCall,
     ToolMessage,
     UserMessage,
 )
-from agent_platform.models.token import TokenUsage
+from agent_platform.core.schemas.token import TokenUsage
 
 
 class _WeatherInput(BaseModel):
@@ -117,7 +117,7 @@ class TestAgentConstruction:
 class TestAgentThink:
     @pytest.mark.asyncio
     async def test_think_returns_assistant_message(self, agent, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="Hello!")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hello!")
         result = await agent.think([UserMessage(content="Hi")])
         assert isinstance(result, AssistantMessage)
         assert result.content == "Hello!"
@@ -125,7 +125,7 @@ class TestAgentThink:
 
     @pytest.mark.asyncio
     async def test_think_with_tool_calls(self, agent, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(
+        mock_llm.agenerate.return_value = make_fake_llm_response(
             content="",
             tool_calls=[
                 {"id": "call_1", "name": "get_weather", "args": {"location": "Paris"}},
@@ -138,41 +138,43 @@ class TestAgentThink:
 
     @pytest.mark.asyncio
     async def test_think_passes_tool_objects(self, agent, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="Done")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Done")
         await agent.think([UserMessage(content="Hi")])
-        call_args = mock_llm.generate.call_args[1]
+        call_args = mock_llm.agenerate.call_args[1]
         assert "tools" in call_args
         tools = call_args["tools"]
         assert len(tools) == 1
         assert tools[0].name == "get_weather"
-        assert isinstance(tools[0], Tool)
+        assert hasattr(tools[0], "run")
 
     @pytest.mark.asyncio
     async def test_think_no_tools_no_schemas(self, mock_llm):
         empty_registry = ToolRegistry()
         a = Agent(name="no-tools", llm=mock_llm, tool_registry=empty_registry)
-        mock_llm.generate.return_value = make_fake_llm_response(content="Done")
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Done")
         await a.think([UserMessage(content="Hi")])
-        call_kwargs = mock_llm.generate.call_args[1]
+        call_kwargs = mock_llm.agenerate.call_args[1]
         assert call_kwargs.get("tools") is None
 
     @pytest.mark.asyncio
-    async def test_think_includes_system_prompt(self, agent_with_system_prompt, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="Sure")
+    async def test_think_includes_system_prompt(
+        self, agent_with_system_prompt, mock_llm
+    ):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Sure")
         await agent_with_system_prompt.think([UserMessage(content="Hi")])
-        call_args = mock_llm.generate.call_args[1]
+        call_args = mock_llm.agenerate.call_args[1]
         prompt = call_args["prompt"]
         assert prompt.system_prompt() == "You are a helpful test agent."
 
     @pytest.mark.asyncio
     async def test_think_llm_error_wrapped(self, agent, mock_llm):
-        mock_llm.generate.side_effect = RuntimeError("LLM crashed")
+        mock_llm.agenerate.side_effect = RuntimeError("LLM crashed")
         with pytest.raises(AgentThinkError, match="LLM generation failed"):
             await agent.think([UserMessage(content="Hi")])
 
     @pytest.mark.asyncio
     async def test_think_none_message_raises(self, agent, mock_llm):
-        mock_llm.generate.return_value = LLMResponse(
+        mock_llm.agenerate.return_value = LLMResponse(
             message=None,
             usage=TokenUsage(),
             model="test",
@@ -193,7 +195,9 @@ class TestAgentAct:
         msg = AssistantMessage(
             content="",
             tool_calls=[
-                ToolCall(id="call_1", name="get_weather", arguments={"location": "Paris"}),
+                ToolCall(
+                    id="call_1", name="get_weather", arguments={"location": "Paris"}
+                ),
             ],
         )
         results = await agent.act(msg)
@@ -252,14 +256,16 @@ class TestAgentAct:
 class TestAgentStep:
     @pytest.mark.asyncio
     async def test_step_no_tools(self, agent, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(content="Direct answer")
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content="Direct answer"
+        )
         assistant_msg, tool_msgs = await agent.step([UserMessage(content="Hi")])
         assert assistant_msg.content == "Direct answer"
         assert tool_msgs == []
 
     @pytest.mark.asyncio
     async def test_step_with_tools(self, agent, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(
+        mock_llm.agenerate.return_value = make_fake_llm_response(
             content="",
             tool_calls=[
                 {"id": "c1", "name": "get_weather", "args": {"location": "Paris"}},
@@ -272,7 +278,7 @@ class TestAgentStep:
 
     @pytest.mark.asyncio
     async def test_step_does_not_mutate_input(self, agent, mock_llm):
-        mock_llm.generate.return_value = make_fake_llm_response(
+        mock_llm.agenerate.return_value = make_fake_llm_response(
             content="Thinking",
             tool_calls=[
                 {"id": "c1", "name": "get_weather", "args": {"location": "Paris"}},
