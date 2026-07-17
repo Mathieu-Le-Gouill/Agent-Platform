@@ -48,12 +48,8 @@ class TestGetLangchainCallbacks:
             def __new__(cls, *args, **kwargs):
                 return sentinel
 
-        fake_module = type(
-            "module", (), {"CallbackHandler": FakeCallbackHandler}
-        )()
-        monkeypatch.setitem(
-            __import__("sys").modules, "langfuse.callback", fake_module
-        )
+        fake_module = type("module", (), {"CallbackHandler": FakeCallbackHandler})()
+        monkeypatch.setitem(__import__("sys").modules, "langfuse.callback", fake_module)
 
         result = langchain_base.get_langchain_callbacks(
             TracingConfig(backend=TracingBackend.LANGFUSE)

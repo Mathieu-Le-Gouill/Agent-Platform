@@ -1,4 +1,3 @@
-from agent_platform.core.credentials import NoCredentials
 from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
@@ -8,11 +7,13 @@ from agent_platform.core.schemas.embedding import Embedding
 
 
 class TestProviderInit:
-
     def test_embedding_provider_init(self):
-        creds = NoCredentials()
+        marker = object()
 
         class _Prov(BaseEmbeddingProvider):
+            def __init__(self, credentials):
+                self._credentials = credentials
+
             def embed_document(self, items, config=None):
                 return EmbeddingResponse(embeddings=[], model="")
 
@@ -25,45 +26,67 @@ class TestProviderInit:
             async def aembed_query(self, query, config=None):
                 return EmbeddingResponse(embeddings=[], model="")
 
-        p = _Prov(credentials=creds)
-        assert p._credentials is creds
+        p = _Prov(credentials=marker)
+        assert p._credentials is marker
 
     def test_llm_provider_init(self):
-        creds = NoCredentials()
+        marker = object()
 
         class _Prov(BaseLLMProvider):
+            def __init__(self, credentials):
+                self._credentials = credentials
+
             def generate(self, prompt, config=None, tools=None):
                 from agent_platform.core.interfaces.llm.response import LLMResponse
+
                 return LLMResponse(message=None, model="", finish_reason=None)
 
             async def agenerate(self, prompt, config=None, tools=None):
                 from agent_platform.core.interfaces.llm.response import LLMResponse
+
                 return LLMResponse(message=None, model="", finish_reason=None)
 
             def stream(self, prompt, config=None):
                 return iter([])
 
-        p = _Prov(credentials=creds)
-        assert p._credentials is creds
+        p = _Prov(credentials=marker)
+        assert p._credentials is marker
 
     def test_speech_provider_init(self):
-        creds = NoCredentials()
+        marker = object()
 
         class _Prov(BaseSpeechToText):
+            def __init__(self, credentials):
+                self._credentials = credentials
+
             async def transcribe(self, audio, config=None):
                 from agent_platform.core.schemas.conversation import Transcript
+
                 return Transcript(utterances=[])
 
             def stream(self, audio, config=None):
                 return iter([])
 
-        p = _Prov(credentials=creds)
-        assert p._credentials is creds
+        p = _Prov(credentials=marker)
+        assert p._credentials is marker
+
+    def test_vector_store_port_accepts_filter_and_config(self):
+        import inspect
+
+        from agent_platform.core.interfaces.vector_store.port import VectorStore
+
+        for method_name in ("search", "search_with_scores"):
+            params = inspect.signature(getattr(VectorStore, method_name)).parameters
+            assert "filter" in params
+            assert "config" in params
 
     def test_vector_store_init(self):
-        creds = NoCredentials()
+        marker = object()
 
         class _Prov(BaseVectorStore):
+            def __init__(self, credentials):
+                self._credentials = credentials
+
             async def add(self, chunks):
                 return []
 
@@ -76,8 +99,8 @@ class TestProviderInit:
             async def search_with_scores(self, vector, k, filter=None, config=None):
                 return []
 
-        p = _Prov(credentials=creds)
-        assert p._credentials is creds
+        p = _Prov(credentials=marker)
+        assert p._credentials is marker
 
 
 class TestEmbeddingResponse:

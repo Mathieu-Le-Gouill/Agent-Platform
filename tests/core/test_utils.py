@@ -2,11 +2,10 @@ import os
 
 import pytest
 
-from agent_platform.utils.utils import secret_from_env, from_env
+from agent_platform.utils.env import secret_from_env, from_env
 
 
 class TestSecretFromEnv:
-
     def test_single_key_found(self):
         os.environ["_TEST_SECRET"] = "my-secret"
         result = secret_from_env("_TEST_SECRET")
@@ -32,7 +31,6 @@ class TestSecretFromEnv:
 
 
 class TestFromEnv:
-
     def test_single_key_found(self):
         os.environ["_TEST_VAR"] = "value"
         result = from_env("_TEST_VAR")
