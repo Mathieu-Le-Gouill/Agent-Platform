@@ -4,9 +4,9 @@ import pytest
 
 from agent_platform.integrations.speech_to_text.deepgram.deepgram import (
     _parse_deepgram_result,
-    _parse_language,
     _mime_from_format,
 )
+from agent_platform.integrations.speech_to_text.utils import parse_language as _parse_language
 
 from agent_platform.core.schemas.conversation import Utterance
 from agent_platform.core.schemas.enums import Language

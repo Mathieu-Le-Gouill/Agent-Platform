@@ -9,10 +9,10 @@ from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXC
 from agent_platform.integrations.credentials import DeepgramCredentials
 from agent_platform.integrations.speech_to_text.deepgram.deepgram import (
     DeepgramSTT,
-    _parse_language,
     _mime_from_format,
     _parse_deepgram_result,
 )
+from agent_platform.integrations.speech_to_text.utils import parse_language as _parse_language
 
 try:
     from agent_platform.integrations.speech_to_text.whisperx.whisperx import (
