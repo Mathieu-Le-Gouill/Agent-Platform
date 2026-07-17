@@ -3,7 +3,7 @@ from typing import Any
 
 from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
 from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
-from agent_platform.integrations.credentials.mistral import MistralCredentials
+from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.core.credentials import (
     resolve_timeout,
     resolve_max_retries,
@@ -12,11 +12,9 @@ from agent_platform.core.credentials import (
 from agent_platform.core.errors import MissingCredentialError
 
 
-class MistralEmbeddingProvider(
-    LangChainEmbedder[MistralCredentials, MistralEmbeddingConfig]
-):
+class MistralEmbeddingProvider(LangChainEmbedder[MistralEmbeddingConfig]):
     def __init__(self, credentials: MistralCredentials | None = None) -> None:
-        super().__init__(
+        self._credentials = (
             credentials if credentials is not None else MistralCredentials()
         )
 

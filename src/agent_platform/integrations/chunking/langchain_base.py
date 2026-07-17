@@ -11,13 +11,12 @@ from agent_platform.core.schemas.enums import Language, DocumentFormat
 from agent_platform.core.interfaces.chunking.base import (
     BaseChunker,
     ChunkerConfigT,
-    CredentialsT,
 )
 
 
 class LangChainChunker(
-    BaseChunker[CredentialsT, TextDocument, TextChunk, ChunkerConfigT],
-    Generic[CredentialsT, ChunkerConfigT],
+    BaseChunker[TextDocument, TextChunk, ChunkerConfigT],
+    Generic[ChunkerConfigT],
 ):
     @abstractmethod
     def _splitter(self, config: ChunkerConfigT) -> TextSplitter: ...

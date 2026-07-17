@@ -35,9 +35,9 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.interfaces.llm.base import (
     BaseLLMProvider,
-    CredentialsT,
     GenerationConfigT,
 )
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.tracing import TracingBackend, TracingConfig
 
 if TYPE_CHECKING:
@@ -45,8 +45,8 @@ if TYPE_CHECKING:
 
 
 class LangChainLLMProvider(
-    BaseLLMProvider[CredentialsT, GenerationConfigT],
-    Generic[CredentialsT, GenerationConfigT],
+    BaseLLMProvider[GenerationConfigT],
+    Generic[GenerationConfigT],
 ):
     @abstractmethod
     def _client(self, config: GenerationConfigT) -> BaseChatModel: ...
@@ -73,6 +73,8 @@ class LangChainLLMProvider(
         )
         return _from_langchain(response, config.model)
 
+    @error_logged(re_raise=ProviderError, message="LLM generation failed")
+    @with_retry()
     async def agenerate(
         self,
         prompt: Prompt,
@@ -195,9 +197,7 @@ def _to_langchain(prompt: Prompt) -> list[LCBaseMessage]:
                         }
                         for tc in m.tool_calls
                     ]
-                    result.append(
-                        AIMessage(content=content, tool_calls=lc_tool_calls)
-                    )
+                    result.append(AIMessage(content=content, tool_calls=lc_tool_calls))
                 else:
                     result.append(AIMessage(content=content))
             case ToolMessage():

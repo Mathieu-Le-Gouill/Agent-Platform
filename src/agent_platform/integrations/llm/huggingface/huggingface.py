@@ -8,7 +8,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
-from agent_platform.integrations.credentials.huggingface import HuggingFaceCredentials
+from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
@@ -22,11 +22,9 @@ if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class HuggingFaceLLM(
-    LangChainLLMProvider[HuggingFaceCredentials, HuggingFaceGenerationConfig]
-):
+class HuggingFaceLLM(LangChainLLMProvider[HuggingFaceGenerationConfig]):
     def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
-        super().__init__(
+        self._credentials = (
             credentials if credentials is not None else HuggingFaceCredentials()
         )
 

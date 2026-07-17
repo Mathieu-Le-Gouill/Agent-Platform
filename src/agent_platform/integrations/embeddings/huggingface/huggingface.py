@@ -8,18 +8,16 @@ from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingConfig,
     HuggingFaceEmbeddingMode,
 )
-from agent_platform.integrations.credentials.huggingface import HuggingFaceCredentials
+from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.core.credentials import (
     resolve_timeout,
 )
 from agent_platform.core.errors import MissingCredentialError
 
 
-class HuggingFaceEmbeddingProvider(
-    LangChainEmbedder[HuggingFaceCredentials, HuggingFaceEmbeddingConfig]
-):
+class HuggingFaceEmbeddingProvider(LangChainEmbedder[HuggingFaceEmbeddingConfig]):
     def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
-        super().__init__(
+        self._credentials = (
             credentials if credentials is not None else HuggingFaceCredentials()
         )
 

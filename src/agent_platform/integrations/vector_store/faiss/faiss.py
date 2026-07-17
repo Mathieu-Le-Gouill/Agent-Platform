@@ -8,7 +8,6 @@ from uuid import UUID
 from langchain_community.vectorstores import FAISS
 from langchain_core.embeddings import Embeddings
 
-from agent_platform.core.credentials import NoCredentials
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
 from agent_platform.integrations.vector_store.faiss.config import FAISSConfig
 from agent_platform.integrations.vector_store.langchain_base import (
@@ -20,13 +19,11 @@ from agent_platform.core.schemas.score import Score
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 
-class FAISSStore(BaseVectorStore[NoCredentials, FAISSConfig]):
+class FAISSStore(BaseVectorStore[FAISSConfig]):
     def __init__(
         self,
-        credentials: NoCredentials | None = None,
         embeddings: Embeddings | None = None,
     ) -> None:
-        super().__init__(credentials if credentials is not None else NoCredentials())
         self._embeddings = embeddings
         self._store: FAISS | None = None
 

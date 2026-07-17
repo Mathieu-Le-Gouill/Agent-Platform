@@ -6,7 +6,7 @@ from langchain_mistralai import ChatMistralAI
 
 from agent_platform.core.schemas import model_schema
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
-from agent_platform.integrations.credentials.mistral import MistralCredentials
+from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
@@ -19,9 +19,9 @@ if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class MistralLLM(LangChainLLMProvider[MistralCredentials, MistralGenerationConfig]):
+class MistralLLM(LangChainLLMProvider[MistralGenerationConfig]):
     def __init__(self, credentials: MistralCredentials | None = None) -> None:
-        super().__init__(
+        self._credentials = (
             credentials if credentials is not None else MistralCredentials()
         )
 

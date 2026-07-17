@@ -11,7 +11,6 @@ from uuid import uuid4
 from agent_platform.core.interfaces.vector_store.base import (
     BaseVectorStore,
     ConfigT,
-    CredentialsT,
 )
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
@@ -19,13 +18,8 @@ from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 
 
-class LangChainVectorStore(
-    BaseVectorStore[CredentialsT, ConfigT], Generic[CredentialsT, ConfigT]
-):
-    def __init__(
-        self, credentials: CredentialsT, embeddings: Embeddings | None = None
-    ) -> None:
-        super().__init__(credentials)
+class LangChainVectorStore(BaseVectorStore[ConfigT], Generic[ConfigT]):
+    def __init__(self, embeddings: Embeddings | None = None) -> None:
         self._embeddings = embeddings
 
     @abstractmethod

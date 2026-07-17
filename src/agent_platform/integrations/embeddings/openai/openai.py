@@ -3,7 +3,7 @@ from typing import Any
 
 from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
 from agent_platform.integrations.embeddings.openai.config import OpenAIEmbeddingConfig
-from agent_platform.integrations.credentials.openai import OpenAICredentials
+from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
@@ -11,11 +11,9 @@ from agent_platform.core.credentials import (
 from agent_platform.core.errors import MissingCredentialError
 
 
-class OpenAIEmbeddingProvider(
-    LangChainEmbedder[OpenAICredentials, OpenAIEmbeddingConfig]
-):
+class OpenAIEmbeddingProvider(LangChainEmbedder[OpenAIEmbeddingConfig]):
     def __init__(self, credentials: OpenAICredentials | None = None) -> None:
-        super().__init__(
+        self._credentials = (
             credentials if credentials is not None else OpenAICredentials()
         )
 

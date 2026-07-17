@@ -6,7 +6,7 @@ from langchain_anthropic import ChatAnthropic
 
 from agent_platform.core.schemas import model_schema
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
-from agent_platform.integrations.credentials.anthropic import AnthropicCredentials
+from agent_platform.integrations.credentials import AnthropicCredentials
 from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
@@ -20,11 +20,9 @@ if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class AnthropicLLM(
-    LangChainLLMProvider[AnthropicCredentials, AnthropicGenerationConfig]
-):
+class AnthropicLLM(LangChainLLMProvider[AnthropicGenerationConfig]):
     def __init__(self, credentials: AnthropicCredentials | None = None) -> None:
-        super().__init__(
+        self._credentials = (
             credentials if credentials is not None else AnthropicCredentials()
         )
 

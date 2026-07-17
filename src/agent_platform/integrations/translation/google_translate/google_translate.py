@@ -1,0 +1,72 @@
+from __future__ import annotations
+
+import asyncio
+
+from google.cloud import translate_v2 as google_translate
+
+from agent_platform.integrations.credentials import (
+    GoogleTranslateCredentials,
+)
+from agent_platform.core.interfaces.translation.base import BaseTranslator
+from agent_platform.integrations.translation.google_translate.config import (
+    GoogleTranslateConfig,
+)
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.enums import Language
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
+
+
+_GOOGLE_TARGETS: dict[Language, str] = {
+    Language.CH: "zh-CN",
+}
+
+
+class GoogleTranslator(BaseTranslator[GoogleTranslateConfig]):
+    def __init__(self, credentials: GoogleTranslateCredentials | None = None) -> None:
+        self._credentials = (
+            credentials if credentials is not None else GoogleTranslateCredentials()
+        )
+
+    def _default_config(self) -> GoogleTranslateConfig:
+        return GoogleTranslateConfig()
+
+    def _build_client(self) -> google_translate.Client:
+        if self._credentials.credentials_path:
+            return google_translate.Client.from_service_account_json(
+                self._credentials.credentials_path
+            )
+        return google_translate.Client()
+
+    @error_logged(re_raise=ProviderError, message="Translation failed")
+    @with_retry()
+    async def translate(
+        self,
+        content: TextChunk,
+        target: Language,
+        source: Language | None = None,
+        config: GoogleTranslateConfig | None = None,
+    ) -> TextChunk:
+        config = config or self._default_config()
+        client = self._build_client()
+
+        target_lang = _GOOGLE_TARGETS.get(target, target.value)
+        source_lang = _GOOGLE_TARGETS.get(source, source.value) if source else None
+
+        try:
+            result = await asyncio.to_thread(
+                client.translate,
+                content.text,
+                target_language=target_lang,
+                source_language=source_lang,
+            )
+        except Exception as exc:
+            raise ProviderError(f"Google Translate failed: {exc}") from exc
+
+        return TextChunk(
+            text=result["translatedText"],
+            metadata={
+                **content.metadata,
+                "translation_provider": "google",
+                "detected_source_lang": result.get("detectedSourceLanguage"),
+            },
+        )

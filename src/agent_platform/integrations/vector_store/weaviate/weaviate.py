@@ -8,20 +8,20 @@ from langchain_weaviate import WeaviateVectorStore
 from langchain_core.embeddings import Embeddings
 from weaviate.classes.query import Filter
 
-from agent_platform.integrations.credentials.weaviate import WeaviateCredentials
+from agent_platform.integrations.credentials import WeaviateCredentials
 from agent_platform.integrations.vector_store.langchain_base import LangChainVectorStore
 from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
 
 
-class WeaviateStore(LangChainVectorStore[WeaviateCredentials, WeaviateConfig]):
+class WeaviateStore(LangChainVectorStore[WeaviateConfig]):
     def __init__(
         self,
         credentials: WeaviateCredentials | None = None,
         embeddings: Embeddings | None = None,
     ) -> None:
-        super().__init__(
-            credentials if credentials is not None else WeaviateCredentials(),
-            embeddings,
+        super().__init__(embeddings)
+        self._credentials = (
+            credentials if credentials is not None else WeaviateCredentials()
         )
 
     def _default_config(self) -> WeaviateConfig:
@@ -58,8 +58,12 @@ class WeaviateStore(LangChainVectorStore[WeaviateCredentials, WeaviateConfig]):
     ) -> dict[str, Any]:
         kwargs: dict[str, Any] = {}
         if filter:
-            conditions = [Filter.by_property(key).equal(value) for key, value in filter.items()]
-            kwargs["filters"] = conditions[0] if len(conditions) == 1 else Filter.all_of(conditions)
+            conditions = [
+                Filter.by_property(key).equal(value) for key, value in filter.items()
+            ]
+            kwargs["filters"] = (
+                conditions[0] if len(conditions) == 1 else Filter.all_of(conditions)
+            )
         if config.namespace:
             kwargs["tenant"] = config.namespace
         return kwargs

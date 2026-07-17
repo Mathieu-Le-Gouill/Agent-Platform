@@ -1,5 +1,5 @@
 from abc import abstractmethod
-from typing import Sequence
+from typing import Generic, Sequence
 from uuid import UUID
 
 from langchain_core.documents import (
@@ -7,27 +7,40 @@ from langchain_core.documents import (
     Document as LC_Document,
 )
 
-from agent_platform.integrations.reranking.base import BaseReranker
-from agent_platform.integrations.reranking.config import RerankerConfig
-from agent_platform.models.chunk import TextChunk
-from agent_platform.models.enums import Language
+from agent_platform.core.interfaces.reranking.base import (
+    BaseReranker,
+    RerankerConfigT,
+)
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.interfaces.reranking.config import RerankerConfig
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.enums import Language
 
 
-class LangChainReranker(BaseReranker[TextChunk, RerankerConfig]):
+class LangChainReranker(
+    BaseReranker[TextChunk, RerankerConfigT],
+    Generic[RerankerConfigT],
+):
     @abstractmethod
-    def _client(self) -> BaseDocumentCompressor: ...
+    def _client(self, config: RerankerConfigT) -> BaseDocumentCompressor: ...
 
+    @abstractmethod
+    def _default_config(self) -> RerankerConfigT: ...
+
+    @error_logged(re_raise=ProviderError, message="Reranking failed")
+    @with_retry()
     async def rerank(
         self,
         query: str,
         items: Sequence[TextChunk],
-        config: RerankerConfig = RerankerConfig(),
+        config: RerankerConfigT | None = None,
     ) -> Sequence[TextChunk]:
-        client = self._client()
+        config = config or self._default_config()
+        client = self._client(config)
         documents = [_chunk_to_lc(item) for item in items]
         result = await client.acompress_documents(documents, query)
 
-        if config is not None and config.top_k is not None:
+        if config.top_k is not None:
             result = result[: config.top_k]
 
         return _lc_to_chunks(result)

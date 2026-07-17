@@ -3,17 +3,15 @@ from typing import Any
 
 from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
 from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
-from agent_platform.integrations.credentials.ollama import OllamaCredentials
+from agent_platform.integrations.credentials import OllamaCredentials
 from agent_platform.core.credentials import (
     resolve_timeout,
 )
 
 
-class OllamaEmbeddingProvider(
-    LangChainEmbedder[OllamaCredentials, OllamaEmbeddingConfig]
-):
+class OllamaEmbeddingProvider(LangChainEmbedder[OllamaEmbeddingConfig]):
     def __init__(self, credentials: OllamaCredentials | None = None) -> None:
-        super().__init__(
+        self._credentials = (
             credentials if credentials is not None else OllamaCredentials()
         )
 

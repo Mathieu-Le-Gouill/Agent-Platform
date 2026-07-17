@@ -6,7 +6,7 @@ from langchain_openai import ChatOpenAI
 
 from agent_platform.core.schemas import model_schema
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
-from agent_platform.integrations.credentials.openai import OpenAICredentials
+from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
@@ -19,9 +19,9 @@ if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class OpenAILLM(LangChainLLMProvider[OpenAICredentials, OpenAIGenerationConfig]):
+class OpenAILLM(LangChainLLMProvider[OpenAIGenerationConfig]):
     def __init__(self, credentials: OpenAICredentials | None = None) -> None:
-        super().__init__(
+        self._credentials = (
             credentials if credentials is not None else OpenAICredentials()
         )
 

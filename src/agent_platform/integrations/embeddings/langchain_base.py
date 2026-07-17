@@ -9,15 +9,15 @@ from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.interfaces.embeddings.base import (
     BaseEmbeddingProvider,
     EmbeddingConfigT,
-    CredentialsT,
 )
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.schemas.embedding import Embedding
 from agent_platform.core.schemas.chunk import TextChunk
 
 
 class LangChainEmbedder(
-    BaseEmbeddingProvider[CredentialsT, EmbeddingConfigT],
-    Generic[CredentialsT, EmbeddingConfigT],
+    BaseEmbeddingProvider[EmbeddingConfigT],
+    Generic[EmbeddingConfigT],
 ):
     @abstractmethod
     def _client(self, config: EmbeddingConfigT) -> Embeddings: ...
@@ -47,6 +47,8 @@ class LangChainEmbedder(
             model=config.model,
         )
 
+    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
+    @with_retry()
     async def aembed_document(
         self,
         items: Sequence[TextChunk],
@@ -85,6 +87,8 @@ class LangChainEmbedder(
             model=config.model,
         )
 
+    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
+    @with_retry()
     async def aembed_query(
         self,
         query: str,

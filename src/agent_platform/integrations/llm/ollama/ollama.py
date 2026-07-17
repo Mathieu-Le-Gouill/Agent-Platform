@@ -6,7 +6,7 @@ from langchain_ollama import ChatOllama
 
 from agent_platform.core.schemas import model_schema
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
-from agent_platform.integrations.credentials.ollama import OllamaCredentials
+from agent_platform.integrations.credentials import OllamaCredentials
 from agent_platform.core.credentials import (
     resolve_timeout,
 )
@@ -17,9 +17,9 @@ if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class OllamaLLM(LangChainLLMProvider[OllamaCredentials, OllamaGenerationConfig]):
+class OllamaLLM(LangChainLLMProvider[OllamaGenerationConfig]):
     def __init__(self, credentials: OllamaCredentials | None = None) -> None:
-        super().__init__(
+        self._credentials = (
             credentials if credentials is not None else OllamaCredentials()
         )
 
