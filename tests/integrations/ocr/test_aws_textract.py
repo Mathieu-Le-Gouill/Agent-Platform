@@ -35,7 +35,10 @@ async def test_extract_returns_chunks_from_line_blocks():
 
         ocr = AWSTextractOCR(AWSTextractCredentials())
 
-        with patch.object(AWSTextractOCR, "_load_bytes", return_value=b"fake-bytes"):
+        with patch(
+            "agent_platform.integrations.ocr.aws_textract.aws_textract.load_bytes",
+            return_value=b"fake-bytes",
+        ):
             chunks = await ocr.extract("some/path.png", document_id=document_id)
 
     assert [c.text for c in chunks] == ["Invoice #123"]

@@ -13,44 +13,25 @@ from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
 from agent_platform.integrations.ocr.aws_textract.aws_textract import AWSTextractOCR
 from agent_platform.integrations.ocr.google_vision.google_vision import GoogleVisionOCR
 from agent_platform.integrations.ocr.tesseract.tesseract import TesseractOCR
+from agent_platform.integrations.ocr.utils import load_bytes
 
 
-class TestGoogleVisionLoadBytes:
+class TestOCRLoadBytes:
     def test_url_source(self):
         source = "https://example.com/image.jpg"
         fake_bytes = b"fake-image-bytes"
-        with patch("urllib.request.urlopen") as mock_urlopen:
+        with patch("agent_platform.integrations.ocr.utils.urlopen") as mock_urlopen:
             mock_response = MagicMock()
             mock_response.read.return_value = fake_bytes
             mock_urlopen.return_value.__enter__.return_value = mock_response
-            result = GoogleVisionOCR._load_bytes(source)
-        assert result == fake_bytes
-
-    def test_file_path(self):
-        fake_bytes = b"fake-image-content"
-        with patch("builtins.open", mock_open(read_data=fake_bytes)):
-            result = GoogleVisionOCR._load_bytes("/path/to/image.png")
-        assert result == fake_bytes
-
-
-class TestAWSTextractLoadBytes:
-    def test_url_source(self):
-        source = "https://example.com/document.png"
-        fake_bytes = b"fake-image-bytes"
-        with patch(
-            "agent_platform.integrations.ocr.aws_textract.aws_textract.urlopen"
-        ) as mock_urlopen:
-            mock_response = MagicMock()
-            mock_response.read.return_value = fake_bytes
-            mock_urlopen.return_value.__enter__.return_value = mock_response
-            result = AWSTextractOCR._load_bytes(source)
+            result = load_bytes(source)
         assert result == fake_bytes
         mock_urlopen.assert_called_once_with(source)
 
     def test_file_path(self):
-        fake_bytes = b"fake-file-bytes"
+        fake_bytes = b"fake-image-content"
         with patch("builtins.open", mock_open(read_data=fake_bytes)):
-            result = AWSTextractOCR._load_bytes("/path/to/doc.png")
+            result = load_bytes("/path/to/image.png")
         assert result == fake_bytes
 
 

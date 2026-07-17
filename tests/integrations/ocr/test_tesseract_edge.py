@@ -45,5 +45,5 @@ def test_from_tesseract_skips_blank_and_low_confidence():
 
     assert [c.text for c in chunks] == ["Hello", "world"]
     assert all(c.document_id == document_id for c in chunks)
-    assert chunks[0].metadata["confidence"] == pytest.approx(95.0)
-    assert chunks[0].metadata["bbox"]["x"] == 0
+    assert chunks[0].confidence.value == pytest.approx(95.0)
+    assert chunks[0].bbox.x == 0
