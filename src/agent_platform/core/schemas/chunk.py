@@ -5,6 +5,9 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
+from agent_platform.core.schemas.bounding_box import BoundingBox
+from agent_platform.core.schemas.dimensions import Dimensions
+from agent_platform.core.schemas.score import Score
 from agent_platform.core.schemas.enums import (
     MediaType,
     DocumentFormat,
@@ -28,6 +31,8 @@ class TextChunk(Chunk, frozen=True):
     format: DocumentFormat = DocumentFormat.UNKNOWN
     start_char: int | None = None
     end_char: int | None = None
+    confidence: Score | None = None
+    bbox: BoundingBox | None = None
 
 
 class AudioChunk(Chunk, frozen=True):
@@ -46,7 +51,6 @@ class VideoChunk(Chunk, frozen=True):
     data: bytes = b""
     start: int = 0
     end: int = 0
-    width: int | None = None
-    height: int | None = None
+    dimensions: Dimensions | None = None
     frame_rate: float | None = None
     format: VideoFormat = VideoFormat.UNKNOWN
