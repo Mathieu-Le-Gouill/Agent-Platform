@@ -8,6 +8,7 @@ from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.components.base import Component
 from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.utils.batching import chunked
 
 CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
 EmbedConfigT = TypeVar("EmbedConfigT", bound=EmbeddingConfig)
@@ -26,4 +27,13 @@ class Embedder(
         self._config = config
 
     async def arun(self, input: list[TextChunk]) -> EmbeddingResponse:
-        return await self._backend.aembed_document(input, self._config)
+        batch_size = (self._config or EmbeddingConfig()).batch_size
+
+        embeddings = []
+        model = ""
+        for batch in chunked(input, batch_size):
+            response = await self._backend.aembed_document(list(batch), self._config)
+            embeddings.extend(response.embeddings)
+            model = response.model
+
+        return EmbeddingResponse(embeddings=embeddings, model=model)
