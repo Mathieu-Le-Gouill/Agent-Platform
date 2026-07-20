@@ -85,6 +85,40 @@ def test_splitter_without_add_start_index():
     assert all(i is None for i in start_indices)
 
 
+def test_splitter_forwards_new_fields_to_constructor():
+    from unittest.mock import patch
+
+    provider = RecursiveChunkerProvider()
+    config = RecursiveChunkerConfig(
+        keep_separator="start",
+        is_separator_regex=True,
+        strip_whitespace=False,
+    )
+
+    with patch(
+        "agent_platform.integrations.chunking.recursive.recursive.RecursiveCharacterTextSplitter"
+    ) as mock_splitter_cls:
+        provider._splitter(config)
+
+    _, kwargs = mock_splitter_cls.call_args
+    assert kwargs["keep_separator"] == "start"
+    assert kwargs["is_separator_regex"] is True
+    assert kwargs["strip_whitespace"] is False
+
+
+def test_splitter_applies_strip_whitespace_false():
+    provider = RecursiveChunkerProvider()
+    config = RecursiveChunkerConfig(
+        chunk_size=8, chunk_overlap=0, strip_whitespace=False, separators=[" "]
+    )
+    doc = TextDocument(text="one two three four five six", format=DocumentFormat.TXT)
+    splitter = provider._splitter(config)
+
+    result = splitter.split_documents([_doc_to_lc(doc)])
+
+    assert any(c.page_content != c.page_content.strip() for c in result)
+
+
 def test_splitter_different_separators():
     provider = RecursiveChunkerProvider()
     config = RecursiveChunkerConfig(chunk_size=10, chunk_overlap=0, separators=[" "])

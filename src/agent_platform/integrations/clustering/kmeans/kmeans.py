@@ -43,11 +43,14 @@ class KMeansClusterer(BaseClusteringAlgorithm[KMeansConfig]):
 
         clusterer = KMeans(
             n_clusters=n,
+            init=config.init,
             n_init=config.n_init,
             max_iter=config.max_iter,
             tol=config.tol,
             algorithm=config.algorithm,
             random_state=config.random_state,
+            copy_x=config.copy_x,
+            verbose=config.verbose,
         )
         labels = clusterer.fit_predict(vectors)
         distances = clusterer.transform(vectors)

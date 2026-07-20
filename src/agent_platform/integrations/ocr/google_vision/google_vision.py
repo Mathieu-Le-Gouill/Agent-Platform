@@ -62,9 +62,20 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
         self._credentials = (
             credentials if credentials is not None else GoogleVisionCredentials()
         )
+        self._client: vision.ImageAnnotatorClient | None = None
 
     def _default_config(self) -> GoogleVisionConfig:
         return GoogleVisionConfig()
+
+    def _get_client(self) -> vision.ImageAnnotatorClient:
+        if self._client is None:
+            if self._credentials.credentials_path:
+                self._client = vision.ImageAnnotatorClient.from_service_account_file(
+                    self._credentials.credentials_path,
+                )
+            else:
+                self._client = vision.ImageAnnotatorClient()
+        return self._client
 
     @error_logged(re_raise=ProviderError, message="OCR extraction failed")
     @with_retry()
@@ -77,17 +88,21 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
         config = config or self._default_config()
         doc_id = document_id or uuid4()
 
-        if self._credentials.credentials_path:
-            client = vision.ImageAnnotatorClient.from_service_account_file(
-                self._credentials.credentials_path,
-            )
-        else:
-            client = vision.ImageAnnotatorClient()
+        client = self._get_client()
 
         document_bytes = await asyncio.to_thread(load_bytes, source)
         image = vision.Image(content=document_bytes)
 
-        response = await asyncio.to_thread(client.document_text_detection, image=image)
+        kwargs: dict = {"image": image}
+        if config.language_hints:
+            kwargs["image_context"] = {"language_hints": config.language_hints}
+
+        method = (
+            client.text_detection
+            if config.feature_type == "TEXT_DETECTION"
+            else client.document_text_detection
+        )
+        response = await asyncio.to_thread(method, **kwargs)
 
         return _from_google_vision(
             response, document_id=doc_id, min_confidence=config.min_confidence

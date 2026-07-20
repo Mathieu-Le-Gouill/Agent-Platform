@@ -18,4 +18,7 @@ class RecursiveChunkerProvider(LangChainChunker[RecursiveChunkerConfig]):
             chunk_overlap=config.chunk_overlap,
             add_start_index=config.add_start_index,
             separators=config.separators,
+            keep_separator=config.keep_separator,
+            is_separator_regex=config.is_separator_regex,
+            strip_whitespace=config.strip_whitespace,
         )

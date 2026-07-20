@@ -39,9 +39,14 @@ def _to_langchain_ollama(
         params["top_p"] = config.top_p
     if config.top_k is not None:
         params["top_k"] = config.top_k
+    if config.keep_alive is not None:
+        params["keep_alive"] = config.keep_alive
 
+    # `OllamaEmbeddings` has `extra="forbid"` and no top-level `timeout`
+    # field; route it through `client_kwargs`, which is merged into the
+    # underlying `ollama.Client`/`AsyncClient` (httpx-based) constructor.
     timeout = resolve_timeout(config.timeout, credentials)
     if timeout is not None:
-        params["timeout"] = timeout
+        params["client_kwargs"] = {"timeout": timeout}
 
     return params

@@ -1,3 +1,4 @@
+import importlib.util
 from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
@@ -7,22 +8,18 @@ from pydantic import SecretStr
 pytest.importorskip("langchain_openai")
 pytest.importorskip("langchain_mistralai")
 pytest.importorskip("langchain_ollama")
-pytest.importorskip("langchain_huggingface")
 
-from agent_platform.integrations.embeddings.providers.openai import (
+HAS_HUGGINGFACE = importlib.util.find_spec("langchain_huggingface") is not None
+
+from agent_platform.integrations.embeddings.openai.openai import (
     OpenAIEmbeddingProvider,
     _to_langchain_openai,
 )
-from agent_platform.integrations.embeddings.providers.huggingface import (
-    HuggingFaceEmbeddingProvider,
-    _to_langchain_huggingface_local,
-    _to_langchain_huggingface_hosted,
-)
-from agent_platform.integrations.embeddings.providers.mistral import (
+from agent_platform.integrations.embeddings.mistral.mistral import (
     MistralEmbeddingProvider,
     _to_langchain_mistral,
 )
-from agent_platform.integrations.embeddings.providers.ollama import (
+from agent_platform.integrations.embeddings.ollama.ollama import (
     OllamaEmbeddingProvider,
     _to_langchain_ollama,
 )
@@ -39,9 +36,20 @@ from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.credentials import OllamaCredentials
 from agent_platform.integrations.credentials import HuggingFaceCredentials
-from agent_platform.core.errors import MissingCredentialError
+from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.embedding import Embedding
+
+if HAS_HUGGINGFACE:
+    from agent_platform.integrations.embeddings.huggingface.huggingface import (
+        HuggingFaceEmbeddingProvider,
+        _to_langchain_huggingface_local,
+        _to_langchain_huggingface_hosted,
+    )
+
+requires_huggingface = pytest.mark.skipif(
+    not HAS_HUGGINGFACE, reason="langchain_huggingface is not installed"
+)
 
 
 # ================================================================
@@ -50,11 +58,64 @@ from agent_platform.core.schemas.embedding import Embedding
 
 
 class TestToLangchainOpenAI:
-    def test_default_model_kwargs(self):
+    def test_model_kwargs_omitted_when_unset(self):
         cfg = OpenAIEmbeddingConfig()
         creds = OpenAICredentials()
         result = _to_langchain_openai(cfg, creds)
-        assert "model_kwargs" in result
+        assert "model_kwargs" not in result
+
+    def test_model_kwargs_included_when_set(self):
+        cfg = OpenAIEmbeddingConfig(model_kwargs={"foo": "bar"})
+        creds = OpenAICredentials()
+        result = _to_langchain_openai(cfg, creds)
+        assert result["model_kwargs"] == {"foo": "bar"}
+
+    def test_default_config_does_not_raise(self):
+        # Regression: `model_kwargs=None` used to be passed through
+        # unconditionally, which raised `TypeError` against
+        # `OpenAIEmbeddings.model_kwargs` (non-Optional, default_factory=dict).
+        cfg = OpenAIEmbeddingConfig()
+        creds = OpenAICredentials(api_key=SecretStr("sk-test"))
+        provider = OpenAIEmbeddingProvider(credentials=creds)
+        provider._client(cfg)  # must not raise
+
+    def test_encoding_format_routed_through_model_kwargs(self):
+        cfg = OpenAIEmbeddingConfig(encoding_format="float")
+        creds = OpenAICredentials()
+        result = _to_langchain_openai(cfg, creds)
+        assert result["model_kwargs"] == {"encoding_format": "float"}
+
+    def test_encoding_format_omitted_when_none(self):
+        cfg = OpenAIEmbeddingConfig()
+        creds = OpenAICredentials()
+        result = _to_langchain_openai(cfg, creds)
+        assert "model_kwargs" not in result
+
+    def test_encoding_format_merged_with_model_kwargs(self):
+        cfg = OpenAIEmbeddingConfig(
+            model_kwargs={"foo": "bar"}, encoding_format="base64"
+        )
+        creds = OpenAICredentials()
+        result = _to_langchain_openai(cfg, creds)
+        assert result["model_kwargs"] == {"foo": "bar", "encoding_format": "base64"}
+
+    def test_check_embedding_ctx_length_forwarded(self):
+        cfg = OpenAIEmbeddingConfig(check_embedding_ctx_length=False)
+        creds = OpenAICredentials()
+        result = _to_langchain_openai(cfg, creds)
+        assert result["check_embedding_ctx_length"] is False
+
+    def test_check_embedding_ctx_length_default_true(self):
+        cfg = OpenAIEmbeddingConfig()
+        creds = OpenAICredentials()
+        result = _to_langchain_openai(cfg, creds)
+        assert result["check_embedding_ctx_length"] is True
+
+    def test_batch_size_forwarded_as_chunk_size(self):
+        cfg = OpenAIEmbeddingConfig(batch_size=64)
+        creds = OpenAICredentials()
+        result = _to_langchain_openai(cfg, creds)
+        assert result["chunk_size"] == 64
 
     def test_dimensions_included_when_set(self):
         cfg = OpenAIEmbeddingConfig(dimensions=256)
@@ -131,17 +192,19 @@ class TestToLangchainMistral:
         result = _to_langchain_mistral(cfg, creds)
         assert result["max_retries"] == 3
 
-    def test_dimensions_included_when_set(self):
+    def test_dimensions_never_forwarded(self):
+        # Regression: `MistralAIEmbeddings` has `extra="forbid"` and no
+        # `dimensions` field; forwarding it used to raise `ValidationError`.
         cfg = MistralEmbeddingConfig(dimensions=128)
         creds = MistralCredentials()
         result = _to_langchain_mistral(cfg, creds)
-        assert result["dimensions"] == 128
-
-    def test_dimensions_omitted_when_none(self):
-        cfg = MistralEmbeddingConfig()
-        creds = MistralCredentials()
-        result = _to_langchain_mistral(cfg, creds)
         assert "dimensions" not in result
+
+    def test_default_config_with_dimensions_does_not_raise(self):
+        cfg = MistralEmbeddingConfig(dimensions=128)
+        creds = MistralCredentials(api_key=SecretStr("mk-test"))
+        provider = MistralEmbeddingProvider(credentials=creds)
+        provider._client(cfg)  # must not raise
 
     def test_wait_time_included_when_set(self):
         cfg = MistralEmbeddingConfig(wait_time=5)
@@ -187,13 +250,41 @@ class TestToLangchainOllama:
         result = _to_langchain_ollama(cfg, creds)
         assert result["top_k"] == 40
 
-    def test_timeout_from_config(self):
+    def test_keep_alive_included_when_set(self):
+        cfg = OllamaEmbeddingConfig(keep_alive=600)
+        creds = OllamaCredentials()
+        result = _to_langchain_ollama(cfg, creds)
+        assert result["keep_alive"] == 600
+
+    def test_keep_alive_omitted_when_none(self):
+        cfg = OllamaEmbeddingConfig()
+        creds = OllamaCredentials()
+        result = _to_langchain_ollama(cfg, creds)
+        assert "keep_alive" not in result
+
+    def test_timeout_routed_through_client_kwargs(self):
+        # Regression: `OllamaEmbeddings` has `extra="forbid"` and no
+        # top-level `timeout` field; forwarding it used to raise
+        # `ValidationError`.
         cfg = OllamaEmbeddingConfig(timeout=25.0)
         creds = OllamaCredentials()
         result = _to_langchain_ollama(cfg, creds)
-        assert result["timeout"] == 25.0
+        assert "timeout" not in result
+        assert result["client_kwargs"] == {"timeout": 25.0}
+
+    def test_client_kwargs_omitted_when_timeout_unset(self):
+        cfg = OllamaEmbeddingConfig()
+        creds = OllamaCredentials()
+        result = _to_langchain_ollama(cfg, creds)
+        assert "client_kwargs" not in result
+
+    def test_default_config_with_timeout_does_not_raise(self):
+        cfg = OllamaEmbeddingConfig(timeout=25.0, keep_alive=300)
+        provider = OllamaEmbeddingProvider(credentials=OllamaCredentials())
+        provider._client(cfg)  # must not raise
 
 
+@requires_huggingface
 class TestToLangchainHuggingFaceLocal:
     def test_empty_when_no_kwargs(self):
         cfg = HuggingFaceEmbeddingConfig()
@@ -220,6 +311,7 @@ class TestToLangchainHuggingFaceLocal:
         assert result["encode_kwargs"] == {"batch_size": 16}
 
 
+@requires_huggingface
 class TestToLangchainHuggingFaceHosted:
     def test_empty_when_no_fields(self):
         cfg = HuggingFaceEmbeddingConfig()
@@ -233,11 +325,46 @@ class TestToLangchainHuggingFaceHosted:
         result = _to_langchain_huggingface_hosted(cfg, creds)
         assert result["provider"] == "huggingface"
 
-    def test_timeout_from_config(self):
+    def test_timeout_never_forwarded(self):
+        # Regression: `HuggingFaceEndpointEmbeddings` has no `timeout` field;
+        # forwarding it used to raise `ValidationError` in hosted mode.
         cfg = HuggingFaceEmbeddingConfig(timeout=20.0)
         creds = HuggingFaceCredentials()
         result = _to_langchain_huggingface_hosted(cfg, creds)
-        assert result["timeout"] == 20.0
+        assert "timeout" not in result
+        assert result == {}
+
+    def test_dimensions_routed_through_model_kwargs(self):
+        cfg = HuggingFaceEmbeddingConfig(dimensions=64)
+        creds = HuggingFaceCredentials()
+        result = _to_langchain_huggingface_hosted(cfg, creds)
+        assert result["model_kwargs"] == {"dimensions": 64}
+
+    def test_truncate_routed_through_model_kwargs(self):
+        cfg = HuggingFaceEmbeddingConfig(truncate=True)
+        creds = HuggingFaceCredentials()
+        result = _to_langchain_huggingface_hosted(cfg, creds)
+        assert result["model_kwargs"] == {"truncate": True}
+
+    def test_normalize_routed_through_model_kwargs(self):
+        cfg = HuggingFaceEmbeddingConfig(normalize=False)
+        creds = HuggingFaceCredentials()
+        result = _to_langchain_huggingface_hosted(cfg, creds)
+        assert result["model_kwargs"] == {"normalize": False}
+
+    def test_model_kwargs_and_encode_kwargs_merged(self):
+        cfg = HuggingFaceEmbeddingConfig(
+            model_kwargs={"foo": "bar"},
+            encode_kwargs={"baz": "qux"},
+            dimensions=32,
+        )
+        creds = HuggingFaceCredentials()
+        result = _to_langchain_huggingface_hosted(cfg, creds)
+        assert result["model_kwargs"] == {
+            "foo": "bar",
+            "baz": "qux",
+            "dimensions": 32,
+        }
 
 
 # ================================================================
@@ -260,6 +387,7 @@ class TestMissingCredentialError:
         with pytest.raises(MissingCredentialError, match="Mistral API key is required"):
             provider._client(cfg)
 
+    @requires_huggingface
     def test_huggingface_hosted_missing_api_key(self):
         cfg = HuggingFaceEmbeddingConfig(
             model="some-model",
@@ -284,9 +412,10 @@ class TestMissingCredentialError:
 # ================================================================
 
 
+@requires_huggingface
 class TestHuggingFaceClient:
     @patch(
-        "agent_platform.integrations.embeddings.providers.huggingface.HuggingFaceEmbeddings"
+        "agent_platform.integrations.embeddings.huggingface.huggingface.HuggingFaceEmbeddings"
     )
     def test_local_mode_calls_local_embeddings(self, mock_local):
         cfg = HuggingFaceEmbeddingConfig(mode=HuggingFaceEmbeddingMode.LOCAL)
@@ -295,7 +424,7 @@ class TestHuggingFaceClient:
         mock_local.assert_called_once()
 
     @patch(
-        "agent_platform.integrations.embeddings.providers.huggingface.HuggingFaceEndpointEmbeddings"
+        "agent_platform.integrations.embeddings.huggingface.huggingface.HuggingFaceEndpointEmbeddings"
     )
     def test_hosted_mode_calls_hosted_embeddings(self, mock_hosted):
         cfg = HuggingFaceEmbeddingConfig(
@@ -378,7 +507,12 @@ class TestEmbedQueryAsync:
         mock_lc.aembed_query.return_value = []
         config = MagicMock(model="m")
 
-        with pytest.raises(ValueError, match="cannot be empty"):
+        # `aembed_query` is wrapped in `@error_logged(re_raise=ProviderError)`
+        # + `@with_retry()`, so the underlying `ValueError` from the
+        # `Embedding` validator surfaces as a `ProviderError` at this layer
+        # boundary (integration -> component), per the error-translation
+        # convention in AGENTS.md.
+        with pytest.raises(ProviderError, match="cannot be empty"):
             await provider.aembed_query("", config=config)
 
 
@@ -460,7 +594,9 @@ class TestErrorHandling:
         mock_lc.aembed_documents.side_effect = RuntimeError("API error")
         items = [TextChunk(id=uuid4(), text="fail")]
 
-        with pytest.raises(RuntimeError, match="API error"):
+        # `aembed_document` translates provider exceptions into `ProviderError`
+        # at the integration layer boundary (see `langchain_base.py`).
+        with pytest.raises(ProviderError, match="API error"):
             await provider.aembed_document(items, config=MagicMock(model="m"))
 
     def test_langchain_raise_in_sync_embed(self, openai_provider):
@@ -484,6 +620,7 @@ class TestProviderDefaults:
         provider = OpenAIEmbeddingProvider()
         assert provider._default_config().model == "text-embedding-ada-002"
 
+    @requires_huggingface
     def test_huggingface_default_config_model(self):
         provider = HuggingFaceEmbeddingProvider()
         assert (

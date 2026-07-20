@@ -10,6 +10,7 @@ from agent_platform.core.schemas.span import SampleSpan
 from agent_platform.core.interfaces.vad.state import VADState
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
 from agent_platform.core.schemas.enums import DataType
+from agent_platform.core.errors import ProviderError
 
 
 class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
@@ -31,6 +32,19 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
             )
             self._handle = pvcobra.create(key, config.device, config.library_path)
         return self._handle
+
+    def close(self) -> None:
+        if self._handle is not None:
+            try:
+                self._handle.delete()
+            finally:
+                self._handle = None
+
+    def __del__(self) -> None:
+        try:
+            self.close()
+        except Exception:
+            pass
 
     @property
     def requirements(self) -> AudioRequirements:
@@ -76,6 +90,7 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
     ) -> AsyncIterator[SampleSpan]:
 
         config = config or self._default_config()
+        self._ensure_handle(config)
         state = VADState()
 
         async for chunk in audio_sequence:
@@ -96,5 +111,24 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
     ) -> bool:
         if self._handle is None:
             raise RuntimeError("VAD handle not initialized. Call detect() first.")
-        voice_prob = self._handle.process(chunk.data)
+
+        expected_samples = self._handle.frame_length
+        num_samples = len(chunk.data) // 2  # int16
+
+        if num_samples != expected_samples:
+            raise ProviderError(
+                f"Cobra requires frames of exactly {expected_samples} samples, "
+                f"got {num_samples} samples"
+            )
+
+        try:
+            voice_prob = self._handle.process(chunk.data)
+        except Exception as exc:
+            raise ProviderError(
+                f"Cobra voice activity processing failed: {exc}"
+            ) from exc
+
         return voice_prob > config.threshold
+
+
+# Ref: https://picovoice.ai/docs/api/cobra-python/

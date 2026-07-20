@@ -8,7 +8,6 @@ from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
-from agent_platform.core.schemas.enums import Language
 from agent_platform.integrations.speech_to_text.utils import parse_language
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
@@ -32,13 +31,16 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
 
         client = DeepgramClient(self._credentials.api_key.get_secret_value())
 
-        options = PrerecordedOptions(
+        options_kwargs = dict(
             model=config.model,
-            language="en",
-            smart_format=True,
-            punctuate=True,
+            smart_format=config.smart_format,
+            punctuate=config.punctuate,
+            diarize=config.diarize,
             utterances=True,
         )
+        if config.language:
+            options_kwargs["language"] = config.language
+        options = PrerecordedOptions(**options_kwargs)
 
         payload = {
             "buffer": audio.data,
@@ -51,7 +53,7 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
 
         results = response.results
         channels = results.channels[0]
-        language = parse_language(results.get("language") or "en")
+        language = parse_language(getattr(results, "language", None) or "en")
 
         utterances = []
         for alt in channels.alternatives:
@@ -60,19 +62,21 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
                 utterances.append(Utterance(text=text, confidence=alt.confidence))
             else:
                 for word in alt.words:
+                    speaker = getattr(word, "speaker", None)
                     utterances.append(
                         Utterance(
                             text=word.word,
                             start_ms=int(word.start * 1000),
                             end_ms=int(word.end * 1000),
                             confidence=word.confidence,
+                            speaker=str(speaker) if speaker is not None else None,
                         )
                     )
 
         return Transcript(
             utterances=utterances,
             language=language,
-            metadata={"stt_provider": "deepgram", "model": "nova-2"},
+            metadata={"stt_provider": "deepgram", "model": config.model},
         )
 
     def stream(
@@ -90,13 +94,15 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
             def _on_result(result: str) -> None:
                 queue.put_nowait(result)
 
-            options = LiveOptions(
+            live_kwargs = dict(
                 model=config.model,
-                language="en",
-                smart_format=True,
-                punctuate=True,
+                smart_format=config.smart_format,
+                punctuate=config.punctuate,
                 utterance_end_ms="1000",
             )
+            if config.language:
+                live_kwargs["language"] = config.language
+            options = LiveOptions(**live_kwargs)
 
             dg_live.on(LiveTranscriptionEvents.Transcript, _on_result)
             await dg_live.start(options)
@@ -154,7 +160,6 @@ def _parse_deepgram_result(raw: str) -> list[Utterance]:
         ]
 
     return [Utterance(text=transcript_text)]
-
 
 
 def _mime_from_format(fmt: str) -> str:

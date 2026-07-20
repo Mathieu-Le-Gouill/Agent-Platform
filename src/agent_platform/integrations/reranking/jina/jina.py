@@ -22,5 +22,8 @@ class JinaRerankerProvider(LangChainReranker[JinaRerankerConfig]):
         )
         return JinaRerank(
             model=config.model,
+            # JinaRerank defaults top_n=3, which silently truncates results
+            # before our own top_k slice ever runs.
+            top_n=config.top_k,
             jina_api_key=api_key,
         )

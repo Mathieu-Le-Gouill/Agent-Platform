@@ -7,6 +7,7 @@ __all__ = [
     "AnthropicCredentials",
     "AWSTextractCredentials",
     "AzureTranslatorCredentials",
+    "ChromaCredentials",
     "CohereCredentials",
     "DeepgramCredentials",
     "DeepLCredentials",
@@ -49,6 +50,12 @@ class AzureTranslatorCredentials(ProviderCredentials, frozen=True):
         default_factory=lambda: from_env("AZURE_TRANSLATOR_REGION")
     )
     endpoint: str = "https://api.cognitive.microsofttranslator.com"
+
+
+class ChromaCredentials(ProviderCredentials, frozen=True):
+    api_key: SecretStr | None = Field(
+        default_factory=lambda: secret_from_env("CHROMA_API_KEY")
+    )
 
 
 class CohereCredentials(ProviderCredentials, frozen=True):

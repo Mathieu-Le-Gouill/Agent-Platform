@@ -15,6 +15,7 @@ from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.reranking.config import RerankerConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
+from agent_platform.integrations.reranking.scoring import build_relevance_scores
 
 
 class LangChainReranker(
@@ -43,7 +44,7 @@ class LangChainReranker(
         if config.top_k is not None:
             result = result[: config.top_k]
 
-        return _lc_to_chunks(result)
+        return _lc_to_chunks(result, config)
 
 
 # --- Mappers ---
@@ -67,9 +68,16 @@ def _chunk_to_lc(chunk: TextChunk) -> LC_Document:
     )
 
 
-def _lc_to_chunks(lc_chunks: Sequence[LC_Document]) -> list[TextChunk]:
+def _lc_to_chunks(
+    lc_chunks: Sequence[LC_Document], config: RerankerConfig | None = None
+) -> list[TextChunk]:
+    scores: list[None] | list = [None] * len(lc_chunks)
+    if config is not None and config.return_scores:
+        raw_scores = [c.metadata.get("relevance_score") for c in lc_chunks]
+        scores = build_relevance_scores(raw_scores, normalize=config.normalize_scores)
+
     result = []
-    for c in lc_chunks:
+    for c, score in zip(lc_chunks, scores):
         m = c.metadata
         result.append(
             TextChunk(
@@ -81,6 +89,7 @@ def _lc_to_chunks(lc_chunks: Sequence[LC_Document]) -> list[TextChunk]:
                 end_char=(m.get("start_index") or 0) + len(c.page_content)
                 if m.get("start_index")
                 else None,
+                confidence=score,
                 metadata={
                     "source": m.get("source"),
                     "language": Language(m["language"]) if m.get("language") else None,

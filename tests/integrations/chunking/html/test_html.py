@@ -30,6 +30,29 @@ def test_default_config_type():
     assert cfg.headers_to_split_on == [("h1", "h1"), ("h2", "h2"), ("h3", "h3")]
 
 
+def test_default_config_return_each_element_default():
+    provider = HTMLStructureChunkerProvider()
+    cfg = provider._default_config()
+    assert cfg.return_each_element is False
+
+
+def test_chunk_forwards_return_each_element():
+    from unittest.mock import patch
+
+    provider = HTMLStructureChunkerProvider()
+    doc = TextDocument(text=HTML_DOC, format=DocumentFormat.HTML)
+    config = HTMLChunkerConfig(return_each_element=True)
+
+    with patch(
+        "agent_platform.integrations.chunking.html.html.HTMLHeaderTextSplitter"
+    ) as mock_splitter_cls:
+        mock_splitter_cls.return_value.split_text.return_value = []
+        provider.chunk([doc], config)
+
+    _, kwargs = mock_splitter_cls.call_args
+    assert kwargs["return_each_element"] is True
+
+
 def test_chunk_splits_by_headers_and_size():
     provider = HTMLStructureChunkerProvider()
     doc = TextDocument(text=HTML_DOC, format=DocumentFormat.HTML)

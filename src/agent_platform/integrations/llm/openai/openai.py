@@ -52,11 +52,28 @@ class OpenAILLM(LangChainLLMProvider[OpenAIGenerationConfig]):
         return OpenAIGenerationConfig()
 
 
+# Reasoning models (o-series, gpt-5 non-chat) reject non-default temperature/top_p
+# and only accept reasoning_effort on this family. https://platform.openai.com/docs/guides/reasoning
+_REASONING_MODEL_PREFIXES = ("o1", "o3", "o4-mini")
+_DEFAULT_TEMPERATURE: float = OpenAIGenerationConfig.model_fields["temperature"].default
+
+
+def _is_reasoning_model(model: str) -> bool:
+    model_lower = model.lower()
+    if model_lower.startswith(_REASONING_MODEL_PREFIXES):
+        return True
+    return model_lower.startswith("gpt-5") and "chat" not in model_lower
+
+
 def _to_langchain_openai(
     config: OpenAIGenerationConfig,
     credentials: OpenAICredentials,
 ) -> dict[str, Any]:
-    params: dict[str, Any] = {"temperature": config.temperature}
+    reasoning_model = _is_reasoning_model(config.model)
+
+    params: dict[str, Any] = {}
+    if not reasoning_model and config.temperature != _DEFAULT_TEMPERATURE:
+        params["temperature"] = config.temperature
     if config.max_tokens is not None:
         params["max_tokens"] = config.max_tokens
     if config.top_p is not None:
@@ -77,7 +94,7 @@ def _to_langchain_openai(
     if config.presence_penalty is not None:
         model_kwargs["presence_penalty"] = config.presence_penalty
 
-    if config.reasoning_effort is not None:
+    if config.reasoning_effort is not None and reasoning_model:
         model_kwargs["reasoning_effort"] = config.reasoning_effort
     if not config.parallel_tool_calls:
         model_kwargs["parallel_tool_calls"] = config.parallel_tool_calls
@@ -92,7 +109,11 @@ def _to_langchain_openai(
                 )
             model_kwargs["response_format"] = {
                 "type": "json_schema",
-                "json_schema": {"name": "response", "schema": config.json_schema},
+                "json_schema": {
+                    "name": "response",
+                    "schema": config.json_schema,
+                    "strict": config.strict,
+                },
             }
 
     if model_kwargs:

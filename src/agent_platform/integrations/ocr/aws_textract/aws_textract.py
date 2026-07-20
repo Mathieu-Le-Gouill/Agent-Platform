@@ -1,4 +1,4 @@
-from typing import Sequence
+from typing import Any, Sequence
 from uuid import UUID, uuid4
 import asyncio
 
@@ -35,7 +35,9 @@ def _from_textract(
                 id=uuid4(),
                 document_id=document_id,
                 text=text.strip(),
-                confidence=Score(value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100),
+                confidence=Score(
+                    value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100
+                ),
                 bbox=BoundingBox(
                     x=bbox.get("Left", 0.0),
                     y=bbox.get("Top", 0.0),
@@ -57,9 +59,22 @@ class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
         self._credentials = (
             credentials if credentials is not None else AWSTextractCredentials()
         )
+        self._clients: dict[str, Any] = {}
 
     def _default_config(self) -> AWSTextractConfig:
         return AWSTextractConfig()
+
+    def _get_client(self, region_name: str):
+        client = self._clients.get(region_name)
+        if client is None:
+            client = boto3.client(
+                "textract",
+                region_name=region_name,
+                aws_access_key_id=self._credentials.aws_access_key_id,
+                aws_secret_access_key=self._credentials.aws_secret_access_key,
+            )
+            self._clients[region_name] = client
+        return client
 
     @error_logged(re_raise=ProviderError, message="OCR extraction failed")
     @with_retry()
@@ -73,12 +88,7 @@ class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
         doc_id = document_id or uuid4()
         document_bytes = await asyncio.to_thread(load_bytes, source)
 
-        client = boto3.client(
-            "textract",
-            region_name=config.region_name,
-            aws_access_key_id=self._credentials.aws_access_key_id,
-            aws_secret_access_key=self._credentials.aws_secret_access_key,
-        )
+        client = self._get_client(config.region_name)
 
         response = await asyncio.to_thread(
             client.detect_document_text,

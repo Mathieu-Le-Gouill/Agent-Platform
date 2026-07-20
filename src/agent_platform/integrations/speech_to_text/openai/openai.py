@@ -12,7 +12,6 @@ from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.integrations.speech_to_text.openai.config import OpenAIWhisperConfig
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
-from agent_platform.core.schemas.enums import Language
 from agent_platform.integrations.speech_to_text.utils import parse_language
 from agent_platform.core.errors import (
     MissingCredentialError,
@@ -47,14 +46,24 @@ class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
         audio_file = io.BytesIO(audio.data)
         audio_file.name = f"audio.{fmt}"
 
+        response_format = config.response_format
+        if response_format is None:
+            response_format = "verbose_json" if "whisper" in config.model else "json"
+
+        create_kwargs: dict = dict(
+            model=config.model,
+            file=audio_file,
+            language=config.language,
+            temperature=config.temperature,
+            response_format=response_format,
+        )
+        if config.timestamp_granularities and response_format == "verbose_json":
+            create_kwargs["timestamp_granularities"] = config.timestamp_granularities
+        if config.prompt:
+            create_kwargs["prompt"] = config.prompt
+
         try:
-            response = await client.audio.transcriptions.create(
-                model=config.model,
-                file=audio_file,
-                language=config.language,
-                temperature=config.temperature,
-                response_format="verbose_json",
-            )
+            response = await client.audio.transcriptions.create(**create_kwargs)
         except Exception as exc:
             raise ProviderError(f"OpenAI Whisper transcription failed: {exc}") from exc
 
@@ -121,4 +130,3 @@ class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
                 yield await self.transcribe(combined, config)
 
         return _stream()
-

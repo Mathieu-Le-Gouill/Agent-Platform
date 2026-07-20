@@ -17,6 +17,9 @@ class CohereRerankerProvider(LangChainReranker[CohereRerankerConfig]):
     def _client(self, config: CohereRerankerConfig) -> CohereRerank:
         return CohereRerank(
             model=config.model,
+            # CohereRerank defaults top_n=3, which silently truncates
+            # results before our own top_k slice ever runs.
+            top_n=config.top_k,
             cohere_api_key=self._credentials.api_key.get_secret_value()
             if self._credentials.api_key
             else None,

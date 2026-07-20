@@ -31,10 +31,21 @@ class MarkdownStructureChunkerProvider(
     ) -> list[TextChunk]:
         config = config or self._default_config()
 
-        header_splitter = MarkdownHeaderTextSplitter(
+        header_splitter_kwargs = dict(
             headers_to_split_on=config.headers_to_split_on,
             strip_headers=config.strip_headers,
+            return_each_line=config.return_each_line,
         )
+        if config.custom_header_patterns is not None:
+            header_splitter_kwargs["custom_header_patterns"] = (
+                config.custom_header_patterns
+            )
+        header_splitter = MarkdownHeaderTextSplitter(**header_splitter_kwargs)
+        # NOTE: unlike `recursive`/`latex`, this provider splits at the string
+        # level (split_text) rather than going through LangChainChunker's
+        # split_documents path, so start_char/end_char are never populated on
+        # the resulting TextChunks. Left as-is per architecture review — see
+        # `html.py` for the same tradeoff.
         size_splitter = RecursiveCharacterTextSplitter(
             chunk_size=config.chunk_size,
             chunk_overlap=config.chunk_overlap,

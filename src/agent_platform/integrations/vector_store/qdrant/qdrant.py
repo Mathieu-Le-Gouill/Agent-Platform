@@ -29,6 +29,7 @@ class QdrantVectorStoreProvider(LangChainVectorStore[QdrantConfig]):
             api_key=self._credentials.api_key.get_secret_value()
             if self._credentials.api_key
             else None,
+            prefer_grpc=config.prefer_grpc,
         )
         return QdrantVectorStore(
             client=client,

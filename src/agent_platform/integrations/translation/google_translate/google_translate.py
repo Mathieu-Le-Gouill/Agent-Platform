@@ -52,12 +52,18 @@ class GoogleTranslator(BaseTranslator[GoogleTranslateConfig]):
         target_lang = _GOOGLE_TARGETS.get(target, target.value)
         source_lang = _GOOGLE_TARGETS.get(source, source.value) if source else None
 
+        extra_kwargs: dict[str, object] = {}
+        if config.model is not None:
+            extra_kwargs["model"] = config.model
+
         try:
             result = await asyncio.to_thread(
                 client.translate,
                 content.text,
                 target_language=target_lang,
                 source_language=source_lang,
+                format_=config.format,
+                **extra_kwargs,
             )
         except Exception as exc:
             raise ProviderError(f"Google Translate failed: {exc}") from exc

@@ -12,7 +12,9 @@ from agent_platform.integrations.speech_to_text.deepgram.deepgram import (
     _mime_from_format,
     _parse_deepgram_result,
 )
-from agent_platform.integrations.speech_to_text.utils import parse_language as _parse_language
+from agent_platform.integrations.speech_to_text.utils import (
+    parse_language as _parse_language,
+)
 
 try:
     from agent_platform.integrations.speech_to_text.whisperx.whisperx import (
@@ -153,8 +155,8 @@ class TestWhisperXSTTTranscribe:
         mock_model.transcribe.return_value = {
             "language": "en",
             "segments": [
-                {"text": " hello ", "start": 0.0, "end": 1.0, "confidence": 0.95},
-                {"text": " world ", "start": 1.0, "end": 2.0, "confidence": 0.90},
+                {"text": " hello ", "start": 0.0, "end": 1.0},
+                {"text": " world ", "start": 1.0, "end": 2.0},
             ],
         }
 
@@ -163,17 +165,15 @@ class TestWhisperXSTTTranscribe:
             data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
         )
         with patch.object(stt, "_load_model", return_value=mock_model):
-            result = await stt.transcribe(audio)
+            result = await stt.transcribe(audio, WhisperXConfig(align=False))
 
         assert len(result.utterances) == 2
         assert result.utterances[0].text == "hello"
         assert result.utterances[0].start_ms == 0
         assert result.utterances[0].end_ms == 1000
-        assert result.utterances[0].confidence == 0.95
         assert result.utterances[1].text == "world"
         assert result.utterances[1].start_ms == 1000
         assert result.utterances[1].end_ms == 2000
-        assert result.utterances[1].confidence == 0.90
         assert result.language == Language.EN
         assert result.metadata["stt_provider"] == "whisperx"
 
@@ -189,7 +189,7 @@ class TestWhisperXSTTTranscribe:
             data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
         )
         with patch.object(stt, "_load_model", return_value=mock_model):
-            result = await stt.transcribe(audio)
+            result = await stt.transcribe(audio, WhisperXConfig(align=False))
 
         assert result.utterances == []
 
@@ -202,9 +202,7 @@ class TestWhisperXSTTStream:
         mock_model = MagicMock()
         mock_model.transcribe.return_value = {
             "language": "en",
-            "segments": [
-                {"text": " hello world ", "start": 0.0, "end": 1.0, "confidence": 0.95}
-            ],
+            "segments": [{"text": " hello world ", "start": 0.0, "end": 1.0}],
         }
 
         async def _frames():
@@ -220,7 +218,7 @@ class TestWhisperXSTTStream:
             results = [
                 t
                 async for t in stt.stream(
-                    _frames(), WhisperXConfig(min_duration_ms=5000)
+                    _frames(), WhisperXConfig(min_duration_ms=5000, align=False)
                 )
             ]
         assert len(results) == 1
@@ -233,9 +231,7 @@ class TestWhisperXSTTStream:
         mock_model = MagicMock()
         mock_model.transcribe.return_value = {
             "language": "en",
-            "segments": [
-                {"text": " final ", "start": 0.0, "end": 0.5, "confidence": 0.9}
-            ],
+            "segments": [{"text": " final ", "start": 0.0, "end": 0.5}],
         }
 
         async def _frames():
@@ -248,7 +244,7 @@ class TestWhisperXSTTStream:
             results = [
                 t
                 async for t in stt.stream(
-                    _frames(), WhisperXConfig(min_duration_ms=5000)
+                    _frames(), WhisperXConfig(min_duration_ms=5000, align=False)
                 )
             ]
         assert len(results) == 1
@@ -265,6 +261,7 @@ class TestDeepgramSTTTranscribe:
         mock_word.start = 0.0
         mock_word.end = 0.5
         mock_word.confidence = 0.9
+        mock_word.speaker = None
 
         mock_alt = MagicMock()
         mock_alt.words = [mock_word]
@@ -276,7 +273,7 @@ class TestDeepgramSTTTranscribe:
 
         mock_response = MagicMock()
         mock_response.results.channels = [mock_channel]
-        mock_response.results.get.return_value = "en"
+        mock_response.results.language = "en"
         mock_v1.transcribe = AsyncMock(return_value=mock_response)
 
         with (
@@ -294,8 +291,119 @@ class TestDeepgramSTTTranscribe:
         assert result.utterances[0].start_ms == 0
         assert result.utterances[0].end_ms == 500
         assert result.utterances[0].confidence == 0.9
+        assert result.utterances[0].speaker is None
         assert result.language == Language.EN
         assert result.metadata["stt_provider"] == "deepgram"
+
+    async def test_transcribe_uses_configured_model_in_metadata(self):
+        mock_dg_client = MagicMock()
+        mock_v1 = AsyncMock()
+        mock_dg_client.listen.asyncprerecorded.v.return_value = mock_v1
+
+        mock_word = MagicMock()
+        mock_word.word = "hi"
+        mock_word.start = 0.0
+        mock_word.end = 0.2
+        mock_word.confidence = 0.9
+        mock_word.speaker = None
+
+        mock_alt = MagicMock()
+        mock_alt.words = [mock_word]
+        mock_alt.confidence = 0.9
+        mock_alt.paragraphs = None
+
+        mock_channel = MagicMock()
+        mock_channel.alternatives = [mock_alt]
+
+        mock_response = MagicMock()
+        mock_response.results.channels = [mock_channel]
+        mock_response.results.language = "en"
+        mock_v1.transcribe = AsyncMock(return_value=mock_response)
+
+        with (
+            patch("deepgram.DeepgramClient", return_value=mock_dg_client),
+            patch("deepgram.PrerecordedOptions", create=True) as mock_options,
+        ):
+            stt = DeepgramSTT(DeepgramCredentials(api_key="test-key"))
+            audio = AudioChunk(
+                data=b"audio_data", start=0, end=1000, format=AudioFormat.WAV
+            )
+            result = await stt.transcribe(
+                audio, DeepgramConfig(model="nova-3", language="fr", smart_format=False)
+            )
+
+        assert result.metadata["model"] == "nova-3"
+        mock_options.assert_called_once_with(
+            model="nova-3",
+            smart_format=False,
+            punctuate=True,
+            diarize=False,
+            utterances=True,
+            language="fr",
+        )
+
+    async def test_transcribe_omits_language_when_unset(self):
+        mock_dg_client = MagicMock()
+        mock_v1 = AsyncMock()
+        mock_dg_client.listen.asyncprerecorded.v.return_value = mock_v1
+
+        mock_channel = MagicMock()
+        mock_channel.alternatives = []
+
+        mock_response = MagicMock()
+        mock_response.results.channels = [mock_channel]
+        mock_response.results.language = "en"
+        mock_v1.transcribe = AsyncMock(return_value=mock_response)
+
+        with (
+            patch("deepgram.DeepgramClient", return_value=mock_dg_client),
+            patch("deepgram.PrerecordedOptions", create=True) as mock_options,
+        ):
+            stt = DeepgramSTT(DeepgramCredentials(api_key="test-key"))
+            audio = AudioChunk(
+                data=b"audio_data", start=0, end=1000, format=AudioFormat.WAV
+            )
+            await stt.transcribe(audio, DeepgramConfig())
+
+        _, kwargs = mock_options.call_args
+        assert "language" not in kwargs
+
+    async def test_transcribe_populates_speaker_when_diarized(self):
+        mock_dg_client = MagicMock()
+        mock_v1 = AsyncMock()
+        mock_dg_client.listen.asyncprerecorded.v.return_value = mock_v1
+
+        mock_word = MagicMock()
+        mock_word.word = "hi"
+        mock_word.start = 0.0
+        mock_word.end = 0.2
+        mock_word.confidence = 0.9
+        mock_word.speaker = 1
+
+        mock_alt = MagicMock()
+        mock_alt.words = [mock_word]
+        mock_alt.confidence = 0.9
+        mock_alt.paragraphs = None
+
+        mock_channel = MagicMock()
+        mock_channel.alternatives = [mock_alt]
+
+        mock_response = MagicMock()
+        mock_response.results.channels = [mock_channel]
+        mock_response.results.language = "en"
+        mock_v1.transcribe = AsyncMock(return_value=mock_response)
+
+        with (
+            patch("deepgram.DeepgramClient", return_value=mock_dg_client),
+            patch("deepgram.PrerecordedOptions", create=True),
+        ):
+            stt = DeepgramSTT(DeepgramCredentials(api_key="test-key"))
+            audio = AudioChunk(
+                data=b"audio_data", start=0, end=1000, format=AudioFormat.WAV
+            )
+            result = await stt.transcribe(audio, DeepgramConfig(diarize=True))
+
+        assert result.utterances[0].speaker == "1"
 
     async def test_transcribe_without_words_uses_paragraphs(self):
         mock_dg_client = MagicMock()
@@ -315,7 +423,7 @@ class TestDeepgramSTTTranscribe:
 
         mock_response = MagicMock()
         mock_response.results.channels = [mock_channel]
-        mock_response.results.get.return_value = "en"
+        mock_response.results.language = "en"
         mock_v1.transcribe = AsyncMock(return_value=mock_response)
 
         with (
@@ -331,3 +439,187 @@ class TestDeepgramSTTTranscribe:
         assert len(result.utterances) == 1
         assert result.utterances[0].text == "full paragraph text"
         assert result.utterances[0].confidence == 0.8
+
+
+class TestWhisperXModelCaching:
+    def test_load_model_called_once_across_multiple_transcribe_calls(self):
+        if not HAS_WHISPERX:
+            pytest.skip("whisperx not available")
+
+        import asyncio
+
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = {
+            "language": "en",
+            "segments": [{"text": " hi ", "start": 0.0, "end": 0.5}],
+        }
+
+        stt = WhisperXSTT()
+        audio = AudioChunk(
+            data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
+        )
+
+        with patch.object(
+            stt, "_load_model_sync", return_value=mock_model
+        ) as mock_load:
+            asyncio.run(stt.transcribe(audio, WhisperXConfig(align=False)))
+            asyncio.run(stt.transcribe(audio, WhisperXConfig(align=False)))
+            asyncio.run(stt.transcribe(audio, WhisperXConfig(align=False)))
+
+        assert mock_load.call_count == 1
+
+    async def test_transcribe_reuses_cached_model_instance(self):
+        if not HAS_WHISPERX:
+            pytest.skip("whisperx not available")
+
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = {
+            "language": "en",
+            "segments": [{"text": " hi ", "start": 0.0, "end": 0.5}],
+        }
+
+        stt = WhisperXSTT()
+        stt._model = mock_model
+        audio = AudioChunk(
+            data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
+        )
+
+        with patch.object(stt, "_load_model_sync") as mock_load_sync:
+            await stt.transcribe(audio, WhisperXConfig(align=False))
+
+        mock_load_sync.assert_not_called()
+
+
+class TestWhisperXAlignment:
+    async def test_align_called_when_enabled(self):
+        if not HAS_WHISPERX:
+            pytest.skip("whisperx not available")
+
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = {
+            "language": "en",
+            "segments": [{"text": " hi ", "start": 0.0, "end": 0.5}],
+        }
+
+        aligned_result = {
+            "segments": [
+                {
+                    "text": " hi ",
+                    "start": 0.0,
+                    "end": 0.5,
+                    "words": [{"word": "hi", "start": 0.0, "end": 0.5, "score": 0.8}],
+                }
+            ]
+        }
+
+        stt = WhisperXSTT()
+        audio = AudioChunk(
+            data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
+        )
+
+        with (
+            patch.object(stt, "_load_model", return_value=mock_model),
+            patch.object(stt, "_align", return_value=aligned_result) as mock_align,
+        ):
+            result = await stt.transcribe(audio, WhisperXConfig(align=True))
+
+        mock_align.assert_called_once()
+        assert result.utterances[0].confidence == 0.8
+
+    async def test_align_skipped_when_disabled(self):
+        if not HAS_WHISPERX:
+            pytest.skip("whisperx not available")
+
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = {
+            "language": "en",
+            "segments": [{"text": " hi ", "start": 0.0, "end": 0.5}],
+        }
+
+        stt = WhisperXSTT()
+        audio = AudioChunk(
+            data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
+        )
+
+        with (
+            patch.object(stt, "_load_model", return_value=mock_model),
+            patch.object(stt, "_align") as mock_align,
+        ):
+            await stt.transcribe(audio, WhisperXConfig(align=False))
+
+        mock_align.assert_not_called()
+
+    def test_align_model_cached_per_language(self):
+        if not HAS_WHISPERX:
+            pytest.skip("whisperx not available")
+
+        import asyncio
+
+        stt = WhisperXSTT()
+        with patch(
+            "agent_platform.integrations.speech_to_text.whisperx.whisperx.whisperx.load_align_model",
+            return_value=("model_a", {"lang": "en"}),
+        ) as mock_load_align:
+            asyncio.run(stt._ensure_align_model("en", "cpu"))
+            asyncio.run(stt._ensure_align_model("en", "cpu"))
+
+        assert mock_load_align.call_count == 1
+
+
+class TestWhisperXDiarization:
+    async def test_diarize_called_when_enabled(self):
+        if not HAS_WHISPERX:
+            pytest.skip("whisperx not available")
+
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = {
+            "language": "en",
+            "segments": [{"text": " hi ", "start": 0.0, "end": 0.5}],
+        }
+
+        diarized_result = {
+            "segments": [
+                {"text": " hi ", "start": 0.0, "end": 0.5, "speaker": "SPEAKER_00"}
+            ]
+        }
+
+        stt = WhisperXSTT()
+        audio = AudioChunk(
+            data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
+        )
+
+        with (
+            patch.object(stt, "_load_model", return_value=mock_model),
+            patch.object(
+                stt, "_diarize", return_value=diarized_result
+            ) as mock_diarize,
+        ):
+            result = await stt.transcribe(
+                audio, WhisperXConfig(align=False, diarize=True)
+            )
+
+        mock_diarize.assert_called_once()
+        assert result.utterances[0].speaker == "SPEAKER_00"
+
+    async def test_diarize_skipped_by_default(self):
+        if not HAS_WHISPERX:
+            pytest.skip("whisperx not available")
+
+        mock_model = MagicMock()
+        mock_model.transcribe.return_value = {
+            "language": "en",
+            "segments": [{"text": " hi ", "start": 0.0, "end": 0.5}],
+        }
+
+        stt = WhisperXSTT()
+        audio = AudioChunk(
+            data=b"\x00\x00\x00\x00", start=0, end=1000, format=AudioFormat.WAV
+        )
+
+        with (
+            patch.object(stt, "_load_model", return_value=mock_model),
+            patch.object(stt, "_diarize") as mock_diarize,
+        ):
+            await stt.transcribe(audio, WhisperXConfig(align=False))
+
+        mock_diarize.assert_not_called()

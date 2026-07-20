@@ -45,14 +45,26 @@ class PDFStructureChunkerProvider(
 
             try:
                 elements = partition_pdf(filename=doc.source)
-                sections = chunk_by_title(
-                    elements,
+
+                chunk_kwargs = dict(
                     max_characters=config.chunk_size,
                     overlap=config.chunk_overlap,
+                    overlap_all=config.overlap_all,
                     combine_text_under_n_chars=config.combine_text_under_n_chars,
                     new_after_n_chars=config.new_after_n_chars,
                     multipage_sections=config.multipage_sections,
+                    include_orig_elements=config.include_orig_elements,
                 )
+                if config.max_tokens is not None:
+                    chunk_kwargs["max_tokens"] = config.max_tokens
+                if config.skip_table_chunking:
+                    chunk_kwargs["skip_table_chunking"] = config.skip_table_chunking
+                if config.repeat_table_headers:
+                    chunk_kwargs["repeat_table_headers"] = config.repeat_table_headers
+                if config.isolate_table:
+                    chunk_kwargs["isolate_table"] = config.isolate_table
+
+                sections = chunk_by_title(elements, **chunk_kwargs)
             except ValidationError:
                 raise
             except Exception as exc:

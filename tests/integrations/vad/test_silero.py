@@ -198,3 +198,110 @@ async def test_adetect_buffer_management(mock_get_speech_timestamps, mock_load):
 
     results = [span async for span in vad.adetect(_gen())]
     assert results == [SampleSpan(start=0, end=80), SampleSpan(start=0, end=80)]
+
+
+def test_config_default_max_samples_is_duration_appropriate():
+    cfg = SileroVadConfig()
+    assert cfg.max_samples == 80_000
+    assert cfg.max_speech_duration_s == float("inf")
+
+
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.get_speech_timestamps")
+def test_detect_forwards_max_speech_duration_s(
+    mock_get_speech_timestamps, mock_load_silero_vad
+):
+    mock_load_silero_vad.return_value = MagicMock()
+    mock_get_speech_timestamps.return_value = []
+
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
+
+    vad = SileroVAD()
+    chunks = [
+        AudioChunk(
+            id=uuid4(),
+            data=b"\x00\x00\x00\x00" * 8000,
+            sample_rate=16000,
+            start=0,
+            end=16000,
+            channels=1,
+            dtype=DataType.FLOAT32,
+        ),
+    ]
+
+    vad.detect(chunks, config=SileroVadConfig(max_speech_duration_s=15.0))
+
+    _, kwargs = mock_get_speech_timestamps.call_args
+    assert kwargs["max_speech_duration_s"] == 15.0
+
+
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.get_speech_timestamps")
+async def test_adetect_forwards_max_speech_duration_s(
+    mock_get_speech_timestamps, mock_load_silero_vad
+):
+    mock_load_silero_vad.return_value = MagicMock()
+    mock_get_speech_timestamps.return_value = []
+
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
+
+    vad = SileroVAD()
+
+    async def _gen():
+        yield AudioChunk(
+            id=uuid4(),
+            data=b"\x00\x00\x00\x00" * 40,
+            sample_rate=16000,
+            start=0,
+            end=160,
+            channels=1,
+            dtype=DataType.FLOAT32,
+        )
+
+    async for _ in vad.adetect(_gen(), config=SileroVadConfig(max_speech_duration_s=8.0)):
+        pass
+
+    _, kwargs = mock_get_speech_timestamps.call_args
+    assert kwargs["max_speech_duration_s"] == 8.0
+
+
+@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
+@patch("agent_platform.integrations.vad.silero.silero.get_speech_timestamps")
+async def test_adetect_buffer_trims_when_max_samples_exceeded(
+    mock_get_speech_timestamps, mock_load
+):
+    mock_load.return_value = MagicMock()
+    mock_get_speech_timestamps.return_value = [{"start": 0, "end": 10}]
+
+    from agent_platform.integrations.vad.silero.silero import SileroVAD
+
+    vad = SileroVAD()
+
+    async def _gen():
+        yield AudioChunk(
+            id=uuid4(),
+            data=b"\x00\x00\x00\x00" * 40,
+            sample_rate=16000,
+            start=0,
+            end=40,
+            channels=1,
+            dtype=DataType.FLOAT32,
+        )
+        yield AudioChunk(
+            id=uuid4(),
+            data=b"\x00\x00\x00\x00" * 40,
+            sample_rate=16000,
+            start=40,
+            end=80,
+            channels=1,
+            dtype=DataType.FLOAT32,
+        )
+
+    results = [
+        span
+        async for span in vad.adetect(_gen(), config=SileroVadConfig(max_samples=50))
+    ]
+
+    assert len(results) == 2
+    last_call_audio = mock_get_speech_timestamps.call_args_list[-1][0][0]
+    assert last_call_audio.shape[-1] <= 50

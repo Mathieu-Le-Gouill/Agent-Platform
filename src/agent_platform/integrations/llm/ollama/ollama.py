@@ -62,8 +62,16 @@ def _to_langchain_ollama(
         params["seed"] = config.seed
     if config.stop_sequences:
         params["stop"] = config.stop_sequences
-    if config.frequency_penalty is not None:
-        params["repeat_penalty"] = config.frequency_penalty
+    if config.repeat_penalty is not None:
+        params["repeat_penalty"] = config.repeat_penalty
+    if config.mirostat is not None:
+        params["mirostat"] = config.mirostat
+    if config.mirostat_tau is not None:
+        params["mirostat_tau"] = config.mirostat_tau
+    if config.mirostat_eta is not None:
+        params["mirostat_eta"] = config.mirostat_eta
+    if config.num_ctx is not None:
+        params["num_ctx"] = config.num_ctx
 
     timeout = resolve_timeout(config.timeout, credentials)
     if timeout is not None:

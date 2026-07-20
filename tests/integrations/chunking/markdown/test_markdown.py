@@ -33,6 +33,63 @@ def test_default_config_type():
     assert cfg.headers_to_split_on == [("#", "h1"), ("##", "h2"), ("###", "h3")]
 
 
+def test_default_config_new_field_defaults():
+    provider = MarkdownStructureChunkerProvider()
+    cfg = provider._default_config()
+    assert cfg.return_each_line is False
+    assert cfg.custom_header_patterns is None
+
+
+def test_chunk_forwards_return_each_line():
+    from unittest.mock import patch
+
+    provider = MarkdownStructureChunkerProvider()
+    doc = TextDocument(text=MARKDOWN_DOC, format=DocumentFormat.MARKDOWN)
+    config = MarkdownChunkerConfig(return_each_line=True)
+
+    with patch(
+        "agent_platform.integrations.chunking.markdown.markdown.MarkdownHeaderTextSplitter"
+    ) as mock_splitter_cls:
+        mock_splitter_cls.return_value.split_text.return_value = []
+        provider.chunk([doc], config)
+
+    _, kwargs = mock_splitter_cls.call_args
+    assert kwargs["return_each_line"] is True
+
+
+def test_chunk_forwards_custom_header_patterns_when_set():
+    from unittest.mock import patch
+
+    provider = MarkdownStructureChunkerProvider()
+    doc = TextDocument(text=MARKDOWN_DOC, format=DocumentFormat.MARKDOWN)
+    config = MarkdownChunkerConfig(custom_header_patterns={"**": 1})
+
+    with patch(
+        "agent_platform.integrations.chunking.markdown.markdown.MarkdownHeaderTextSplitter"
+    ) as mock_splitter_cls:
+        mock_splitter_cls.return_value.split_text.return_value = []
+        provider.chunk([doc], config)
+
+    _, kwargs = mock_splitter_cls.call_args
+    assert kwargs["custom_header_patterns"] == {"**": 1}
+
+
+def test_chunk_omits_custom_header_patterns_when_unset():
+    from unittest.mock import patch
+
+    provider = MarkdownStructureChunkerProvider()
+    doc = TextDocument(text=MARKDOWN_DOC, format=DocumentFormat.MARKDOWN)
+
+    with patch(
+        "agent_platform.integrations.chunking.markdown.markdown.MarkdownHeaderTextSplitter"
+    ) as mock_splitter_cls:
+        mock_splitter_cls.return_value.split_text.return_value = []
+        provider.chunk([doc], None)
+
+    _, kwargs = mock_splitter_cls.call_args
+    assert "custom_header_patterns" not in kwargs
+
+
 def test_chunk_splits_by_headers_and_size():
     provider = MarkdownStructureChunkerProvider()
     doc = TextDocument(text=MARKDOWN_DOC, format=DocumentFormat.MARKDOWN)

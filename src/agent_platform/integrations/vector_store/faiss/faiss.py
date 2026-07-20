@@ -6,9 +6,11 @@ from typing import Any
 from uuid import UUID
 
 from langchain_community.vectorstores import FAISS
+from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_core.embeddings import Embeddings
 
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
+from agent_platform.core.interfaces.vector_store.config import DistanceMetric
 from agent_platform.integrations.vector_store.faiss.config import FAISSConfig
 from agent_platform.integrations.vector_store.langchain_base import (
     _chunk_to_lc,
@@ -17,6 +19,15 @@ from agent_platform.integrations.vector_store.langchain_base import (
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
+
+# DistanceMetric has no JACCARD/MAX_INNER_PRODUCT/DOT counterpart, so those
+# LangChain strategies are unreachable via config; COSINE/EUCLIDEAN/DOT map 1:1.
+# Source: api.python.langchain.com langchain_community.vectorstores.faiss.DistanceStrategy.
+_DISTANCE_STRATEGY_MAP: dict[DistanceMetric, DistanceStrategy] = {
+    DistanceMetric.COSINE: DistanceStrategy.COSINE,
+    DistanceMetric.EUCLIDEAN: DistanceStrategy.EUCLIDEAN_DISTANCE,
+    DistanceMetric.DOT: DistanceStrategy.DOT_PRODUCT,
+}
 
 
 class FAISSStore(BaseVectorStore[FAISSConfig]):
@@ -38,6 +49,7 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
                 config.index_path,
                 embeddings=self._embeddings,
                 allow_dangerous_deserialization=True,
+                distance_strategy=_DISTANCE_STRATEGY_MAP[config.distance],
             )
         return self._store
 
@@ -53,7 +65,10 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
                     "Embeddings are required to initialize a FAISS index"
                 )
             self._store = await asyncio.to_thread(
-                FAISS.from_documents, lc_docs, self._embeddings
+                FAISS.from_documents,
+                lc_docs,
+                self._embeddings,
+                distance_strategy=_DISTANCE_STRATEGY_MAP[config.distance],
             )
         else:
             await self._store.aadd_documents(lc_docs)
@@ -108,6 +123,8 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
             k,
             filter=filter,
         )
+        # Clamped to [0, 1]; now correctly corresponds to the configured
+        # distance_strategy rather than always assuming the library default.
         return [
             (_lc_to_chunk(doc), Score.similarity(min(1.0, max(0.0, float(score)))))
             for doc, score in results

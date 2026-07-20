@@ -40,6 +40,8 @@ class GMMClusterer(BaseClusteringAlgorithm[GMMConfig]):
             max_iter=config.max_iter,
             n_init=config.n_init,
             tol=config.tol,
+            reg_covar=config.reg_covar,
+            init_params=config.init_params,
             random_state=config.random_state,
         )
         labels = gmm.fit_predict(vectors)

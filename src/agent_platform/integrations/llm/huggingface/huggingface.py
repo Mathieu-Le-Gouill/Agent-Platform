@@ -74,6 +74,14 @@ def _to_langchain_hugging_face(
         params["top_k"] = config.top_k
     if config.stop_sequences:
         params["stop_sequences"] = config.stop_sequences
+    if config.repetition_penalty is not None:
+        params["repetition_penalty"] = config.repetition_penalty
+    if config.do_sample is not None:
+        params["do_sample"] = config.do_sample
+    if config.typical_p is not None:
+        params["typical_p"] = config.typical_p
+    if config.return_full_text is not None:
+        params["return_full_text"] = config.return_full_text
 
     timeout = resolve_timeout(config.timeout, credentials)
     if timeout is not None:

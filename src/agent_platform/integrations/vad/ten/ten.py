@@ -14,8 +14,21 @@ from agent_platform.core.schemas.enums import DataType
 
 
 class TenVAD(FrameBasedVAD[TenVadConfig]):
+    def __init__(self) -> None:
+        self.handle: TenVad | None = None
+        self._handle_config: tuple[int, float] | None = None
+
     def _default_config(self) -> TenVadConfig:
         return TenVadConfig()
+
+    def _ensure_handle(self, config: TenVadConfig) -> TenVad:
+        key = (config.hop_size, config.threshold)
+
+        if self.handle is None or self._handle_config != key:
+            self.handle = TenVad(config.hop_size, config.threshold)
+            self._handle_config = key
+
+        return self.handle
 
     @property
     def requirements(self) -> AudioRequirements:
@@ -23,7 +36,7 @@ class TenVAD(FrameBasedVAD[TenVadConfig]):
             sample_rates=(16000,),
             channels=1,
             dtype=DataType.INT16,
-            normalized=True,
+            normalized=False,
         )
 
     def detect(
@@ -33,7 +46,7 @@ class TenVAD(FrameBasedVAD[TenVadConfig]):
         config = config or self._default_config()
         state = VADState()
 
-        self.handle = TenVad(config.hop_size, config.threshold)
+        self._ensure_handle(config)
 
         if not audio_sequence:
             return []
@@ -62,6 +75,8 @@ class TenVAD(FrameBasedVAD[TenVadConfig]):
         config = config or self._default_config()
         state = VADState()
 
+        self._ensure_handle(config)
+
         async for chunk in audio_sequence:
             self._validate_chunk(chunk, config.sample_rate)
 
@@ -81,3 +96,6 @@ class TenVAD(FrameBasedVAD[TenVadConfig]):
 
         voice_prob, flag = self.handle.process(AudioIO.to_numpy(chunk))
         return voice_prob > config.threshold
+
+
+# Ref: https://github.com/TEN-framework/ten-vad

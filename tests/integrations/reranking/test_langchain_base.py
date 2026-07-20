@@ -169,6 +169,89 @@ def test_lc_to_chunks_handles_language_enum():
     assert chunks[0].metadata["language"] == Language.SP
 
 
+def test_lc_to_chunks_no_config_no_score():
+    lc = LC_Document(
+        page_content="a",
+        metadata={
+            "chunk_id": str(uuid4()),
+            "document_id": None,
+            "index": 0,
+            "relevance_score": 0.9,
+        },
+    )
+    chunks = _lc_to_chunks([lc])
+    assert chunks[0].confidence is None
+
+
+def test_lc_to_chunks_return_scores_false_no_score():
+    lc = LC_Document(
+        page_content="a",
+        metadata={
+            "chunk_id": str(uuid4()),
+            "document_id": None,
+            "index": 0,
+            "relevance_score": 0.9,
+        },
+    )
+    cfg = RerankerConfig(return_scores=False)
+    chunks = _lc_to_chunks([lc], cfg)
+    assert chunks[0].confidence is None
+
+
+def test_lc_to_chunks_return_scores_normalized():
+    lc1 = LC_Document(
+        page_content="a",
+        metadata={
+            "chunk_id": str(uuid4()),
+            "document_id": None,
+            "index": 0,
+            "relevance_score": 0.2,
+        },
+    )
+    lc2 = LC_Document(
+        page_content="b",
+        metadata={
+            "chunk_id": str(uuid4()),
+            "document_id": None,
+            "index": 1,
+            "relevance_score": 0.8,
+        },
+    )
+    cfg = RerankerConfig(return_scores=True, normalize_scores=True)
+    chunks = _lc_to_chunks([lc1, lc2], cfg)
+    assert chunks[0].confidence.value == 0.0
+    assert chunks[1].confidence.value == 1.0
+    assert chunks[0].confidence.low == 0.0
+    assert chunks[0].confidence.high == 1.0
+
+
+def test_lc_to_chunks_return_scores_raw_unbounded():
+    lc = LC_Document(
+        page_content="a",
+        metadata={
+            "chunk_id": str(uuid4()),
+            "document_id": None,
+            "index": 0,
+            "relevance_score": 5.3,
+        },
+    )
+    cfg = RerankerConfig(return_scores=True, normalize_scores=False)
+    chunks = _lc_to_chunks([lc], cfg)
+    assert chunks[0].confidence.value == 5.3
+    assert chunks[0].confidence.low == float("-inf")
+    assert chunks[0].confidence.high == float("inf")
+
+
+def test_lc_to_chunks_return_scores_missing_metadata_key():
+    lc = LC_Document(
+        page_content="a",
+        metadata={"chunk_id": str(uuid4()), "document_id": None, "index": 0},
+    )
+    cfg = RerankerConfig(return_scores=True)
+    chunks = _lc_to_chunks([lc], cfg)
+    assert chunks[0].confidence is None
+
+
 def test_round_trip():
     uid = uuid4()
     original = TextChunk(
@@ -318,6 +401,59 @@ class TestLangChainReranker:
             results = await reranker.rerank(query="q", items=items, config=config)
 
         assert len(results) == 3
+
+
+    async def test_rerank_propagates_relevance_score(self):
+        items = [TextChunk(id=uuid4(), text="a", index=0)]
+        mock_result_lc = LC_Document(
+            page_content="a",
+            metadata={
+                "chunk_id": str(uuid4()),
+                "document_id": None,
+                "index": 0,
+                "start_index": None,
+                "format": None,
+                "source": None,
+                "language": None,
+                "extra": None,
+                "relevance_score": 0.42,
+            },
+        )
+        mock_client = MagicMock()
+        mock_client.acompress_documents = AsyncMock(return_value=[mock_result_lc])
+
+        config = RerankerConfig(return_scores=True, normalize_scores=False)
+        reranker = _TestReranker()
+        with patch.object(reranker, "_client", return_value=mock_client):
+            results = await reranker.rerank(query="q", items=items, config=config)
+
+        assert results[0].confidence is not None
+        assert results[0].confidence.value == 0.42
+
+    async def test_rerank_return_scores_false_leaves_confidence_none(self):
+        items = [TextChunk(id=uuid4(), text="a", index=0)]
+        mock_result_lc = LC_Document(
+            page_content="a",
+            metadata={
+                "chunk_id": str(uuid4()),
+                "document_id": None,
+                "index": 0,
+                "start_index": None,
+                "format": None,
+                "source": None,
+                "language": None,
+                "extra": None,
+                "relevance_score": 0.42,
+            },
+        )
+        mock_client = MagicMock()
+        mock_client.acompress_documents = AsyncMock(return_value=[mock_result_lc])
+
+        reranker = _TestReranker()
+        with patch.object(reranker, "_client", return_value=mock_client):
+            results = await reranker.rerank(query="q", items=items)
+
+        assert results[0].confidence is None
 
 
 class TestRerankRetryAndTranslation:

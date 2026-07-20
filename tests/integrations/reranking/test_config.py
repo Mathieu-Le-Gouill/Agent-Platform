@@ -6,6 +6,8 @@ from agent_platform.integrations.reranking.jina.config import JinaRerankerConfig
 from agent_platform.integrations.reranking.huggingface.config import (
     HuggingFaceRerankerConfig,
 )
+from agent_platform.integrations.reranking.voyage.config import VoyageRerankerConfig
+from agent_platform.integrations.reranking.flashrank.config import FlashRankConfig
 
 
 def test_reranker_config_defaults():
@@ -14,6 +16,13 @@ def test_reranker_config_defaults():
     assert cfg.return_scores is False
     assert cfg.batch_size == 32
     assert cfg.normalize_scores is True
+
+
+def test_reranker_config_model_default_is_provider_neutral():
+    # base default must not be the stale "rerank-english-v3.0" leak;
+    # every provider subclass overrides it anyway.
+    cfg = RerankerConfig()
+    assert cfg.model == "rerank-v3.5"
 
 
 def test_reranker_config_custom():
@@ -57,6 +66,31 @@ def test_huggingface_reranker_config_defaults():
 def test_huggingface_reranker_config_device():
     cfg = HuggingFaceRerankerConfig(device="cuda:0")
     assert cfg.device == "cuda:0"
+
+
+def test_voyage_reranker_config_defaults():
+    cfg = VoyageRerankerConfig()
+    assert isinstance(cfg, RerankerConfig)
+    assert cfg.model == "rerank-2.5"
+    assert cfg.truncation is None
+
+
+def test_voyage_reranker_config_truncation():
+    cfg = VoyageRerankerConfig(truncation=False)
+    assert cfg.truncation is False
+
+
+def test_flashrank_config_defaults():
+    cfg = FlashRankConfig()
+    assert isinstance(cfg, RerankerConfig)
+    assert cfg.model == "ms-marco-MiniLM-L-12-v2"
+    assert cfg.cache_dir is None
+    assert cfg.max_length is None
+
+
+def test_flashrank_config_max_length():
+    cfg = FlashRankConfig(max_length=256)
+    assert cfg.max_length == 256
 
 
 def test_configs_are_frozen():

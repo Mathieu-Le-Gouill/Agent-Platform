@@ -4,6 +4,9 @@ from agent_platform.core.interfaces.vad.config import VADConfig
 
 
 class PvcobraVadConfig(VADConfig):
+    # Custom path to a Cobra dynamic library for the target platform. https://picovoice.ai/docs/api/cobra-python/
     device: str | None = Field(default=None)
+    # Custom path to the Cobra model/library file, overriding the bundled default. https://picovoice.ai/docs/api/cobra-python/
     library_path: str | None = Field(default=None)
+    # Voice probability threshold above which a frame counts as speech. https://picovoice.ai/docs/api/cobra-python/
     threshold: float = Field(default=0.5, ge=0.0, le=1.0)

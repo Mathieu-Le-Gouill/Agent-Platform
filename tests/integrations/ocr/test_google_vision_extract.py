@@ -66,7 +66,10 @@ async def test_extract_returns_chunks(mock_vision, mock_to_thread):
     ocr = GoogleVisionOCR()
     doc_id = uuid4()
 
-    with patch("agent_platform.integrations.ocr.google_vision.google_vision.load_bytes", return_value=b"fake-bytes"):
+    with patch(
+        "agent_platform.integrations.ocr.google_vision.google_vision.load_bytes",
+        return_value=b"fake-bytes",
+    ):
         with patch(
             "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
             side_effect=[b"fake-bytes", response],
@@ -90,7 +93,10 @@ async def test_extract_no_pages_returns_empty(mock_vision):
     response.full_text_annotation = full_text_annotation
 
     ocr = GoogleVisionOCR()
-    with patch("agent_platform.integrations.ocr.google_vision.google_vision.load_bytes", return_value=b"fake-bytes"):
+    with patch(
+        "agent_platform.integrations.ocr.google_vision.google_vision.load_bytes",
+        return_value=b"fake-bytes",
+    ):
         with patch(
             "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
             side_effect=[b"fake-bytes", response],
@@ -109,7 +115,10 @@ async def test_extract_filters_by_min_confidence(mock_vision):
     response = _make_response([[word]])
 
     ocr = GoogleVisionOCR()
-    with patch("agent_platform.integrations.ocr.google_vision.google_vision.load_bytes", return_value=b"fake-bytes"):
+    with patch(
+        "agent_platform.integrations.ocr.google_vision.google_vision.load_bytes",
+        return_value=b"fake-bytes",
+    ):
         with patch(
             "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
             side_effect=[b"fake-bytes", response],
@@ -127,13 +136,113 @@ async def test_extract_raises_on_api_error(mock_vision):
     mock_vision.ImageAnnotatorClient.return_value = mock_client
 
     ocr = GoogleVisionOCR()
-    with patch("agent_platform.integrations.ocr.google_vision.google_vision.load_bytes", return_value=b"fake-bytes"):
+    with patch(
+        "agent_platform.integrations.ocr.google_vision.google_vision.load_bytes",
+        return_value=b"fake-bytes",
+    ):
         with patch(
             "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
             side_effect=RuntimeError("API error occurred"),
         ):
             with pytest.raises(ProviderError, match="API error occurred"):
                 await ocr.extract("http://example.com/img.jpg")
+
+
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread")
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.vision")
+async def test_extract_forwards_language_hints_and_uses_document_text_detection(
+    mock_vision, mock_to_thread
+):
+    mock_client = MagicMock()
+    mock_vision.ImageAnnotatorClient.return_value = mock_client
+    mock_vision.Image.return_value = MagicMock()
+
+    word = _make_word("H", 0.95)
+    response = _make_response([[word]])
+
+    calls = []
+
+    async def fake_to_thread(fn, *args, **kwargs):
+        calls.append((fn, args, kwargs))
+        if fn is load_bytes:
+            return b"fake-bytes"
+        return response
+
+    mock_to_thread.side_effect = fake_to_thread
+
+    ocr = GoogleVisionOCR()
+    with patch(
+        "agent_platform.integrations.ocr.google_vision.google_vision.load_bytes",
+        return_value=b"fake-bytes",
+    ):
+        await ocr.extract(
+            "http://example.com/img.jpg",
+            config=GoogleVisionConfig(language_hints=["en"]),
+        )
+
+    ocr_call = calls[-1]
+    assert ocr_call[0] is mock_client.document_text_detection
+    assert ocr_call[2]["image_context"] == {"language_hints": ["en"]}
+
+
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread")
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.vision")
+async def test_extract_uses_text_detection_for_text_detection_feature_type(
+    mock_vision, mock_to_thread
+):
+    mock_client = MagicMock()
+    mock_vision.ImageAnnotatorClient.return_value = mock_client
+    mock_vision.Image.return_value = MagicMock()
+
+    word = _make_word("H", 0.95)
+    response = _make_response([[word]])
+
+    calls = []
+
+    async def fake_to_thread(fn, *args, **kwargs):
+        calls.append((fn, args, kwargs))
+        if fn is load_bytes:
+            return b"fake-bytes"
+        return response
+
+    mock_to_thread.side_effect = fake_to_thread
+
+    ocr = GoogleVisionOCR()
+    with patch(
+        "agent_platform.integrations.ocr.google_vision.google_vision.load_bytes",
+        return_value=b"fake-bytes",
+    ):
+        await ocr.extract(
+            "http://example.com/img.jpg",
+            config=GoogleVisionConfig(feature_type="TEXT_DETECTION"),
+        )
+
+    ocr_call = calls[-1]
+    assert ocr_call[0] is mock_client.text_detection
+    assert "image_context" not in ocr_call[2]
+
+
+@patch("agent_platform.integrations.ocr.google_vision.google_vision.vision")
+async def test_client_is_cached_across_calls(mock_vision):
+    mock_client = MagicMock()
+    mock_vision.ImageAnnotatorClient.return_value = mock_client
+    mock_vision.Image.return_value = MagicMock()
+
+    response = _make_response([])
+
+    ocr = GoogleVisionOCR()
+    with patch(
+        "agent_platform.integrations.ocr.google_vision.google_vision.load_bytes",
+        return_value=b"fake-bytes",
+    ):
+        with patch(
+            "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
+            side_effect=[b"fake-bytes", response, b"fake-bytes", response],
+        ):
+            await ocr.extract("http://example.com/img.jpg")
+            await ocr.extract("http://example.com/img2.jpg")
+
+    mock_vision.ImageAnnotatorClient.assert_called_once()
 
 
 @patch("agent_platform.integrations.ocr.google_vision.google_vision.vision")
@@ -150,7 +259,10 @@ async def test_extract_handles_missing_confidence(mock_vision):
     response = _make_response([[word]])
 
     ocr = GoogleVisionOCR()
-    with patch("agent_platform.integrations.ocr.google_vision.google_vision.load_bytes", return_value=b"fake-bytes"):
+    with patch(
+        "agent_platform.integrations.ocr.google_vision.google_vision.load_bytes",
+        return_value=b"fake-bytes",
+    ):
         with patch(
             "agent_platform.integrations.ocr.google_vision.google_vision.asyncio.to_thread",
             side_effect=[b"fake-bytes", response],

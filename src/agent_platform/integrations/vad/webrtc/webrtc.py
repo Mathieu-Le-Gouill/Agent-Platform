@@ -16,11 +16,33 @@ from agent_platform.audio.io import AudioIO
 
 
 class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
+    _VALID_FRAME_DURATIONS_MS = (10, 20, 30)
+    _BYTES_PER_SAMPLE = 2  # int16
+
     def __init__(self) -> None:
         self.model = webrtcvad.Vad()
 
     def _default_config(self) -> WebrtcVadConfig:
         return WebrtcVadConfig()
+
+    def _validate_chunk(
+        self,
+        chunk: AudioChunk,
+        config_sample_rate: int,
+    ) -> None:
+        super()._validate_chunk(chunk, config_sample_rate)
+
+        num_samples = len(chunk.data) // self._BYTES_PER_SAMPLE
+        valid_sample_counts = {
+            config_sample_rate * ms // 1000 for ms in self._VALID_FRAME_DURATIONS_MS
+        }
+
+        if num_samples not in valid_sample_counts:
+            raise ValueError(
+                "webrtcvad requires 10/20/30ms frames at "
+                f"{config_sample_rate}Hz ({sorted(valid_sample_counts)} samples), "
+                f"got {num_samples} samples"
+            )
 
     @property
     def requirements(self) -> AudioRequirements:
@@ -48,10 +70,8 @@ class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
         voiced_frames: list[SampleSpan] = []
 
         for chunk in audio_sequence:
-            if chunk.sample_rate != config.sample_rate:
-                raise ValueError(
-                    f"Expected {config.sample_rate}, got {chunk.sample_rate}"
-                )
+            self._validate_chunk(chunk, config.sample_rate)
+
             if self._is_speech(chunk, config):
                 self._on_speech(state, chunk, config)
             else:

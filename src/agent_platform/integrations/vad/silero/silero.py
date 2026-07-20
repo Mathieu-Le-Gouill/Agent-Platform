@@ -59,6 +59,7 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
             speech_pad_ms=config.speech_pad_ms,
             min_speech_duration_ms=config.min_speech_duration_ms,
             min_silence_duration_ms=config.min_silence_duration_ms,
+            max_speech_duration_s=config.max_speech_duration_s,
         )
 
         return [SampleSpan(start=s["start"], end=s["end"]) for s in speech_samples]
@@ -106,6 +107,7 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
                 speech_pad_ms=config.speech_pad_ms,
                 min_speech_duration_ms=config.min_speech_duration_ms,
                 min_silence_duration_ms=config.min_silence_duration_ms,
+                max_speech_duration_s=config.max_speech_duration_s,
             )
 
             for s in speech_samples:

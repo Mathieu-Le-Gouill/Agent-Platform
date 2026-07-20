@@ -34,9 +34,16 @@ class LatexChunkerProvider(LangChainChunker[LatexChunkerConfig]):
         self,
         config: LatexChunkerConfig,
     ) -> TextSplitter:
+        # Note: is_separator_regex is intentionally not forwarded here —
+        # from_language() always calls cls(..., is_separator_regex=True, **kwargs),
+        # so passing it again would raise a duplicate-kwarg TypeError. The field
+        # is still exposed on the config for documentation/consistency with
+        # `recursive`, but LaTeX separators are always treated as regex.
         return RecursiveCharacterTextSplitter.from_language(
             Language.LATEX,
             chunk_size=config.chunk_size,
             chunk_overlap=config.chunk_overlap,
             add_start_index=config.add_start_index,
+            keep_separator=config.keep_separator,
+            strip_whitespace=config.strip_whitespace,
         )

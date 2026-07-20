@@ -34,7 +34,9 @@ def _from_tesseract(
                 id=uuid4(),
                 document_id=document_id,
                 text=text.strip(),
-                confidence=Score(value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100),
+                confidence=Score(
+                    value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100
+                ),
                 bbox=BoundingBox(
                     x=float((data.get("left") or [0])[i]),
                     y=float((data.get("top") or [0])[i]),

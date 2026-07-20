@@ -52,12 +52,18 @@ class AnthropicLLM(LangChainLLMProvider[AnthropicGenerationConfig]):
         return AnthropicGenerationConfig()
 
 
+_DEFAULT_MAX_TOKENS = 1024
+_DEFAULT_THINKING_BUDGET = 5000
+# Higher fallback so the default thinking_budget stays comfortably below
+# max_tokens (Anthropic requires budget_tokens < max_tokens or the request 400s).
+_DEFAULT_MAX_TOKENS_WITH_THINKING = 8192
+
+
 def _to_langchain_anthropic(
     config: AnthropicGenerationConfig,
     credentials: AnthropicCredentials,
 ) -> dict[str, Any]:
     params: dict[str, Any] = {
-        "max_tokens": config.max_tokens or 1024,
         "temperature": config.temperature,
     }
     if config.top_p is not None:
@@ -72,13 +78,35 @@ def _to_langchain_anthropic(
         params["timeout"] = timeout
     params["max_retries"] = resolve_max_retries(config.max_retries, credentials)
 
-    if config.thinking:
+    if config.effort is not None:
+        # Modern effort control supersedes manual thinking_budget management;
+        # skip the legacy `thinking` payload entirely when set.
+        params["max_tokens"] = config.max_tokens or _DEFAULT_MAX_TOKENS
+        params["effort"] = config.effort
+    elif config.thinking:
+        budget_tokens = config.thinking_budget or _DEFAULT_THINKING_BUDGET
+        if config.max_tokens is not None:
+            max_tokens = config.max_tokens
+            if budget_tokens >= max_tokens:
+                budget_tokens = max(1, max_tokens - 1024)
+        else:
+            # No explicit max_tokens: size it to comfortably fit the (possibly
+            # user-supplied) budget rather than clamping the user's budget down
+            # to an unrelated fixed default.
+            max_tokens = max(_DEFAULT_MAX_TOKENS_WITH_THINKING, budget_tokens + 1024)
+        params["max_tokens"] = max_tokens
         params["thinking"] = {
             "type": "enabled",
-            "budget_tokens": config.thinking_budget or 5000,
+            "budget_tokens": budget_tokens,
         }
+    else:
+        params["max_tokens"] = config.max_tokens or _DEFAULT_MAX_TOKENS
+
     if config.cache_control:
-        params["cache_control"] = {"type": "ephemeral"}
+        # `cache_control` is not a ChatAnthropic constructor field; routing it
+        # through model_kwargs is the documented pass-through mechanism and
+        # avoids the silent "unrecognized kwarg" fallback warning.
+        params.setdefault("model_kwargs", {})["cache_control"] = {"type": "ephemeral"}
 
     params.update(config.extra_params)
     return params

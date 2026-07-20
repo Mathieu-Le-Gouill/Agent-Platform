@@ -78,10 +78,14 @@ class TestToLangchainAnthropic:
     def test_anthropic_config_thinking(self):
         cfg = AnthropicGenerationConfig(thinking=True)
         result = _to_langchain_anthropic(cfg, self._creds())
+        # Default max_tokens must widen so budget_tokens < max_tokens holds
+        # (Anthropic 400s otherwise) — the bug this fix addresses.
+        assert result["max_tokens"] == 8192
         assert result["thinking"] == {
             "type": "enabled",
             "budget_tokens": 5000,
         }
+        assert result["thinking"]["budget_tokens"] < result["max_tokens"]
 
     def test_anthropic_config_thinking_with_budget(self):
         cfg = AnthropicGenerationConfig(thinking=True, thinking_budget=10000)
@@ -90,17 +94,42 @@ class TestToLangchainAnthropic:
             "type": "enabled",
             "budget_tokens": 10000,
         }
+        assert result["thinking"]["budget_tokens"] < result["max_tokens"]
+
+    def test_anthropic_config_thinking_budget_exceeds_explicit_max_tokens(self):
+        # Explicit max_tokens smaller than the default thinking_budget must not
+        # produce budget_tokens >= max_tokens (the original 400-on-defaults bug).
+        cfg = AnthropicGenerationConfig(thinking=True, max_tokens=1024)
+        result = _to_langchain_anthropic(cfg, self._creds())
+        assert result["max_tokens"] == 1024
+        assert result["thinking"]["budget_tokens"] < result["max_tokens"]
+
+    def test_anthropic_config_effort(self):
+        cfg = AnthropicGenerationConfig(effort="high")
+        result = _to_langchain_anthropic(cfg, self._creds())
+        assert result["effort"] == "high"
+        assert "thinking" not in result
+        assert result["max_tokens"] == 1024
+
+    def test_anthropic_config_effort_takes_precedence_over_thinking(self):
+        cfg = AnthropicGenerationConfig(effort="max", thinking=True)
+        result = _to_langchain_anthropic(cfg, self._creds())
+        assert result["effort"] == "max"
+        assert "thinking" not in result
 
     def test_anthropic_config_cache_control(self):
         cfg = AnthropicGenerationConfig(cache_control=True)
         result = _to_langchain_anthropic(cfg, self._creds())
-        assert result["cache_control"] == {"type": "ephemeral"}
+        # cache_control is not a real ChatAnthropic constructor field; it must
+        # be routed through model_kwargs, not passed top-level.
+        assert result["model_kwargs"] == {"cache_control": {"type": "ephemeral"}}
+        assert "cache_control" not in result
 
     def test_anthropic_config_thinking_disabled(self):
         cfg = AnthropicGenerationConfig(thinking=False, cache_control=True)
         result = _to_langchain_anthropic(cfg, self._creds())
         assert "thinking" not in result
-        assert result["cache_control"] == {"type": "ephemeral"}
+        assert result["model_kwargs"] == {"cache_control": {"type": "ephemeral"}}
 
 
 class TestToLangchainOpenAI:
@@ -110,7 +139,8 @@ class TestToLangchainOpenAI:
     def test_default_config(self):
         cfg = OpenAIGenerationConfig()
         result = _to_langchain_openai(cfg, self._creds())
-        assert result == {"temperature": 0.7, "max_retries": 3}
+        # temperature equals the field default -> omitted, not sent unconditionally.
+        assert result == {"max_retries": 3}
 
     def test_with_fields(self):
         cfg = OpenAIGenerationConfig(
@@ -135,10 +165,38 @@ class TestToLangchainOpenAI:
         assert result["model_kwargs"]["frequency_penalty"] == 0.3
         assert result["model_kwargs"]["presence_penalty"] == 0.4
 
+    def test_temperature_at_default_is_omitted(self):
+        cfg = OpenAIGenerationConfig(temperature=0.7)
+        result = _to_langchain_openai(cfg, self._creds())
+        assert "temperature" not in result
+
+    def test_temperature_non_default_non_reasoning_model_is_sent(self):
+        cfg = OpenAIGenerationConfig(model="gpt-4.1", temperature=0.2)
+        result = _to_langchain_openai(cfg, self._creds())
+        assert result["temperature"] == 0.2
+
+    @pytest.mark.parametrize(
+        "model", ["o1", "o1-mini", "o3", "o3-mini", "o4-mini", "gpt-5", "gpt-5-mini"]
+    )
+    def test_temperature_dropped_for_reasoning_models(self, model):
+        cfg = OpenAIGenerationConfig(model=model, temperature=0.2)
+        result = _to_langchain_openai(cfg, self._creds())
+        assert "temperature" not in result
+
+    def test_temperature_kept_for_gpt5_chat(self):
+        cfg = OpenAIGenerationConfig(model="gpt-5-chat", temperature=0.2)
+        result = _to_langchain_openai(cfg, self._creds())
+        assert result["temperature"] == 0.2
+
     def test_openai_config_reasoning_effort(self):
-        cfg = OpenAIGenerationConfig(reasoning_effort="high")
+        cfg = OpenAIGenerationConfig(model="o3", reasoning_effort="high")
         result = _to_langchain_openai(cfg, self._creds())
         assert result["model_kwargs"]["reasoning_effort"] == "high"
+
+    def test_openai_config_reasoning_effort_dropped_for_non_reasoning_model(self):
+        cfg = OpenAIGenerationConfig(model="gpt-4.1", reasoning_effort="high")
+        result = _to_langchain_openai(cfg, self._creds())
+        assert "reasoning_effort" not in result.get("model_kwargs", {})
 
     def test_openai_config_parallel_tool_calls_false(self):
         cfg = OpenAIGenerationConfig(parallel_tool_calls=False)
@@ -164,8 +222,18 @@ class TestToLangchainOpenAI:
         result = _to_langchain_openai(cfg, self._creds())
         assert result["model_kwargs"]["response_format"] == {
             "type": "json_schema",
-            "json_schema": {"name": "response", "schema": schema},
+            "json_schema": {"name": "response", "schema": schema, "strict": True},
         }
+
+    def test_response_format_json_schema_strict_false(self):
+        schema = {"type": "object"}
+        cfg = OpenAIGenerationConfig(
+            response_format=ResponseFormat.JSON_SCHEMA,
+            json_schema=schema,
+            strict=False,
+        )
+        result = _to_langchain_openai(cfg, self._creds())
+        assert result["model_kwargs"]["response_format"]["json_schema"]["strict"] is False
 
     def test_json_schema_missing_raises(self):
         cfg = OpenAIGenerationConfig(
@@ -221,7 +289,29 @@ class TestToLangchainMistral:
         result = _to_langchain_mistral(cfg, self._creds())
         assert result["model_kwargs"]["response_format"] == {
             "type": "json_schema",
-            "json_schema": schema,
+            "json_schema": {
+                "schema": schema,
+                "name": "response",
+                "strict": True,
+            },
+        }
+
+    def test_response_format_json_schema_custom_name_and_strict(self):
+        schema = {"type": "object"}
+        cfg = MistralGenerationConfig(
+            response_format=ResponseFormat.JSON_SCHEMA,
+            json_schema=schema,
+            json_schema_name="my_schema",
+            json_schema_strict=False,
+        )
+        result = _to_langchain_mistral(cfg, self._creds())
+        assert result["model_kwargs"]["response_format"] == {
+            "type": "json_schema",
+            "json_schema": {
+                "schema": schema,
+                "name": "my_schema",
+                "strict": False,
+            },
         }
 
     def test_json_schema_missing_raises(self):
@@ -249,7 +339,6 @@ class TestToLangchainOllama:
             top_k=40,
             seed=99,
             stop_sequences=["stop"],
-            frequency_penalty=0.3,
             timeout=60.0,
         )
         result = _to_langchain_ollama(cfg, self._creds())
@@ -259,8 +348,38 @@ class TestToLangchainOllama:
         assert result["top_k"] == 40
         assert result["seed"] == 99
         assert result["stop"] == ["stop"]
-        assert result["repeat_penalty"] == 0.3
         assert result["timeout"] == 60.0
+
+    def test_frequency_penalty_is_not_remapped_to_repeat_penalty(self):
+        # frequency_penalty (additive, OpenAI/Anthropic-shaped) must NOT be
+        # cross-mapped into Ollama's repeat_penalty (multiplicative) -- the
+        # semantics don't correspond.
+        cfg = OllamaGenerationConfig(frequency_penalty=0.3)
+        result = _to_langchain_ollama(cfg, self._creds())
+        assert "repeat_penalty" not in result
+
+    def test_repeat_penalty_native_field(self):
+        cfg = OllamaGenerationConfig(repeat_penalty=1.2)
+        result = _to_langchain_ollama(cfg, self._creds())
+        assert result["repeat_penalty"] == 1.2
+
+    def test_mirostat_fields(self):
+        cfg = OllamaGenerationConfig(mirostat=2, mirostat_tau=5.0, mirostat_eta=0.1)
+        result = _to_langchain_ollama(cfg, self._creds())
+        assert result["mirostat"] == 2
+        assert result["mirostat_tau"] == 5.0
+        assert result["mirostat_eta"] == 0.1
+
+    def test_num_ctx_field(self):
+        cfg = OllamaGenerationConfig(num_ctx=4096)
+        result = _to_langchain_ollama(cfg, self._creds())
+        assert result["num_ctx"] == 4096
+
+    def test_optional_fields_omitted_when_unset(self):
+        cfg = OllamaGenerationConfig()
+        result = _to_langchain_ollama(cfg, self._creds())
+        for key in ("repeat_penalty", "mirostat", "mirostat_tau", "mirostat_eta", "num_ctx"):
+            assert key not in result
 
     def test_response_format_json(self):
         cfg = OllamaGenerationConfig(response_format=ResponseFormat.JSON)
@@ -317,7 +436,7 @@ class TestMistralLLMConstruction:
         provider = MistralLLM()
         cfg = provider._default_config()
         assert isinstance(cfg, MistralGenerationConfig)
-        assert cfg.model == "mistral-medium"
+        assert cfg.model == "mistral-medium-latest"
 
 
 class TestOllamaLLMConstruction:

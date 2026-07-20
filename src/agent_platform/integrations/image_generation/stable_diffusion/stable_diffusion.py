@@ -64,6 +64,7 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
         config: StableDiffusionConfig | None = None,
         size: str | None = None,
         format: ImageFormat = ImageFormat.PNG,
+        negative_prompt: str | None = None,
     ) -> ImageDocument:
         config = config or self._config
         await self._load()
@@ -76,16 +77,27 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
             )
 
         height, width = _parse_size(size)
+        negative_prompt = (
+            negative_prompt if negative_prompt is not None else config.negative_prompt
+        )
+        generator = _build_generator(config)
         loop = asyncio.get_event_loop()
 
         def _infer() -> Image.Image:
+            call_kwargs: dict[str, Any] = {
+                "prompt": prompt,
+                "height": height,
+                "width": width,
+                "num_images_per_prompt": 1,
+                "guidance_scale": config.guidance_scale,
+                "num_inference_steps": config.num_inference_steps,
+            }
+            if negative_prompt:
+                call_kwargs["negative_prompt"] = negative_prompt
+            if generator is not None:
+                call_kwargs["generator"] = generator
             with torch.no_grad():
-                output = pipeline(
-                    prompt=prompt,
-                    height=height,
-                    width=width,
-                    num_images_per_prompt=1,
-                )
+                output = pipeline(**call_kwargs)
             return _pluck_images(output)[0]
 
         pil_image = await loop.run_in_executor(None, _infer)
@@ -114,6 +126,7 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
         config: StableDiffusionConfig | None = None,
         size: str | None = None,
         format: ImageFormat = ImageFormat.PNG,
+        negative_prompt: str | None = None,
     ) -> list[ImageDocument]:
         config = config or self._config
         await self._load()
@@ -126,16 +139,27 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
             )
 
         height, width = _parse_size(size)
+        negative_prompt = (
+            negative_prompt if negative_prompt is not None else config.negative_prompt
+        )
+        generator = _build_generator(config)
         loop = asyncio.get_event_loop()
 
         def _infer() -> list[bytes]:
+            call_kwargs: dict[str, Any] = {
+                "prompt": prompt,
+                "height": height,
+                "width": width,
+                "num_images_per_prompt": n,
+                "guidance_scale": config.guidance_scale,
+                "num_inference_steps": config.num_inference_steps,
+            }
+            if negative_prompt:
+                call_kwargs["negative_prompt"] = negative_prompt
+            if generator is not None:
+                call_kwargs["generator"] = generator
             with torch.no_grad():
-                output = pipeline(
-                    prompt=prompt,
-                    height=height,
-                    width=width,
-                    num_images_per_prompt=n,
-                )
+                output = pipeline(**call_kwargs)
 
             documents: list[bytes] = []
             for img in _pluck_images(output):
@@ -167,16 +191,27 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
 # --- Utils ---
 
 
+def _build_generator(config: StableDiffusionConfig) -> torch.Generator | None:
+    if config.seed is None:
+        return None
+    return torch.Generator(device=config.device).manual_seed(config.seed)
+
+
 def _parse_size(size: str | None) -> tuple[int, int]:
     if size is None:
         return 512, 512
     parts = size.lower().split("x")
     if len(parts) != 2:
-        return 512, 512
+        raise ValueError(f"Invalid size '{size}'. Expected format 'WIDTHxHEIGHT'.")
     try:
-        return int(parts[0]), int(parts[1])
-    except ValueError:
-        return 512, 512
+        width, height = int(parts[0]), int(parts[1])
+    except ValueError as exc:
+        raise ValueError(
+            f"Invalid size '{size}'. Expected format 'WIDTHxHEIGHT'."
+        ) from exc
+    if width <= 0 or height <= 0:
+        raise ValueError(f"Invalid size '{size}'. Width and height must be positive.")
+    return width, height
 
 
 def _pluck_images(output: Any) -> list[Image.Image]:

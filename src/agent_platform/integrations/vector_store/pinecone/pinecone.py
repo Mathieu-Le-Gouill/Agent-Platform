@@ -24,9 +24,12 @@ class PineconeStore(LangChainVectorStore[PineconeConfig]):
     def _build_client(self, config: PineconeConfig) -> PineconeVectorStore:
         if not self._credentials.api_key:
             raise MissingCredentialError("Pinecone API key is required")
-        return PineconeVectorStore(
-            index_name=config.collection_name,
-            embedding=self._embeddings,
-            pinecone_api_key=self._credentials.api_key.get_secret_value(),
-            namespace=config.namespace,
-        )
+        kwargs: dict = {
+            "index_name": config.collection_name,
+            "embedding": self._embeddings,
+            "pinecone_api_key": self._credentials.api_key.get_secret_value(),
+            "namespace": config.namespace,
+        }
+        if config.host is not None:
+            kwargs["host"] = config.host
+        return PineconeVectorStore(**kwargs)

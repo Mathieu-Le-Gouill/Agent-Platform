@@ -8,7 +8,7 @@ from agent_platform.core.schemas.chunk import TextChunk
 
 @pytest.fixture
 def openai_provider():
-    from agent_platform.integrations.embeddings.providers.openai import (
+    from agent_platform.integrations.embeddings.openai.openai import (
         OpenAIEmbeddingProvider,
     )
 
@@ -24,7 +24,7 @@ def openai_provider():
 
 @pytest.fixture
 def mistral_provider():
-    from agent_platform.integrations.embeddings.providers.mistral import (
+    from agent_platform.integrations.embeddings.mistral.mistral import (
         MistralEmbeddingProvider,
     )
 
@@ -40,7 +40,7 @@ def mistral_provider():
 
 @pytest.fixture
 def ollama_provider():
-    from agent_platform.integrations.embeddings.providers.ollama import (
+    from agent_platform.integrations.embeddings.ollama.ollama import (
         OllamaEmbeddingProvider,
     )
 

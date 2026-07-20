@@ -3,6 +3,7 @@ from __future__ import annotations
 import asyncio
 
 from azure.ai.translation.text import TextTranslationClient
+from azure.ai.translation.text.models import TranslateInputItem, TranslationTarget
 from azure.core.credentials import AzureKeyCredential
 
 from agent_platform.integrations.credentials import (
@@ -29,7 +30,7 @@ class AzureTranslator(BaseTranslator[AzureTranslatorConfig]):
     def _default_config(self) -> AzureTranslatorConfig:
         return AzureTranslatorConfig()
 
-    def _build_client(self) -> TextTranslationClient:
+    def _build_client(self, config: AzureTranslatorConfig) -> TextTranslationClient:
         if not self._credentials.api_key:
             raise MissingCredentialError("Azure Translator API key is required")
         credential = AzureKeyCredential(self._credentials.api_key.get_secret_value())
@@ -37,6 +38,7 @@ class AzureTranslator(BaseTranslator[AzureTranslatorConfig]):
             endpoint=self._credentials.endpoint,
             credential=credential,
             region=self._credentials.region,
+            api_version=config.api_version,
         )
 
     @error_logged(re_raise=ProviderError, message="Translation failed")
@@ -49,14 +51,25 @@ class AzureTranslator(BaseTranslator[AzureTranslatorConfig]):
         config: AzureTranslatorConfig | None = None,
     ) -> TextChunk:
         config = config or self._default_config()
-        client = self._build_client()
+        client = self._build_client(config)
+
+        target_item = TranslationTarget(
+            language=target.value,
+            profanity_action=config.profanity_action,
+            profanity_marker=config.profanity_marker,
+            allow_fallback=config.allow_fallback,
+        )
+        input_item = TranslateInputItem(
+            text=content.text,
+            targets=[target_item],
+            language=source.value if source else None,
+            text_type=config.text_type,
+        )
 
         try:
             response = await asyncio.to_thread(
                 client.translate,
-                body=[{"text": content.text}],
-                to_language=[target.value],
-                from_language=[source.value] if source else None,
+                body=[input_item],
             )
         except Exception as exc:
             raise ProviderError(f"Azure Translator failed: {exc}") from exc

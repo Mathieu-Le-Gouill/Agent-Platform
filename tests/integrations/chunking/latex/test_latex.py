@@ -29,6 +29,33 @@ def test_default_config_type():
     assert cfg.chunk_overlap == 64
 
 
+def test_default_config_new_field_defaults():
+    provider = LatexChunkerProvider()
+    cfg = provider._default_config()
+    assert cfg.keep_separator is True
+    assert cfg.is_separator_regex is False
+    assert cfg.strip_whitespace is True
+
+
+def test_splitter_forwards_new_fields_to_from_language():
+    from unittest.mock import patch
+
+    provider = LatexChunkerProvider()
+    config = LatexChunkerConfig(keep_separator="end", strip_whitespace=False)
+
+    with patch(
+        "agent_platform.integrations.chunking.latex.latex.RecursiveCharacterTextSplitter.from_language"
+    ) as mock_from_language:
+        provider._splitter(config)
+
+    _, kwargs = mock_from_language.call_args
+    assert kwargs["keep_separator"] == "end"
+    assert kwargs["strip_whitespace"] is False
+    # is_separator_regex must never be forwarded: from_language() always
+    # passes it internally and a duplicate kwarg would raise a TypeError.
+    assert "is_separator_regex" not in kwargs
+
+
 def test_chunk_respects_latex_sections():
     provider = LatexChunkerProvider()
     doc = TextDocument(text=LATEX_DOC, format=DocumentFormat.LATEX)

@@ -5,6 +5,7 @@ from typing import AsyncIterator
 
 import numpy as np
 from faster_whisper import WhisperModel
+from faster_whisper.transcribe import Segment, TranscriptionInfo
 
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.integrations.speech_to_text.faster_whisper.config import (
@@ -12,7 +13,6 @@ from agent_platform.integrations.speech_to_text.faster_whisper.config import (
 )
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
-from agent_platform.core.schemas.enums import Language
 from agent_platform.integrations.speech_to_text.utils import parse_language
 
 
@@ -40,21 +40,10 @@ class FasterWhisperSTT(BaseSpeechToText[FasterWhisperConfig]):
         audio_np = np.frombuffer(audio.data, dtype=np.float32)
 
         segments, info = await asyncio.to_thread(
-            model.transcribe,
-            audio_np,
-            beam_size=config.beam_size,
-            language=config.language,
-            vad_filter=config.vad_filter,
+            _run_transcribe, model, audio_np, config
         )
 
-        utterances = [
-            Utterance(
-                text=seg.text.strip(),
-                start_ms=int(seg.start * 1000),
-                end_ms=int(seg.end * 1000),
-            )
-            for seg in segments
-        ]
+        utterances = _map_utterances(segments, config)
 
         return Transcript(
             utterances=utterances,
@@ -91,20 +80,47 @@ class FasterWhisperSTT(BaseSpeechToText[FasterWhisperConfig]):
         return _stream()
 
 
-async def _transcribe_buffer(
-    model: WhisperModel,
-    buffer: list[np.ndarray],
-    config: FasterWhisperConfig,
-) -> Transcript:
-    audio_np = np.concatenate(buffer)
-    segments, info = await asyncio.to_thread(
-        model.transcribe,
+def _run_transcribe(
+    model: WhisperModel, audio_np: np.ndarray, config: FasterWhisperConfig
+) -> tuple[list[Segment], TranscriptionInfo]:
+    segments, info = model.transcribe(
         audio_np,
         beam_size=config.beam_size,
         language=config.language,
         vad_filter=config.vad_filter,
+        word_timestamps=config.word_timestamps,
+        condition_on_previous_text=config.condition_on_previous_text,
     )
-    utterances = [
+    return list(segments), info
+
+
+def _map_utterances(
+    segments: list[Segment], config: FasterWhisperConfig
+) -> list[Utterance]:
+    if config.word_timestamps:
+        utterances = []
+        for seg in segments:
+            if not seg.words:
+                utterances.append(
+                    Utterance(
+                        text=seg.text.strip(),
+                        start_ms=int(seg.start * 1000),
+                        end_ms=int(seg.end * 1000),
+                    )
+                )
+                continue
+            for word in seg.words:
+                utterances.append(
+                    Utterance(
+                        text=word.word.strip(),
+                        start_ms=int(word.start * 1000),
+                        end_ms=int(word.end * 1000),
+                        confidence=word.probability,
+                    )
+                )
+        return utterances
+
+    return [
         Utterance(
             text=seg.text.strip(),
             start_ms=int(seg.start * 1000),
@@ -112,9 +128,18 @@ async def _transcribe_buffer(
         )
         for seg in segments
     ]
+
+
+async def _transcribe_buffer(
+    model: WhisperModel,
+    buffer: list[np.ndarray],
+    config: FasterWhisperConfig,
+) -> Transcript:
+    audio_np = np.concatenate(buffer)
+    segments, info = await asyncio.to_thread(_run_transcribe, model, audio_np, config)
+    utterances = _map_utterances(segments, config)
     return Transcript(
         utterances=utterances,
         language=parse_language(info.language),
         metadata={"stt_provider": "faster-whisper", "model": config.model_size},
     )
-

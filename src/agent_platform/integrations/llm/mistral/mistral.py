@@ -89,7 +89,11 @@ def _to_langchain_mistral(
                 )
             model_kwargs["response_format"] = {
                 "type": "json_schema",
-                "json_schema": config.json_schema,
+                "json_schema": {
+                    "schema": config.json_schema,
+                    "name": config.json_schema_name,
+                    "strict": config.json_schema_strict,
+                },
             }
 
     if model_kwargs:

@@ -34,26 +34,31 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
         format: ImageFormat = ImageFormat.PNG,
     ) -> ImageDocument:
         config = config or self._default_config()
-        client = httpx.AsyncClient(timeout=config.timeout)
 
         payload = {
             "prompt": prompt,
             "aspect_ratio": _size_to_aspect(size),
-            "process_mode": "fast",
+            "process_mode": config.process_mode,
         }
 
-        response = await client.post(
-            f"{config.api_url}/imagine",
-            json=payload,
-            headers={
-                "Authorization": f"Bearer {self._credentials.api_key.get_secret_value()}"
-            },
-        )
-        response.raise_for_status()
-        data: dict[str, Any] = response.json()
+        async with httpx.AsyncClient(timeout=config.timeout) as client:
+            response = await client.post(
+                f"{config.api_url}/imagine",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {self._credentials.api_key.get_secret_value()}"
+                },
+            )
+            response.raise_for_status()
+            data: dict[str, Any] = response.json()
 
-        image_url = data.get("image_url") or data.get("uri", "")
-        image_bytes = await self._fetch_image(client, image_url)
+            image_url = data.get("image_url") or data.get("uri")
+            if not image_url:
+                raise ProviderError(
+                    "Midjourney proxy response missing image_url/uri",
+                    code="midjourney.no_image_url",
+                )
+            image_bytes = await self._fetch_image(client, image_url)
 
         return ImageDocument(
             content=image_bytes,
@@ -79,43 +84,51 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
         format: ImageFormat = ImageFormat.PNG,
     ) -> list[ImageDocument]:
         config = config or self._default_config()
-        client = httpx.AsyncClient(timeout=config.timeout)
 
         payload = {
             "prompt": prompt,
             "aspect_ratio": _size_to_aspect(size),
-            "process_mode": "fast",
+            "process_mode": config.process_mode,
         }
 
-        response = await client.post(
-            f"{config.api_url}/imagine",
-            json=payload,
-            headers={
-                "Authorization": f"Bearer {self._credentials.api_key.get_secret_value()}"
-            },
-        )
-        response.raise_for_status()
-        data: dict[str, Any] = response.json()
-
-        image_urls: list[str] = data.get("image_urls", [data.get("image_url", "")])
-        image_urls = image_urls[:n]
-
         documents: list[ImageDocument] = []
-        for url in image_urls:
-            image_bytes = await self._fetch_image(client, url)
-            documents.append(
-                ImageDocument(
-                    content=image_bytes,
-                    format=format,
-                    metadata=DocumentMetadata(
-                        description=prompt,
-                        extra={
-                            "provider": "midjourney",
-                            "size": size,
-                        },
-                    ),
-                )
+        async with httpx.AsyncClient(timeout=config.timeout) as client:
+            response = await client.post(
+                f"{config.api_url}/imagine",
+                json=payload,
+                headers={
+                    "Authorization": f"Bearer {self._credentials.api_key.get_secret_value()}"
+                },
             )
+            response.raise_for_status()
+            data: dict[str, Any] = response.json()
+
+            image_urls: list[str] = data.get("image_urls") or [
+                data.get("image_url") or data.get("uri") or ""
+            ]
+            image_urls = image_urls[:n]
+
+            if not image_urls or any(not url for url in image_urls):
+                raise ProviderError(
+                    "Midjourney proxy response missing image_url(s)/uri",
+                    code="midjourney.no_image_url",
+                )
+
+            for url in image_urls:
+                image_bytes = await self._fetch_image(client, url)
+                documents.append(
+                    ImageDocument(
+                        content=image_bytes,
+                        format=format,
+                        metadata=DocumentMetadata(
+                            description=prompt,
+                            extra={
+                                "provider": "midjourney",
+                                "size": size,
+                            },
+                        ),
+                    )
+                )
         return documents
 
     @staticmethod

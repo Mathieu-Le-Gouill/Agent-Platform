@@ -47,8 +47,8 @@ def _to_langchain_mistral(
 
     params["max_retries"] = resolve_max_retries(config.max_retries, credentials)
 
-    if config.dimensions is not None:
-        params["dimensions"] = config.dimensions
+    # `dimensions` is intentionally never forwarded: `MistralAIEmbeddings` has
+    # `extra="forbid"` and no such field (see config.py note).
     if config.wait_time is not None:
         params["wait_time"] = config.wait_time
     if config.max_concurrent_requests is not None:

@@ -56,6 +56,24 @@ def test_recursive_chunker_config_is_subclass():
     assert issubclass(RecursiveChunkerConfig, ChunkerConfig)
 
 
+def test_recursive_chunker_config_new_field_defaults():
+    cfg = RecursiveChunkerConfig()
+    assert cfg.keep_separator is True
+    assert cfg.is_separator_regex is False
+    assert cfg.strip_whitespace is True
+
+
+def test_recursive_chunker_config_new_field_overrides():
+    cfg = RecursiveChunkerConfig(
+        keep_separator="end",
+        is_separator_regex=True,
+        strip_whitespace=False,
+    )
+    assert cfg.keep_separator == "end"
+    assert cfg.is_separator_regex is True
+    assert cfg.strip_whitespace is False
+
+
 def test_recursive_chunker_config_pydantic():
     from pydantic import BaseModel
 

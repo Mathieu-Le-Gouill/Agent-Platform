@@ -102,3 +102,128 @@ def test_chunk_wraps_unexpected_errors_as_provider_error(
 
     with pytest.raises(ProviderError):
         provider.chunk([doc], None)
+
+
+def test_default_config_overlap_all_defaults_true():
+    cfg = PDFChunkerConfig()
+    assert cfg.overlap_all is True
+
+
+@patch("agent_platform.integrations.chunking.pdf.pdf.chunk_by_title")
+@patch("agent_platform.integrations.chunking.pdf.pdf.partition_pdf")
+def test_chunk_forwards_overlap_all_by_default(mock_partition, mock_chunk_by_title):
+    mock_partition.return_value = ["element"]
+    mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
+
+    provider = PDFStructureChunkerProvider()
+    doc = TextDocument(text="", source="doc.pdf", format=DocumentFormat.PDF)
+
+    provider.chunk([doc], None)
+
+    _, kwargs = mock_chunk_by_title.call_args
+    assert kwargs["overlap_all"] is True
+    assert kwargs["overlap"] == 64
+
+
+@patch("agent_platform.integrations.chunking.pdf.pdf.chunk_by_title")
+@patch("agent_platform.integrations.chunking.pdf.pdf.partition_pdf")
+def test_chunk_forwards_overlap_all_false_when_configured(
+    mock_partition, mock_chunk_by_title
+):
+    mock_partition.return_value = ["element"]
+    mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
+
+    provider = PDFStructureChunkerProvider()
+    doc = TextDocument(text="", source="doc.pdf", format=DocumentFormat.PDF)
+    config = PDFChunkerConfig(overlap_all=False)
+
+    provider.chunk([doc], config)
+
+    _, kwargs = mock_chunk_by_title.call_args
+    assert kwargs["overlap_all"] is False
+
+
+@patch("agent_platform.integrations.chunking.pdf.pdf.chunk_by_title")
+@patch("agent_platform.integrations.chunking.pdf.pdf.partition_pdf")
+def test_chunk_forwards_include_orig_elements(mock_partition, mock_chunk_by_title):
+    mock_partition.return_value = ["element"]
+    mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
+
+    provider = PDFStructureChunkerProvider()
+    doc = TextDocument(text="", source="doc.pdf", format=DocumentFormat.PDF)
+    config = PDFChunkerConfig(include_orig_elements=True)
+
+    provider.chunk([doc], config)
+
+    _, kwargs = mock_chunk_by_title.call_args
+    assert kwargs["include_orig_elements"] is True
+
+
+@patch("agent_platform.integrations.chunking.pdf.pdf.chunk_by_title")
+@patch("agent_platform.integrations.chunking.pdf.pdf.partition_pdf")
+def test_chunk_forwards_max_tokens_when_set(mock_partition, mock_chunk_by_title):
+    mock_partition.return_value = ["element"]
+    mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
+
+    provider = PDFStructureChunkerProvider()
+    doc = TextDocument(text="", source="doc.pdf", format=DocumentFormat.PDF)
+    config = PDFChunkerConfig(max_tokens=256)
+
+    provider.chunk([doc], config)
+
+    _, kwargs = mock_chunk_by_title.call_args
+    assert kwargs["max_tokens"] == 256
+
+
+@patch("agent_platform.integrations.chunking.pdf.pdf.chunk_by_title")
+@patch("agent_platform.integrations.chunking.pdf.pdf.partition_pdf")
+def test_chunk_omits_max_tokens_when_unset(mock_partition, mock_chunk_by_title):
+    mock_partition.return_value = ["element"]
+    mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
+
+    provider = PDFStructureChunkerProvider()
+    doc = TextDocument(text="", source="doc.pdf", format=DocumentFormat.PDF)
+
+    provider.chunk([doc], None)
+
+    _, kwargs = mock_chunk_by_title.call_args
+    assert "max_tokens" not in kwargs
+
+
+@patch("agent_platform.integrations.chunking.pdf.pdf.chunk_by_title")
+@patch("agent_platform.integrations.chunking.pdf.pdf.partition_pdf")
+def test_chunk_forwards_table_options_when_true(mock_partition, mock_chunk_by_title):
+    mock_partition.return_value = ["element"]
+    mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
+
+    provider = PDFStructureChunkerProvider()
+    doc = TextDocument(text="", source="doc.pdf", format=DocumentFormat.PDF)
+    config = PDFChunkerConfig(
+        skip_table_chunking=True,
+        repeat_table_headers=True,
+        isolate_table=True,
+    )
+
+    provider.chunk([doc], config)
+
+    _, kwargs = mock_chunk_by_title.call_args
+    assert kwargs["skip_table_chunking"] is True
+    assert kwargs["repeat_table_headers"] is True
+    assert kwargs["isolate_table"] is True
+
+
+@patch("agent_platform.integrations.chunking.pdf.pdf.chunk_by_title")
+@patch("agent_platform.integrations.chunking.pdf.pdf.partition_pdf")
+def test_chunk_omits_table_options_when_false(mock_partition, mock_chunk_by_title):
+    mock_partition.return_value = ["element"]
+    mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
+
+    provider = PDFStructureChunkerProvider()
+    doc = TextDocument(text="", source="doc.pdf", format=DocumentFormat.PDF)
+
+    provider.chunk([doc], None)
+
+    _, kwargs = mock_chunk_by_title.call_args
+    assert "skip_table_chunking" not in kwargs
+    assert "repeat_table_headers" not in kwargs
+    assert "isolate_table" not in kwargs

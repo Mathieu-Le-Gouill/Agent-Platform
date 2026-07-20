@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import hdbscan
+
 from agent_platform.core.interfaces.clustering.base import BaseClusteringAlgorithm
 from agent_platform.integrations.clustering.hdbscan.config import HDBSCANConfig
 from agent_platform.core.interfaces.clustering.response import (
@@ -23,7 +25,6 @@ class HDBSCANClusterer(BaseClusteringAlgorithm[HDBSCANConfig]):
         if not items:
             return ClusterResult(clusters=[], items=[])
         _validate_vectors(items)
-        import hdbscan
 
         vectors = _extract_vectors(items)
         clusterer = hdbscan.HDBSCAN(
@@ -31,6 +32,11 @@ class HDBSCANClusterer(BaseClusteringAlgorithm[HDBSCANConfig]):
             min_samples=config.min_samples,
             metric=config.metric,
             cluster_selection_epsilon=config.cluster_selection_epsilon,
+            cluster_selection_method=config.cluster_selection_method,
+            alpha=config.alpha,
+            allow_single_cluster=config.allow_single_cluster,
+            cluster_selection_epsilon_max=config.cluster_selection_epsilon_max,
+            max_cluster_size=config.max_cluster_size,
         )
         labels = clusterer.fit_predict(vectors)
         probabilities = getattr(clusterer, "probabilities_", None)

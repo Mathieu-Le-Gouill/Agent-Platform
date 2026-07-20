@@ -6,7 +6,7 @@ from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXC
 class TestSpeechConfig:
     def test_default_model(self):
         cfg = SpeechConfig()
-        assert cfg.model == "nova-2"
+        assert cfg.model == ""
 
     def test_custom_model(self):
         cfg = SpeechConfig(model="nova-2-phonecall")

@@ -6,7 +6,7 @@ from PIL.ExifTags import TAGS as EXIF_TAGS
 
 from agent_platform.core.interfaces.loader.image.base import BaseImageLoader
 from agent_platform.core.interfaces.loader.image.config import ImageLoaderConfig
-from agent_platform.core.schemas.dimensions import Dimensions
+from agent_platform.core.schemas.dimensions import Dimensions, bit_depth_for_mode
 from agent_platform.core.schemas.document import ImageDocument, DocumentMetadata
 from agent_platform.core.schemas.enums import ImageFormat, FileFormat
 
@@ -43,7 +43,7 @@ class PILImageLoader(BaseImageLoader):
                 color_space = img.mode
                 channels = len(img.getbands())
 
-            bit_depth = _get_bit_depth(img.mode)
+            bit_depth = bit_depth_for_mode(img.mode)
             img_width, img_height = img.size
 
             exif_data = _extract_exif(img)
@@ -71,29 +71,6 @@ class PILImageLoader(BaseImageLoader):
                 channels=channels,
             )
         ]
-
-
-_MODE_BIT_DEPTH: dict[str, int] = {
-    "1": 1,
-    "L": 8,
-    "LA": 8,
-    "P": 8,
-    "I": 32,
-    "F": 32,
-    "RGB": 8,
-    "RGBA": 8,
-    "CMYK": 8,
-    "YCbCr": 8,
-    "LAB": 8,
-    "HSV": 8,
-    "I;16": 16,
-    "I;16L": 16,
-    "I;16B": 16,
-}
-
-
-def _get_bit_depth(mode: str) -> int | None:
-    return _MODE_BIT_DEPTH.get(mode)
 
 
 def _extract_exif(img: Image.Image) -> dict:

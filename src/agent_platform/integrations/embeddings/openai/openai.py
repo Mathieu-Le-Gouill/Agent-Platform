@@ -38,9 +38,23 @@ def _to_langchain_openai(
     config: OpenAIEmbeddingConfig,
     credentials: OpenAICredentials,
 ) -> dict[str, Any]:
-    params: dict[str, Any] = {"model_kwargs": config.model_kwargs}
+    params: dict[str, Any] = {}
+
+    # `OpenAIEmbeddings.model_kwargs` defaults to `dict` (non-Optional), so
+    # `None` must never be passed through directly. `encoding_format` has no
+    # dedicated field on the client and is routed through this same channel.
+    if config.model_kwargs is not None or config.encoding_format is not None:
+        model_kwargs: dict[str, Any] = dict(config.model_kwargs or {})
+        if config.encoding_format is not None:
+            model_kwargs["encoding_format"] = config.encoding_format
+        params["model_kwargs"] = model_kwargs
+
     if config.dimensions is not None:
         params["dimensions"] = config.dimensions
+
+    # Maps the base `batch_size` field to the client's request-batching knob.
+    params["chunk_size"] = config.batch_size
+    params["check_embedding_ctx_length"] = config.check_embedding_ctx_length
 
     timeout = resolve_timeout(config.timeout, credentials)
     if timeout is not None:

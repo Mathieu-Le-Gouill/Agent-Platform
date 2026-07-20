@@ -9,9 +9,6 @@ from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingMode,
 )
 from agent_platform.integrations.credentials import HuggingFaceCredentials
-from agent_platform.core.credentials import (
-    resolve_timeout,
-)
 from agent_platform.core.errors import MissingCredentialError
 
 
@@ -61,8 +58,23 @@ def _to_langchain_huggingface_hosted(
     if config.provider is not None:
         params["provider"] = config.provider
 
-    timeout = resolve_timeout(config.timeout, credentials)
-    if timeout is not None:
-        params["timeout"] = timeout
+    # `HuggingFaceEndpointEmbeddings` has no `timeout` field (verified
+    # against the installed package source) and `InferenceClient` offers no
+    # equivalent kwargs channel for hosted embeddings either, so `timeout` is
+    # intentionally dropped in hosted mode.
+
+    model_kwargs: dict[str, Any] = {}
+    if config.model_kwargs is not None:
+        model_kwargs.update(config.model_kwargs)
+    if config.encode_kwargs is not None:
+        model_kwargs.update(config.encode_kwargs)
+    if config.dimensions is not None:
+        model_kwargs["dimensions"] = config.dimensions
+    if config.truncate is not None:
+        model_kwargs["truncate"] = config.truncate
+    if config.normalize is not None:
+        model_kwargs["normalize"] = config.normalize
+    if model_kwargs:
+        params["model_kwargs"] = model_kwargs
 
     return params

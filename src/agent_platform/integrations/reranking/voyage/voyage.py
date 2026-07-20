@@ -21,8 +21,13 @@ class VoyageRerankerProvider(LangChainReranker[VoyageRerankerConfig]):
             if self._credentials.api_key
             else None
         )
+        kwargs = {}
+        if config.truncation is not None:
+            kwargs["truncation"] = config.truncation
+
         return VoyageAIRerank(
             model=config.model,
             voyage_api_key=api_key,
             top_k=config.top_k,
+            **kwargs,
         )
