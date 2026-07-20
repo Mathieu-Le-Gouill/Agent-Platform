@@ -7,7 +7,7 @@ from datetime import datetime
 
 from pydantic import BaseModel, Field
 
-from agent_platform.core.schemas.dimensions import Dimensions
+from agent_platform.core.schemas.dimensions import Dimensions, bit_depth_for_mode
 from agent_platform.core.schemas.enums import (
     MediaType,
     DocumentFormat,
@@ -225,27 +225,9 @@ _SF_FORMAT_MAP: dict[AudioFormat, str] = {
     AudioFormat.M4A: "MP4",
 }
 
-_MODE_BIT_DEPTH: dict[str, int] = {
-    "1": 1,
-    "L": 8,
-    "LA": 8,
-    "P": 8,
-    "I": 32,
-    "F": 32,
-    "RGB": 8,
-    "RGBA": 8,
-    "CMYK": 8,
-    "YCbCr": 8,
-    "LAB": 8,
-    "HSV": 8,
-    "I;16": 16,
-    "I;16L": 16,
-    "I;16B": 16,
-}
-
 
 def _image_bit_depth(mode: str) -> int | None:
-    return _MODE_BIT_DEPTH.get(mode)
+    return bit_depth_for_mode(mode)
 
 
 def _infer_image_format(path: str) -> ImageFormat:
