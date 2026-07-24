@@ -1,4 +1,4 @@
-# agent_platform — Codebase Architecture
+# agent_platform: Codebase Architecture
 
 ## Layers
 
@@ -22,27 +22,27 @@
 
 ## Layer Details
 
-### `core/` — Foundation
+### `core/`: Foundation
 
 Zero external dependencies. Everything here is pure Python, `pydantic`, `abc`, `typing`, `uuid`, `datetime`.
 
 | Path | Contents |
 |---|---|
 | `core/base.py` | `Entity` (UUID mixin), `Timestamped` |
-| `core/errors.py` | `PlatformError` hierarchy — `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
+| `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
 | `core/credentials.py` | `BaseCredentials`, `ProviderCredentials` |
 | `core/interfaces/<domain>/` | ABCs for every capability (llm, embeddings, vad, ocr, vector_store, reranking, chunking, speech, translation, clustering, classification, loader, image_generation) |
 | `core/schemas/` | Shared Pydantic v2 data models used across all layers |
 
-#### `core/schemas/` — Shared Data Structures
+#### `core/schemas/`: Shared Data Structures
 
 All models are `pydantic.BaseModel`. Frozen where appropriate.
 
 | File | Contents |
 |---|---|
-| `document.py` | `Document` hierarchy — `TextDocument`, `ImageDocument`, `AudioDocument`, `VideoDocument` |
-| `chunk.py` | `Chunk` hierarchy — `TextChunk`, `AudioChunk`, `VideoChunk` |
-| `message.py` | Chat messages — `SystemMessage`, `UserMessage`, `AssistantMessage`, `ToolMessage`, `ToolCall`, `ToolResult`, `Prompt` |
+| `document.py` | `Document` hierarchy, `TextDocument`, `ImageDocument`, `AudioDocument`, `VideoDocument` |
+| `chunk.py` | `Chunk` hierarchy, `TextChunk`, `AudioChunk`, `VideoChunk` |
+| `message.py` | Chat messages, `SystemMessage`, `UserMessage`, `AssistantMessage`, `ToolMessage`, `ToolCall`, `ToolResult`, `Prompt` |
 | `conversation.py` | `Utterance` (speaker, text, timestamps, confidence), `Transcript` |
 | `embedding.py` | `Embedding` with vector, norm, dimension helpers |
 | `score.py` | `Score` with kind, bounds, normalization |
@@ -51,7 +51,7 @@ All models are `pydantic.BaseModel`. Frozen where appropriate.
 | `cluster.py` | `Cluster` with label, items, centroid |
 | `enums.py` | `MediaType`, `DocumentFormat`, `ImageFormat`, `AudioFormat`, `VideoFormat`, `DataType`, `Language`, `FileFormat` |
 
-### `integrations/` — Service Adapters
+### `integrations/`: Service Adapters
 
 Each domain follows:
 
@@ -67,20 +67,20 @@ integrations/<domain>/
 
 `loader/` uses `strategies/` instead of plain `<provider>/` subdirectories because each strategy handles a different media type rather than a different vendor.
 
-Each domain's `integrations/<domain>/__init__.py` re-exports its provider classes lazily via a module-level `__getattr__` (PEP 562) over a `_PROVIDERS: dict[class_name, module_path]` map, so callers get a flat import — `from agent_platform.integrations.llm import OpenAILLM` — without eagerly importing every provider's SDK (each class is only imported on first access). Add a new provider to a domain by adding one entry to that domain's `_PROVIDERS` map.
+Each domain's `integrations/<domain>/__init__.py` re-exports its provider classes lazily via a module-level `__getattr__` (PEP 562) over a `_PROVIDERS: dict[class_name, module_path]` map, so callers get a flat import, `from agent_platform.integrations.llm import OpenAILLM`, without eagerly importing every provider's SDK (each class is only imported on first access). Add a new provider to a domain by adding one entry to that domain's `_PROVIDERS` map.
 
-### `components/` — Composable Units
+### `components/`: Composable Units
 
 `Component[InputT, OutputT]` ABC with `async def arun(input) -> OutputT`. See `components/README.md`.
 
-### `pipelines/` — Orchestration Flows
+### `pipelines/`: Orchestration Flows
 
 Multi-step operations that chain components together. See `pipelines/README.md`.
 
-### `audio/` — DSP Utilities
+### `audio/`: DSP Utilities
 
-- `io.py` — AudioDocument/Chunk construction, tensor/numpy/base64 conversions
-- `dsp.py` — resampling, waveform chunking, full audio processing pipeline
+- `io.py`, AudioDocument/Chunk construction, tensor/numpy/base64 conversions
+- `dsp.py`, resampling, waveform chunking, full audio processing pipeline
 
 ## Extension Patterns
 
@@ -107,9 +107,10 @@ class MyLLM(LangChainLLMProvider):
 
 | Issue | Location | Status |
 |---|---|---|
-| No entrypoint | `main.py` declared in `pyproject.toml` but missing | Open |
 | DI container commented out | `config/container.py` | Open |
-| `speech_translation.py` is pseudocode | `pipelines/speech_translation.py` | Open |
-| Minimal RAG pipelines | `rag/ingest.py`, `rag/query.py` missing embedding step | Open |
-| classification integration has no providers | `integrations/classification/` | Open |
+| `speech_translation.py` is pseudocode, `run()` raises `NotImplementedError` | `pipelines/speech_translation.py` | Open |
+| Minimal RAG pipelines | `rag/ingest.py`, `rag/query.py` missing chunk/embed/rerank/generate steps | Open |
+| `classification` has no `integrations/` layer, only interface response models and component-level use | `core/interfaces/classification/`, `integrations/classification/` (missing) | Open |
+| `classification-transformers` extra declared but unused | `pyproject.toml` | Open |
+| `uv run --extra chunking-pdf`/`--extra all` fails (uv resolves an old `unstructured`→`numba` pin incompatible with Python >=3.10); `pip install -e ".[chunking-pdf]"` works | `pyproject.toml` | Open |
 | Empty stubs | `api/`, `workflows/` | By design |

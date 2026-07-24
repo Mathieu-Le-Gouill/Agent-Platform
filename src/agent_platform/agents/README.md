@@ -1,4 +1,4 @@
-# Agents — Status & Roadmap
+# Agents: Status & Roadmap
 
 The agents layer is the top-level composition: LLM reasoning, tool calls, and conversation state.
 
@@ -7,10 +7,10 @@ Agent = LLM (reasoning) + Tools (capabilities) + Executor (loop control)
 ```
 
 Each agent skill should be:
-- **Self-contained** — clear input/output contract
-- **Reusable** — composable into larger workflows
-- **Language-driven** — LLM for planning and reasoning
-- **Observable** — errors surfaced via `AgentError` hierarchy
+- **Self-contained**, clear input/output contract
+- **Reusable**, composable into larger workflows
+- **Language-driven**, LLM for planning and reasoning
+- **Observable**, errors surfaced via `AgentError` hierarchy
 
 ## Implemented
 
@@ -20,9 +20,9 @@ Each agent skill should be:
 |---|---|---|
 | `Tool` Protocol | `tools/base.py` | `name`, `description`, `input_schema: type[BaseModel]`, `output_schema`, `async run(**kwargs) -> Any`; validates at subclass definition time |
 | `ToolRegistry` | `tools/registry.py` | Register/get/remove/iterate; `resolve_call()` dispatches a `ToolCall`; `call_and_wrap()` returns a `ToolMessage` (captures errors as `is_error=True`) |
-| `TranscribeTool` | `tools/transcribe.py` | Wraps `BaseSpeechToText` — audio → transcript |
+| `TranscribeTool` | `tools/transcribe.py` | Wraps `BaseSpeechToText`, audio → transcript |
 | `SearchTool` | `tools/search.py` | Embeds query → vector store search → ranked chunks |
-| `OCRTool` | `tools/ocr.py` | Wraps `BaseOCRProvider` — image → extracted text |
+| `OCRTool` | `tools/ocr.py` | Wraps `BaseOCRProvider`, image → extracted text |
 | `safe_call()` | `tools/_utils.py` | Error-wrapping helper for provider calls inside tools |
 
 ### Agent Runtime (`agents/`)
@@ -55,21 +55,21 @@ ToolError
 
 | Tool | Backing Integration | Status |
 |---|---|---|
-| `TranslateTool` | `BaseTranslator` — text → target language | Not started |
-| `SummarizeTool` | LLM — text → summary | Not started |
-| `ClassifyTool` | `BaseClassificationProvider` — text → label | Not started |
-| `GenerateImageTool` | `BaseImageGenerator` — prompt → image | Not started |
+| `TranslateTool` | `BaseTranslator`, text → target language | Not started |
+| `SummarizeTool` | LLM, text → summary | Not started |
+| `ClassifyTool` | `BaseClassificationProvider`, text → label | Not started |
+| `GenerateImageTool` | `BaseImageGenerator`, prompt → image | Not started |
 
 ### Infrastructure
 
-- **Workflows** (`workflows/`) — LangGraph state machine for multi-turn agents (stub)
-- **API Layer** (`api/`) — FastAPI REST + WebSocket exposing agents (stub)
-- **Factories** (`factories/`) — Provider resolution from config/env (stub)
-- **Streaming** — `Agent.think()` does not yet support streaming responses
+- **Workflows** (`workflows/`), LangGraph state machine for multi-turn agents (empty stub directory exists)
+- **API Layer** (`api/`), FastAPI REST + WebSocket exposing agents (empty stub directory exists)
+- **Factories** (`factories/`), provider resolution from config/env (not started, no directory yet, see `config/container.py` for the commented-out DI approach it would replace)
+- **Streaming**, `Agent.think()` does not yet support streaming responses
 
 ### Specialized Agents
 
-`MeetingNotesAgent`, `DocumentQAAgent`, `TranslationAgent` — each is a `ConversationAgent` subclass with a fixed system prompt, tool set, and domain-specific logic.
+`MeetingNotesAgent`, `DocumentQAAgent`, `TranslationAgent`, each is a `ConversationAgent` subclass with a fixed system prompt, tool set, and domain-specific logic.
 
 ## Adding a New Tool
 

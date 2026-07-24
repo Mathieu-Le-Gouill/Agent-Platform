@@ -12,7 +12,9 @@ htmlcov/
 # --- Virtual environments ---
 .venv/
 venv/
-.test_venv/
+
+# --- uv (venv resolution only; dependency source of truth stays pyproject.toml extras) ---
+uv.lock
 
 # --- Environment / secrets ---
 .env

@@ -1,4 +1,4 @@
-# Pipelines — Status & Roadmap
+# Pipelines: Status & Roadmap
 
 Pipelines compose multiple integrations into multi-step, asynchronous flows.
 
@@ -24,7 +24,7 @@ Audio → [STT] → Text → [Translator] → Translated Text
 
 `SpeechTranslationPipeline` class exists with constructor and method signatures, but `run()` body is in a docstring comment. STT and Translation providers are now implemented (WhisperX, Deepgram, DeepL, Google Translate), so this pipeline needs actual wiring + streaming support.
 
-### RAG — Ingest (`rag/ingest.py`)
+### RAG - Ingest (`rag/ingest.py`)
 **Status: Minimal**
 
 ```python
@@ -34,7 +34,7 @@ async def ingest(chunks: list[TextChunk], store: VectorStore) -> None:
 
 **Missing:** Embedding step, chunking, document preprocessing, metadata handling, batching.
 
-### RAG — Query (`rag/query.py`)
+### RAG - Query (`rag/query.py`)
 **Status: Minimal**
 
 ```python

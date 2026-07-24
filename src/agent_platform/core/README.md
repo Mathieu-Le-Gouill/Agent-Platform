@@ -1,8 +1,8 @@
-# Core — Library-Independent Foundation
+# Core: Library-Independent Foundation
 
 ## Design
 
-`core/` is the **zero-dependency foundation** of the platform. It defines everything that does not depend on an external library — pure Python ABCs, Pydantic schemas, enums, and error types. No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
+`core/` is the **zero-dependency foundation** of the platform. It defines everything that does not depend on an external library, pure Python ABCs, Pydantic schemas, enums, and error types. No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
 
 ## Directory Layout
 
@@ -38,7 +38,7 @@ core/
     └── enums.py
 ```
 
-### `interfaces/` — The Contract Layer
+### `interfaces/`: The Contract Layer
 
 Each subdirectory follows a fixed pattern (example: `interfaces/llm/`):
 
@@ -51,11 +51,11 @@ interfaces/<domain>/
 
 An interface ABC **never imports from `integrations/`**, **never imports from `components/`**, and **never imports from `pipelines/`**. It may only use `core/schemas/`, `core/errors.py`, and `core/credentials.py`.
 
-### `schemas/` — Shared Data Structures
+### `schemas/`: Shared Data Structures
 
-All Pydantic v2 models live here. They are the currency passed between layers — a component returns a schema type, a pipeline accepts one, a tool wraps one.
+All Pydantic v2 models live here. They are the currency passed between layers, a component returns a schema type, a pipeline accepts one, a tool wraps one.
 
-### `errors.py` — Error Hierarchy
+### `errors.py`: Error Hierarchy
 
 ```
 PlatformError
@@ -115,5 +115,5 @@ core/interfaces/<new_domain>/
 ## Constraints
 
 - **No imports from `integrations/`, `components/`, `pipelines/`, or `agents/`**
-- **No external library imports** (no langchain, no openai, no numpy, etc.) — only `pydantic`, `abc`, `typing`, `uuid`, `datetime`
+- **No external library imports** (no langchain, no openai, no numpy, etc.), only `pydantic`, `abc`, `typing`, `uuid`, `datetime`
 - ABCs use `Generic` TypeVars for type safety where appropriate
