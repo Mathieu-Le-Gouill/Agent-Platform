@@ -4,18 +4,16 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
-from agent_platform.core.schemas import model_schema
-from agent_platform.integrations.llm.huggingface.config import (
-    HuggingFaceGenerationConfig,
-)
-from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
 )
-
 from agent_platform.core.errors import MissingCredentialError
-
+from agent_platform.core.schemas import model_schema
+from agent_platform.integrations.credentials import HuggingFaceCredentials
+from agent_platform.integrations.llm.huggingface.config import (
+    HuggingFaceGenerationConfig,
+)
 from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 
 if TYPE_CHECKING:
@@ -28,7 +26,7 @@ class HuggingFaceLLM(LangChainLLMProvider[HuggingFaceGenerationConfig]):
             credentials if credentials is not None else HuggingFaceCredentials()
         )
 
-    def _tool_to_schema(self, tool: "Tool") -> dict[str, Any]:
+    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
         return {
             "type": "function",

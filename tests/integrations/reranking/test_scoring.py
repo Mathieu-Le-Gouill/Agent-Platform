@@ -1,5 +1,5 @@
-from agent_platform.integrations.reranking.scoring import build_relevance_scores
 from agent_platform.core.schemas.score import ScoreKind
+from agent_platform.integrations.reranking.scoring import build_relevance_scores
 
 
 def test_normalize_min_max():

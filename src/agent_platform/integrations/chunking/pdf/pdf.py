@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
 from uuid import uuid4
 
 from unstructured.chunking.title import chunk_by_title
 from unstructured.partition.pdf import partition_pdf
 
-from agent_platform.core.interfaces.chunking.base import BaseChunker
 from agent_platform.core.errors import ProviderError, ValidationError
+from agent_platform.core.interfaces.chunking.base import BaseChunker
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat

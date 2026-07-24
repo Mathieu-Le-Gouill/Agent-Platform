@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 from abc import abstractmethod
-from typing import Sequence, Generic
+from collections.abc import Sequence
+from typing import Generic
 
 from langchain_core.embeddings import Embeddings
 
-from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.embeddings.base import (
     BaseEmbeddingProvider,
     EmbeddingConfigT,
 )
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
-from agent_platform.core.schemas.embedding import Embedding
+from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.embedding import Embedding
 
 
 class LangChainEmbedder(

@@ -1,11 +1,12 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import TYPE_CHECKING, AsyncIterator, Generic, TypeVar
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Generic, TypeVar
 
-from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
+from agent_platform.core.schemas.message import Prompt
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool

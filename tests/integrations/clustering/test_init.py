@@ -1,12 +1,12 @@
 from agent_platform.core.interfaces.clustering.base import BaseClusteringAlgorithm
 from agent_platform.core.interfaces.clustering.config import ClusteringConfig
+from agent_platform.core.interfaces.clustering.response import (
+    ClusteredItem,
+    ClusterResult,
+)
 from agent_platform.integrations.clustering.gmm.config import GMMConfig
 from agent_platform.integrations.clustering.hdbscan.config import HDBSCANConfig
 from agent_platform.integrations.clustering.kmeans.config import KMeansConfig
-from agent_platform.core.interfaces.clustering.response import (
-    ClusterResult,
-    ClusteredItem,
-)
 
 
 class TestClusteringInitExports:

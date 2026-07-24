@@ -17,8 +17,12 @@ def mock_provider():
     provider = AsyncMock()
     provider.extract = AsyncMock(
         return_value=[
-            TextChunk(id=uuid4(), text="Hello", index=0, confidence=Score.confidence(0.95)),
-            TextChunk(id=uuid4(), text="World", index=1, confidence=Score.confidence(0.87)),
+            TextChunk(
+                id=uuid4(), text="Hello", index=0, confidence=Score.confidence(0.95)
+            ),
+            TextChunk(
+                id=uuid4(), text="World", index=1, confidence=Score.confidence(0.87)
+            ),
         ]
     )
     return provider

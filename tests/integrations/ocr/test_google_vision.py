@@ -8,7 +8,6 @@ pytest.importorskip("google.cloud")
 from agent_platform.integrations.ocr.google_vision.google_vision import (
     _from_google_vision,
 )
-from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
 
 
 def _symbol(text):

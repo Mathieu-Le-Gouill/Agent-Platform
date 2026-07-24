@@ -8,7 +8,7 @@ class SparseVector(BaseModel, frozen=True):
     values: list[float]
 
     @model_validator(mode="after")
-    def _validate_lengths(self) -> "SparseVector":
+    def _validate_lengths(self) -> SparseVector:
         if len(self.indices) != len(self.values):
             raise ValueError(
                 f"SparseVector indices/values length mismatch: "

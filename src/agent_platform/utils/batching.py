@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Iterator, Sequence, TypeVar
+from collections.abc import Iterator, Sequence
+from typing import TypeVar
 
 __all__ = ["chunked"]
 
-T = TypeVar("T")
+ItemT = TypeVar("ItemT")
 
 
-def chunked(items: Sequence[T], size: int) -> Iterator[Sequence[T]]:
+def chunked(items: Sequence[ItemT], size: int) -> Iterator[Sequence[ItemT]]:
     for i in range(0, len(items), size):
         yield items[i : i + size]

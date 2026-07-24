@@ -6,9 +6,9 @@ from unittest.mock import MagicMock, patch
 import numpy as np
 import pytest
 
-
 pytest.importorskip("sklearn")
 
+from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.clustering.gmm.config import GMMConfig
 from agent_platform.integrations.clustering.gmm.gmm import GMMClusterer
 from agent_platform.integrations.clustering.hdbscan.config import HDBSCANConfig
@@ -20,8 +20,6 @@ from agent_platform.integrations.clustering.kmeans.kmeans import (
     KMeansClusterer,
     _softmax,
 )
-from agent_platform.core.schemas.chunk import TextChunk
-
 
 # ---------------------------------------------------------------------------
 # Empty items

@@ -3,13 +3,14 @@ from __future__ import annotations
 import hdbscan
 
 from agent_platform.core.interfaces.clustering.base import BaseClusteringAlgorithm
-from agent_platform.integrations.clustering.hdbscan.config import HDBSCANConfig
 from agent_platform.core.interfaces.clustering.response import (
-    ClusterResult,
     ClusteredItem,
+    ClusterResult,
 )
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.cluster import Cluster
+from agent_platform.core.schemas.document import TextDocument
+from agent_platform.integrations.clustering.hdbscan.config import HDBSCANConfig
 
 
 class HDBSCANClusterer(BaseClusteringAlgorithm[HDBSCANConfig]):
@@ -63,7 +64,7 @@ def _build_result(
     labels: list[int],
     probabilities: list[float] | None = None,
 ) -> ClusterResult:
-    clusters_map: dict[int, list[TextChunk]] = {}
+    clusters_map: dict[int, list[TextChunk | TextDocument]] = {}
     for item, label in zip(items, labels):
         clusters_map.setdefault(label, []).append(item)
 

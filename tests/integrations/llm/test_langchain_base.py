@@ -1,42 +1,44 @@
-from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
-
+from langchain_core.messages import (
+    AIMessage as LCAIMessage,
+)
 from langchain_core.messages import (
     HumanMessage as LCHumanMessage,
+)
+from langchain_core.messages import (
     SystemMessage as LCSystemMessage,
-    AIMessage as LCAIMessage,
+)
+from langchain_core.messages import (
     ToolMessage as LCToolMessage,
 )
 
-from agent_platform.integrations.llm.langchain_base import (
-    _to_langchain,
-    _from_langchain,
-    _block_to_langchain,
-    _content_to_langchain,
-    LangChainLLMProvider,
-)
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
-    StreamChunk,
 )
 from agent_platform.core.schemas.document import AudioDocument, ImageDocument
 from agent_platform.core.schemas.enums import AudioFormat, FinishReason, ImageFormat
 from agent_platform.core.schemas.message import (
+    AssistantMessage,
     AudioBlock,
     ImageBlock,
+    Prompt,
     SystemMessage,
     TextBlock,
-    UserMessage,
-    AssistantMessage,
     ToolMessage,
-    ToolCall,
     ToolResult,
-    Prompt,
+    UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.integrations.llm.langchain_base import (
+    LangChainLLMProvider,
+    _block_to_langchain,
+    _content_to_langchain,
+    _from_langchain,
+    _to_langchain,
+)
 
 
 class TestBlockToLangchain:

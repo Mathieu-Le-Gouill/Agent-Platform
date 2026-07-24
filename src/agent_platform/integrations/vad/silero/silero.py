@@ -1,18 +1,18 @@
 from __future__ import annotations
 
-from silero_vad import load_silero_vad, get_speech_timestamps
-from typing import AsyncIterator, Sequence
 from collections import deque
+from collections.abc import AsyncIterator, Sequence
 
 import torch
+from silero_vad import get_speech_timestamps, load_silero_vad
 
+from agent_platform.audio.io import AudioIO
 from agent_platform.core.interfaces.vad.base import BaseVAD
-from agent_platform.integrations.vad.silero.config import SileroVadConfig
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
 from agent_platform.core.schemas.chunk import AudioChunk
-from agent_platform.core.schemas.span import SampleSpan
 from agent_platform.core.schemas.enums import DataType
-from agent_platform.audio.io import AudioIO
+from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.integrations.vad.silero.config import SileroVadConfig
 
 
 class SileroVAD(BaseVAD[SileroVadConfig]):
@@ -72,7 +72,7 @@ class SileroVAD(BaseVAD[SileroVadConfig]):
 
         config = config or self._default_config()
 
-        buffer_chunks = deque()
+        buffer_chunks: deque[torch.Tensor] = deque()
         torch_audio = None
 
         async for chunk in audio_sequence:

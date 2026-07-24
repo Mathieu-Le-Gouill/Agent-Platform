@@ -1,14 +1,15 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 pytest.importorskip("silero_vad")
 
-from agent_platform.integrations.vad.silero.config import SileroVadConfig
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
-from agent_platform.core.schemas.enums import DataType
 from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.enums import DataType
 from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.integrations.vad.silero.config import SileroVadConfig
 
 
 def test_config_defaults():
@@ -258,7 +259,9 @@ async def test_adetect_forwards_max_speech_duration_s(
             dtype=DataType.FLOAT32,
         )
 
-    async for _ in vad.adetect(_gen(), config=SileroVadConfig(max_speech_duration_s=8.0)):
+    async for _ in vad.adetect(
+        _gen(), config=SileroVadConfig(max_speech_duration_s=8.0)
+    ):
         pass
 
     _, kwargs = mock_get_speech_timestamps.call_args

@@ -1,11 +1,18 @@
-from agent_platform.components.llm_classifier.strategies.base import PromptStrategy
+from collections.abc import Callable
+from typing import TypeVar
+
 from agent_platform.components.llm_classifier.config import ClassificationMode
+from agent_platform.components.llm_classifier.strategies.base import PromptStrategy
+
+_StrategyT = TypeVar("_StrategyT", bound=type[PromptStrategy])
 
 _STRATEGIES: dict[ClassificationMode, PromptStrategy] = {}
 
 
-def register_strategy(mode: ClassificationMode):
-    def decorator(cls):
+def register_strategy(
+    mode: ClassificationMode,
+) -> Callable[[_StrategyT], _StrategyT]:
+    def decorator(cls: _StrategyT) -> _StrategyT:
         _STRATEGIES[mode] = cls()
         return cls
 

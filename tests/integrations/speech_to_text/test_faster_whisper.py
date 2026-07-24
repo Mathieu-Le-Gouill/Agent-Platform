@@ -5,15 +5,15 @@ import pytest
 
 pytest.importorskip("faster_whisper")
 
+from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.enums import AudioFormat
 from agent_platform.integrations.speech_to_text.faster_whisper.config import (
     FasterWhisperConfig,
 )
 from agent_platform.integrations.speech_to_text.faster_whisper.faster_whisper import (
     FasterWhisperSTT,
 )
-from agent_platform.core.interfaces.speech.base import BaseSpeechToText
-from agent_platform.core.schemas.enums import AudioFormat
-from agent_platform.core.schemas.chunk import AudioChunk
 
 
 def _make_audio() -> AudioChunk:

@@ -2,8 +2,8 @@ from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
 
 from agent_platform.integrations.credentials import ChromaCredentials
-from agent_platform.integrations.vector_store.langchain_base import LangChainVectorStore
 from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
+from agent_platform.integrations.vector_store.langchain_base import LangChainVectorStore
 
 
 class ChromaStore(LangChainVectorStore[ChromaConfig]):

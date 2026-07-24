@@ -3,7 +3,8 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.models.chunk import TextChunk
+from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
+from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.pipelines.rag.ingest import ingest
 from agent_platform.pipelines.rag.query import query
 
@@ -56,15 +57,19 @@ class TestQuery:
 
     async def test_query_default_k(self, mock_store):
         await query([0.1, 0.2, 0.3], mock_store)
-        mock_store.search.assert_awaited_once_with([0.1, 0.2, 0.3], k=5)
+        mock_store.search.assert_awaited_once_with(
+            [0.1, 0.2, 0.3], k=5, config=None, filter=None
+        )
 
     async def test_query_custom_k(self, mock_store):
         await query([0.1, 0.2, 0.3], mock_store, k=10)
-        mock_store.search.assert_awaited_once_with([0.1, 0.2, 0.3], k=10)
+        mock_store.search.assert_awaited_once_with(
+            [0.1, 0.2, 0.3], k=10, config=None, filter=None
+        )
 
     async def test_query_empty_vector(self, mock_store):
         await query([], mock_store)
-        mock_store.search.assert_awaited_once_with([], k=5)
+        mock_store.search.assert_awaited_once_with([], k=5, config=None, filter=None)
 
     async def test_query_empty_result(self):
         store = AsyncMock()
@@ -75,4 +80,19 @@ class TestQuery:
     async def test_query_passes_vector_correctly(self, mock_store):
         vector = [0.5, 0.6, 0.7, 0.8]
         await query(vector, mock_store, k=3)
-        mock_store.search.assert_awaited_once_with(vector, k=3)
+        mock_store.search.assert_awaited_once_with(
+            vector, k=3, config=None, filter=None
+        )
+
+    async def test_query_passes_filter_through(self, mock_store):
+        await query([0.1, 0.2], mock_store, filter={"source": "doc.txt"})
+        mock_store.search.assert_awaited_once_with(
+            [0.1, 0.2], k=5, config=None, filter={"source": "doc.txt"}
+        )
+
+    async def test_query_passes_config_through(self, mock_store):
+        config = VectorStoreConfig(collection_name="docs", namespace="tenant-a")
+        await query([0.1, 0.2], mock_store, config=config)
+        mock_store.search.assert_awaited_once_with(
+            [0.1, 0.2], k=5, config=config, filter=None
+        )

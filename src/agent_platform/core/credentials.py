@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from pydantic import BaseModel, ConfigDict, SecretStr, Field
+from pydantic import BaseModel, ConfigDict, SecretStr
 
 
 class BaseCredentials(BaseModel, frozen=True):

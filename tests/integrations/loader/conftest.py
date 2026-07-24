@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, AsyncMock
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest

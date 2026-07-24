@@ -12,7 +12,7 @@ class TokenUsage(BaseModel, frozen=True):
     def total_tokens(self) -> int:
         return self.input_tokens + self.output_tokens + self.reasoning_tokens
 
-    def __add__(self, other: "TokenUsage") -> "TokenUsage":
+    def __add__(self, other: TokenUsage) -> TokenUsage:
         return TokenUsage(
             input_tokens=self.input_tokens + other.input_tokens,
             output_tokens=self.output_tokens + other.output_tokens,
@@ -20,5 +20,5 @@ class TokenUsage(BaseModel, frozen=True):
         )
 
     @classmethod
-    def zero(cls) -> "TokenUsage":
+    def zero(cls) -> TokenUsage:
         return cls(input_tokens=0, output_tokens=0, reasoning_tokens=0)

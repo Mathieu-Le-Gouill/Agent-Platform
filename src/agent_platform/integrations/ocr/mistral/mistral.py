@@ -2,27 +2,30 @@ from __future__ import annotations
 
 import asyncio
 import base64
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
+from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 try:
-    from mistralai import Mistral
+    from mistralai import Mistral  # type: ignore[attr-defined]
 except ImportError:  # pragma: no cover - depends on installed mistralai version
     from mistralai.client import Mistral
 
-from agent_platform.integrations.credentials import MistralCredentials
-from agent_platform.core.interfaces.ocr.base import BaseOCR
-from agent_platform.integrations.ocr.mistral.config import MistralOCRConfig
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.score import Score
+if TYPE_CHECKING:
+    from mistralai.client.models.ocrresponse import OCRResponse
+
 from agent_platform.core.errors import (
     MissingCredentialError,
     ProviderError,
     error_logged,
     with_retry,
 )
-
+from agent_platform.core.interfaces.ocr.base import BaseOCR
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.score import Score
+from agent_platform.integrations.credentials import MistralCredentials
+from agent_platform.integrations.ocr.mistral.config import MistralOCRConfig
 
 _MIME_MAP = {
     "pdf": "application/pdf",
@@ -99,9 +102,9 @@ class MistralOCR(BaseOCR[MistralOCRConfig]):
 
 
 def _from_mistral(
-    response, document_id: UUID, min_confidence: float = 0.0
+    response: OCRResponse, document_id: UUID, min_confidence: float = 0.0
 ) -> list[TextChunk]:
-    chunks = []
+    chunks: list[TextChunk] = []
     for page in response.pages:
         text = (page.markdown or "").strip()
         if not text:
@@ -115,7 +118,7 @@ def _from_mistral(
         if avg_conf is not None and avg_conf < min_confidence:
             continue
 
-        chunk_kwargs = dict(
+        chunk_kwargs: dict[str, Any] = dict(
             id=uuid4(),
             document_id=document_id,
             text=text,

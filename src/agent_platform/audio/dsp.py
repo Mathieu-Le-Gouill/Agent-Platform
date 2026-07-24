@@ -1,14 +1,15 @@
 from __future__ import annotations
 
 import io
-import torch
-import torchaudio
 from uuid import uuid4
 
-from agent_platform.models.document import AudioDocument
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.enums import DataType
+import torch
+import torchaudio
+
 from agent_platform.audio.io import AudioIO
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.document import AudioDocument
+from agent_platform.core.schemas.enums import DataType
 
 
 class AudioDSP:

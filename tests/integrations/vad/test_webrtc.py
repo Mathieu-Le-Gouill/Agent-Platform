@@ -1,13 +1,14 @@
-import pytest
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
+
+import pytest
 
 pytest.importorskip("webrtcvad")
 
-from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
-from agent_platform.core.schemas.enums import DataType
 from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.enums import DataType
 from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
 
 
 def _chunk(num_samples: int, start: int, sample_rate: int = 16000) -> AudioChunk:

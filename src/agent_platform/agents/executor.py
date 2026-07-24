@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 from agent_platform.agents.agent import Agent
 from agent_platform.agents.errors import AgentMaxIterations

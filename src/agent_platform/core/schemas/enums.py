@@ -1,11 +1,10 @@
 from __future__ import annotations
 
-from enum import Enum
-from typing import Union
+from enum import Enum, StrEnum
 from pathlib import Path
 
 
-class MediaType(str, Enum):
+class MediaType(StrEnum):
     TEXT = "text"
     IMAGE = "image"
     AUDIO = "audio"
@@ -13,7 +12,7 @@ class MediaType(str, Enum):
     UNKNOWN = "unknown"
 
 
-class DocumentFormat(str, Enum):
+class DocumentFormat(StrEnum):
     PDF = "pdf"
     MARKDOWN = "markdown"
     HTML = "html"
@@ -27,7 +26,7 @@ class DocumentFormat(str, Enum):
     UNKNOWN = "unknown"
 
 
-class ImageFormat(str, Enum):
+class ImageFormat(StrEnum):
     JPEG = "jpeg"
     PNG = "png"
     WEBP = "webp"
@@ -37,7 +36,7 @@ class ImageFormat(str, Enum):
     UNKNOWN = "unknown"
 
 
-class AudioFormat(str, Enum):
+class AudioFormat(StrEnum):
     MP3 = "mp3"
     WAV = "wav"
     FLAC = "flac"
@@ -47,7 +46,7 @@ class AudioFormat(str, Enum):
     UNKNOWN = "unknown"
 
 
-class VideoFormat(str, Enum):
+class VideoFormat(StrEnum):
     MP4 = "mp4"
     MOV = "mov"
     AVI = "avi"
@@ -56,14 +55,14 @@ class VideoFormat(str, Enum):
     UNKNOWN = "unknown"
 
 
-class DataType(str, Enum):
+class DataType(StrEnum):
     INT16 = "int16"
     FLOAT32 = "float32"
     INT8 = "int8"
     UINT8 = "uint8"
 
 
-class Language(str, Enum):
+class Language(StrEnum):
     AF = "af"
     AM = "am"
     AR = "ar"
@@ -85,11 +84,11 @@ class Language(str, Enum):
         return self.value
 
 
-MediaFormat = Union[DocumentFormat, ImageFormat, AudioFormat, VideoFormat]
+MediaFormat = DocumentFormat | ImageFormat | AudioFormat | VideoFormat
 
 
-_MIME_TO_FORMAT: dict[str, "FileFormat"] = {}
-_FORMAT_BY_EXTENSION: dict[str, "FileFormat"] = {}
+_MIME_TO_FORMAT: dict[str, FileFormat] = {}
+_FORMAT_BY_EXTENSION: dict[str, FileFormat] = {}
 
 
 class FileFormat(Enum):
@@ -130,16 +129,18 @@ class FileFormat(Enum):
 
     UNKNOWN = (None, MediaType.UNKNOWN)
 
-    def __init__(self, extension_format: MediaFormat | None, media_type: MediaType):
+    def __init__(
+        self, extension_format: MediaFormat | None, media_type: MediaType
+    ) -> None:
         self.extension_format = extension_format
         self.media_type = media_type
 
     @property
-    def extension(self):
+    def extension(self) -> str | None:
         return self.extension_format.value if self.extension_format else None
 
     @property
-    def media(self):
+    def media(self) -> str:
         return self.media_type.value
 
     @classmethod
@@ -251,14 +252,14 @@ _FORMAT_BY_EXTENSION.update(
 )
 
 
-class SimilarityMetric(str, Enum):
+class SimilarityMetric(StrEnum):
     COSINE = "cosine"
     DOT = "dot"
     EUCLIDEAN = "euclidean"
     MANHATTAN = "manhattan"
 
 
-class FinishReason(str, Enum):
+class FinishReason(StrEnum):
     STOP = "stop"
     STOP_SEQUENCE = "stop_sequence"
     LENGTH = "length"

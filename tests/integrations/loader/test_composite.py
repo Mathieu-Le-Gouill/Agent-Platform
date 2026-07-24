@@ -1,5 +1,5 @@
 import sys
-from unittest.mock import MagicMock, patch, AsyncMock
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -27,16 +27,16 @@ def _mock_langchain_community(monkeypatch):
 
 
 from agent_platform.core.schemas.document import (
-    ImageDocument,
     AudioDocument,
-    VideoDocument,
+    ImageDocument,
     TextDocument,
+    VideoDocument,
 )
 from agent_platform.core.schemas.enums import (
-    ImageFormat,
     AudioFormat,
-    VideoFormat,
     DocumentFormat,
+    ImageFormat,
+    VideoFormat,
 )
 
 
@@ -194,8 +194,8 @@ class TestMultiLoader:
 
     @pytest.mark.asyncio
     async def test_load_with_config_passthrough(self):
-        from agent_platform.integrations.loader.composite.multi import MultiLoader
         from agent_platform.core.interfaces.loader.config import LoaderConfig
+        from agent_platform.integrations.loader.composite.multi import MultiLoader
 
         mock_auto = MagicMock()
         mock_auto.load = AsyncMock()

@@ -1,5 +1,6 @@
+from uuid import uuid4
+
 import pytest
-from uuid import UUID, uuid4
 
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.interfaces.ocr.config import OCRConfig

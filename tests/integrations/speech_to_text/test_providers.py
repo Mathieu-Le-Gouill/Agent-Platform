@@ -4,9 +4,8 @@ import pytest
 
 pytest.importorskip("deepgram")
 
-from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
-from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXConfig
 from agent_platform.integrations.credentials import DeepgramCredentials
+from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
 from agent_platform.integrations.speech_to_text.deepgram.deepgram import (
     DeepgramSTT,
     _mime_from_format,
@@ -15,6 +14,7 @@ from agent_platform.integrations.speech_to_text.deepgram.deepgram import (
 from agent_platform.integrations.speech_to_text.utils import (
     parse_language as _parse_language,
 )
+from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXConfig
 
 try:
     from agent_platform.integrations.speech_to_text.whisperx.whisperx import (
@@ -26,8 +26,8 @@ except ImportError:
     HAS_WHISPERX = False
 
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
-from agent_platform.core.schemas.enums import Language, AudioFormat
 from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.enums import AudioFormat, Language
 
 
 class TestParseLanguage:
@@ -590,9 +590,7 @@ class TestWhisperXDiarization:
 
         with (
             patch.object(stt, "_load_model", return_value=mock_model),
-            patch.object(
-                stt, "_diarize", return_value=diarized_result
-            ) as mock_diarize,
+            patch.object(stt, "_diarize", return_value=diarized_result) as mock_diarize,
         ):
             result = await stt.transcribe(
                 audio, WhisperXConfig(align=False, diarize=True)

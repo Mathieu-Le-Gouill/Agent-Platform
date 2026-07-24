@@ -1,5 +1,3 @@
-import pytest
-
 from agent_platform.core.tracing import TracingBackend, TracingConfig
 
 

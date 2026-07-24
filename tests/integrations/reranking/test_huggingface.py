@@ -1,13 +1,13 @@
 from unittest.mock import MagicMock, patch
 
-import pytest
+from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 
+from agent_platform.integrations.reranking.huggingface.config import (
+    HuggingFaceRerankerConfig,
+)
 from agent_platform.integrations.reranking.huggingface.huggingface import (
     HuggingFaceRerankerProvider,
     _ScoredCrossEncoderReranker,
-)
-from agent_platform.integrations.reranking.huggingface.config import (
-    HuggingFaceRerankerConfig,
 )
 
 
@@ -15,7 +15,7 @@ def _client(config: HuggingFaceRerankerConfig):
     with patch(
         "agent_platform.integrations.reranking.huggingface.huggingface.HuggingFaceCrossEncoder"
     ) as mock_encoder_cls:
-        mock_encoder_cls.return_value = MagicMock()
+        mock_encoder_cls.return_value = MagicMock(spec=HuggingFaceCrossEncoder)
         provider = HuggingFaceRerankerProvider()
         client = provider._client(config)
         return client, mock_encoder_cls
@@ -47,7 +47,7 @@ class TestScoredCrossEncoderReranker:
     def test_compress_documents_attaches_relevance_score(self):
         from langchain_core.documents import Document
 
-        model = MagicMock()
+        model = MagicMock(spec=HuggingFaceCrossEncoder)
         model.score.return_value = [0.1, 0.9]
         reranker = _ScoredCrossEncoderReranker(model=model)
 
@@ -62,7 +62,7 @@ class TestScoredCrossEncoderReranker:
     def test_compress_documents_respects_top_n(self):
         from langchain_core.documents import Document
 
-        model = MagicMock()
+        model = MagicMock(spec=HuggingFaceCrossEncoder)
         model.score.return_value = [0.1, 0.9, 0.5]
         reranker = _ScoredCrossEncoderReranker(model=model, top_n=1)
 
@@ -73,14 +73,14 @@ class TestScoredCrossEncoderReranker:
         assert result[0].page_content == "b"
 
     def test_compress_documents_empty_input(self):
-        model = MagicMock()
+        model = MagicMock(spec=HuggingFaceCrossEncoder)
         reranker = _ScoredCrossEncoderReranker(model=model)
         assert reranker.compress_documents([], "query") == []
 
     async def test_acompress_documents_delegates_to_sync(self):
         from langchain_core.documents import Document
 
-        model = MagicMock()
+        model = MagicMock(spec=HuggingFaceCrossEncoder)
         model.score.return_value = [0.3]
         reranker = _ScoredCrossEncoderReranker(model=model)
 

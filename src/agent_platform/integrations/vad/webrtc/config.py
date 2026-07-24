@@ -1,5 +1,7 @@
 from __future__ import annotations
+
 from pydantic import Field
+
 from agent_platform.core.interfaces.vad.config import VADConfig
 
 

@@ -1,18 +1,19 @@
 from __future__ import annotations
 
+from enum import StrEnum
+
 from pydantic import BaseModel
-from enum import Enum
 
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
-from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
-from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
-from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
+from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
+from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
+from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 
 
-class ClassificationMode(str, Enum):
+class ClassificationMode(StrEnum):
     ZERO_SHOT = "zero_shot"
     FEW_SHOT = "few_shot"
     SENTIMENT_ANALYSIS = "sentiment_analysis"

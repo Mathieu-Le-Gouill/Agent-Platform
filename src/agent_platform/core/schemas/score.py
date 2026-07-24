@@ -1,11 +1,11 @@
 from __future__ import annotations
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel, model_validator
 
 
-class ScoreKind(str, Enum):
+class ScoreKind(StrEnum):
     SIMILARITY = "similarity"
     RELEVANCE = "relevance"
     CONFIDENCE = "confidence"
@@ -20,7 +20,7 @@ class Score(BaseModel, frozen=True):
     high: float = 1.0
 
     @model_validator(mode="after")
-    def _validate_bounds(self) -> "Score":
+    def _validate_bounds(self) -> Score:
         if self.low >= self.high:
             raise ValueError(
                 f"Score bounds invalid: low={self.low} >= high={self.high}"
@@ -32,25 +32,23 @@ class Score(BaseModel, frozen=True):
         return self
 
     @classmethod
-    def similarity(
-        cls, value: float, *, low: float = 0.0, high: float = 1.0
-    ) -> "Score":
+    def similarity(cls, value: float, *, low: float = 0.0, high: float = 1.0) -> Score:
         return cls(value=value, kind=ScoreKind.SIMILARITY, low=low, high=high)
 
     @classmethod
-    def relevance(cls, value: float) -> "Score":
+    def relevance(cls, value: float) -> Score:
         return cls(value=value, kind=ScoreKind.RELEVANCE)
 
     @classmethod
-    def confidence(cls, value: float) -> "Score":
+    def confidence(cls, value: float) -> Score:
         return cls(value=value, kind=ScoreKind.CONFIDENCE)
 
     @classmethod
-    def quality(cls, value: float) -> "Score":
+    def quality(cls, value: float) -> Score:
         return cls(value=value, kind=ScoreKind.QUALITY)
 
     @classmethod
-    def logit(cls, value: float, kind: ScoreKind = ScoreKind.CONFIDENCE) -> "Score":
+    def logit(cls, value: float, kind: ScoreKind = ScoreKind.CONFIDENCE) -> Score:
         return cls(value=value, kind=kind, low=float("-inf"), high=float("inf"))
 
     @property

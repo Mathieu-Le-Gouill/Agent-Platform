@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-
-from typing import Generic, Sequence, TypeVar
+from collections.abc import Sequence
+from typing import Generic, TypeVar
 
 from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse

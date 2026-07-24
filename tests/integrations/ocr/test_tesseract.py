@@ -5,9 +5,8 @@ import pytest
 
 pytest.importorskip("pytesseract")
 
-from agent_platform.integrations.ocr.tesseract.tesseract import TesseractOCR
 from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
-
+from agent_platform.integrations.ocr.tesseract.tesseract import TesseractOCR
 
 FAKE_TESSERACT_DATA = {
     "text": ["Total:", "42.00"],

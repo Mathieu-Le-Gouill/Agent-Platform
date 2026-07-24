@@ -1,5 +1,4 @@
 from unittest.mock import MagicMock, mock_open, patch
-from uuid import uuid4
 
 import pytest
 
@@ -7,11 +6,6 @@ pytest.importorskip("boto3")
 pytest.importorskip("google.cloud")
 pytest.importorskip("pytesseract")
 
-from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
-from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
-from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
-from agent_platform.integrations.ocr.aws_textract.aws_textract import AWSTextractOCR
-from agent_platform.integrations.ocr.google_vision.google_vision import GoogleVisionOCR
 from agent_platform.integrations.ocr.tesseract.tesseract import TesseractOCR
 from agent_platform.integrations.ocr.utils import load_bytes
 

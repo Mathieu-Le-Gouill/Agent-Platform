@@ -1,17 +1,20 @@
 from abc import abstractmethod
-from typing import Generic, Sequence
+from collections.abc import Sequence
+from typing import Generic
 from uuid import UUID
 
 from langchain_core.documents import (
     BaseDocumentCompressor,
+)
+from langchain_core.documents import (
     Document as LC_Document,
 )
 
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.reranking.base import (
     BaseReranker,
     RerankerConfigT,
 )
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.reranking.config import RerankerConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language

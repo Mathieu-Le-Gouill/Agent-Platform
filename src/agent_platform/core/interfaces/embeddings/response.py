@@ -1,4 +1,5 @@
 from dataclasses import dataclass
+
 from agent_platform.core.schemas.embedding import Embedding
 
 

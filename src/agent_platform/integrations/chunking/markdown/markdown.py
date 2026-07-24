@@ -1,6 +1,7 @@
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
+from typing import Any
 from uuid import uuid4
 
 from langchain_text_splitters import (
@@ -8,8 +9,8 @@ from langchain_text_splitters import (
     RecursiveCharacterTextSplitter,
 )
 
-from agent_platform.core.interfaces.chunking.base import BaseChunker
 from agent_platform.core.errors import ValidationError
+from agent_platform.core.interfaces.chunking.base import BaseChunker
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat
@@ -31,7 +32,7 @@ class MarkdownStructureChunkerProvider(
     ) -> list[TextChunk]:
         config = config or self._default_config()
 
-        header_splitter_kwargs = dict(
+        header_splitter_kwargs: dict[str, Any] = dict(
             headers_to_split_on=config.headers_to_split_on,
             strip_headers=config.strip_headers,
             return_each_line=config.return_each_line,

@@ -1,9 +1,9 @@
 import pytest
 
+from agent_platform.core.credentials import ProviderCredentials
 from agent_platform.core.interfaces.clustering.base import BaseClusteringAlgorithm
 from agent_platform.core.interfaces.clustering.config import ClusteringConfig
 from agent_platform.core.interfaces.clustering.response import ClusterResult
-from agent_platform.core.credentials import ProviderCredentials
 
 
 class _ConcreteClusteringAlgorithm(BaseClusteringAlgorithm[ClusteringConfig]):

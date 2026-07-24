@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 import pytest
 from pydantic import BaseModel, SecretStr
 
@@ -9,32 +7,33 @@ pytest.importorskip("langchain_mistralai")
 pytest.importorskip("langchain_ollama")
 
 from agent_platform.agents.tools.base import Tool
-from agent_platform.core.interfaces.llm.config import GenerationConfig
-from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
-from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
-from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
-from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 from agent_platform.core.interfaces.llm.response import ResponseFormat
+from agent_platform.integrations.credentials import (
+    AnthropicCredentials,
+    MistralCredentials,
+    OllamaCredentials,
+    OpenAICredentials,
+)
 from agent_platform.integrations.llm.anthropic.anthropic import (
     AnthropicLLM,
     _to_langchain_anthropic,
 )
-from agent_platform.integrations.llm.openai.openai import (
-    OpenAILLM,
-    _to_langchain_openai,
-)
+from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
+from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
 from agent_platform.integrations.llm.mistral.mistral import (
     MistralLLM,
     _to_langchain_mistral,
 )
+from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.ollama.ollama import (
     OllamaLLM,
     _to_langchain_ollama,
 )
-from agent_platform.integrations.credentials import AnthropicCredentials
-from agent_platform.integrations.credentials import OpenAICredentials
-from agent_platform.integrations.credentials import MistralCredentials
-from agent_platform.integrations.credentials import OllamaCredentials
+from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
+from agent_platform.integrations.llm.openai.openai import (
+    OpenAILLM,
+    _to_langchain_openai,
+)
 
 
 class TestToLangchainAnthropic:
@@ -233,7 +232,9 @@ class TestToLangchainOpenAI:
             strict=False,
         )
         result = _to_langchain_openai(cfg, self._creds())
-        assert result["model_kwargs"]["response_format"]["json_schema"]["strict"] is False
+        assert (
+            result["model_kwargs"]["response_format"]["json_schema"]["strict"] is False
+        )
 
     def test_json_schema_missing_raises(self):
         cfg = OpenAIGenerationConfig(
@@ -378,7 +379,13 @@ class TestToLangchainOllama:
     def test_optional_fields_omitted_when_unset(self):
         cfg = OllamaGenerationConfig()
         result = _to_langchain_ollama(cfg, self._creds())
-        for key in ("repeat_penalty", "mirostat", "mirostat_tau", "mirostat_eta", "num_ctx"):
+        for key in (
+            "repeat_penalty",
+            "mirostat",
+            "mirostat_tau",
+            "mirostat_eta",
+            "num_ctx",
+        ):
             assert key not in result
 
     def test_response_format_json(self):

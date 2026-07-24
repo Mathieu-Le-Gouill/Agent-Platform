@@ -3,11 +3,11 @@ from pydantic import ValidationError
 
 from agent_platform.core.interfaces.image_generation.config import ImageGenConfig
 from agent_platform.integrations.image_generation.dalle.config import DalleConfig
-from agent_platform.integrations.image_generation.stable_diffusion.config import (
-    StableDiffusionConfig,
-)
 from agent_platform.integrations.image_generation.midjourney.config import (
     MidjourneyConfig,
+)
+from agent_platform.integrations.image_generation.stable_diffusion.config import (
+    StableDiffusionConfig,
 )
 
 

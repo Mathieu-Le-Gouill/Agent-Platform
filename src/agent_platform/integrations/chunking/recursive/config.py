@@ -1,6 +1,9 @@
 from __future__ import annotations
+
 from typing import Literal
+
 from pydantic import Field
+
 from agent_platform.core.interfaces.chunking.config import ChunkerConfig
 
 

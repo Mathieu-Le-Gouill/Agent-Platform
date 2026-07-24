@@ -3,8 +3,8 @@ import pytest
 pytest.importorskip("langchain_chroma")
 
 from agent_platform.integrations.credentials import ChromaCredentials
-from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
 from agent_platform.integrations.vector_store.chroma.chroma import ChromaStore
+from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
 
 
 def test_chroma_config_persist_directory_defaults_to_none():

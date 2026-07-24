@@ -1,4 +1,3 @@
-from unittest.mock import patch
 from uuid import uuid4
 
 import pytest
@@ -6,7 +5,6 @@ import pytest
 pytest.importorskip("pytesseract")
 
 from agent_platform.integrations.ocr.tesseract.tesseract import _from_tesseract
-from agent_platform.core.schemas.chunk import TextChunk
 
 
 def test_from_tesseract_missing_block_num():

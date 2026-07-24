@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from ten_vad import TenVad
-from typing import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Sequence
 
-from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
-from agent_platform.integrations.vad.ten.config import TenVadConfig
-from agent_platform.core.schemas.chunk import AudioChunk
-from agent_platform.core.schemas.span import SampleSpan
-from agent_platform.core.interfaces.vad.state import VADState
+from ten_vad import TenVad
+
 from agent_platform.audio.io import AudioIO
+from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.interfaces.vad.state import VADState
+from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.enums import DataType
+from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.integrations.vad.ten.config import TenVadConfig
 
 
 class TenVAD(FrameBasedVAD[TenVadConfig]):
@@ -94,7 +95,8 @@ class TenVAD(FrameBasedVAD[TenVadConfig]):
         config: TenVadConfig,
     ) -> bool:
 
-        voice_prob, flag = self.handle.process(AudioIO.to_numpy(chunk))
+        handle = self._ensure_handle(config)
+        voice_prob, flag = handle.process(AudioIO.to_numpy(chunk))
         return voice_prob > config.threshold
 
 

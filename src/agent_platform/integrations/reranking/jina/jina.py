@@ -1,8 +1,8 @@
 from langchain_community.document_compressors import JinaRerank
 
 from agent_platform.integrations.credentials import JinaCredentials
-from agent_platform.integrations.reranking.langchain_base import LangChainReranker
 from agent_platform.integrations.reranking.jina.config import JinaRerankerConfig
+from agent_platform.integrations.reranking.langchain_base import LangChainReranker
 
 
 class JinaRerankerProvider(LangChainReranker[JinaRerankerConfig]):

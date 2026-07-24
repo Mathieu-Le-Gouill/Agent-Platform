@@ -1,18 +1,19 @@
 from __future__ import annotations
 
 import base64
+from typing import Any
 
 import numpy as np
 import soundfile as sf
 import torch
 from torch import Tensor
 
-from agent_platform.models.document import AudioDocument
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.enums import AudioFormat, DataType
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.document import AudioDocument
+from agent_platform.core.schemas.enums import AudioFormat, DataType
 
 
-def _to_numpy_dtype(sample_type: DataType):
+def _to_numpy_dtype(sample_type: DataType) -> type[np.generic] | None:
     import numpy as np
 
     match sample_type:
@@ -26,7 +27,7 @@ def _to_numpy_dtype(sample_type: DataType):
             return np.uint8
 
 
-def _from_numpy_dtype(dtype) -> DataType:
+def _from_numpy_dtype(dtype: np.dtype) -> DataType:
     import numpy as np
 
     match dtype:
@@ -61,7 +62,7 @@ class AudioIO:
         )
 
     @staticmethod
-    def from_tensor(tensor: Tensor, sample_rate: int, **kwargs) -> AudioChunk:
+    def from_tensor(tensor: Tensor, sample_rate: int, **kwargs: Any) -> AudioChunk:
         tensor = tensor.to(torch.float32)
         if tensor.ndim == 1:
             tensor = tensor.unsqueeze(0)
@@ -77,17 +78,17 @@ class AudioIO:
         )
 
     @staticmethod
-    def from_bytes(raw: bytes, sample_rate: int, **kwargs) -> AudioChunk:
+    def from_bytes(raw: bytes, sample_rate: int, **kwargs: Any) -> AudioChunk:
         return AudioChunk(data=raw, sample_rate=sample_rate, **kwargs)
 
     @staticmethod
-    def from_base64(encoded: str, sample_rate: int, **kwargs) -> AudioChunk:
+    def from_base64(encoded: str, sample_rate: int, **kwargs: Any) -> AudioChunk:
         return AudioIO.from_bytes(base64.b64decode(encoded), sample_rate, **kwargs)
 
     @staticmethod
     def to_tensor(segment: AudioChunk) -> Tensor:
         np_dtype = _to_numpy_dtype(segment.dtype)
-        arr = np.frombuffer(segment.data, dtype=np_dtype)
+        arr: np.ndarray = np.frombuffer(segment.data, dtype=np_dtype)
         if segment.channels > 1:
             arr = arr.reshape(segment.channels, -1)
         return torch.from_numpy(arr.copy())
@@ -95,7 +96,7 @@ class AudioIO:
     @staticmethod
     def to_numpy(segment: AudioChunk) -> np.ndarray:
         np_dtype = _to_numpy_dtype(segment.dtype)
-        arr = np.frombuffer(segment.data, dtype=np_dtype)
+        arr: np.ndarray = np.frombuffer(segment.data, dtype=np_dtype)
         if segment.channels > 1:
             arr = arr.reshape(segment.channels, -1)
         return arr.copy()
@@ -103,4 +104,3 @@ class AudioIO:
     @staticmethod
     def to_base64(segment: AudioChunk) -> str:
         return base64.b64encode(segment.data).decode("utf-8")
-

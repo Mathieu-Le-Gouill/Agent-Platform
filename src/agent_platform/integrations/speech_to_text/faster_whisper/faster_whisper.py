@@ -1,18 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
 import numpy as np
 from faster_whisper import WhisperModel
 from faster_whisper.transcribe import Segment, TranscriptionInfo
 
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.integrations.speech_to_text.faster_whisper.config import (
     FasterWhisperConfig,
 )
-from agent_platform.core.schemas.chunk import AudioChunk
-from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.integrations.speech_to_text.utils import parse_language
 
 

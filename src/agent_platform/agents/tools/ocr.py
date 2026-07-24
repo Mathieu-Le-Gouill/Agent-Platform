@@ -1,12 +1,13 @@
 from __future__ import annotations
 
-from typing import Sequence
+from collections.abc import Sequence
+from typing import Any
 from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools._utils import safe_call
+from agent_platform.agents.tools.base import Tool
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.interfaces.ocr.config import OCRConfig
 from agent_platform.core.schemas.chunk import TextChunk
@@ -40,7 +41,7 @@ class OCRTool(Tool):
     def __init__(self, provider: BaseOCR) -> None:
         self._provider = provider
 
-    async def run(self, **kwargs) -> list[TextChunk]:
+    async def run(self, **kwargs: Any) -> list[TextChunk]:
         validated = OCRInput(**kwargs)
         config = OCRConfig(
             language=validated.language,

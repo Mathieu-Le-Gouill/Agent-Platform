@@ -1,22 +1,23 @@
-from typing import Sequence
-from uuid import UUID, uuid4
 import asyncio
+from collections.abc import Sequence
+from typing import Any
+from uuid import UUID, uuid4
 
 from google.cloud import vision
 
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.interfaces.ocr.base import BaseOCR
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import (
     GoogleVisionCredentials,
 )
-from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
 from agent_platform.integrations.ocr.utils import load_bytes
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.score import Score
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 
 def _from_google_vision(
-    response, document_id: UUID, min_confidence: float
+    response: vision.AnnotateImageResponse, document_id: UUID, min_confidence: float
 ) -> list[TextChunk]:
     chunks: list[TextChunk] = []
     pages = response.full_text_annotation.pages
@@ -93,7 +94,7 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
         document_bytes = await asyncio.to_thread(load_bytes, source)
         image = vision.Image(content=document_bytes)
 
-        kwargs: dict = {"image": image}
+        kwargs: dict[str, Any] = {"image": image}
         if config.language_hints:
             kwargs["image_context"] = {"language_hints": config.language_hints}
 

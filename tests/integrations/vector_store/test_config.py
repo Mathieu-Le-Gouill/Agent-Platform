@@ -1,8 +1,8 @@
 from pydantic import ValidationError
 
 from agent_platform.core.interfaces.vector_store.config import (
-    VectorStoreConfig,
     DistanceMetric,
+    VectorStoreConfig,
 )
 from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig

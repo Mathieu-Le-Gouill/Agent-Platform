@@ -6,9 +6,8 @@ import pytest
 import torch
 
 from agent_platform.audio.io import AudioIO, _from_numpy_dtype, _to_numpy_dtype
-from agent_platform.models.chunk import AudioChunk
-from agent_platform.models.document import AudioDocument
-from agent_platform.models.enums import AudioFormat, DataType
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.enums import AudioFormat, DataType
 
 
 class TestToNumpyDtype:

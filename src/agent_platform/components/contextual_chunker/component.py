@@ -5,25 +5,23 @@ from typing import Generic, TypeVar
 from agent_platform.components.base import Component
 from agent_platform.components.chunker import Chunker
 from agent_platform.components.contextual_chunker.config import ContextualChunkerConfig
-from agent_platform.core.credentials import BaseCredentials
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.message import Prompt
 
-CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
 GenConfigT = TypeVar("GenConfigT", bound=GenerationConfig)
 
 
 class ContextualChunker(
     Component[list[TextDocument], list[TextChunk]],
-    Generic[CredentialsT, GenConfigT],
+    Generic[GenConfigT],
 ):
     def __init__(
         self,
         chunker: Chunker,
-        llm: BaseLLMProvider[CredentialsT, GenConfigT],
+        llm: BaseLLMProvider[GenConfigT],
         config: ContextualChunkerConfig | None = None,
         generation_config: GenConfigT | None = None,
     ) -> None:

@@ -1,7 +1,7 @@
 from typing import Any
 
-from langchain_qdrant import QdrantVectorStore
 from langchain_core.embeddings import Embeddings
+from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 
 from agent_platform.integrations.credentials import QdrantCredentials

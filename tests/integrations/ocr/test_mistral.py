@@ -6,10 +6,10 @@ import pytest
 
 pytest.importorskip("mistralai")
 
+from agent_platform.core.errors import MissingCredentialError, ProviderError
+from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.ocr.mistral.config import MistralOCRConfig
 from agent_platform.integrations.ocr.mistral.mistral import MistralOCR, _from_mistral
-from agent_platform.integrations.credentials import MistralCredentials
-from agent_platform.core.errors import MissingCredentialError, ProviderError
 
 
 def _page(index, markdown, confidence_scores=None):

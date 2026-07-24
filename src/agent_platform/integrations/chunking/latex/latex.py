@@ -1,14 +1,14 @@
-from typing import Sequence
+from collections.abc import Sequence
 
 from langchain_text_splitters import Language, RecursiveCharacterTextSplitter
 from langchain_text_splitters.base import TextSplitter
 
-from agent_platform.integrations.chunking.langchain_base import LangChainChunker
-from agent_platform.integrations.chunking.latex.config import LatexChunkerConfig
 from agent_platform.core.errors import ValidationError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat
+from agent_platform.integrations.chunking.langchain_base import LangChainChunker
+from agent_platform.integrations.chunking.latex.config import LatexChunkerConfig
 
 _ACCEPTED_FORMATS = {DocumentFormat.LATEX, DocumentFormat.UNKNOWN}
 

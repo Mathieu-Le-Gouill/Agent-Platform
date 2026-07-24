@@ -1,6 +1,7 @@
-from pydantic import SecretStr
 import os
-from typing import Iterable
+from collections.abc import Iterable
+
+from pydantic import SecretStr
 
 
 def secret_from_env(

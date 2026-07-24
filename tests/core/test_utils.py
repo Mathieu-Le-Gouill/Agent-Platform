@@ -1,8 +1,6 @@
 import os
 
-import pytest
-
-from agent_platform.utils.env import secret_from_env, from_env
+from agent_platform.utils.env import from_env, secret_from_env
 
 
 class TestSecretFromEnv:

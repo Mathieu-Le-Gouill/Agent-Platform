@@ -8,15 +8,17 @@ pytest.importorskip("langchain_mistralai")
 pytest.importorskip("langchain_ollama")
 pytest.importorskip("langchain_openai")
 
+from agent_platform.core.errors import MissingCredentialError
+from agent_platform.integrations.credentials import (
+    AnthropicCredentials,
+    MistralCredentials,
+    OllamaCredentials,
+    OpenAICredentials,
+)
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
-from agent_platform.integrations.credentials import OpenAICredentials
-from agent_platform.integrations.credentials import AnthropicCredentials
-from agent_platform.integrations.credentials import MistralCredentials
-from agent_platform.integrations.credentials import OllamaCredentials
-from agent_platform.core.errors import MissingCredentialError
 
 
 @patch("agent_platform.integrations.llm.ollama.ollama.ChatOllama")
@@ -36,7 +38,7 @@ async def test_ollama_client_none_config(mock_chat):
 
     provider = OllamaLLM(OllamaCredentials())
     config = OllamaGenerationConfig(model="llama3")
-    client = provider._client(config)
+    provider._client(config)
     mock_chat.assert_called_once()
 
 
@@ -57,7 +59,7 @@ async def test_mistral_client_none_config(mock_chat):
 
     provider = MistralLLM(MistralCredentials(api_key=SecretStr("key")))
     config = MistralGenerationConfig(model="mistral-large")
-    client = provider._client(config)
+    provider._client(config)
     mock_chat.assert_called_once()
 
 
@@ -78,7 +80,7 @@ async def test_anthropic_client_none_config(mock_chat):
 
     provider = AnthropicLLM(AnthropicCredentials(api_key=SecretStr("key")))
     config = AnthropicGenerationConfig(model="claude-3")
-    client = provider._client(config)
+    provider._client(config)
     mock_chat.assert_called_once()
 
 
@@ -99,7 +101,7 @@ async def test_openai_client_none_config(mock_chat):
 
     provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("key")))
     config = OpenAIGenerationConfig(model="gpt-4")
-    client = provider._client(config)
+    provider._client(config)
     mock_chat.assert_called_once()
 
 

@@ -1,4 +1,4 @@
-from agent_platform.core.schemas.span import TimeSpan, SampleSpan
+from agent_platform.core.schemas.span import SampleSpan, TimeSpan
 
 
 class TestTimeSpan:

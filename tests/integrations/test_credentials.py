@@ -3,8 +3,8 @@ from pydantic import SecretStr
 from agent_platform.core.credentials import (
     BaseCredentials,
     ProviderCredentials,
-    resolve_timeout,
     resolve_max_retries,
+    resolve_timeout,
 )
 from agent_platform.integrations.credentials import (
     AnthropicCredentials,

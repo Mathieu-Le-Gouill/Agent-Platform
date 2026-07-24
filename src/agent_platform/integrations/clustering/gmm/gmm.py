@@ -4,13 +4,14 @@ import numpy as np
 from sklearn.mixture import GaussianMixture
 
 from agent_platform.core.interfaces.clustering.base import BaseClusteringAlgorithm
-from agent_platform.integrations.clustering.gmm.config import GMMConfig
 from agent_platform.core.interfaces.clustering.response import (
-    ClusterResult,
     ClusteredItem,
+    ClusterResult,
 )
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.cluster import Cluster
+from agent_platform.core.schemas.document import TextDocument
+from agent_platform.integrations.clustering.gmm.config import GMMConfig
 
 
 class GMMClusterer(BaseClusteringAlgorithm[GMMConfig]):
@@ -47,7 +48,7 @@ class GMMClusterer(BaseClusteringAlgorithm[GMMConfig]):
         labels = gmm.fit_predict(vectors)
         probabilities = gmm.predict_proba(vectors)
 
-        clusters_map: dict[int, list[TextChunk]] = {}
+        clusters_map: dict[int, list[TextChunk | TextDocument]] = {}
         for item, label in zip(items, labels):
             clusters_map.setdefault(int(label), []).append(item)
 

@@ -4,7 +4,7 @@ from uuid import uuid4
 import pytest
 from pydantic import ValidationError
 
-from agent_platform.agents.tools import TranscribeInput, TranscribeTool, ToolError
+from agent_platform.agents.tools import ToolError, TranscribeInput, TranscribeTool
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.core.schemas.enums import AudioFormat, DataType

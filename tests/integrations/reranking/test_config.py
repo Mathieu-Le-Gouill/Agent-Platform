@@ -1,13 +1,13 @@
-from pydantic import SecretStr, ValidationError
+from pydantic import ValidationError
 
 from agent_platform.core.interfaces.reranking.config import RerankerConfig
 from agent_platform.integrations.reranking.cohere.config import CohereRerankerConfig
-from agent_platform.integrations.reranking.jina.config import JinaRerankerConfig
+from agent_platform.integrations.reranking.flashrank.config import FlashRankConfig
 from agent_platform.integrations.reranking.huggingface.config import (
     HuggingFaceRerankerConfig,
 )
+from agent_platform.integrations.reranking.jina.config import JinaRerankerConfig
 from agent_platform.integrations.reranking.voyage.config import VoyageRerankerConfig
-from agent_platform.integrations.reranking.flashrank.config import FlashRankConfig
 
 
 def test_reranker_config_defaults():

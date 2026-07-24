@@ -15,13 +15,19 @@ class TestFilterByScore:
 
     def test_zero_threshold_returns_all(self):
         chunks = self.make_chunks([0.1, 0.5, 0.9])
-        key = lambda c: c.metadata.get("confidence") or 1.0
+
+        def key(c):
+            return c.metadata.get("confidence") or 1.0
+
         result = filter_by_score(chunks, 0.0, key=key)
         assert len(result) == 3
 
     def test_filters_below_threshold(self):
         chunks = self.make_chunks([0.1, 0.5, 0.9])
-        key = lambda c: c.metadata.get("confidence") or 1.0
+
+        def key(c):
+            return c.metadata.get("confidence") or 1.0
+
         result = filter_by_score(chunks, 0.5, key=key)
         assert len(result) == 2
         assert result[0].text == "chunk1"
@@ -29,13 +35,19 @@ class TestFilterByScore:
 
     def test_all_below_returns_empty(self):
         chunks = self.make_chunks([0.1, 0.2])
-        key = lambda c: c.metadata.get("confidence") or 1.0
+
+        def key(c):
+            return c.metadata.get("confidence") or 1.0
+
         result = filter_by_score(chunks, 0.5, key=key)
         assert result == []
 
     def test_missing_confidence_defaults_to_1(self):
         chunks = [TextChunk(text="no_conf", index=0, metadata={})]
-        key = lambda c: c.metadata.get("confidence") or 1.0
+
+        def key(c):
+            return c.metadata.get("confidence") or 1.0
+
         result = filter_by_score(chunks, 0.5, key=key)
         assert len(result) == 1
 

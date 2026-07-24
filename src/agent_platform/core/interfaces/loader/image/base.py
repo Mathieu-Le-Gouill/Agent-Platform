@@ -1,9 +1,10 @@
 from abc import abstractmethod
-from typing import Sequence, TypeVar
+from collections.abc import Sequence
+from typing import TypeVar
 
-from agent_platform.core.schemas.document import ImageDocument
 from agent_platform.core.interfaces.loader.base import BaseMediaLoader
 from agent_platform.core.interfaces.loader.image.config import ImageLoaderConfig
+from agent_platform.core.schemas.document import ImageDocument
 
 ConfigT = TypeVar("ConfigT", bound=ImageLoaderConfig)
 

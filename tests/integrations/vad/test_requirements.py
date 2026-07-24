@@ -1,7 +1,7 @@
 import pytest
 
-from agent_platform.core.schemas.enums import DataType
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.schemas.enums import DataType
 
 
 class TestAudioRequirements:

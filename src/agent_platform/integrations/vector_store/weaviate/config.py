@@ -1,9 +1,12 @@
 from __future__ import annotations
+
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 
 
 class WeaviateConfig(VectorStoreConfig):
-    text_key: str = "text"  # property name storing the document body in each Weaviate object
+    text_key: str = (
+        "text"  # property name storing the document body in each Weaviate object
+    )
 
     # gRPC port for `weaviate.connect_to_custom`/`connect_to_local`; Weaviate
     # Cloud and most self-hosted setups keep the 50051 default.

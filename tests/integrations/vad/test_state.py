@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 from agent_platform.core.interfaces.vad.state import VADState
 
 

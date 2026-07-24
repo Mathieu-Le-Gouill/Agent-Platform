@@ -1,21 +1,23 @@
-from typing import Any, Sequence
-from uuid import UUID, uuid4
 import asyncio
+from collections.abc import Sequence
+from typing import Any
+from uuid import UUID, uuid4
 
 import boto3
+from botocore.client import BaseClient
 
-from agent_platform.integrations.credentials import AWSTextractCredentials
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.ocr.base import BaseOCR
+from agent_platform.core.schemas.bounding_box import BoundingBox
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.score import Score, ScoreKind
+from agent_platform.integrations.credentials import AWSTextractCredentials
 from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
 from agent_platform.integrations.ocr.utils import load_bytes
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.bounding_box import BoundingBox
-from agent_platform.core.schemas.score import Score, ScoreKind
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 
 def _from_textract(
-    response: dict, document_id: UUID, min_confidence: float
+    response: dict[str, Any], document_id: UUID, min_confidence: float
 ) -> list[TextChunk]:
     chunks: list[TextChunk] = []
 
@@ -64,7 +66,7 @@ class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
     def _default_config(self) -> AWSTextractConfig:
         return AWSTextractConfig()
 
-    def _get_client(self, region_name: str):
+    def _get_client(self, region_name: str) -> BaseClient:
         client = self._clients.get(region_name)
         if client is None:
             client = boto3.client(

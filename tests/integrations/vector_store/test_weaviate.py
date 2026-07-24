@@ -117,7 +117,9 @@ class TestWeaviateConfigFields:
         assert cfg.http_port is None
 
     def test_structured_fields_custom(self):
-        cfg = WeaviateConfig(http_host="weaviate.internal", http_port=9000, grpc_port=50052)
+        cfg = WeaviateConfig(
+            http_host="weaviate.internal", http_port=9000, grpc_port=50052
+        )
         assert cfg.http_host == "weaviate.internal"
         assert cfg.http_port == 9000
         assert cfg.grpc_port == 50052
@@ -214,9 +216,7 @@ class TestWeaviateConnectionLifecycle:
         provider._embeddings = None
         monkeypatch.setattr(provider, "_connect", lambda config: FakeRawClient())
 
-        await provider.add(
-            [TextChunk(text="hi", index=0)], config=WeaviateConfig()
-        )
+        await provider.add([TextChunk(text="hi", index=0)], config=WeaviateConfig())
 
         assert closed["called"] is True
 

@@ -1,7 +1,4 @@
-from unittest.mock import MagicMock, patch, mock_open
-from uuid import uuid4
-
-import pytest
+from unittest.mock import MagicMock, mock_open, patch
 
 from agent_platform.core.interfaces.loader.audio.config import AudioLoaderConfig
 from agent_platform.core.schemas.enums import AudioFormat

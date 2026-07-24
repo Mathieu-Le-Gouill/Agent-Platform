@@ -1,8 +1,10 @@
 from __future__ import annotations
+
 from typing import Literal
-from agent_platform.core.interfaces.vad.config import VADConfig
 
 from pydantic import Field
+
+from agent_platform.core.interfaces.vad.config import VADConfig
 
 
 class TenVadConfig(VADConfig):

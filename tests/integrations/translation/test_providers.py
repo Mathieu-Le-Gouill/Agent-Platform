@@ -13,16 +13,17 @@ from agent_platform.integrations.credentials import (
 )
 from agent_platform.integrations.translation.deepl.config import DeepLConfig
 from agent_platform.integrations.translation.deepl.deepl import (
-    DeepLTranslator,
     _DEEPL_TARGETS,
+    DeepLTranslator,
 )
 from agent_platform.integrations.translation.google_translate.config import (
     GoogleTranslateConfig,
 )
 from agent_platform.integrations.translation.google_translate.google_translate import (
-    GoogleTranslator,
     _GOOGLE_TARGETS,
+    GoogleTranslator,
 )
+
 
 def _deepl_credentials(auth_key: str | None = "test-key") -> DeepLCredentials:
     return DeepLCredentials(auth_key=auth_key)

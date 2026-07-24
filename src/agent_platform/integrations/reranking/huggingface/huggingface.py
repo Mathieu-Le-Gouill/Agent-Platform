@@ -1,16 +1,17 @@
 from __future__ import annotations
 
+from collections.abc import Sequence
 from copy import deepcopy
-from typing import Any, Sequence
 
-from langchain_core.documents import BaseDocumentCompressor, Document
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+from langchain_core.callbacks import Callbacks
+from langchain_core.documents import BaseDocumentCompressor, Document
 from pydantic import ConfigDict
 
-from agent_platform.integrations.reranking.langchain_base import LangChainReranker
 from agent_platform.integrations.reranking.huggingface.config import (
     HuggingFaceRerankerConfig,
 )
+from agent_platform.integrations.reranking.langchain_base import LangChainReranker
 
 
 class _ScoredCrossEncoderReranker(BaseDocumentCompressor):
@@ -28,7 +29,7 @@ class _ScoredCrossEncoderReranker(BaseDocumentCompressor):
     keeps this provider decoupled from that internal reshuffle.
     """
 
-    model: Any
+    model: HuggingFaceCrossEncoder
     top_n: int | None = None
 
     model_config = ConfigDict(arbitrary_types_allowed=True)
@@ -37,7 +38,7 @@ class _ScoredCrossEncoderReranker(BaseDocumentCompressor):
         self,
         documents: Sequence[Document],
         query: str,
-        callbacks: Any = None,
+        callbacks: Callbacks = None,
     ) -> Sequence[Document]:
         if not documents:
             return []
@@ -47,7 +48,7 @@ class _ScoredCrossEncoderReranker(BaseDocumentCompressor):
         if self.top_n is not None:
             ranked = ranked[: self.top_n]
 
-        result = []
+        result: list[Document] = []
         for doc, score in ranked:
             doc_copy = Document(doc.page_content, metadata=deepcopy(doc.metadata))
             doc_copy.metadata["relevance_score"] = float(score)

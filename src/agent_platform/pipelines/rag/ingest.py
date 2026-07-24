@@ -1,5 +1,5 @@
-from agent_platform.integrations.vector_store.port import VectorStore
-from agent_platform.models.chunk import TextChunk
+from agent_platform.core.interfaces.vector_store.port import VectorStore
+from agent_platform.core.schemas.chunk import TextChunk
 
 
 async def ingest(chunks: list[TextChunk], store: VectorStore) -> None:

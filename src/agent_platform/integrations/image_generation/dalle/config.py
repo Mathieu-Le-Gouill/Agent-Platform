@@ -1,7 +1,9 @@
 from __future__ import annotations
+
 from typing import Literal
 
 from pydantic import model_validator
+
 from agent_platform.core.interfaces.image_generation.config import ImageGenConfig
 
 # Quality vocabulary differs per model
@@ -21,7 +23,7 @@ class DalleConfig(ImageGenConfig):
     style: Literal["vivid", "natural"] | None = None
 
     @model_validator(mode="after")
-    def _validate_quality(self) -> "DalleConfig":
+    def _validate_quality(self) -> DalleConfig:
         allowed = _QUALITY_BY_MODEL.get(self.model)
         if allowed is not None and self.quality not in allowed:
             raise ValueError(

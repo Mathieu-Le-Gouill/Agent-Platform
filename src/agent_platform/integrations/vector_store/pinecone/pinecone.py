@@ -1,10 +1,10 @@
-from langchain_pinecone import PineconeVectorStore
 from langchain_core.embeddings import Embeddings
+from langchain_pinecone import PineconeVectorStore
 
+from agent_platform.core.errors import MissingCredentialError
 from agent_platform.integrations.credentials import PineconeCredentials
 from agent_platform.integrations.vector_store.langchain_base import LangChainVectorStore
 from agent_platform.integrations.vector_store.pinecone.config import PineconeConfig
-from agent_platform.core.errors import MissingCredentialError
 
 
 class PineconeStore(LangChainVectorStore[PineconeConfig]):

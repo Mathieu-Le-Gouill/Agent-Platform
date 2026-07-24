@@ -1,13 +1,13 @@
 import os
-from typing import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Sequence
 
-from agent_platform.core.interfaces.loader.config import LoaderConfig
-from agent_platform.core.interfaces.loader.text.strategies.unstructured import (
-    UnstructuredFileLoader,
-)
-from agent_platform.core.interfaces.loader.image.strategies.pil import PILImageLoader
 from agent_platform.core.interfaces.loader.audio.strategies.soundfile import (
     SoundFileLoader,
+)
+from agent_platform.core.interfaces.loader.config import LoaderConfig
+from agent_platform.core.interfaces.loader.image.strategies.pil import PILImageLoader
+from agent_platform.core.interfaces.loader.text.strategies.unstructured import (
+    UnstructuredFileLoader,
 )
 from agent_platform.core.interfaces.loader.video.strategies.pyav import PyAVLoader
 from agent_platform.core.schemas.document import Document
@@ -23,7 +23,9 @@ class AutoLoader:
         self._audio_loader = SoundFileLoader()
         self._video_loader = PyAVLoader()
 
-    def _loader_for(self, source: str):
+    def _loader_for(
+        self, source: str
+    ) -> PILImageLoader | SoundFileLoader | PyAVLoader | UnstructuredFileLoader:
         ext = os.path.splitext(source)[1].lstrip(".")
         fmt = FileFormat.from_extension(ext)
         match fmt.media_type:

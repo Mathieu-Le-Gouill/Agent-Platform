@@ -3,15 +3,15 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.models.chunk import AudioChunk, TextChunk
-from agent_platform.models.document import TextDocument
-from agent_platform.models.enums import DataType, DocumentFormat
-from agent_platform.models.message import (
+from agent_platform.core.schemas.chunk import AudioChunk, TextChunk
+from agent_platform.core.schemas.document import TextDocument
+from agent_platform.core.schemas.enums import DataType, DocumentFormat
+from agent_platform.core.schemas.message import (
+    Prompt,
     SystemMessage,
     UserMessage,
-    Prompt,
 )
-from agent_platform.models.token import TokenUsage
+from agent_platform.core.schemas.token import TokenUsage
 
 
 @pytest.fixture
@@ -79,5 +79,5 @@ def mock_langchain_response() -> MagicMock:
 @pytest.fixture
 def mock_llm():
     llm = MagicMock()
-    llm.generate = AsyncMock()
+    llm.agenerate = AsyncMock()
     return llm

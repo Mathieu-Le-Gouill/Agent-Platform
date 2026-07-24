@@ -4,16 +4,16 @@ from typing import TYPE_CHECKING, Any
 
 from langchain_openai import ChatOpenAI
 
-from agent_platform.core.schemas import model_schema
-from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
-from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
 )
-from agent_platform.core.interfaces.llm.response import ResponseFormat
-from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 from agent_platform.core.errors import MissingCredentialError
+from agent_platform.core.interfaces.llm.response import ResponseFormat
+from agent_platform.core.schemas import model_schema
+from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
+from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
@@ -25,7 +25,7 @@ class OpenAILLM(LangChainLLMProvider[OpenAIGenerationConfig]):
             credentials if credentials is not None else OpenAICredentials()
         )
 
-    def _tool_to_schema(self, tool: "Tool") -> dict[str, Any]:
+    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
         return {
             "name": tool.name,

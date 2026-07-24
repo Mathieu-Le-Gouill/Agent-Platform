@@ -1,7 +1,6 @@
-
-from agent_platform.integrations.llm.response import LLMResponse, FinishReason
-from agent_platform.models.message import AssistantMessage, ToolCall
-from agent_platform.models.token import TokenUsage
+from agent_platform.core.interfaces.llm.response import FinishReason, LLMResponse
+from agent_platform.core.schemas.message import AssistantMessage, ToolCall
+from agent_platform.core.schemas.token import TokenUsage
 
 
 def make_fake_llm_response(

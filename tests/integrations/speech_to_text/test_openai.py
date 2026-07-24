@@ -4,14 +4,14 @@ import pytest
 
 pytest.importorskip("openai")
 
+from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.enums import AudioFormat
 from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.speech_to_text.openai.config import (
     OpenAIWhisperConfig,
 )
 from agent_platform.integrations.speech_to_text.openai.openai import OpenAIWhisperSTT
-from agent_platform.core.interfaces.speech.base import BaseSpeechToText
-from agent_platform.core.schemas.enums import AudioFormat
-from agent_platform.core.schemas.chunk import AudioChunk
 
 
 def _make_audio() -> AudioChunk:
@@ -41,9 +41,7 @@ class TestOpenAIWhisperResponseFormatGating:
         mock_response.language = "en"
 
         mock_client = MagicMock()
-        mock_client.audio.transcriptions.create = AsyncMock(
-            return_value=mock_response
-        )
+        mock_client.audio.transcriptions.create = AsyncMock(return_value=mock_response)
 
         with patch.object(stt, "_build_client", return_value=mock_client):
             await stt.transcribe(_make_audio(), OpenAIWhisperConfig(model="whisper-1"))
@@ -59,9 +57,7 @@ class TestOpenAIWhisperResponseFormatGating:
         mock_response.language = "en"
 
         mock_client = MagicMock()
-        mock_client.audio.transcriptions.create = AsyncMock(
-            return_value=mock_response
-        )
+        mock_client.audio.transcriptions.create = AsyncMock(return_value=mock_response)
 
         with patch.object(stt, "_build_client", return_value=mock_client):
             await stt.transcribe(
@@ -79,9 +75,7 @@ class TestOpenAIWhisperResponseFormatGating:
         mock_response.language = "en"
 
         mock_client = MagicMock()
-        mock_client.audio.transcriptions.create = AsyncMock(
-            return_value=mock_response
-        )
+        mock_client.audio.transcriptions.create = AsyncMock(return_value=mock_response)
 
         with patch.object(stt, "_build_client", return_value=mock_client):
             await stt.transcribe(
@@ -99,9 +93,7 @@ class TestOpenAIWhisperResponseFormatGating:
         mock_response.language = "en"
 
         mock_client = MagicMock()
-        mock_client.audio.transcriptions.create = AsyncMock(
-            return_value=mock_response
-        )
+        mock_client.audio.transcriptions.create = AsyncMock(return_value=mock_response)
 
         with patch.object(stt, "_build_client", return_value=mock_client):
             await stt.transcribe(
@@ -120,9 +112,7 @@ class TestOpenAIWhisperResponseFormatGating:
         mock_response.language = "en"
 
         mock_client = MagicMock()
-        mock_client.audio.transcriptions.create = AsyncMock(
-            return_value=mock_response
-        )
+        mock_client.audio.transcriptions.create = AsyncMock(return_value=mock_response)
 
         with patch.object(stt, "_build_client", return_value=mock_client):
             await stt.transcribe(
@@ -143,9 +133,7 @@ class TestOpenAIWhisperResponseFormatGating:
         mock_response.language = "en"
 
         mock_client = MagicMock()
-        mock_client.audio.transcriptions.create = AsyncMock(
-            return_value=mock_response
-        )
+        mock_client.audio.transcriptions.create = AsyncMock(return_value=mock_response)
 
         with patch.object(stt, "_build_client", return_value=mock_client):
             await stt.transcribe(
@@ -166,9 +154,7 @@ class TestOpenAIWhisperResponseFormatGating:
         mock_response.language = "en"
 
         mock_client = MagicMock()
-        mock_client.audio.transcriptions.create = AsyncMock(
-            return_value=mock_response
-        )
+        mock_client.audio.transcriptions.create = AsyncMock(return_value=mock_response)
 
         with patch.object(stt, "_build_client", return_value=mock_client):
             await stt.transcribe(
@@ -187,9 +173,7 @@ class TestOpenAIWhisperResponseFormatGating:
         mock_response.language = "en"
 
         mock_client = MagicMock()
-        mock_client.audio.transcriptions.create = AsyncMock(
-            return_value=mock_response
-        )
+        mock_client.audio.transcriptions.create = AsyncMock(return_value=mock_response)
 
         with patch.object(stt, "_build_client", return_value=mock_client):
             await stt.transcribe(_make_audio(), OpenAIWhisperConfig(model="whisper-1"))

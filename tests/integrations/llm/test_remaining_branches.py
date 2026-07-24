@@ -1,8 +1,8 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
-from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.schemas.message import Prompt, UserMessage
+from agent_platform.integrations.llm.langchain_base import LangChainLLMProvider
 
 
 async def test_stream_content_is_none():

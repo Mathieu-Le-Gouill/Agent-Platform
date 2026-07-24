@@ -10,14 +10,14 @@ from diffusers.pipelines.stable_diffusion.pipeline_stable_diffusion import (
 )
 from PIL import Image
 
-from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
-from agent_platform.integrations.image_generation.stable_diffusion.config import (
-    StableDiffusionConfig,
-)
 from agent_platform.core.errors import ProviderError
+from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
 from agent_platform.core.schemas.dimensions import Dimensions
 from agent_platform.core.schemas.document import DocumentMetadata, ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat
+from agent_platform.integrations.image_generation.stable_diffusion.config import (
+    StableDiffusionConfig,
+)
 
 
 class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):

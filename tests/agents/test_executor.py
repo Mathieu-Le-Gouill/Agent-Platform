@@ -1,14 +1,12 @@
-from unittest.mock import AsyncMock, MagicMock
-
 import pytest
 
 from agent_platform.agents.agent import Agent
-from tests.helpers import make_fake_llm_response
-from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.errors import AgentMaxIterations, AgentThinkError
+from agent_platform.agents.executor import AgentExecutor
 from agent_platform.core.schemas.message import (
     UserMessage,
 )
+from tests.helpers import make_fake_llm_response
 
 
 @pytest.fixture
@@ -70,9 +68,10 @@ class TestExecutorRun:
 
         mock_llm.agenerate.side_effect = generate_side_effect
 
+        from pydantic import BaseModel
+
         from agent_platform.agents.tools.base import Tool
         from agent_platform.agents.tools.registry import ToolRegistry
-        from pydantic import BaseModel
 
         class _WeatherTool(Tool):
             name = "get_weather"
@@ -100,9 +99,10 @@ class TestExecutorRun:
             ],
         )
 
+        from pydantic import BaseModel
+
         from agent_platform.agents.tools.base import Tool
         from agent_platform.agents.tools.registry import ToolRegistry
-        from pydantic import BaseModel
 
         class _WeatherTool(Tool):
             name = "get_weather"
@@ -159,9 +159,10 @@ class TestExecutorRun:
 
         mock_llm.agenerate.side_effect = generate_side_effect
 
+        from pydantic import BaseModel
+
         from agent_platform.agents.tools.base import Tool
         from agent_platform.agents.tools.registry import ToolRegistry
-        from pydantic import BaseModel
 
         class _WeatherTool(Tool):
             name = "get_weather"

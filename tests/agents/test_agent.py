@@ -1,13 +1,12 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import BaseModel
 
 from agent_platform.agents.agent import Agent
-from tests.helpers import make_fake_llm_response
+from agent_platform.agents.errors import AgentThinkError
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.agents.errors import AgentThinkError
 from agent_platform.core.interfaces.llm.response import LLMResponse
 from agent_platform.core.schemas.message import (
     AssistantMessage,
@@ -16,6 +15,7 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
+from tests.helpers import make_fake_llm_response
 
 
 class _WeatherInput(BaseModel):

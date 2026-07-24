@@ -1,14 +1,12 @@
-import pytest
-
 from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
-from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
-from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
-from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
-from agent_platform.core.interfaces.llm.response import ResponseFormat
+from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
+from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
+from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 
 
 class TestResponseFormat:

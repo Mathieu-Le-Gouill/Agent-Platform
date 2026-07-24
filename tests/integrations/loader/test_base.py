@@ -1,8 +1,8 @@
+from collections.abc import Sequence
+
 import pytest
-from typing import Sequence
 
 from agent_platform.core.interfaces.loader.base import BaseMediaLoader
-from agent_platform.core.schemas.document import Document
 from agent_platform.core.schemas.chunk import TextChunk
 
 

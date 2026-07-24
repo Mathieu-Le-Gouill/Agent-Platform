@@ -1,7 +1,7 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
-from agent_platform.models.document import TextDocument
-from agent_platform.models.chunk import TextChunk
 
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.document import TextDocument
 
 _splitter = RecursiveCharacterTextSplitter(
     chunk_size=512,

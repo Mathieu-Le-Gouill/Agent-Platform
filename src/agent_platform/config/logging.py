@@ -2,7 +2,7 @@ import logging
 import sys
 
 
-def setup_logging(level=logging.INFO) -> None:
+def setup_logging(level: int = logging.INFO) -> None:
     root = logging.getLogger()
     root.setLevel(level)
 
@@ -15,3 +15,6 @@ def setup_logging(level=logging.INFO) -> None:
 
     if not root.handlers:
         root.addHandler(handler)
+
+
+__all__ = ["setup_logging"]

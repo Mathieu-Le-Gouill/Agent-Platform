@@ -1,13 +1,14 @@
-import pytest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
+import pytest
+
 pytest.importorskip("ten_vad")
 
-from agent_platform.integrations.vad.ten.config import TenVadConfig
-from agent_platform.core.schemas.enums import DataType
 from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.enums import DataType
 from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.integrations.vad.ten.config import TenVadConfig
 
 
 def test_config_defaults():

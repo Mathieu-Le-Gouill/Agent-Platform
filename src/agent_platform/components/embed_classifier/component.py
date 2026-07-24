@@ -2,12 +2,6 @@ from __future__ import annotations
 
 from typing import Generic, TypeVar
 
-from agent_platform.core.interfaces.classification.response import (
-    ClassificationResponse,
-    ClassificationResult,
-)
-from agent_platform.core.credentials import BaseCredentials
-from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
 from agent_platform.components.base import Component
 from agent_platform.components.chunker import Chunker
 from agent_platform.components.embed_classifier.config import (
@@ -20,10 +14,14 @@ from agent_platform.components.similarity_scorer import (
     SimilarityInput,
     SimilarityScorer,
 )
+from agent_platform.core.interfaces.classification.response import (
+    ClassificationResponse,
+    ClassificationResult,
+)
+from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 
-CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
 EmbedConfigT = TypeVar("EmbedConfigT", bound=EmbeddingConfig)
 
 _EmbedClassifierInput = tuple[list[TextDocument], list[str], EmbeddingClassifierConfig]
@@ -31,12 +29,12 @@ _EmbedClassifierInput = tuple[list[TextDocument], list[str], EmbeddingClassifier
 
 class EmbeddingClassifier(
     Component[_EmbedClassifierInput, ClassificationResponse],
-    Generic[CredentialsT, EmbedConfigT],
+    Generic[EmbedConfigT],
 ):
     def __init__(
         self,
         chunker: Chunker,
-        embedder: Embedder[CredentialsT, EmbedConfigT],
+        embedder: Embedder[EmbedConfigT],
         similarity_scorer: SimilarityScorer,
         llm_classifier: LLMClassifier | None = None,
     ) -> None:

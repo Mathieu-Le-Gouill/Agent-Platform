@@ -1,11 +1,14 @@
 from __future__ import annotations
+
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 
 
 class ChromaConfig(VectorStoreConfig):
     # HTTP-client mode target; ignored when `persist_directory` is set.
     host: str = "localhost"
-    port: int = 8000  # HTTP-client mode target port; ignored when `persist_directory` is set
+    port: int = (
+        8000  # HTTP-client mode target port; ignored when `persist_directory` is set
+    )
 
     # When set, uses an embedded PersistentClient instead of the HTTP client.
     persist_directory: str | None = None

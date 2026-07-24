@@ -1,20 +1,20 @@
 from __future__ import annotations
 
-from uuid import UUID, uuid4
 from typing import Any
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
 from agent_platform.core.schemas.bounding_box import BoundingBox
 from agent_platform.core.schemas.dimensions import Dimensions
-from agent_platform.core.schemas.score import Score
 from agent_platform.core.schemas.enums import (
-    MediaType,
-    DocumentFormat,
     AudioFormat,
-    VideoFormat,
     DataType,
+    DocumentFormat,
+    MediaType,
+    VideoFormat,
 )
+from agent_platform.core.schemas.score import Score
 
 
 class Chunk(BaseModel, frozen=True):

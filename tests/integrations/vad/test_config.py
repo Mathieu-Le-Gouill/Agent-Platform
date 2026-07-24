@@ -1,8 +1,8 @@
 from agent_platform.core.interfaces.vad.config import VADConfig
-from agent_platform.integrations.vad.silero.config import SileroVadConfig
-from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
 from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
+from agent_platform.integrations.vad.silero.config import SileroVadConfig
 from agent_platform.integrations.vad.ten.config import TenVadConfig
+from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
 
 
 class TestVADConfig:

@@ -1,7 +1,7 @@
 from agent_platform.core.interfaces.ocr.config import OCRConfig
-from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
-from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
 from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
+from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
+from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
 
 
 def test_tesseract_config_inherits_base_defaults():

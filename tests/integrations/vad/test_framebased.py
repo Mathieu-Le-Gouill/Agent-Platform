@@ -1,13 +1,14 @@
-import pytest
 from uuid import uuid4
 
-from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
+import pytest
+
 from agent_platform.core.interfaces.vad.config import VADConfig
-from agent_platform.core.interfaces.vad.state import VADState
+from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.interfaces.vad.state import VADState
 from agent_platform.core.schemas.chunk import AudioChunk
-from agent_platform.core.schemas.span import SampleSpan
 from agent_platform.core.schemas.enums import DataType
+from agent_platform.core.schemas.span import SampleSpan
 
 
 class _TestableVAD(FrameBasedVAD[VADConfig]):

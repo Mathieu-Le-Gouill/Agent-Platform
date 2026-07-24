@@ -1,18 +1,18 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 
-from agent_platform.integrations.vector_store.langchain_base import (
-    _chunk_to_lc,
-    _lc_to_chunk,
-    LangChainVectorStore,
-)
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import DocumentFormat, Language
 from agent_platform.core.schemas.score import Score
+from agent_platform.integrations.vector_store.langchain_base import (
+    LangChainVectorStore,
+    _chunk_to_lc,
+    _lc_to_chunk,
+)
 
 
 def test_chunk_to_lc_basic():

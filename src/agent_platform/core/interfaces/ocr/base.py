@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import Generic, Sequence, TypeVar
+from collections.abc import Sequence
+from typing import Generic, TypeVar
 from uuid import UUID
 
 from agent_platform.core.interfaces.ocr.config import OCRConfig

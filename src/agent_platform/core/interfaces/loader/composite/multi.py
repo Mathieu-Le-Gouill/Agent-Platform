@@ -1,4 +1,4 @@
-from typing import AsyncIterator, Sequence
+from collections.abc import AsyncIterator, Sequence
 
 from agent_platform.core.interfaces.loader.composite.auto import AutoLoader
 from agent_platform.core.interfaces.loader.config import LoaderConfig

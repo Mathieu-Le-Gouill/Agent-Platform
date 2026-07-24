@@ -1,7 +1,7 @@
 from uuid import uuid4
 
-from agent_platform.models.document import TextDocument, DocumentMetadata
-from agent_platform.models.enums import DocumentFormat, Language
+from agent_platform.core.schemas.document import DocumentMetadata, TextDocument
+from agent_platform.core.schemas.enums import DocumentFormat, Language
 from agent_platform.pipelines.ingestion import chunk_document
 
 

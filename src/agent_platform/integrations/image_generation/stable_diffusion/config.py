@@ -1,4 +1,5 @@
 from __future__ import annotations
+
 from agent_platform.core.interfaces.image_generation.config import ImageGenConfig
 
 

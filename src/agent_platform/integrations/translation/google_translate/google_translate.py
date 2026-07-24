@@ -2,19 +2,18 @@ from __future__ import annotations
 
 import asyncio
 
-from google.cloud import translate_v2 as google_translate
+from google.cloud import translate_v2 as google_translate  # type: ignore[attr-defined]
 
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.interfaces.translation.base import BaseTranslator
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.enums import Language
 from agent_platform.integrations.credentials import (
     GoogleTranslateCredentials,
 )
-from agent_platform.core.interfaces.translation.base import BaseTranslator
 from agent_platform.integrations.translation.google_translate.config import (
     GoogleTranslateConfig,
 )
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.enums import Language
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
-
 
 _GOOGLE_TARGETS: dict[Language, str] = {
     Language.CH: "zh-CN",

@@ -5,7 +5,6 @@ from agent_platform.agents.tools._utils import safe_call
 from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.core.schemas import model_schema
 
-
 # ---------------------------------------------------------------------------
 # safe_call
 # ---------------------------------------------------------------------------

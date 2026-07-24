@@ -1,5 +1,5 @@
 import importlib.util
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
@@ -11,40 +11,42 @@ pytest.importorskip("langchain_ollama")
 
 HAS_HUGGINGFACE = importlib.util.find_spec("langchain_huggingface") is not None
 
-from agent_platform.integrations.embeddings.openai.openai import (
-    OpenAIEmbeddingProvider,
-    _to_langchain_openai,
+from agent_platform.core.errors import MissingCredentialError, ProviderError
+from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
+from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.embedding import Embedding
+from agent_platform.integrations.credentials import (
+    HuggingFaceCredentials,
+    MistralCredentials,
+    OllamaCredentials,
+    OpenAICredentials,
 )
+from agent_platform.integrations.embeddings.huggingface.config import (
+    HuggingFaceEmbeddingConfig,
+    HuggingFaceEmbeddingMode,
+)
+from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
 from agent_platform.integrations.embeddings.mistral.mistral import (
     MistralEmbeddingProvider,
     _to_langchain_mistral,
 )
+from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
 from agent_platform.integrations.embeddings.ollama.ollama import (
     OllamaEmbeddingProvider,
     _to_langchain_ollama,
 )
 from agent_platform.integrations.embeddings.openai.config import OpenAIEmbeddingConfig
-from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
-from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
-from agent_platform.integrations.embeddings.huggingface.config import (
-    HuggingFaceEmbeddingConfig,
-    HuggingFaceEmbeddingMode,
+from agent_platform.integrations.embeddings.openai.openai import (
+    OpenAIEmbeddingProvider,
+    _to_langchain_openai,
 )
-from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
-from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
-from agent_platform.integrations.credentials import OpenAICredentials
-from agent_platform.integrations.credentials import MistralCredentials
-from agent_platform.integrations.credentials import OllamaCredentials
-from agent_platform.integrations.credentials import HuggingFaceCredentials
-from agent_platform.core.errors import MissingCredentialError, ProviderError
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.embedding import Embedding
 
 if HAS_HUGGINGFACE:
     from agent_platform.integrations.embeddings.huggingface.huggingface import (
         HuggingFaceEmbeddingProvider,
-        _to_langchain_huggingface_local,
         _to_langchain_huggingface_hosted,
+        _to_langchain_huggingface_local,
     )
 
 requires_huggingface = pytest.mark.skipif(

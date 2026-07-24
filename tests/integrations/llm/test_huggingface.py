@@ -5,11 +5,11 @@ from pydantic import SecretStr
 
 pytest.importorskip("langchain_huggingface")
 
+from agent_platform.core.errors import MissingCredentialError
+from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
-from agent_platform.integrations.credentials import HuggingFaceCredentials
-from agent_platform.core.errors import MissingCredentialError
 
 
 class TestHuggingFaceToLangchain:
@@ -155,7 +155,9 @@ class TestHuggingFaceMissingCredential:
 
 class TestHuggingFaceClient:
     @patch("agent_platform.integrations.llm.huggingface.huggingface.ChatHuggingFace")
-    @patch("agent_platform.integrations.llm.huggingface.huggingface.HuggingFaceEndpoint")
+    @patch(
+        "agent_platform.integrations.llm.huggingface.huggingface.HuggingFaceEndpoint"
+    )
     def test_client_creation(self, mock_endpoint, mock_chat):
         from agent_platform.integrations.llm.huggingface.huggingface import (
             HuggingFaceLLM,

@@ -1,19 +1,17 @@
-from abc import abstractmethod
 import asyncio
-from uuid import UUID
+from abc import abstractmethod
 from typing import Any, Generic
+from uuid import UUID, uuid4
 
-from langchain_core.vectorstores import VectorStore
 from langchain_core.documents import Document as LC_Document
 from langchain_core.embeddings import Embeddings
-from uuid import uuid4
+from langchain_core.vectorstores import VectorStore
 
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.vector_store.base import (
     BaseVectorStore,
     ConfigT,
 )
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
-from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 

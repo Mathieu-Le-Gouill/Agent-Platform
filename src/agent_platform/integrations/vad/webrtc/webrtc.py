@@ -1,18 +1,18 @@
-from typing import Sequence, AsyncIterator
 import warnings
+from collections.abc import AsyncIterator, Sequence
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
     import webrtcvad
 
-from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
-from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
-from agent_platform.core.schemas.chunk import AudioChunk
-from agent_platform.core.schemas.span import SampleSpan
-from agent_platform.core.interfaces.vad.state import VADState
-from agent_platform.core.interfaces.vad.requirements import AudioRequirements
-from agent_platform.core.schemas.enums import DataType
 from agent_platform.audio.io import AudioIO
+from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
+from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.interfaces.vad.state import VADState
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.enums import DataType
+from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
 
 
 class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):

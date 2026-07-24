@@ -5,11 +5,11 @@ import pytest
 
 pytest.importorskip("diffusers")
 
+from agent_platform.core.errors import ProviderError
+from agent_platform.core.schemas.enums import ImageFormat
 from agent_platform.integrations.image_generation.stable_diffusion.config import (
     StableDiffusionConfig,
 )
-from agent_platform.core.errors import ProviderError
-from agent_platform.core.schemas.enums import ImageFormat
 
 
 @patch(
@@ -125,7 +125,6 @@ def test_pluck_images_tuple():
         _pluck_images,
     )
 
-    mock_out = MagicMock()
     mock_img = MagicMock()
     result = _pluck_images(([mock_img],))
     assert list(result) == [mock_img]

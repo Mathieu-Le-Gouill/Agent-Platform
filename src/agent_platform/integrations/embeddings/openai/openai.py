@@ -1,14 +1,15 @@
-from langchain_openai import OpenAIEmbeddings
 from typing import Any
 
-from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
-from agent_platform.integrations.embeddings.openai.config import OpenAIEmbeddingConfig
-from agent_platform.integrations.credentials import OpenAICredentials
+from langchain_openai import OpenAIEmbeddings
+
 from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
 )
 from agent_platform.core.errors import MissingCredentialError
+from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
+from agent_platform.integrations.embeddings.openai.config import OpenAIEmbeddingConfig
 
 
 class OpenAIEmbeddingProvider(LangChainEmbedder[OpenAIEmbeddingConfig]):

@@ -1,23 +1,24 @@
 from __future__ import annotations
 
-from typing import Callable, Sequence, TypeVar
+from collections.abc import Callable, Sequence
+from typing import TypeVar
 
-T = TypeVar("T")
+ItemT = TypeVar("ItemT")
 
 
 def filter_by_score(
-    items: Sequence[T],
+    items: Sequence[ItemT],
     min_score: float,
     *,
-    key: Callable[[T], float],
-) -> list[T]:
+    key: Callable[[ItemT], float],
+) -> list[ItemT]:
     return [item for item in items if key(item) >= min_score]
 
 
 def sort_by_score(
-    items: Sequence[T],
+    items: Sequence[ItemT],
     *,
-    key: Callable[[T], float],
+    key: Callable[[ItemT], float],
     reverse: bool = True,
-) -> list[T]:
+) -> list[ItemT]:
     return sorted(items, key=key, reverse=reverse)

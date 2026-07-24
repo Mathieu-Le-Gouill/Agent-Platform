@@ -1,5 +1,6 @@
 from abc import ABC, abstractmethod
-from typing import AsyncIterator, Generic, TypeVar
+from collections.abc import AsyncIterator
+from typing import Generic, TypeVar
 
 from agent_platform.core.interfaces.speech.config import SpeechConfig
 from agent_platform.core.schemas.chunk import AudioChunk

@@ -4,16 +4,16 @@ import asyncio
 from abc import ABC, abstractmethod
 from typing import Generic, TypeVar
 
-In = TypeVar("In", contravariant=True)
-Out = TypeVar("Out", covariant=True)
-NewOut = TypeVar("NewOut")
+InputT = TypeVar("InputT", contravariant=True)
+OutputT = TypeVar("OutputT", covariant=True)
+NewOutputT = TypeVar("NewOutputT")
 
 
-class Component(ABC, Generic[In, Out]):
+class Component(ABC, Generic[InputT, OutputT]):
     @abstractmethod
-    async def arun(self, input: In) -> Out: ...
+    async def arun(self, input: InputT) -> OutputT: ...
 
-    def run(self, input: In) -> Out:
+    def run(self, input: InputT) -> OutputT:
         try:
             asyncio.get_running_loop()
         except RuntimeError:
@@ -23,14 +23,18 @@ class Component(ABC, Generic[In, Out]):
             "use 'await component.arun(...)' instead."
         )
 
-    def __rshift__(self, other: Component[Out, NewOut]) -> Component[In, NewOut]:
+    def __rshift__(
+        self, other: Component[OutputT, NewOutputT]
+    ) -> Component[InputT, NewOutputT]:
         return _Chain(self, other)
 
 
-class _Chain(Component[In, NewOut], Generic[In, Out, NewOut]):
-    def __init__(self, first: Component[In, Out], second: Component[Out, NewOut]) -> None:
+class _Chain(Component[InputT, NewOutputT], Generic[InputT, OutputT, NewOutputT]):
+    def __init__(
+        self, first: Component[InputT, OutputT], second: Component[OutputT, NewOutputT]
+    ) -> None:
         self._first = first
         self._second = second
 
-    async def arun(self, input: In) -> NewOut:
+    async def arun(self, input: InputT) -> NewOutputT:
         return await self._second.arun(await self._first.arun(input))

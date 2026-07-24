@@ -1,12 +1,13 @@
-from langchain_ollama import OllamaEmbeddings
 from typing import Any
 
-from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
-from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
-from agent_platform.integrations.credentials import OllamaCredentials
+from langchain_ollama import OllamaEmbeddings
+
 from agent_platform.core.credentials import (
     resolve_timeout,
 )
+from agent_platform.integrations.credentials import OllamaCredentials
+from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
+from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
 
 
 class OllamaEmbeddingProvider(LangChainEmbedder[OllamaEmbeddingConfig]):

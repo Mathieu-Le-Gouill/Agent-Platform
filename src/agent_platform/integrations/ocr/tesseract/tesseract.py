@@ -1,17 +1,17 @@
+import asyncio
+from collections.abc import Sequence
 from pathlib import Path
-from typing import Sequence
 from urllib.request import urlopen
 from uuid import UUID, uuid4
-import asyncio
 
 import pytesseract
 from PIL import Image
 
 from agent_platform.core.interfaces.ocr.base import BaseOCR
-from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
-from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.bounding_box import BoundingBox
+from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score, ScoreKind
+from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
 
 
 def _from_tesseract(

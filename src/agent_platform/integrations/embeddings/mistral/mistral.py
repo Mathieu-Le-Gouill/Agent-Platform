@@ -1,15 +1,15 @@
-from langchain_mistralai import MistralAIEmbeddings
 from typing import Any
 
+from langchain_mistralai import MistralAIEmbeddings
+
+from agent_platform.core.credentials import (
+    resolve_max_retries,
+    resolve_timeout,
+)
+from agent_platform.core.errors import MissingCredentialError
+from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
 from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
-from agent_platform.integrations.credentials import MistralCredentials
-from agent_platform.core.credentials import (
-    resolve_timeout,
-    resolve_max_retries,
-)
-
-from agent_platform.core.errors import MissingCredentialError
 
 
 class MistralEmbeddingProvider(LangChainEmbedder[MistralEmbeddingConfig]):

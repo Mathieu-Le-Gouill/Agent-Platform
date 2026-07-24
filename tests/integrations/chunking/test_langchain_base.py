@@ -8,16 +8,15 @@ pytest.importorskip("langchain_core")
 
 from langchain_core.documents import Document as LC_Document
 
-from agent_platform.integrations.chunking.langchain_base import (
-    _doc_to_lc,
-    _lc_to_chunks,
-    LangChainChunker,
-)
 from agent_platform.core.interfaces.chunking.config import ChunkerConfig
 from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.document import TextDocument, DocumentMetadata
+from agent_platform.core.schemas.document import DocumentMetadata, TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat, Language
-
+from agent_platform.integrations.chunking.langchain_base import (
+    LangChainChunker,
+    _doc_to_lc,
+    _lc_to_chunks,
+)
 
 # ================================================================
 # _doc_to_lc  mapper

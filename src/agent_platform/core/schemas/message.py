@@ -1,17 +1,17 @@
 from __future__ import annotations
 
-from uuid import UUID, uuid4
-from typing import Annotated, Literal, Union, Any
 from datetime import datetime
-from enum import Enum
+from enum import StrEnum
+from typing import Annotated, Any, Literal
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
+from agent_platform.core.schemas.document import AudioDocument, ImageDocument
 from agent_platform.core.schemas.enums import Language, MediaType
-from agent_platform.core.schemas.document import ImageDocument, AudioDocument
 
 
-class MessageRole(str, Enum):
+class MessageRole(StrEnum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
@@ -47,7 +47,7 @@ class AudioBlock(BaseModel, frozen=True):
 
 
 ContentBlock = Annotated[
-    Union[TextBlock, ImageBlock, AudioBlock], Field(discriminator="media_type")
+    TextBlock | ImageBlock | AudioBlock, Field(discriminator="media_type")
 ]
 
 
@@ -94,7 +94,7 @@ class ToolMessage(BaseMessage):
     )
 
 
-Message = Union[SystemMessage, UserMessage, AssistantMessage, ToolMessage]
+Message = SystemMessage | UserMessage | AssistantMessage | ToolMessage
 
 
 class Prompt(BaseModel):
@@ -125,27 +125,27 @@ class Prompt(BaseModel):
 
         return cls(messages=messages)
 
-    def add_system(self, content: str, **kw) -> Prompt:
+    def add_system(self, content: str, **kw: Any) -> Prompt:
         self.messages.append(SystemMessage(content=content, **kw))
         return self
 
-    def add_user(self, content: str, **kw) -> Prompt:
+    def add_user(self, content: str, **kw: Any) -> Prompt:
         self.messages.append(UserMessage(content=content, **kw))
         return self
 
-    def add_user_content(self, blocks: list[ContentBlock], **kw) -> Prompt:
+    def add_user_content(self, blocks: list[ContentBlock], **kw: Any) -> Prompt:
         self.messages.append(UserMessage(content=blocks, **kw))
         return self
 
     def add_assistant(
-        self, content: str, tool_calls: list[ToolCall] | None = None, **kw
+        self, content: str, tool_calls: list[ToolCall] | None = None, **kw: Any
     ) -> Prompt:
         self.messages.append(
             AssistantMessage(content=content, tool_calls=tool_calls or [], **kw)
         )
         return self
 
-    def add_tool_result(self, result: ToolResult, **kw) -> Prompt:
+    def add_tool_result(self, result: ToolResult, **kw: Any) -> Prompt:
         self.messages.append(ToolMessage(result=result, **kw))
         return self
 

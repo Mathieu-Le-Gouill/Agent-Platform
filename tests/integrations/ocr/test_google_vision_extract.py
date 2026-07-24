@@ -1,19 +1,14 @@
-from types import SimpleNamespace
-from unittest.mock import MagicMock, AsyncMock, patch
+from unittest.mock import MagicMock, patch
 from uuid import uuid4
 
 import pytest
 
 pytest.importorskip("google.cloud")
 
+from agent_platform.core.errors import ProviderError
 from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
 from agent_platform.integrations.ocr.google_vision.google_vision import GoogleVisionOCR
 from agent_platform.integrations.ocr.utils import load_bytes
-from agent_platform.integrations.credentials import (
-    GoogleVisionCredentials,
-)
-from agent_platform.core.errors import ProviderError
-from agent_platform.core.schemas.chunk import TextChunk
 
 
 def _make_response(words_per_paragraph):

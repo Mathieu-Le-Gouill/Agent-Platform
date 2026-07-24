@@ -1,34 +1,34 @@
 import base64
 from unittest.mock import AsyncMock, MagicMock, patch
-from uuid import uuid4
 
 import pytest
 from pydantic import SecretStr
 
 pytest.importorskip("openai")
 
+from agent_platform.core.errors import ProviderError
+from agent_platform.core.schemas.document import ImageDocument
+from agent_platform.core.schemas.enums import ImageFormat
+from agent_platform.integrations.credentials import (
+    MidjourneyCredentials,
+    OpenAICredentials,
+)
 from agent_platform.integrations.image_generation.dalle.config import DalleConfig
+from agent_platform.integrations.image_generation.dalle.dalle import (
+    DallEImageGenerator,
+    _validate_n,
+    _validate_size,
+)
 from agent_platform.integrations.image_generation.midjourney.config import (
     MidjourneyConfig,
 )
-from agent_platform.integrations.image_generation.stable_diffusion.config import (
-    StableDiffusionConfig,
-)
-from agent_platform.integrations.image_generation.dalle.dalle import (
-    DallEImageGenerator,
-    _validate_size,
-    _validate_n,
-)
-from agent_platform.core.errors import ProviderError
 from agent_platform.integrations.image_generation.midjourney.midjourney import (
     MidjourneyGenerator,
     _size_to_aspect,
 )
-from agent_platform.integrations.credentials import OpenAICredentials
-from agent_platform.integrations.credentials import MidjourneyCredentials
-from agent_platform.core.errors import ProviderError
-from agent_platform.core.schemas.document import ImageDocument
-from agent_platform.core.schemas.enums import ImageFormat
+from agent_platform.integrations.image_generation.stable_diffusion.config import (
+    StableDiffusionConfig,
+)
 
 try:
     from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
@@ -283,9 +283,7 @@ class TestDallEGenerate:
         mock_client.images.generate = AsyncMock(return_value=mock_response)
 
         gen = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("test-key")))
-        await gen.generate(
-            "test", config=DalleConfig(model="dall-e-3", style="vivid")
-        )
+        await gen.generate("test", config=DalleConfig(model="dall-e-3", style="vivid"))
 
         _, kwargs = mock_client.images.generate.call_args
         assert kwargs["style"] == "vivid"
@@ -370,9 +368,7 @@ class TestDallEValidateN:
             import asyncio
 
             asyncio.run(
-                gen.generate_many(
-                    "test", n=11, config=DalleConfig(model="dall-e-2")
-                )
+                gen.generate_many("test", n=11, config=DalleConfig(model="dall-e-2"))
             )
 
 
@@ -566,7 +562,10 @@ class TestMidjourneyGenerate:
             )
 
         # with_retry retries on failure; every attempt must still close its client.
-        assert mock_http_client.__aenter__.await_count == mock_http_client.__aexit__.await_count
+        assert (
+            mock_http_client.__aenter__.await_count
+            == mock_http_client.__aexit__.await_count
+        )
         assert mock_http_client.__aexit__.await_count >= 1
 
     @patch("httpx.AsyncClient")

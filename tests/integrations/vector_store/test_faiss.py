@@ -6,8 +6,8 @@ from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.vector_store.config import DistanceMetric
 from agent_platform.integrations.vector_store.faiss.config import FAISSConfig
 from agent_platform.integrations.vector_store.faiss.faiss import (
-    FAISSStore,
     _DISTANCE_STRATEGY_MAP,
+    FAISSStore,
 )
 
 
@@ -83,8 +83,7 @@ class TestFAISSDistanceStrategy:
             == DistanceStrategy.EUCLIDEAN_DISTANCE
         )
         assert (
-            _DISTANCE_STRATEGY_MAP[DistanceMetric.DOT]
-            == DistanceStrategy.DOT_PRODUCT
+            _DISTANCE_STRATEGY_MAP[DistanceMetric.DOT] == DistanceStrategy.DOT_PRODUCT
         )
 
     async def test_add_passes_distance_strategy_to_from_documents(self, monkeypatch):

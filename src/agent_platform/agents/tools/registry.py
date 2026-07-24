@@ -2,9 +2,10 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
-from agent_platform.agents.tools.base import Tool, ToolError, ToolStreamChunk
+from agent_platform.agents.tools.base import Tool, ToolStreamChunk
 from agent_platform.agents.tools.errors import ToolNotFoundError, ToolRegistrationError
 from agent_platform.core.schemas.message import (
     ToolCall,

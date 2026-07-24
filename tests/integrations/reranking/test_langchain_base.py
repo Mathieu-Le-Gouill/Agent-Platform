@@ -2,18 +2,17 @@ from unittest.mock import AsyncMock, MagicMock, patch
 from uuid import uuid4
 
 import pytest
-
 from langchain_core.documents import Document as LC_Document
 
-from agent_platform.integrations.reranking.langchain_base import (
-    _chunk_to_lc,
-    _lc_to_chunks,
-    LangChainReranker,
-)
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.reranking.config import RerankerConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import DocumentFormat, Language
+from agent_platform.integrations.reranking.langchain_base import (
+    LangChainReranker,
+    _chunk_to_lc,
+    _lc_to_chunks,
+)
 
 
 def test_chunk_to_lc_basic():
@@ -401,7 +400,6 @@ class TestLangChainReranker:
             results = await reranker.rerank(query="q", items=items, config=config)
 
         assert len(results) == 3
-
 
     async def test_rerank_propagates_relevance_score(self):
         items = [TextChunk(id=uuid4(), text="a", index=0)]

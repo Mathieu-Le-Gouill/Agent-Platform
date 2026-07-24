@@ -1,15 +1,15 @@
-from langchain_huggingface import HuggingFaceEmbeddings
-from langchain_huggingface import HuggingFaceEndpointEmbeddings
-from langchain_core.embeddings import Embeddings
 from typing import Any
 
-from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
+from langchain_core.embeddings import Embeddings
+from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpointEmbeddings
+
+from agent_platform.core.errors import MissingCredentialError
+from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingConfig,
     HuggingFaceEmbeddingMode,
 )
-from agent_platform.integrations.credentials import HuggingFaceCredentials
-from agent_platform.core.errors import MissingCredentialError
+from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
 
 
 class HuggingFaceEmbeddingProvider(LangChainEmbedder[HuggingFaceEmbeddingConfig]):

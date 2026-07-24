@@ -5,13 +5,12 @@ import pytest
 
 pytest.importorskip("boto3")
 
+from agent_platform.integrations.credentials import AWSTextractCredentials
 from agent_platform.integrations.ocr.aws_textract.aws_textract import (
     AWSTextractOCR,
     _from_textract,
 )
 from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
-from agent_platform.integrations.credentials import AWSTextractCredentials
-
 
 FAKE_TEXTRACT_RESPONSE = {
     "Blocks": [

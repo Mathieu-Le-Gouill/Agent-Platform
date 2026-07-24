@@ -1,17 +1,17 @@
 from abc import abstractmethod
-from typing import Sequence, Generic
+from collections.abc import Sequence
+from typing import Generic
 
-from langchain_text_splitters import TextSplitter
 from langchain_core.documents import Document as LC_Document
-
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.document import TextDocument
-from agent_platform.core.schemas.enums import Language, DocumentFormat
+from langchain_text_splitters import TextSplitter
 
 from agent_platform.core.interfaces.chunking.base import (
     BaseChunker,
     ChunkerConfigT,
 )
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.document import TextDocument
+from agent_platform.core.schemas.enums import DocumentFormat, Language
 
 
 class LangChainChunker(
@@ -87,7 +87,7 @@ def _lc_to_chunks(lc_chunks: list[LC_Document]) -> list[TextChunk]:
                 document_id=parsed_document_id,
                 text=c.page_content,
                 index=m.get("index", 0),
-                format=DocumentFormat(format),
+                format=DocumentFormat(format) if format else DocumentFormat.UNKNOWN,
                 start_char=start_char,
                 end_char=(start_char + len(c.page_content))
                 if start_char is not None

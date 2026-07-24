@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 from uuid import uuid4
 
 from PIL import Image
@@ -7,8 +7,8 @@ from PIL.ExifTags import TAGS as EXIF_TAGS
 from agent_platform.core.interfaces.loader.image.base import BaseImageLoader
 from agent_platform.core.interfaces.loader.image.config import ImageLoaderConfig
 from agent_platform.core.schemas.dimensions import Dimensions, bit_depth_for_mode
-from agent_platform.core.schemas.document import ImageDocument, DocumentMetadata
-from agent_platform.core.schemas.enums import ImageFormat, FileFormat
+from agent_platform.core.schemas.document import DocumentMetadata, ImageDocument
+from agent_platform.core.schemas.enums import FileFormat, ImageFormat
 
 
 class PILImageLoader(BaseImageLoader):

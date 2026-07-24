@@ -1,12 +1,12 @@
-from agent_platform.components.llm_classifier.strategies.registry import (
-    register_strategy,
-)
 from agent_platform.components.llm_classifier.config import (
     ClassificationMode,
     LLMClassifierConfig,
 )
 from agent_platform.components.llm_classifier.strategies.prompt_templates import (
     build_classification_template,
+)
+from agent_platform.components.llm_classifier.strategies.registry import (
+    register_strategy,
 )
 
 

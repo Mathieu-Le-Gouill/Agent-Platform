@@ -1,11 +1,9 @@
 from unittest.mock import MagicMock
-
-import pytest
 from uuid import uuid4
 
-from agent_platform.integrations.reranking.flashrank.flashrank import FlashRankReranker
-from agent_platform.integrations.reranking.flashrank.config import FlashRankConfig
 from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.integrations.reranking.flashrank.config import FlashRankConfig
+from agent_platform.integrations.reranking.flashrank.flashrank import FlashRankReranker
 
 
 def _items():

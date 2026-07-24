@@ -1,13 +1,13 @@
-from unittest.mock import patch, MagicMock
+from unittest.mock import MagicMock, patch
 
 import pytest
 
 pytest.importorskip("langchain_community")
 
+from agent_platform.core.schemas.enums import FileFormat
 from agent_platform.integrations.loader.strategies.unstructured.config import (
     UnstructuredLoaderConfig,
 )
-from agent_platform.core.schemas.enums import FileFormat
 
 _MODULE = "agent_platform.integrations.loader.strategies.unstructured.unstructured"
 

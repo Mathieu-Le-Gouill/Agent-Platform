@@ -1,10 +1,10 @@
 from uuid import uuid4
 
-from agent_platform.core.schemas.cluster import Cluster
 from agent_platform.core.interfaces.clustering.response import (
-    ClusterResult,
     ClusteredItem,
+    ClusterResult,
 )
+from agent_platform.core.schemas.cluster import Cluster
 
 
 def test_clustered_item_construction():

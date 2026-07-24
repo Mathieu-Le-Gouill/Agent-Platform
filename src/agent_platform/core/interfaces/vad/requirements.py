@@ -7,8 +7,7 @@ from agent_platform.core.interfaces.vad.config import VADConfig
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.enums import DataType
 
-
-T = TypeVar("T", bound="VADConfig")
+ConfigT = TypeVar("ConfigT", bound="VADConfig")
 
 
 @dataclass(frozen=True, slots=True)

@@ -3,41 +3,50 @@ from __future__ import annotations
 import base64
 import json
 from abc import abstractmethod
-from typing import TYPE_CHECKING, Any, AsyncIterator, Generic
+from collections.abc import AsyncIterator
+from typing import TYPE_CHECKING, Any, Generic
 
 from langchain_core.language_models.chat_models import BaseChatModel
 from langchain_core.messages import (
-    BaseMessage as LCBaseMessage,
-    HumanMessage,
-    SystemMessage as LCSystemMessage,
     AIMessage,
+    HumanMessage,
+    UsageMetadata,
+)
+from langchain_core.messages import (
+    BaseMessage as LCBaseMessage,
+)
+from langchain_core.messages import (
+    SystemMessage as LCSystemMessage,
+)
+from langchain_core.messages import (
     ToolMessage as LCToolMessage,
 )
+from langchain_core.runnables import Runnable
 
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.interfaces.llm.base import (
+    BaseLLMProvider,
+    GenerationConfigT,
+)
 from agent_platform.core.interfaces.llm.response import (
+    FinishReason,
     LLMResponse,
     StreamChunk,
-    FinishReason,
 )
-from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     AudioBlock,
     ContentBlock,
     ContentMessage,
     ImageBlock,
+    Prompt,
     SystemMessage,
     TextBlock,
-    UserMessage,
-    ToolMessage,
     ToolCall,
-    Prompt,
+    ToolMessage,
+    UserMessage,
 )
-from agent_platform.core.interfaces.llm.base import (
-    BaseLLMProvider,
-    GenerationConfigT,
-)
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.tracing import TracingBackend, TracingConfig
 
 if TYPE_CHECKING:
@@ -65,10 +74,13 @@ class LangChainLLMProvider(
     ) -> LLMResponse:
         config = config or self._default_config()
 
-        lc = self._client(config)
-        if tools:
-            lc = lc.bind_tools([self._tool_to_schema(t) for t in tools])
-        response = lc.invoke(
+        client = self._client(config)
+        runnable: Runnable[Any, Any] = (
+            client.bind_tools([self._tool_to_schema(t) for t in tools])
+            if tools
+            else client
+        )
+        response = runnable.invoke(
             _to_langchain(prompt), config={"callbacks": get_langchain_callbacks()}
         )
         return _from_langchain(response, config.model)
@@ -83,10 +95,13 @@ class LangChainLLMProvider(
     ) -> LLMResponse:
         config = config or self._default_config()
 
-        lc = self._client(config)
-        if tools:
-            lc = lc.bind_tools([self._tool_to_schema(t) for t in tools])
-        response = await lc.ainvoke(
+        client = self._client(config)
+        runnable: Runnable[Any, Any] = (
+            client.bind_tools([self._tool_to_schema(t) for t in tools])
+            if tools
+            else client
+        )
+        response = await runnable.ainvoke(
             _to_langchain(prompt), config={"callbacks": get_langchain_callbacks()}
         )
         return _from_langchain(response, config.model)
@@ -170,14 +185,14 @@ def _block_to_langchain(block: ContentBlock) -> dict[str, Any]:
             return {"type": "input_audio", "input_audio": {"data": data, "format": fmt}}
 
 
-def _content_to_langchain(m: ContentMessage) -> str | list[dict[str, Any]]:
+def _content_to_langchain(m: ContentMessage) -> str | list[str | dict[str, Any]]:
     if isinstance(m.content, str):
         return m.content
     return [_block_to_langchain(b) for b in m.blocks]
 
 
 def _to_langchain(prompt: Prompt) -> list[LCBaseMessage]:
-    result = []
+    result: list[LCBaseMessage] = []
     for m in prompt.messages:
         match m:
             case SystemMessage():
@@ -220,7 +235,7 @@ def _from_langchain(response: AIMessage, model: str) -> LLMResponse:
         for tc in (response.tool_calls or [])
     ]
 
-    usage_meta = response.usage_metadata or {}
+    usage_meta: UsageMetadata | dict[str, Any] = response.usage_metadata or {}
 
     if isinstance(response.content, str):
         content = response.content

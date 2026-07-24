@@ -8,13 +8,13 @@ pytest.importorskip("langchain_community")
 
 from langchain_core.documents import Document as LCDocument
 
+from agent_platform.core.schemas.enums import DocumentFormat, Language
 from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+    UnstructuredBaseLoader,
     _extract_format,
     _extract_title,
     _text_from_langchain,
-    UnstructuredBaseLoader,
 )
-from agent_platform.core.schemas.enums import DocumentFormat, Language
 
 
 class TestExtractFormat:

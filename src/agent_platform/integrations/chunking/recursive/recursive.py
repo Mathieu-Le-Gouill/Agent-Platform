@@ -1,8 +1,8 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
+from langchain_text_splitters.base import TextSplitter
 
 from agent_platform.integrations.chunking.langchain_base import LangChainChunker
 from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
-from langchain_text_splitters.base import TextSplitter
 
 
 class RecursiveChunkerProvider(LangChainChunker[RecursiveChunkerConfig]):

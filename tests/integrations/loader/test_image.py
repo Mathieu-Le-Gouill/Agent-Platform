@@ -1,10 +1,3 @@
-from unittest.mock import MagicMock, mock_open, patch
-from uuid import uuid4
-
-import pytest
-
-from agent_platform.core.interfaces.loader.image.config import ImageLoaderConfig
-from agent_platform.core.schemas.enums import ImageFormat
 from agent_platform.core.schemas.dimensions import bit_depth_for_mode as _get_bit_depth
 
 

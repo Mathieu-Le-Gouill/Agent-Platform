@@ -1,16 +1,18 @@
 from __future__ import annotations
 
+from collections.abc import AsyncIterator, Sequence
+
 import pvcobra
-from typing import AsyncIterator, Sequence
-from agent_platform.integrations.credentials import PicoVoiceCredentials
-from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
-from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
-from agent_platform.core.schemas.chunk import AudioChunk
-from agent_platform.core.schemas.span import SampleSpan
-from agent_platform.core.interfaces.vad.state import VADState
-from agent_platform.core.interfaces.vad.requirements import AudioRequirements
-from agent_platform.core.schemas.enums import DataType
+
 from agent_platform.core.errors import ProviderError
+from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
+from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.interfaces.vad.state import VADState
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.enums import DataType
+from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.integrations.credentials import PicoVoiceCredentials
+from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
 
 
 class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):

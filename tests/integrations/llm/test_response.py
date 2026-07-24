@@ -1,9 +1,7 @@
-from uuid import uuid4
-
 from agent_platform.core.interfaces.llm.response import (
+    FinishReason,
     LLMResponse,
     StreamChunk,
-    FinishReason,
 )
 from agent_platform.core.schemas.message import AssistantMessage, ToolCall
 from agent_platform.core.schemas.token import TokenUsage

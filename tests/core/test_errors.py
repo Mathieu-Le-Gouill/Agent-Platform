@@ -2,6 +2,13 @@ import logging
 
 import pytest
 
+from agent_platform.agents.errors import (
+    AgentActError,
+    AgentError,
+    AgentMaxIterations,
+    AgentThinkError,
+)
+from agent_platform.agents.tools.errors import ToolError
 from agent_platform.core.errors import (
     ConfigError,
     MissingCredentialError,
@@ -13,19 +20,12 @@ from agent_platform.core.errors import (
     error_logged,
     with_retry,
 )
-from agent_platform.agents.errors import (
-    AgentActError,
-    AgentError,
-    AgentMaxIterations,
-    AgentThinkError,
-)
 from agent_platform.core.interfaces.llm.errors import (
     LLMError,
     LLMGenerationError,
     LLMRateLimitError,
     LLMTimeoutError,
 )
-from agent_platform.agents.tools.errors import ToolError
 
 
 class TestErrorHierarchy:

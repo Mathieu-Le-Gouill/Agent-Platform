@@ -1,25 +1,24 @@
 from __future__ import annotations
 
 import asyncio
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Any
 
 import deepl
 
 if TYPE_CHECKING:
     from deepl import TextResult
 
-from agent_platform.integrations.credentials import DeepLCredentials
-from agent_platform.core.interfaces.translation.base import BaseTranslator
-from agent_platform.integrations.translation.deepl.config import DeepLConfig
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.enums import Language
 from agent_platform.core.errors import (
     MissingCredentialError,
     ProviderError,
     error_logged,
     with_retry,
 )
-
+from agent_platform.core.interfaces.translation.base import BaseTranslator
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.enums import Language
+from agent_platform.integrations.credentials import DeepLCredentials
+from agent_platform.integrations.translation.deepl.config import DeepLConfig
 
 _DEEPL_TARGETS: dict[Language, str] = {
     Language.EN: "EN-US",
@@ -65,7 +64,7 @@ class DeepLTranslator(BaseTranslator[DeepLConfig]):
         target_lang = _DEEPL_TARGETS.get(target, target.value)
         source_lang = _DEEPL_TARGETS.get(source) if source else None
 
-        extra_kwargs: dict[str, object] = {}
+        extra_kwargs: dict[str, Any] = {}
         if config.formality is not None:
             extra_kwargs["formality"] = config.formality
         if config.preserve_formatting is not None:

@@ -1,24 +1,22 @@
 from __future__ import annotations
 
-import asyncio
 import io
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
-import numpy as np
 from openai import AsyncOpenAI
 
-from agent_platform.integrations.credentials import OpenAICredentials
-from agent_platform.core.interfaces.speech.base import BaseSpeechToText
-from agent_platform.integrations.speech_to_text.openai.config import OpenAIWhisperConfig
-from agent_platform.core.schemas.chunk import AudioChunk
-from agent_platform.core.schemas.conversation import Transcript, Utterance
-from agent_platform.integrations.speech_to_text.utils import parse_language
 from agent_platform.core.errors import (
     MissingCredentialError,
     ProviderError,
     error_logged,
     with_retry,
 )
+from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.conversation import Transcript, Utterance
+from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.speech_to_text.openai.config import OpenAIWhisperConfig
+from agent_platform.integrations.speech_to_text.utils import parse_language
 
 
 class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):

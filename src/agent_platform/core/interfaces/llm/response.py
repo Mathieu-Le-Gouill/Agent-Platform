@@ -1,11 +1,12 @@
 from __future__ import annotations
 
-from pydantic import BaseModel
 from enum import Enum
 
+from pydantic import BaseModel
+
+from agent_platform.core.schemas.enums import FinishReason
 from agent_platform.core.schemas.message import AssistantMessage
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.schemas.enums import FinishReason
 
 
 class ResponseFormat(Enum):

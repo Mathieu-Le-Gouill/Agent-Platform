@@ -1,29 +1,37 @@
+import asyncio
+import warnings
 from abc import abstractmethod
 from pathlib import Path
 from uuid import uuid4
-import asyncio
-import warnings
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message="`langchain-community` is being sunset")
-    from langchain_community.document_loaders.unstructured import (
-        UnstructuredFileLoader as LC_UnstructuredFileLoader,
+    from langchain_community.document_loaders import (
+        UnstructuredFileLoader as LC_FallbackLoader,
+    )
+    from langchain_community.document_loaders import (
+        UnstructuredHTMLLoader as LC_HTMLLoader,
+    )
+    from langchain_community.document_loaders import (
+        UnstructuredMarkdownLoader as LC_MarkdownLoader,
     )
     from langchain_community.document_loaders import (
         UnstructuredPDFLoader as LC_PDFLoader,
-        UnstructuredMarkdownLoader as LC_MarkdownLoader,
-        UnstructuredHTMLLoader as LC_HTMLLoader,
+    )
+    from langchain_community.document_loaders import (
         UnstructuredWordDocumentLoader as LC_OfficeLoader,
-        UnstructuredFileLoader as LC_FallbackLoader,
+    )
+    from langchain_community.document_loaders.unstructured import (
+        UnstructuredFileLoader as LC_UnstructuredFileLoader,
     )
 from langchain_core.documents import Document as LCDocument
 
 from agent_platform.core.interfaces.loader.text.base import BaseTextLoader
+from agent_platform.core.schemas.document import DocumentMetadata, TextDocument
+from agent_platform.core.schemas.enums import DocumentFormat, FileFormat, Language
 from agent_platform.integrations.loader.strategies.unstructured.config import (
     UnstructuredLoaderConfig,
 )
-from agent_platform.core.schemas.document import TextDocument, DocumentMetadata
-from agent_platform.core.schemas.enums import DocumentFormat, Language, FileFormat
 
 
 class UnstructuredBaseLoader(BaseTextLoader[UnstructuredLoaderConfig]):

@@ -1,27 +1,25 @@
 from __future__ import annotations
 
 import logging
-from typing import Generic, TypeVar
+from typing import Generic, TypeVar, cast
 
-from agent_platform.core.interfaces.classification.response import (
-    ClassificationPrediction,
-    ClassificationResult,
-    ClassificationResponse,
-)
-from agent_platform.core.credentials import BaseCredentials
-from agent_platform.core.interfaces.llm.base import BaseLLMProvider
-from agent_platform.core.interfaces.llm.config import GenerationConfig
-from agent_platform.core.interfaces.llm.response import LLMResponse
 from agent_platform.components.base import Component
 from agent_platform.components.llm_classifier.config import LLMClassifierConfig
 from agent_platform.components.llm_classifier.strategies.registry import get_strategy
 from agent_platform.core.errors import ValidationError
+from agent_platform.core.interfaces.classification.response import (
+    ClassificationPrediction,
+    ClassificationResponse,
+    ClassificationResult,
+)
+from agent_platform.core.interfaces.llm.base import BaseLLMProvider
+from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.core.interfaces.llm.response import LLMResponse
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.message import Prompt
 
 logger = logging.getLogger(__name__)
 
-CredentialsT = TypeVar("CredentialsT", bound=BaseCredentials)
 GenConfigT = TypeVar("GenConfigT", bound=GenerationConfig)
 
 _ClassifierInput = tuple[list[TextDocument], list[str], LLMClassifierConfig]
@@ -29,11 +27,11 @@ _ClassifierInput = tuple[list[TextDocument], list[str], LLMClassifierConfig]
 
 class LLMClassifier(
     Component[_ClassifierInput, ClassificationResponse],
-    Generic[CredentialsT, GenConfigT],
+    Generic[GenConfigT],
 ):
     def __init__(
         self,
-        llm: BaseLLMProvider[CredentialsT, GenConfigT],
+        llm: BaseLLMProvider[GenConfigT],
         config: LLMClassifierConfig | None = None,
     ) -> None:
         self._llm = llm
@@ -53,7 +51,10 @@ class LLMClassifier(
         results: list[ClassificationResult] = []
         for item in items:
             prompt = Prompt.build(system=system_prompt, user=item.text)
-            response = await self._llm.agenerate(prompt, config)
+            # `config` is a provider-specific *LLMClassifierConfig subclass
+            # (e.g. OpenAILLMClassifierConfig) that also mixes in the
+            # matching GenerationConfig — see components/llm_classifier/config.py.
+            response = await self._llm.agenerate(prompt, cast(GenConfigT, config))
             pred = _extract_pred(response, config.multi_label)
             results.append(pred)
 

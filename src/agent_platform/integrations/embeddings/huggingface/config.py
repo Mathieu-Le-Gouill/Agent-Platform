@@ -1,9 +1,11 @@
 from __future__ import annotations
-from enum import Enum
+
+from enum import StrEnum
+
 from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
 
 
-class HuggingFaceEmbeddingMode(str, Enum):
+class HuggingFaceEmbeddingMode(StrEnum):
     LOCAL = "local"
     HOSTED = "hosted"
 

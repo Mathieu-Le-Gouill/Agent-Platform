@@ -12,7 +12,7 @@ class Embedding(BaseModel, frozen=True):
     model: str = ""
 
     @model_validator(mode="after")
-    def _check_not_empty(self) -> "Embedding":
+    def _check_not_empty(self) -> Embedding:
         if len(self.vector) == 0:
             raise ValueError("Embedding vector cannot be empty")
         return self
@@ -20,7 +20,7 @@ class Embedding(BaseModel, frozen=True):
     @classmethod
     def from_list(
         cls, vector: list[float], model: str = "", id: UUID | None = None
-    ) -> "Embedding":
+    ) -> Embedding:
         return cls(vector=tuple(vector), model=model, id=id or uuid4())
 
     def to_list(self) -> list[float]:

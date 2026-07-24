@@ -12,6 +12,7 @@ from agent_platform.integrations.translation.azure.config import (
     AzureTranslatorConfig,
 )
 
+
 def _azure_credentials(api_key: str | None = "test-key") -> AzureTranslatorCredentials:
     return AzureTranslatorCredentials(api_key=api_key, region="westus")
 

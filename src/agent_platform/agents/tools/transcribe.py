@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from agent_platform.agents.tools.base import Tool, ToolError
-from uuid import uuid4
-
 from agent_platform.agents.tools._utils import safe_call, safe_stream
+from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript
@@ -44,7 +44,7 @@ class TranscribeTool(Tool):
             format=AudioFormat.UNKNOWN,
         )
 
-    async def run(self, **kwargs) -> Transcript:
+    async def run(self, **kwargs: Any) -> Transcript:
         validated = TranscribeInput(**kwargs)
         result = await safe_call(
             self._provider.transcribe(self._build_chunk(validated)),
@@ -72,7 +72,7 @@ class TranscribeTool(Tool):
             blocks.append(TextBlock(text=text))
         return blocks
 
-    async def astream(self, **kwargs) -> AsyncIterator[str]:
+    async def astream(self, **kwargs: Any) -> AsyncIterator[str]:
         validated = TranscribeInput(**kwargs)
 
         async def frames() -> AsyncIterator[AudioChunk]:

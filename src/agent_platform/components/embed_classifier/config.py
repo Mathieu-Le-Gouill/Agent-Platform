@@ -1,12 +1,12 @@
 from pydantic import BaseModel, ConfigDict, Field
 
-from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
+from agent_platform.components.llm_classifier.config import LLMClassifierConfig
 from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
+from agent_platform.core.schemas.enums import SimilarityMetric
+from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
 from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingConfig,
 )
-from agent_platform.components.llm_classifier.config import LLMClassifierConfig
-from agent_platform.core.schemas.enums import SimilarityMetric
 
 
 class EmbeddingClassifierConfig(BaseModel):

@@ -1,12 +1,13 @@
-import pytest
 from uuid import uuid4
+
+import pytest
 
 from agent_platform.core.interfaces.vad.base import BaseVAD
 from agent_platform.core.interfaces.vad.config import VADConfig
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
 from agent_platform.core.schemas.chunk import AudioChunk
-from agent_platform.core.schemas.span import SampleSpan
 from agent_platform.core.schemas.enums import DataType
+from agent_platform.core.schemas.span import SampleSpan
 
 
 class _ConcreteVAD(BaseVAD[VADConfig]):

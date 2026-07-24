@@ -1,14 +1,13 @@
 import pytest
-from pydantic import SecretStr
 
 pytest.importorskip("langchain_mistralai")
 pytest.importorskip("langchain_anthropic")
 
-from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.integrations.credentials import (
+    AnthropicCredentials,
+    MistralCredentials,
+)
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
-from agent_platform.integrations.credentials import MistralCredentials
-from agent_platform.integrations.credentials import AnthropicCredentials
-from agent_platform.core.schemas.message import Prompt, UserMessage
 
 
 def test_mistral_to_langchain_no_max_retries():

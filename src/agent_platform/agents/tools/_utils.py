@@ -1,16 +1,17 @@
 from __future__ import annotations
 
-from typing import Any, AsyncIterator, Coroutine, TypeVar
+from collections.abc import AsyncIterator, Coroutine
+from typing import Any, TypeVar
 
 from agent_platform.agents.tools.errors import ToolError
 
-T = TypeVar("T")
+ResultT = TypeVar("ResultT")
 
 
 async def safe_call(
-    coro: Coroutine[Any, Any, T],
+    coro: Coroutine[Any, Any, ResultT],
     error_message: str = "Provider execution failed",
-) -> T:
+) -> ResultT:
     try:
         return await coro
     except ToolError:
@@ -20,9 +21,9 @@ async def safe_call(
 
 
 async def safe_stream(
-    agen: AsyncIterator[T],
+    agen: AsyncIterator[ResultT],
     error_message: str = "Provider execution failed",
-) -> AsyncIterator[T]:
+) -> AsyncIterator[ResultT]:
     try:
         async for item in agen:
             yield item

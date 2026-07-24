@@ -1,15 +1,16 @@
-import pytest
 from unittest.mock import MagicMock, patch
 from uuid import uuid4
+
+import pytest
 from pydantic import SecretStr
 
 pytest.importorskip("pvcobra")
 
-from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
+from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.enums import DataType
-from agent_platform.core.errors import ProviderError
 from agent_platform.integrations.credentials import PicoVoiceCredentials
+from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
 
 FRAME_LENGTH = 512
 
@@ -75,7 +76,7 @@ def test_requirements_rejects_invalid_dtype(mock_pvcobra):
     vad = PvcobraVAD(_credentials())
     chunk = AudioChunk(
         id=uuid4(),
-        data=bytes(),
+        data=b"",
         sample_rate=16000,
         start=0,
         end=100,
@@ -94,7 +95,7 @@ def test_requirements_rejects_invalid_channels(mock_pvcobra):
     vad = PvcobraVAD(_credentials())
     chunk = AudioChunk(
         id=uuid4(),
-        data=bytes(),
+        data=b"",
         sample_rate=16000,
         start=0,
         end=100,

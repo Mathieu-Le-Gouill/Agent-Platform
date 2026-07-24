@@ -1,5 +1,3 @@
-from uuid import uuid4
-
 import pytest
 
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText

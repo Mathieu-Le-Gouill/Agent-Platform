@@ -4,11 +4,13 @@ import asyncio
 import functools
 import logging
 import random
+from collections.abc import Callable, Coroutine, Iterator
 from contextlib import contextmanager
-from typing import Any, Callable, Coroutine, TypeVar
+from typing import Any, TypeVar
 
 _CompatibleFunc = TypeVar("_CompatibleFunc", bound=Callable[..., Any])
 _AsyncFunc = TypeVar("_AsyncFunc", bound=Callable[..., Coroutine[Any, Any, Any]])
+_T = TypeVar("_T")
 
 __all__ = [
     # Exception classes
@@ -77,7 +79,7 @@ def error_logged(
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 try:
-                    return await func(*args, **kwargs)  # type: ignore
+                    return await func(*args, **kwargs)
                 except PlatformError:
                     raise
                 except Exception as exc:
@@ -99,7 +101,7 @@ def error_logged(
             @functools.wraps(func)
             async def async_wrapper(*args: Any, **kwargs: Any) -> Any:
                 try:
-                    return await func(*args, **kwargs)  # type: ignore
+                    return await func(*args, **kwargs)
                 except PlatformError:
                     raise
                 except Exception:
@@ -116,9 +118,9 @@ def error_logged(
                     logger.exception("%s in %s", message, func.__qualname__)
                     raise
 
-        if asyncio_iscoroutinefunction(func):
-            return async_wrapper  # type: ignore
-        return sync_wrapper  # type: ignore
+        if _asyncio_iscoroutinefunction(func):
+            return async_wrapper  # type: ignore[return-value]
+        return sync_wrapper  # type: ignore[return-value]
 
     return decorate
 
@@ -152,7 +154,7 @@ def with_retry(
                     )
                     await asyncio.sleep(delay)
 
-        return wrapper  # type: ignore
+        return wrapper  # type: ignore[return-value]
 
     return decorate
 
@@ -160,9 +162,9 @@ def with_retry(
 @contextmanager
 def catch_noraise(
     logger: logging.Logger,
-    fallback: Any = None,
+    fallback: _T | None = None,
     context_msg: str = "",
-):
+) -> Iterator[None]:
     """Catch any exception, log as warning, yield the fallback value."""
     try:
         yield
@@ -174,7 +176,7 @@ def catch_noraise(
         )
 
 
-def asyncio_iscoroutinefunction(func: Callable[..., Any]) -> bool:
+def _asyncio_iscoroutinefunction(func: Callable[..., Any]) -> bool:
     import asyncio
 
     return asyncio.iscoroutinefunction(func)

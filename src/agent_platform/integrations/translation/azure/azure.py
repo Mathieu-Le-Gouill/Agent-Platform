@@ -6,19 +6,19 @@ from azure.ai.translation.text import TextTranslationClient
 from azure.ai.translation.text.models import TranslateInputItem, TranslationTarget
 from azure.core.credentials import AzureKeyCredential
 
-from agent_platform.integrations.credentials import (
-    AzureTranslatorCredentials,
-)
-from agent_platform.core.interfaces.translation.base import BaseTranslator
-from agent_platform.integrations.translation.azure.config import AzureTranslatorConfig
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.enums import Language
 from agent_platform.core.errors import (
     MissingCredentialError,
     ProviderError,
     error_logged,
     with_retry,
 )
+from agent_platform.core.interfaces.translation.base import BaseTranslator
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.enums import Language
+from agent_platform.integrations.credentials import (
+    AzureTranslatorCredentials,
+)
+from agent_platform.integrations.translation.azure.config import AzureTranslatorConfig
 
 
 class AzureTranslator(BaseTranslator[AzureTranslatorConfig]):

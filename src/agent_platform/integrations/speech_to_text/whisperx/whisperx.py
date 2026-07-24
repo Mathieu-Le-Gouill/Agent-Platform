@@ -1,16 +1,17 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any, AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
 
 import numpy as np
 import whisperx
 
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
-from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXConfig
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.integrations.speech_to_text.utils import parse_language
+from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXConfig
 
 
 class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
@@ -45,8 +46,12 @@ class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
         return await asyncio.to_thread(self._load_align_model_sync, language, device)
 
     async def _align(
-        self, result: dict, audio_np: np.ndarray, language: str, config: WhisperXConfig
-    ) -> dict:
+        self,
+        result: dict[str, Any],
+        audio_np: np.ndarray,
+        language: str,
+        config: WhisperXConfig,
+    ) -> dict[str, Any]:
         model_a, metadata = await self._ensure_align_model(language, config.device)
         return await asyncio.to_thread(
             whisperx.align,
@@ -68,8 +73,8 @@ class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
         return self._diarize_pipeline
 
     async def _diarize(
-        self, audio_np: np.ndarray, result: dict, config: WhisperXConfig
-    ) -> dict:
+        self, audio_np: np.ndarray, result: dict[str, Any], config: WhisperXConfig
+    ) -> dict[str, Any]:
         from whisperx.diarize import assign_word_speakers
 
         pipeline = await asyncio.to_thread(self._load_diarize_pipeline_sync, config)
@@ -128,8 +133,8 @@ class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
         return _stream()
 
     async def _postprocess(
-        self, audio_np: np.ndarray, result: dict, config: WhisperXConfig
-    ) -> dict:
+        self, audio_np: np.ndarray, result: dict[str, Any], config: WhisperXConfig
+    ) -> dict[str, Any]:
         language = result.get("language") or config.language
         if config.align and language:
             result = await self._align(result, audio_np, language, config)
@@ -160,7 +165,7 @@ class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
         return _map_transcript(result, config)
 
 
-def _map_transcript(result: dict, config: WhisperXConfig) -> Transcript:
+def _map_transcript(result: dict[str, Any], config: WhisperXConfig) -> Transcript:
     language = parse_language(result.get("language", "") or "")
 
     utterances = []

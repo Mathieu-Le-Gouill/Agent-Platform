@@ -1,13 +1,11 @@
-import pytest
-
+from agent_platform.core.interfaces.loader.audio.config import AudioLoaderConfig
 from agent_platform.core.interfaces.loader.config import LoaderConfig
+from agent_platform.core.interfaces.loader.image.config import ImageLoaderConfig
+from agent_platform.core.interfaces.loader.video.config import VideoLoaderConfig
+from agent_platform.core.schemas.enums import ImageFormat
 from agent_platform.integrations.loader.strategies.unstructured.config import (
     UnstructuredLoaderConfig,
 )
-from agent_platform.core.interfaces.loader.image.config import ImageLoaderConfig
-from agent_platform.core.interfaces.loader.audio.config import AudioLoaderConfig
-from agent_platform.core.interfaces.loader.video.config import VideoLoaderConfig
-from agent_platform.core.schemas.enums import ImageFormat
 
 
 class TestLoaderConfig:
