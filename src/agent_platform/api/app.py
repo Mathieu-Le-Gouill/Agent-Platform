@@ -9,6 +9,7 @@ from pydantic import BaseModel
 
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.config import Settings, build_agent, get_settings, setup_logging
+from agent_platform.core.tracing import configure_tracing
 
 
 class ChatRequest(BaseModel):
@@ -22,6 +23,7 @@ class ChatResponse(BaseModel):
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     setup_logging(getattr(logging, settings.log_level.upper(), logging.INFO))
+    configure_tracing()
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

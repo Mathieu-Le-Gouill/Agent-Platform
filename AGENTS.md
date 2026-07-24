@@ -37,7 +37,7 @@ Purpose only, enough to know which README to open next.
 
 | Path | Purpose | Has local README? |
 |---|---|---|
-| `src/agent_platform/core/` | Zero-dependency foundation: ABCs, Pydantic schemas, error hierarchy, credentials | yes |
+| `src/agent_platform/core/` | Near-zero-dependency foundation: ABCs, Pydantic schemas, error hierarchy, credentials, OTel-based tracing | yes |
 | `src/agent_platform/integrations/` | Provider adapters per domain (llm, embeddings, vector_store, reranking, ocr, speech_to_text, translation, vad, chunking, clustering, loader, image_generation), 12 domains; `classification` has no integration/provider layer, see `src/agent_platform/README.md` known issues | yes |
 | `src/agent_platform/components/` | Reusable processing units wrapping one or more integrations (`Chunker`, `Embedder`, `Reranker`, classifiers) | yes |
 | `src/agent_platform/pipelines/` | Multi-step orchestration flows composing components (ingestion, RAG, speech translation) | yes |

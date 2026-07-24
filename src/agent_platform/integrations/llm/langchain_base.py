@@ -47,7 +47,11 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import TracingBackend, TracingConfig
+from agent_platform.core.tracing import (
+    GenAIAttributes,
+    record_token_usage,
+    traced_operation_span,
+)
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
@@ -66,6 +70,10 @@ class LangChainLLMProvider(
     @abstractmethod
     def _default_config(self) -> GenerationConfigT: ...
 
+    def _gen_ai_system(self) -> str:
+        name = type(self).__name__
+        return (name[: -len("LLM")] if name.endswith("LLM") else name).lower()
+
     def generate(
         self,
         prompt: Prompt,
@@ -74,16 +82,23 @@ class LangChainLLMProvider(
     ) -> LLMResponse:
         config = config or self._default_config()
 
-        client = self._client(config)
-        runnable: Runnable[Any, Any] = (
-            client.bind_tools([self._tool_to_schema(t) for t in tools])
-            if tools
-            else client
-        )
-        response = runnable.invoke(
-            _to_langchain(prompt), config={"callbacks": get_langchain_callbacks()}
-        )
-        return _from_langchain(response, config.model)
+        with traced_operation_span(
+            "chat",
+            **{
+                GenAIAttributes.SYSTEM: self._gen_ai_system(),
+                GenAIAttributes.REQUEST_MODEL: config.model,
+            },
+        ) as span:
+            client = self._client(config)
+            runnable: Runnable[Any, Any] = (
+                client.bind_tools([self._tool_to_schema(t) for t in tools])
+                if tools
+                else client
+            )
+            response = runnable.invoke(_to_langchain(prompt))
+            result = _from_langchain(response, config.model)
+            record_token_usage(span, result.usage)
+            return result
 
     @error_logged(re_raise=ProviderError, message="LLM generation failed")
     @with_retry()
@@ -95,16 +110,23 @@ class LangChainLLMProvider(
     ) -> LLMResponse:
         config = config or self._default_config()
 
-        client = self._client(config)
-        runnable: Runnable[Any, Any] = (
-            client.bind_tools([self._tool_to_schema(t) for t in tools])
-            if tools
-            else client
-        )
-        response = await runnable.ainvoke(
-            _to_langchain(prompt), config={"callbacks": get_langchain_callbacks()}
-        )
-        return _from_langchain(response, config.model)
+        with traced_operation_span(
+            "chat",
+            **{
+                GenAIAttributes.SYSTEM: self._gen_ai_system(),
+                GenAIAttributes.REQUEST_MODEL: config.model,
+            },
+        ) as span:
+            client = self._client(config)
+            runnable: Runnable[Any, Any] = (
+                client.bind_tools([self._tool_to_schema(t) for t in tools])
+                if tools
+                else client
+            )
+            response = await runnable.ainvoke(_to_langchain(prompt))
+            result = _from_langchain(response, config.model)
+            record_token_usage(span, result.usage)
+            return result
 
     async def stream(
         self,
@@ -114,50 +136,45 @@ class LangChainLLMProvider(
         config = config or self._default_config()
         lc = self._client(config)
 
-        async for chunk in lc.astream(
-            _to_langchain(prompt), config={"callbacks": get_langchain_callbacks()}
-        ):
-            content = chunk.content
-            if isinstance(content, str):
-                if content:
-                    yield StreamChunk(delta=content)
-            elif isinstance(content, list):
-                for item in content:
-                    if isinstance(item, str) and item:
-                        yield StreamChunk(delta=item)
-                    elif isinstance(item, dict):
-                        text = item.get("text", "")
-                        if isinstance(text, str) and text:
-                            yield StreamChunk(delta=text)
+        with traced_operation_span(
+            "chat",
+            **{
+                GenAIAttributes.SYSTEM: self._gen_ai_system(),
+                GenAIAttributes.REQUEST_MODEL: config.model,
+            },
+        ) as span:
+            usage_totals = TokenUsage.zero()
+            async for chunk in lc.astream(_to_langchain(prompt)):
+                content = chunk.content
+                if isinstance(content, str):
+                    if content:
+                        yield StreamChunk(delta=content)
+                elif isinstance(content, list):
+                    for item in content:
+                        if isinstance(item, str) and item:
+                            yield StreamChunk(delta=item)
+                        elif isinstance(item, dict):
+                            text = item.get("text", "")
+                            if isinstance(text, str) and text:
+                                yield StreamChunk(delta=text)
 
-            usage = chunk.usage_metadata
-            if usage:
-                yield StreamChunk(
-                    delta="",
-                    finish_reason=FinishReason.STOP,
-                    usage=TokenUsage(
+                usage = chunk.usage_metadata
+                if usage:
+                    usage_totals = usage_totals + TokenUsage(
                         input_tokens=usage.get("input_tokens", 0),
                         output_tokens=usage.get("output_tokens", 0),
-                    ),
-                )
+                    )
+                    yield StreamChunk(
+                        delta="",
+                        finish_reason=FinishReason.STOP,
+                        usage=TokenUsage(
+                            input_tokens=usage.get("input_tokens", 0),
+                            output_tokens=usage.get("output_tokens", 0),
+                        ),
+                    )
 
-        yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
-
-
-def get_langchain_callbacks(config: TracingConfig | None = None) -> list[Any]:
-    config = config or TracingConfig.from_env()
-    match config.backend:
-        case TracingBackend.LANGSMITH:
-            # LangSmith traces automatically via LANGCHAIN_TRACING_V2 / LANGCHAIN_API_KEY
-            # env vars picked up internally by langchain-core; no explicit callback needed.
-            return []
-        case TracingBackend.LANGFUSE:
-            from langfuse.callback import CallbackHandler
-
-            # Reads LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY / LANGFUSE_HOST from env.
-            return [CallbackHandler()]
-        case _:
-            return []
+            record_token_usage(span, usage_totals)
+            yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
 
 
 # --- Mappers ---

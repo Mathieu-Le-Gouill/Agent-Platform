@@ -12,6 +12,7 @@ from agent_platform.core.schemas.message import (
     ToolMessage,
     ToolResult,
 )
+from agent_platform.core.tracing import GenAIAttributes, traced_operation_span
 
 logger = logging.getLogger(__name__)
 
@@ -46,16 +47,25 @@ class ToolRegistry:
         return await tool.run(**call.arguments)
 
     async def call_and_wrap(self, call: ToolCall) -> ToolMessage:
-        try:
-            raw = await self.resolve_call(call)
-            content = str(raw) if raw is not None else ""
-            is_error = False
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.exception("Tool call '%s' failed", call.name)
-            content = str(exc)
-            is_error = True
+        with traced_operation_span(
+            "execute_tool",
+            **{
+                GenAIAttributes.TOOL_NAME: call.name,
+                GenAIAttributes.TOOL_CALL_ID: call.id,
+            },
+        ) as span:
+            try:
+                raw = await self.resolve_call(call)
+                content = str(raw) if raw is not None else ""
+                is_error = False
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.exception("Tool call '%s' failed", call.name)
+                content = str(exc)
+                is_error = True
+
+            span.set_attribute(GenAIAttributes.TOOL_CALL_IS_ERROR, is_error)
 
         return ToolMessage(
             result=ToolResult(
@@ -79,17 +89,26 @@ class ToolRegistry:
             )
             return
 
-        try:
-            async for delta in tool.astream(**call.arguments):
-                yield ToolStreamChunk(tool_call_id=call.id, delta=delta)
-            yield ToolStreamChunk(tool_call_id=call.id, delta="", is_final=True)
-        except asyncio.CancelledError:
-            raise
-        except Exception as exc:
-            logger.exception("Tool stream '%s' failed", call.name)
-            yield ToolStreamChunk(
-                tool_call_id=call.id, delta=str(exc), is_final=True, is_error=True
-            )
+        with traced_operation_span(
+            "execute_tool",
+            **{
+                GenAIAttributes.TOOL_NAME: call.name,
+                GenAIAttributes.TOOL_CALL_ID: call.id,
+            },
+        ) as span:
+            try:
+                async for delta in tool.astream(**call.arguments):
+                    yield ToolStreamChunk(tool_call_id=call.id, delta=delta)
+                yield ToolStreamChunk(tool_call_id=call.id, delta="", is_final=True)
+                span.set_attribute(GenAIAttributes.TOOL_CALL_IS_ERROR, False)
+            except asyncio.CancelledError:
+                raise
+            except Exception as exc:
+                logger.exception("Tool stream '%s' failed", call.name)
+                span.set_attribute(GenAIAttributes.TOOL_CALL_IS_ERROR, True)
+                yield ToolStreamChunk(
+                    tool_call_id=call.id, delta=str(exc), is_final=True, is_error=True
+                )
 
     def __len__(self) -> int:
         return len(self._tools)

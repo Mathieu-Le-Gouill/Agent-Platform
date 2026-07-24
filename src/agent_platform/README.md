@@ -25,13 +25,14 @@
 
 ### `core/`: Foundation
 
-Zero external dependencies. Everything here is pure Python, `pydantic`, `abc`, `typing`, `uuid`, `datetime`.
+Near-zero external dependencies. Everything here is pure Python, `pydantic`, `abc`, `typing`, `uuid`, `datetime`, with one exception: `core/tracing.py` depends on `opentelemetry-api` (always installed, lightweight; a no-op unless the optional `tracing` extra + an OTLP endpoint are configured).
 
 | Path | Contents |
 |---|---|
 | `core/base.py` | `Entity` (UUID mixin), `Timestamped` |
 | `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
 | `core/credentials.py` | `BaseCredentials`, `ProviderCredentials` |
+| `core/tracing.py` | Vendor-agnostic OpenTelemetry tracing: `TracingBackend`, `TracingConfig`, `configure_tracing()`, `traced_span()`/`traced_operation_span()`, `record_token_usage()`, `GenAIAttributes` |
 | `core/interfaces/<domain>/` | ABCs for every capability (llm, embeddings, vad, ocr, vector_store, reranking, chunking, speech, translation, clustering, classification, loader, image_generation) |
 | `core/schemas/` | Shared Pydantic v2 data models used across all layers |
 

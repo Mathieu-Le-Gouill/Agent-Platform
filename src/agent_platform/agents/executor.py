@@ -6,6 +6,7 @@ from agent_platform.agents.agent import Agent
 from agent_platform.agents.errors import AgentMaxIterations
 from agent_platform.agents.tools.base import ToolStreamChunk
 from agent_platform.core.schemas.message import Message, ToolMessage, UserMessage
+from agent_platform.core.tracing import GenAIAttributes, traced_operation_span
 
 
 class AgentExecutor:
@@ -38,41 +39,47 @@ class AgentExecutor:
         return await self._execute(list(messages))
 
     async def _execute(self, messages: list[Message]) -> tuple[str, list[Message]]:
-        for _ in range(self._max_iterations):
-            assistant_msg = await self._agent.think(messages)
-            messages.append(assistant_msg)
+        with traced_operation_span(
+            "invoke_agent", **{GenAIAttributes.AGENT_NAME: self._agent.name}
+        ):
+            for _ in range(self._max_iterations):
+                assistant_msg = await self._agent.think(messages)
+                messages.append(assistant_msg)
 
-            if not assistant_msg.tool_calls:
-                return assistant_msg.text, messages
+                if not assistant_msg.tool_calls:
+                    return assistant_msg.text, messages
 
-            tool_messages = await self._agent.act(assistant_msg)
-            messages.extend(tool_messages)
+                tool_messages = await self._agent.act(assistant_msg)
+                messages.extend(tool_messages)
 
-        raise AgentMaxIterations(
-            f"Agent '{self._agent.name}' exceeded "
-            f"max iterations ({self._max_iterations})"
-        )
+            raise AgentMaxIterations(
+                f"Agent '{self._agent.name}' exceeded "
+                f"max iterations ({self._max_iterations})"
+            )
 
     async def run_streaming(
         self, user_input: str
     ) -> AsyncIterator[ToolStreamChunk | str]:
         messages: list[Message] = [UserMessage(content=user_input)]
 
-        for _ in range(self._max_iterations):
-            assistant_msg = await self._agent.think(messages)
-            messages.append(assistant_msg)
+        with traced_operation_span(
+            "invoke_agent", **{GenAIAttributes.AGENT_NAME: self._agent.name}
+        ):
+            for _ in range(self._max_iterations):
+                assistant_msg = await self._agent.think(messages)
+                messages.append(assistant_msg)
 
-            if not assistant_msg.tool_calls:
-                yield assistant_msg.text
-                return
+                if not assistant_msg.tool_calls:
+                    yield assistant_msg.text
+                    return
 
-            async for event in self._agent.act_stream(assistant_msg):
-                if isinstance(event, ToolMessage):
-                    messages.append(event)
-                else:
-                    yield event
+                async for event in self._agent.act_stream(assistant_msg):
+                    if isinstance(event, ToolMessage):
+                        messages.append(event)
+                    else:
+                        yield event
 
-        raise AgentMaxIterations(
-            f"Agent '{self._agent.name}' exceeded "
-            f"max iterations ({self._max_iterations})"
-        )
+            raise AgentMaxIterations(
+                f"Agent '{self._agent.name}' exceeded "
+                f"max iterations ({self._max_iterations})"
+            )
