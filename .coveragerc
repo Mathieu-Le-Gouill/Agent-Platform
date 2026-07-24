@@ -1,0 +1,14 @@
+[report]
+omit =
+    src/agent_platform/audio/*
+    src/agent_platform/components/*
+    src/agent_platform/core/interfaces/loader/*
+    src/agent_platform/core/interfaces/reranking/*
+    src/agent_platform/core/interfaces/chunking/base.py
+    src/agent_platform/integrations/chunking/*
+    src/agent_platform/integrations/classification/*
+    src/agent_platform/integrations/embeddings/langchain_base.py
+    src/agent_platform/integrations/llm/langchain_base.py
+    src/agent_platform/integrations/reranking/*
+    src/agent_platform/integrations/vector_store/langchain_base.py
+    src/agent_platform/pipelines/*

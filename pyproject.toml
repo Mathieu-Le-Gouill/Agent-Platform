@@ -1,11 +1,24 @@
 [build-system]
-requires = ["setuptools", "wheel"]
+requires = ["setuptools>=68", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
 name = "agent_platform"
 version = "0.1.0"
+description = "Async-first, pydantic v2 platform for composable LLM agents and pipelines (RAG, speech translation, ingestion) over pluggable provider integrations."
+readme = "README.md"
 requires-python = ">=3.11,<3.13"
+authors = [
+    { name = "Mathieu Le Gouill", email = "mathieulegouill@outlook.com" },
+]
+keywords = ["agents", "llm", "rag", "pipelines", "langchain"]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Operating System :: OS Independent",
+    "Typing :: Typed",
+]
 
 dependencies = [
     # --- Core ---
@@ -78,10 +91,15 @@ dependencies = [
 dev = [
     "pytest",
     "pytest-asyncio",
+    "pytest-cov",
     "ruff",
     "mypy",
     "import-linter",
 ]
+
+[project.urls]
+Repository = "https://github.com/Mathieu-Le-Gouill/Agent-Platform"
+Issues = "https://github.com/Mathieu-Le-Gouill/Agent-Platform/issues"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -95,6 +113,56 @@ agent_platform = ["py.typed"]
 
 [tool.ruff]
 line-length = 88
+target-version = "py311"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP"]
+ignore = ["E501"]
+
+[tool.ruff.lint.isort]
+known-first-party = ["agent_platform"]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**" = ["E402"]
+
+[tool.mypy]
+python_version = "3.12"
+packages = ["agent_platform"]
+mypy_path = "src"
+ignore_missing_imports = true
+warn_unused_ignores = true
+warn_redundant_casts = true
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
+markers = [
+    "unit: fast, no external services",
+    "integration: hits a real external provider/network",
+]
+
+[tool.importlinter]
+root_package = "agent_platform"
+exclude_type_checking_imports = true
+
+[[tool.importlinter.contracts]]
+name = "Layered architecture"
+type = "layers"
+layers = [
+    "agent_platform.agents",
+    "agent_platform.pipelines",
+    "agent_platform.components",
+    "agent_platform.integrations",
+    "agent_platform.core",
+]
+
+[[tool.importlinter.contracts]]
+name = "Core has no sibling-layer dependencies"
+type = "forbidden"
+source_modules = ["agent_platform.core"]
+forbidden_modules = [
+    "agent_platform.integrations",
+    "agent_platform.components",
+    "agent_platform.pipelines",
+    "agent_platform.agents",
+]
