@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from importlib import import_module
-from typing import Any
+from agent_platform.utils.lazy_imports import make_lazy_provider_accessors
 
 _PROVIDERS: dict[str, str] = {
     "OpenAIEmbeddingProvider": "agent_platform.integrations.embeddings.openai.openai",
@@ -10,12 +9,4 @@ _PROVIDERS: dict[str, str] = {
     "HuggingFaceEmbeddingProvider": "agent_platform.integrations.embeddings.huggingface.huggingface",
 }
 
-
-def __getattr__(name: str) -> Any:
-    if name in _PROVIDERS:
-        return getattr(import_module(_PROVIDERS[name]), name)
-    raise AttributeError(f"module {__name__!r} has no attribute {name!r}")
-
-
-def __dir__() -> list[str]:
-    return sorted(list(globals().keys()) + list(_PROVIDERS.keys()))
+__getattr__, __dir__ = make_lazy_provider_accessors(_PROVIDERS, globals())
