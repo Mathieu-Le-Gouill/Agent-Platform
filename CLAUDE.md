@@ -13,7 +13,7 @@ Coding-agent guide for this repository. Read this before writing any code. For l
 The platform is **structurally complete** at the integration and agent layers. The main gaps are:
 1. Pipelines are mostly stubs or minimal
 2. A few tools are missing
-3. Scaffold directories (`api/`, `workflows/`) are empty
+3. `workflows/` is still an empty scaffold; `api/` now has a real FastAPI entrypoint (`api/app.py`) wiring one `ConversationAgent` via `config/container.py::build_agent()`, driven by `config/settings.py::Settings`
 
 ### What is solid
 
@@ -31,7 +31,6 @@ The platform is **structurally complete** at the integration and agent layers. T
 | P0 | RAG query pipeline missing embed → rerank → generate steps (currently just `store.search(vector)`) | `pipelines/rag/query.py` |
 | P1 | `speech_translation.py` body is pseudocode in a docstring, `run()` raises `NotImplementedError` | `pipelines/speech_translation.py` |
 | P1 | `classification` has no integration/provider layer at all (interface only defines response models, no `base.py` ABC, no `integrations/classification/` directory); classification today is implemented entirely in `components/embed_classifier` and `components/llm_classifier` instead | `core/interfaces/classification/`, `integrations/classification/` (missing) |
-| P2 | DI container commented out | `config/container.py` |
 | P2 | `uv run --extra chunking-pdf` (and `--extra all`) fails: uv resolves `unstructured==0.18.32` -> `numba==0.53.1`, incompatible with Python >=3.10; `pip install -e ".[chunking-pdf]"` resolves a newer, working `unstructured` for the same file. Needs an explicit floor pin on `unstructured` in that extra | `pyproject.toml` |
 | P3 | `classification-transformers` extra is declared in `pyproject.toml` but nothing imports `transformers`, no consuming code exists yet | `pyproject.toml` |
 

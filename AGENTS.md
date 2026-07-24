@@ -44,8 +44,9 @@ Purpose only, enough to know which README to open next.
 | `src/agent_platform/agents/` | Top-level composition: `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, tools | yes |
 | `src/agent_platform/audio/` | DSP utilities, resampling, waveform chunking, tensor/numpy/base64 conversion | no |
 | `src/agent_platform/utils/` | Shared helpers: async batching, env var parsing, score utilities | no |
-| `src/agent_platform/config/` | Logging setup, DI container (currently commented out) | no |
-| `src/agent_platform/api/`, `src/agent_platform/workflows/` | Scaffold stubs (FastAPI layer, LangGraph state machine), not yet implemented | no |
+| `src/agent_platform/config/` | Logging setup, `Settings` (pydantic-settings), `build_agent()` DI factory | no |
+| `src/agent_platform/api/` | FastAPI app wiring `build_agent()` behind `/chat` and `/health` | no |
+| `src/agent_platform/workflows/` | Scaffold stub (LangGraph state machine), not yet implemented | no |
 | `tests/` | Test suite, mirrors `src/agent_platform` structure | no |
 
 Read `src/agent_platform/README.md` first for the full layer diagram before

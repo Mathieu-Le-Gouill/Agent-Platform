@@ -7,7 +7,8 @@
 │  agents/         ← composition (Agent, Executor,  │
 │                     ConversationAgent, Tool ABC,  │
 │                     ToolRegistry, 3 tools)        │
-│  workflows/  api/   ← stubs                       │
+│  api/        ← FastAPI entrypoint (build_agent)   │
+│  workflows/  ← stub                                │
 ├──────────────────────────────────────────────────┤
 │  pipelines/         ← orchestration               │
 │  (ingestion, speech_translation, rag)             │

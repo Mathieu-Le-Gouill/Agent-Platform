@@ -28,6 +28,7 @@ dependencies = [
     "langfuse~=2.0",
     "numpy",
     "pillow",
+    "pydantic-settings~=2.0",
 ]
 
 [project.optional-dependencies]
@@ -103,6 +104,9 @@ clustering = ["agent_platform[clustering-hdbscan,clustering-kmeans]"]
 # --- Classification ---
 classification-transformers = ["transformers"]
 
+# --- API ---
+api = ["fastapi~=0.121", "uvicorn[standard]~=0.34"]
+
 # --- Chunking (structure-based) ---
 chunking-recursive = ["langchain-text-splitters~=1.0"]
 chunking-html = ["langchain-text-splitters~=1.0"]
@@ -117,7 +121,7 @@ loader-soundfile = ["soundfile"]
 
 # --- Everything (parity with the old monolithic install) ---
 all = [
-    "agent_platform[llm,embeddings,vector-store,reranking,stt,translation,ocr,vad,image,clustering,classification-transformers,chunking,loader-av,loader-soundfile]",
+    "agent_platform[llm,embeddings,vector-store,reranking,stt,translation,ocr,vad,image,clustering,classification-transformers,chunking,loader-av,loader-soundfile,api]",
 ]
 
 dev = [
@@ -127,11 +131,15 @@ dev = [
     "ruff",
     "mypy",
     "import-linter",
+    "httpx",
 ]
 
 [project.urls]
 Repository = "https://github.com/Mathieu-Le-Gouill/Agent-Platform"
 Issues = "https://github.com/Mathieu-Le-Gouill/Agent-Platform/issues"
+
+[project.scripts]
+agent-platform-api = "agent_platform.api.app:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
