@@ -10,6 +10,8 @@ from agent_platform.agents.tools import (
     SearchTool,
     ToolError,
 )
+from agent_platform.components.embedder import Embedder
+from agent_platform.components.vector_search import VectorSearch
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.embedding import Embedding
@@ -48,7 +50,10 @@ def mock_store():
 
 @pytest.fixture
 def tool(mock_embedder, mock_store):
-    return SearchTool(embedder=mock_embedder, store=mock_store)
+    return SearchTool(
+        embedder=Embedder(backend=mock_embedder),
+        vector_search=VectorSearch(backend=mock_store),
+    )
 
 
 class TestSearchInput:

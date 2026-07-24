@@ -5,6 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from agent_platform.agents.tools import OCRInput, OCRTool, ToolError
+from agent_platform.components.ocr import OCR
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat
@@ -30,7 +31,7 @@ def mock_provider():
 
 @pytest.fixture
 def tool(mock_provider):
-    return OCRTool(provider=mock_provider)
+    return OCRTool(ocr=OCR(backend=mock_provider))
 
 
 class TestOCRInput:

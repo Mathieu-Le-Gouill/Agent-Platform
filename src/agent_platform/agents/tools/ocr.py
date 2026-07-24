@@ -2,13 +2,12 @@ from __future__ import annotations
 
 from collections.abc import Sequence
 from typing import Any
-from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools._utils import safe_call
 from agent_platform.agents.tools.base import Tool
-from agent_platform.core.interfaces.ocr.base import BaseOCR
+from agent_platform.components.ocr import OCR
 from agent_platform.core.interfaces.ocr.config import OCRConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import ImageDocument
@@ -38,8 +37,8 @@ class OCRTool(Tool):
     input_schema = OCRInput
     output_schema = None
 
-    def __init__(self, provider: BaseOCR) -> None:
-        self._provider = provider
+    def __init__(self, ocr: OCR) -> None:
+        self._ocr = ocr
 
     async def run(self, **kwargs: Any) -> list[TextChunk]:
         validated = OCRInput(**kwargs)
@@ -48,11 +47,7 @@ class OCRTool(Tool):
             min_confidence=validated.min_confidence,
         )
         results = await safe_call(
-            self._provider.extract(
-                source=validated.source,
-                config=config,
-                document_id=uuid4(),
-            ),
+            self._ocr.arun((validated.source, config)),
             "OCR extraction failed",
         )
         return filter_by_score(
