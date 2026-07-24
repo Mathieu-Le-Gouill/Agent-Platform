@@ -13,7 +13,9 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    llm_provider: str = "openai"
+    # Provider class name as exported by `agent_platform.integrations.llm`
+    # (e.g. "OpenAILLM", "AnthropicLLM") - see config/container.py:build_provider.
+    llm_provider: str = "OpenAILLM"
     llm_model: str = "gpt-4o-mini"
     agent_name: str = "assistant"
     agent_system_prompt: str | None = None

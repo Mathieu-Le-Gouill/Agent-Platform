@@ -83,6 +83,16 @@ Multi-step operations that chain components together. See `pipelines/README.md`.
 - `io.py`, AudioDocument/Chunk construction, tensor/numpy/base64 conversions
 - `dsp.py`, resampling, waveform chunking, full audio processing pipeline
 
+### `config/`: Settings and DI
+
+- `settings.py`, `Settings` (`pydantic-settings`, env prefix `AGENT_PLATFORM_`), `get_settings()` (`lru_cache`'d singleton)
+- `container.py`, `build_provider(domain_module, provider_name)`, a generic factory that instantiates any `integrations.<domain>` provider by its exported class name (`getattr(domain_module, provider_name)()`), raising `ConfigError` if the name isn't found. It reads no separate provider registry, the target domain's own `_PROVIDERS` map (see `integrations/` above) is already the source of truth for valid names, so a `Settings` field for a domain just stores that class name directly (e.g. `llm_provider: str = "OpenAILLM"`)
+- `container.py`, `build_agent(settings)`, the only concrete wiring today: builds a `ConversationAgent` from `settings.llm_provider` via `build_provider`
+
+### `api/`: FastAPI Entrypoint
+
+`app.py` wires one `ConversationAgent` via `config.build_agent()` behind `/chat` and `/health`, using `config.Settings`/`get_settings()` for configuration and `config.setup_logging()` + `core.tracing.configure_tracing()` at startup.
+
 ## Extension Patterns
 
 ### Add a new integration provider
@@ -104,14 +114,33 @@ class MyLLM(LangChainLLMProvider):
 1. Create the ABC in `core/interfaces/<domain>/` (see `core/README.md`)
 2. Create `integrations/<domain>/<first_provider>/` and implement the ABC
 
+### Wire a new provider domain into `Settings`/DI
+
+Once a domain has real consumers beyond direct constructor injection (the
+pattern `agents/tools/*` use today), expose it through `config/` instead of
+adding a bespoke factory function per domain:
+
+```python
+# config/settings.py
+vector_store_provider: str = "ChromaStore"   # class name from integrations.vector_store
+
+# config/container.py
+def build_vector_store(settings: Settings) -> BaseVectorStore:
+    import agent_platform.integrations.vector_store as vector_store_module
+    return build_provider(vector_store_module, settings.vector_store_provider)
+```
+
+`build_provider` already works for any domain module that follows the
+`_PROVIDERS: dict[class_name, module_path]` + lazy `__getattr__` convention,
+so this is the only code needed, no new registry, no per-domain dict.
+
 ## Known Issues
 
 | Issue | Location | Status |
 |---|---|---|
-| DI container commented out | `config/container.py` | Open |
 | `speech_translation.py` is pseudocode, `run()` raises `NotImplementedError` | `pipelines/speech_translation.py` | Open |
 | Minimal RAG pipelines | `rag/ingest.py`, `rag/query.py` missing chunk/embed/rerank/generate steps | Open |
 | `classification` has no `integrations/` layer, only interface response models and component-level use | `core/interfaces/classification/`, `integrations/classification/` (missing) | Open |
 | `classification-transformers` extra declared but unused | `pyproject.toml` | Open |
 | `uv run --extra chunking-pdf`/`--extra all` fails (uv resolves an old `unstructured`→`numba` pin incompatible with Python >=3.10); `pip install -e ".[chunking-pdf]"` works | `pyproject.toml` | Open |
-| Empty stubs | `api/`, `workflows/` | By design |
+| Empty stub | `workflows/` | By design |
