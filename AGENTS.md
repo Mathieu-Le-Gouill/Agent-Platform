@@ -97,6 +97,15 @@ dependency system. No `uv.lock` is committed.
   `mypy src/`, `lint-imports`, and the pytest suite (with coverage) on every
   push/PR to `main`, on Python 3.11 and 3.12. A change that fails any of
   these locally will fail CI the same way.
+- **Run the checks locally before committing/pushing, don't rely on CI to
+  catch it first.** `pre-commit install` (see `README.md` Git hooks) wires
+  ruff, mypy, and lint-imports into `git commit`, and the full `pytest`
+  suite into `git push`; if hooks aren't installed, run the equivalent
+  commands from this section manually.
+- If a change touches shared/public behavior (function signatures, error
+  types, schemas, provider interfaces), run the **full** `pytest` suite
+  before pushing, not just the tests for the file you touched, breaking
+  changes usually surface in a caller's test, not the callee's.
 
 ## 4. Error handling conventions
 

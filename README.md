@@ -90,6 +90,20 @@ uv run pytest -v tests/agents/test_executor.py::test_max_iterations
 uv run ruff check src/
 ```
 
+### Git hooks
+
+One-time setup after cloning:
+
+```bash
+uv run --extra dev pre-commit install --hook-type pre-commit --hook-type pre-push
+```
+
+This runs `ruff check`, `ruff format`, `mypy`, and `lint-imports` on every commit, and the full `pytest` suite before every push, the same checks CI runs on `main`. Config lives in `.pre-commit-config.yaml`. To run everything on demand without committing: `uv run pre-commit run --all-files`.
+
+### Commit messages
+
+Follow [Conventional Commits](https://www.conventionalcommits.org/): `<type>: <summary>`, e.g. `feat: add streaming support to ConversationAgent`, `fix: repair broken CI`, `docs: update README`. Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
+
 ## For Coding Agents
 
 Read `AGENTS.md` before making any changes. It documents the lookup protocol, layer rules, error hierarchy, testing conventions, and extension guidance.

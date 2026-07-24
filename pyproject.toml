@@ -132,6 +132,7 @@ dev = [
     "mypy",
     "import-linter",
     "httpx",
+    "pre-commit",
 ]
 
 [project.urls]
