@@ -1,0 +1,115 @@
+# agent_platform — Codebase Architecture
+
+## Layers
+
+```
+┌──────────────────────────────────────────────────┐
+│  agents/         ← composition (Agent, Executor,  │
+│                     ConversationAgent, Tool ABC,  │
+│                     ToolRegistry, 3 tools)        │
+│  workflows/  api/   ← stubs                       │
+├──────────────────────────────────────────────────┤
+│  pipelines/         ← orchestration               │
+│  (ingestion, speech_translation, rag)             │
+├──────────────────────────────────────────────────┤
+│  components/        ← reusable processing units   │
+├──────────────────────────────────────────────────┤
+│  integrations/      ← service adapters            │
+├──────────────────────────────────────────────────┤
+│  core/  audio/  utils/ ← foundation               │
+└──────────────────────────────────────────────────┘
+```
+
+## Layer Details
+
+### `core/` — Foundation
+
+Zero external dependencies. Everything here is pure Python, `pydantic`, `abc`, `typing`, `uuid`, `datetime`.
+
+| Path | Contents |
+|---|---|
+| `core/base.py` | `Entity` (UUID mixin), `Timestamped` |
+| `core/errors.py` | `PlatformError` hierarchy — `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
+| `core/credentials.py` | `BaseCredentials`, `ProviderCredentials` |
+| `core/interfaces/<domain>/` | ABCs for every capability (llm, embeddings, vad, ocr, vector_store, reranking, chunking, speech, translation, clustering, classification, loader, image_generation) |
+| `core/schemas/` | Shared Pydantic v2 data models used across all layers |
+
+#### `core/schemas/` — Shared Data Structures
+
+All models are `pydantic.BaseModel`. Frozen where appropriate.
+
+| File | Contents |
+|---|---|
+| `document.py` | `Document` hierarchy — `TextDocument`, `ImageDocument`, `AudioDocument`, `VideoDocument` |
+| `chunk.py` | `Chunk` hierarchy — `TextChunk`, `AudioChunk`, `VideoChunk` |
+| `message.py` | Chat messages — `SystemMessage`, `UserMessage`, `AssistantMessage`, `ToolMessage`, `ToolCall`, `ToolResult`, `Prompt` |
+| `conversation.py` | `Utterance` (speaker, text, timestamps, confidence), `Transcript` |
+| `embedding.py` | `Embedding` with vector, norm, dimension helpers |
+| `score.py` | `Score` with kind, bounds, normalization |
+| `token.py` | `TokenUsage` with addition, total |
+| `span.py` | `TimeSpan`, `SampleSpan` |
+| `cluster.py` | `Cluster` with label, items, centroid |
+| `enums.py` | `MediaType`, `DocumentFormat`, `ImageFormat`, `AudioFormat`, `VideoFormat`, `DataType`, `Language`, `FileFormat` |
+
+### `integrations/` — Service Adapters
+
+Each domain follows:
+
+```
+integrations/<domain>/
+├── __init__.py
+├── langchain_base.py    # Optional: LangChain intermediate abstract
+└── <provider>/
+    ├── __init__.py
+    ├── config.py        # Provider-specific Pydantic config
+    └── <provider>.py    # Concrete class implementing core/interfaces ABC
+```
+
+`loader/` uses `strategies/` instead of plain `<provider>/` subdirectories because each strategy handles a different media type rather than a different vendor.
+
+Each domain's `integrations/<domain>/__init__.py` re-exports its provider classes lazily via a module-level `__getattr__` (PEP 562) over a `_PROVIDERS: dict[class_name, module_path]` map, so callers get a flat import — `from agent_platform.integrations.llm import OpenAILLM` — without eagerly importing every provider's SDK (each class is only imported on first access). Add a new provider to a domain by adding one entry to that domain's `_PROVIDERS` map.
+
+### `components/` — Composable Units
+
+`Component[InputT, OutputT]` ABC with `async def arun(input) -> OutputT`. See `components/README.md`.
+
+### `pipelines/` — Orchestration Flows
+
+Multi-step operations that chain components together. See `pipelines/README.md`.
+
+### `audio/` — DSP Utilities
+
+- `io.py` — AudioDocument/Chunk construction, tensor/numpy/base64 conversions
+- `dsp.py` — resampling, waveform chunking, full audio processing pipeline
+
+## Extension Patterns
+
+### Add a new integration provider
+```
+integrations/<domain>/<new_provider>/
+├── __init__.py
+├── config.py
+└── <new_provider>.py   # implements core/interfaces/<domain>/base.py ABC
+```
+
+### Add a new LLM provider (LangChain-based)
+```python
+class MyLLM(LangChainLLMProvider):
+    def _client(self, model, config):
+        return SomeLangChainModel(model, **_to_langchain_some(config))
+```
+
+### Add a new integration domain
+1. Create the ABC in `core/interfaces/<domain>/` (see `core/README.md`)
+2. Create `integrations/<domain>/<first_provider>/` and implement the ABC
+
+## Known Issues
+
+| Issue | Location | Status |
+|---|---|---|
+| No entrypoint | `main.py` declared in `pyproject.toml` but missing | Open |
+| DI container commented out | `config/container.py` | Open |
+| `speech_translation.py` is pseudocode | `pipelines/speech_translation.py` | Open |
+| Minimal RAG pipelines | `rag/ingest.py`, `rag/query.py` missing embedding step | Open |
+| classification integration has no providers | `integrations/classification/` | Open |
+| Empty stubs | `api/`, `workflows/` | By design |

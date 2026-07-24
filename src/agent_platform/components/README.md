@@ -5,7 +5,7 @@
 `components/` is the **composition layer** between raw Integrations and full Pipelines. A component wraps one or more Integration providers into a higher-level, reusable processing unit with a standard interface.
 
 Unlike an Integration (which implements a `core/interfaces` ABC for a specific library), a Component:
-- Is framework-independent — it follows the `Component[In, Out]` ABC
+- Is framework-independent — it follows the `Component[InputT, OutputT]` ABC
 - May compose multiple backends (e.g., embed + classify)
 - May add logic not present in any single provider (e.g., similarity scoring, thresholding)
 - Has no external library dependencies of its own — it delegates to Integrations
@@ -30,7 +30,7 @@ Every component receives typed input and returns typed output. The sync `run()` 
 ```
 components/
 ├── __init__.py
-├── base.py                  # Component[In, Out] ABC
+├── base.py                  # Component[InputT, OutputT] ABC
 ├── chunker.py               # TextDocument → TextChunk (wraps BaseChunker)
 ├── embedder.py              # TextChunk → EmbeddingResponse (wraps BaseEmbeddingProvider)
 ├── reranker.py              # list[T] → list[T] (wraps BaseReranker)
@@ -94,7 +94,7 @@ components/<name>.py
 ```
 
 1. Create a new file in `components/`
-2. Subclass `Component[In, Out]`
+2. Subclass `Component[InputT, OutputT]`
 3. Accept the backend Integration(s) in `__init__`
 4. Implement `arun()` — one async method that orchestrates the backend(s)
 5. Export from `components/__init__.py`
