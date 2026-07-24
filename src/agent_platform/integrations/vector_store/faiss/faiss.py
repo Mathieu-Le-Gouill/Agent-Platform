@@ -66,13 +66,14 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
                 raise ProviderError(
                     "Embeddings are required to initialize a FAISS index"
                 )
-            self._store = await asyncio.to_thread(
+            new_store: FAISS = await asyncio.to_thread(
                 FAISS.from_documents,
                 lc_docs,
                 self._embeddings,
                 distance_strategy=_DISTANCE_STRATEGY_MAP[config.distance],
             )
-            store = self._store
+            self._store = new_store
+            store = new_store
         else:
             store = self._store
             await store.aadd_documents(lc_docs)
