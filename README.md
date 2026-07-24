@@ -54,11 +54,23 @@ src/agent_platform/
 
 ## Setup
 
+Provider SDKs are installed via extras, not bundled by default, so you only pull in what you use:
+
 ```bash
+# Base install (framework only, no provider SDKs) + dev tooling
 pip install -e ".[dev]"
+
+# Add just the providers you need, e.g. OpenAI LLM + Chroma vector store
+pip install -e ".[dev,llm-openai,vector-store-chroma]"
+
+# Or grab every provider in a domain
+pip install -e ".[dev,llm]"
+
+# Or everything (parity with the old monolithic install)
+pip install -e ".[dev,all]"
 ```
 
-Requires Python 3.11. Some providers have system dependencies (Tesseract, CUDA for WhisperX).
+Extras are named `<domain>-<provider>` (e.g. `stt-whisperx`, `ocr-tesseract`); see `pyproject.toml` for the full list. Requires Python 3.11. Some providers have system dependencies (Tesseract, CUDA for WhisperX).
 
 ## Development
 

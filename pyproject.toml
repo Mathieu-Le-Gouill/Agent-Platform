@@ -21,73 +21,100 @@ classifiers = [
 ]
 
 dependencies = [
-    # --- Core ---
+    # --- Core framework (always installed) ---
     "langchain~=1.3",
     "langgraph~=1.2",
     "langsmith~=0.10",
     "langfuse~=2.0",
-    "soundfile",
-
-    # --- LLM ---
-    "langchain-openai~=1.3",
-    "langchain-anthropic~=1.4",
-    "langchain-mistralai~=1.1",
-    "langchain-ollama~=1.1",
-    "langchain-community~=0.4",
-
-    # --- Embeddings / Vector Stores / Reranking ---
-    "langchain-chroma~=1.1",
-    "langchain-cohere~=0.6",
-    "langchain-qdrant~=1.1",
-    "langchain-pinecone~=0.2",
-    "langchain-weaviate~=0.0.8",
-    "langchain-voyageai~=0.4",
-    "faiss-cpu",
-
-    # --- OCR ---
-    "pytesseract",
-    "boto3",
-    "google-cloud-vision",
-    "mistralai",
-
-    # --- Speech-to-Text ---
     "numpy",
-    "whisperx",
-    "faster-whisper",
-    "deepgram-sdk",
-    "openai",
-
-    # --- Translation ---
-    "deepl",
-    "google-cloud-translate",
-    "azure-ai-translation-text",
-
-    # --- VAD ---
-    "silero-vad",
-    "webrtcvad",
-    "ten-vad @ git+https://github.com/TEN-framework/ten-vad.git@22a3bcd4509d0faaa8eef4881e8af5f39c178950",
-
-    # --- Reranking ---
-    "flashrank",
-
-    # --- Classification ---
-    "transformers",
-
-    # --- Chunking (structure-based) ---
-    "beautifulsoup4",
-    "unstructured[pdf]",
-
-    # --- Clustering ---
-    "hdbscan",
-    "scikit-learn",
-
-    # --- Image Generation ---
-    "diffusers[torch]",
-    "accelerate",
-    "httpx",
+    "pillow",
 ]
 
 [project.optional-dependencies]
+# --- LLM ---
+llm-openai = ["langchain-openai~=1.3"]
+llm-anthropic = ["langchain-anthropic~=1.4"]
+llm-mistral = ["langchain-mistralai~=1.1"]
+llm-ollama = ["langchain-ollama~=1.1"]
+llm-huggingface = ["langchain-huggingface"]
+llm = ["agent_platform[llm-openai,llm-anthropic,llm-mistral,llm-ollama,llm-huggingface]"]
+
+# --- Embeddings ---
+embeddings-openai = ["langchain-openai~=1.3"]
+embeddings-mistral = ["langchain-mistralai~=1.1"]
+embeddings-ollama = ["langchain-ollama~=1.1"]
+embeddings-huggingface = ["langchain-huggingface"]
+embeddings = ["agent_platform[embeddings-openai,embeddings-mistral,embeddings-ollama,embeddings-huggingface]"]
+
+# --- Vector Stores ---
+vector-store-chroma = ["langchain-chroma~=1.1"]
+vector-store-faiss = ["faiss-cpu", "langchain-community~=0.4"]
+vector-store-pinecone = ["langchain-pinecone~=0.2"]
+vector-store-qdrant = ["langchain-qdrant~=1.1"]
+vector-store-weaviate = ["langchain-weaviate~=0.0.8"]
+vector-store = ["agent_platform[vector-store-chroma,vector-store-faiss,vector-store-pinecone,vector-store-qdrant,vector-store-weaviate]"]
+
+# --- Reranking ---
+reranking-cohere = ["langchain-cohere~=0.6"]
+reranking-jina = ["langchain-community~=0.4"]
+reranking-huggingface = ["langchain-community~=0.4"]
+reranking-flashrank = ["flashrank"]
+reranking-voyage = ["langchain-voyageai~=0.4"]
+reranking = ["agent_platform[reranking-cohere,reranking-jina,reranking-huggingface,reranking-flashrank,reranking-voyage]"]
+
+# --- Speech-to-Text ---
+stt-whisperx = ["whisperx"]
+stt-faster-whisper = ["faster-whisper"]
+stt-deepgram = ["deepgram-sdk"]
+stt-openai = ["openai"]
+stt = ["agent_platform[stt-whisperx,stt-faster-whisper,stt-deepgram,stt-openai]"]
+
+# --- Translation ---
+translation-deepl = ["deepl"]
+translation-google = ["google-cloud-translate"]
+translation-azure = ["azure-ai-translation-text"]
+translation = ["agent_platform[translation-deepl,translation-google,translation-azure]"]
+
+# --- OCR ---
+ocr-tesseract = ["pytesseract"]
+ocr-google-vision = ["google-cloud-vision"]
+ocr-aws-textract = ["boto3"]
+ocr-mistral = ["mistralai"]
+ocr = ["agent_platform[ocr-tesseract,ocr-google-vision,ocr-aws-textract,ocr-mistral]"]
+
+# --- VAD ---
+vad-silero = ["silero-vad", "torch"]
+vad-webrtc = ["webrtcvad"]
+vad-pvcobra = ["pvcobra"]
+vad-ten = ["ten-vad @ git+https://github.com/TEN-framework/ten-vad.git@22a3bcd4509d0faaa8eef4881e8af5f39c178950"]
+vad = ["agent_platform[vad-silero,vad-webrtc,vad-pvcobra,vad-ten]"]
+
+# --- Image Generation ---
+image-dalle = ["openai"]
+image-midjourney = ["httpx"]
+image-stable-diffusion = ["diffusers[torch]", "accelerate"]
+image = ["agent_platform[image-dalle,image-midjourney,image-stable-diffusion]"]
+
+# --- Clustering ---
+clustering-hdbscan = ["hdbscan"]
+clustering-kmeans = ["scikit-learn"]
+clustering = ["agent_platform[clustering-hdbscan,clustering-kmeans]"]
+
+# --- Classification ---
+classification-transformers = ["transformers"]
+
+# --- Chunking (structure-based) ---
+chunking-pdf = ["unstructured[pdf]"]
+
+# --- Loader strategies ---
+loader-av = ["av"]
+loader-soundfile = ["soundfile"]
+
+# --- Everything (parity with the old monolithic install) ---
+all = [
+    "agent_platform[llm,embeddings,vector-store,reranking,stt,translation,ocr,vad,image,clustering,classification-transformers,chunking-pdf,loader-av,loader-soundfile]",
+]
+
 dev = [
     "pytest",
     "pytest-asyncio",
