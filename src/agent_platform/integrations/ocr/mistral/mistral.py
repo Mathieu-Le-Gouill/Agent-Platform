@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 try:
-    from mistralai import Mistral  # type: ignore[attr-defined]
+    from mistralai import Mistral
 except ImportError:  # pragma: no cover - depends on installed mistralai version
     from mistralai.client import Mistral
 

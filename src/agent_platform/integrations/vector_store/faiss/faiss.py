@@ -72,11 +72,13 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
                 self._embeddings,
                 distance_strategy=_DISTANCE_STRATEGY_MAP[config.distance],
             )
+            store = self._store
         else:
-            await self._store.aadd_documents(lc_docs)
+            store = self._store
+            await store.aadd_documents(lc_docs)
 
         if config.index_path:
-            await asyncio.to_thread(self._store.save_local, config.index_path)
+            await asyncio.to_thread(store.save_local, config.index_path)
 
     async def delete(
         self, document_ids: list[UUID], config: FAISSConfig | None = None
