@@ -104,7 +104,12 @@ clustering = ["agent_platform[clustering-hdbscan,clustering-kmeans]"]
 classification-transformers = ["transformers"]
 
 # --- Chunking (structure-based) ---
+chunking-recursive = ["langchain-text-splitters~=1.0"]
+chunking-html = ["langchain-text-splitters~=1.0"]
+chunking-latex = ["langchain-text-splitters~=1.0"]
+chunking-markdown = ["langchain-text-splitters~=1.0"]
 chunking-pdf = ["unstructured[pdf]"]
+chunking = ["agent_platform[chunking-recursive,chunking-html,chunking-latex,chunking-markdown,chunking-pdf]"]
 
 # --- Loader strategies ---
 loader-av = ["av"]
@@ -112,7 +117,7 @@ loader-soundfile = ["soundfile"]
 
 # --- Everything (parity with the old monolithic install) ---
 all = [
-    "agent_platform[llm,embeddings,vector-store,reranking,stt,translation,ocr,vad,image,clustering,classification-transformers,chunking-pdf,loader-av,loader-soundfile]",
+    "agent_platform[llm,embeddings,vector-store,reranking,stt,translation,ocr,vad,image,clustering,classification-transformers,chunking,loader-av,loader-soundfile]",
 ]
 
 dev = [
@@ -141,6 +146,9 @@ agent_platform = ["py.typed"]
 [tool.ruff]
 line-length = 88
 target-version = "py311"
+
+[tool.ruff.format]
+exclude = ["*.md"]
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP"]
