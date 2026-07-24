@@ -147,7 +147,7 @@ rather than guessing silently.
   order and that `core/` never imports a sibling layer; run `lint-imports`
   to check, CI fails the same way.
 - **`core/` has no external deps** beyond `pydantic`, `abc`, `typing`,
-  `uuid`, `datetime`.
+  `uuid`, `datetime`, `opentelemetry` (tracing only).
 - **All IO is async.** Use `asyncio.to_thread()` for blocking calls; `run()`
   on `Component` is a sync convenience wrapper around `arun()`, nothing more.
 - **Backends are injected**, never instantiated inside a component or tool.
