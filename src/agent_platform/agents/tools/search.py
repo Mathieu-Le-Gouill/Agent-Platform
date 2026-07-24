@@ -1,13 +1,13 @@
 from __future__ import annotations
 
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
+from typing import Any
+from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from agent_platform.agents.tools.base import Tool, ToolError
-from uuid import uuid4
-
 from agent_platform.agents.tools._utils import safe_call
+from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
 from agent_platform.core.interfaces.vector_store.port import VectorStore
 from agent_platform.core.schemas.chunk import TextChunk
@@ -50,7 +50,7 @@ class SearchTool(Tool):
     async def _search(self, validated: SearchInput) -> list[SearchResult]:
         query_chunk = TextChunk(id=uuid4(), text=validated.query, index=0)
         response = await safe_call(
-            self._embedder.embed_document([query_chunk]),
+            self._embedder.aembed_document([query_chunk]),
             "Embedding failed",
         )
         if not response.embeddings:
@@ -62,9 +62,9 @@ class SearchTool(Tool):
         )
         return [SearchResult(chunk=chunk, score=score) for chunk, score in results]
 
-    async def run(self, **kwargs) -> list[SearchResult]:
+    async def run(self, **kwargs: Any) -> list[SearchResult]:
         return await self._search(SearchInput(**kwargs))
 
-    async def astream(self, **kwargs) -> AsyncIterator[str]:
+    async def astream(self, **kwargs: Any) -> AsyncIterator[str]:
         for result in await self._search(SearchInput(**kwargs)):
             yield result.model_dump_json()

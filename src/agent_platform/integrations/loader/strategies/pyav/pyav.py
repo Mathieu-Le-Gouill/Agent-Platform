@@ -1,4 +1,4 @@
-from typing import Sequence
+from collections.abc import Sequence
 from uuid import uuid4
 
 import av
@@ -6,8 +6,8 @@ import av
 from agent_platform.core.interfaces.loader.video.base import BaseVideoLoader
 from agent_platform.core.interfaces.loader.video.config import VideoLoaderConfig
 from agent_platform.core.schemas.dimensions import Dimensions
-from agent_platform.core.schemas.document import VideoDocument, DocumentMetadata
-from agent_platform.core.schemas.enums import VideoFormat, FileFormat
+from agent_platform.core.schemas.document import DocumentMetadata, VideoDocument
+from agent_platform.core.schemas.enums import FileFormat, VideoFormat
 
 
 class PyAVLoader(BaseVideoLoader):
@@ -21,20 +21,18 @@ class PyAVLoader(BaseVideoLoader):
             video_fmt = VideoFormat.UNKNOWN
 
         with av.open(source) as container:
-            video_stream = next(
-                (s for s in container.streams if s.type == "video"), None
+            video_stream = (
+                container.streams.video[0] if container.streams.video else None
             )
-            audio_stream = next(
-                (s for s in container.streams if s.type == "audio"), None
+            audio_stream = (
+                container.streams.audio[0] if container.streams.audio else None
             )
 
             if video_stream is None:
                 return []
 
             duration_sec = (
-                float(container.duration / av.utils.time_base)
-                if container.duration
-                else None
+                float(container.duration / av.time_base) if container.duration else None
             )
             frame_rate = (
                 float(video_stream.average_rate) if video_stream.average_rate else None

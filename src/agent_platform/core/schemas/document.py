@@ -1,20 +1,20 @@
 from __future__ import annotations
 
 import os
-from uuid import UUID, uuid4
-from typing import Any
 from datetime import datetime
+from typing import Any
+from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
 from agent_platform.core.schemas.dimensions import Dimensions, bit_depth_for_mode
 from agent_platform.core.schemas.enums import (
-    MediaType,
+    AudioFormat,
     DocumentFormat,
     ImageFormat,
-    AudioFormat,
-    VideoFormat,
     Language,
+    MediaType,
+    VideoFormat,
 )
 
 
@@ -60,7 +60,7 @@ class ImageDocument(Document, frozen=True):
         from PIL import Image
 
         with Image.open(path) as img:
-            fmt = _infer_image_format(img)
+            fmt = _infer_image_format(path)
             width, height = img.size
             has_alpha = img.mode == "RGBA"
             channels = len(img.getbands())
@@ -82,8 +82,9 @@ class ImageDocument(Document, frozen=True):
 
     def save_content(self, path: str) -> None:
         if self.format == ImageFormat.UNKNOWN:
-            from PIL import Image as PILImage
             import io
+
+            from PIL import Image as PILImage
 
             img = PILImage.open(io.BytesIO(self.content))
             img.save(path)
@@ -126,10 +127,10 @@ class AudioDocument(Document, frozen=True):
         )
 
     def save_content(self, path: str) -> None:
-        import soundfile as sf
         import numpy as np
+        import soundfile as sf
 
-        arr = np.frombuffer(self.content, dtype=np.float32)
+        arr: np.ndarray = np.frombuffer(self.content, dtype=np.float32)
         if self.channels and self.channels > 1:
             arr = arr.reshape(-1, self.channels)
         fmt = _SF_FORMAT_MAP.get(self.format, "WAV")
@@ -156,18 +157,16 @@ class VideoDocument(Document, frozen=True):
         import av
 
         with av.open(path) as container:
-            video_stream = next(
-                (s for s in container.streams if s.type == "video"), None
+            video_stream = (
+                container.streams.video[0] if container.streams.video else None
             )
-            audio_stream = next(
-                (s for s in container.streams if s.type == "audio"), None
+            audio_stream = (
+                container.streams.audio[0] if container.streams.audio else None
             )
             if video_stream is None:
                 raise ValueError(f"No video stream found in {path}")
             duration_sec = (
-                float(container.duration / av.utils.time_base)
-                if container.duration
-                else None
+                float(container.duration / av.time_base) if container.duration else None
             )
             frame_rate = (
                 float(video_stream.average_rate) if video_stream.average_rate else None

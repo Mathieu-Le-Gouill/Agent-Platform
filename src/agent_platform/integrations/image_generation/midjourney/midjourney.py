@@ -5,14 +5,19 @@ from typing import Any
 
 import httpx
 
-from agent_platform.integrations.credentials import MidjourneyCredentials
+from agent_platform.core.errors import (
+    MissingCredentialError,
+    ProviderError,
+    error_logged,
+    with_retry,
+)
 from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
+from agent_platform.core.schemas.document import DocumentMetadata, ImageDocument
+from agent_platform.core.schemas.enums import ImageFormat
+from agent_platform.integrations.credentials import MidjourneyCredentials
 from agent_platform.integrations.image_generation.midjourney.config import (
     MidjourneyConfig,
 )
-from agent_platform.core.schemas.document import DocumentMetadata, ImageDocument
-from agent_platform.core.schemas.enums import ImageFormat
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 
 class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
@@ -23,6 +28,11 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
 
     def _default_config(self) -> MidjourneyConfig:
         return MidjourneyConfig()
+
+    def _api_key(self) -> str:
+        if self._credentials.api_key is None:
+            raise MissingCredentialError("Midjourney API key is required")
+        return self._credentials.api_key.get_secret_value()
 
     @error_logged(re_raise=ProviderError, message="Image generation failed")
     @with_retry()
@@ -45,9 +55,7 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
             response = await client.post(
                 f"{config.api_url}/imagine",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {self._credentials.api_key.get_secret_value()}"
-                },
+                headers={"Authorization": f"Bearer {self._api_key()}"},
             )
             response.raise_for_status()
             data: dict[str, Any] = response.json()
@@ -96,9 +104,7 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
             response = await client.post(
                 f"{config.api_url}/imagine",
                 json=payload,
-                headers={
-                    "Authorization": f"Bearer {self._credentials.api_key.get_secret_value()}"
-                },
+                headers={"Authorization": f"Bearer {self._api_key()}"},
             )
             response.raise_for_status()
             data: dict[str, Any] = response.json()

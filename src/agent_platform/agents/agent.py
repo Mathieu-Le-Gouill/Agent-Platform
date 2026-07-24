@@ -2,11 +2,11 @@ from __future__ import annotations
 
 import asyncio
 import logging
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
+from agent_platform.agents.errors import AgentThinkError
 from agent_platform.agents.tools.base import ToolStreamChunk
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.agents.errors import AgentThinkError
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.schemas.message import (
@@ -55,14 +55,19 @@ class Agent:
     def _build_prompt(self, messages: list[Message]) -> Prompt:
         return Prompt.build(system=self._system_prompt, history=messages)
 
+    def _build_generation_config(self) -> GenerationConfig:
+        config = self._generation_config or GenerationConfig()
+        if not config.model:
+            config = config.model_copy(update={"model": self._model})
+        return config
+
     async def think(self, messages: list[Message]) -> AssistantMessage:
         tool_list = list(self._tool_registry)
 
         try:
             response = await self._llm.agenerate(
                 prompt=self._build_prompt(messages),
-                model=self._model,
-                config=self._generation_config,
+                config=self._build_generation_config(),
                 tools=tool_list or None,
             )
         except asyncio.CancelledError:

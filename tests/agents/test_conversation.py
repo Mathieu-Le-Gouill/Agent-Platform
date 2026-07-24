@@ -4,13 +4,12 @@ import pytest
 from pydantic import BaseModel
 
 from agent_platform.agents.conversation import ConversationAgent
-from tests.helpers import make_fake_llm_response
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.core.schemas.message import (
-    AssistantMessage,
     UserMessage,
 )
+from tests.helpers import make_fake_llm_response
 
 
 class _EchoTool(Tool):
@@ -226,15 +225,15 @@ class TestConversationTruncation:
 
 @pytest.mark.asyncio
 async def test_transcribe_search_summarize_integration():
-    from agent_platform.agents.tools import TranscribeTool, SearchTool
-    from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+    from agent_platform.agents.tools import SearchTool, TranscribeTool
     from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
-    from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
-    from agent_platform.core.schemas.conversation import Transcript, Utterance
-    from agent_platform.core.schemas.chunk import TextChunk
-    from agent_platform.core.schemas.score import Score
     from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
+    from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+    from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
+    from agent_platform.core.schemas.chunk import TextChunk
+    from agent_platform.core.schemas.conversation import Transcript, Utterance
     from agent_platform.core.schemas.embedding import Embedding
+    from agent_platform.core.schemas.score import Score
 
     stt = AsyncMock(spec=BaseSpeechToText)
     stt.transcribe = AsyncMock(
@@ -246,7 +245,7 @@ async def test_transcribe_search_summarize_integration():
     )
 
     embedder = AsyncMock(spec=BaseEmbeddingProvider)
-    embedder.embed_document = AsyncMock(
+    embedder.aembed_document = AsyncMock(
         return_value=EmbeddingResponse(
             embeddings=[Embedding.from_list([0.1, 0.2, 0.3])],
             model="test",
@@ -323,5 +322,5 @@ async def test_transcribe_search_summarize_integration():
     assert "Paris" in result
     assert llm.agenerate.await_count == 3
     assert stt.transcribe.await_count == 1
-    assert embedder.embed_document.await_count == 1
+    assert embedder.aembed_document.await_count == 1
     assert store.search_with_scores.await_count == 1

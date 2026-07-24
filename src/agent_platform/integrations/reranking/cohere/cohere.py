@@ -1,8 +1,8 @@
 from langchain_cohere import CohereRerank
 
 from agent_platform.integrations.credentials import CohereCredentials
-from agent_platform.integrations.reranking.langchain_base import LangChainReranker
 from agent_platform.integrations.reranking.cohere.config import CohereRerankerConfig
+from agent_platform.integrations.reranking.langchain_base import LangChainReranker
 
 
 class CohereRerankerProvider(LangChainReranker[CohereRerankerConfig]):
@@ -20,7 +20,5 @@ class CohereRerankerProvider(LangChainReranker[CohereRerankerConfig]):
             # CohereRerank defaults top_n=3, which silently truncates
             # results before our own top_k slice ever runs.
             top_n=config.top_k,
-            cohere_api_key=self._credentials.api_key.get_secret_value()
-            if self._credentials.api_key
-            else None,
+            cohere_api_key=self._credentials.api_key,
         )

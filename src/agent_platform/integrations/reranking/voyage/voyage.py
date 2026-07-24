@@ -1,5 +1,7 @@
-from langchain_voyageai import VoyageAIRerank
+from typing import Any
+
 from langchain_core.documents import BaseDocumentCompressor
+from langchain_voyageai import VoyageAIRerank
 
 from agent_platform.integrations.credentials import VoyageCredentials
 from agent_platform.integrations.reranking.langchain_base import LangChainReranker
@@ -16,18 +18,14 @@ class VoyageRerankerProvider(LangChainReranker[VoyageRerankerConfig]):
         return VoyageRerankerConfig()
 
     def _client(self, config: VoyageRerankerConfig) -> BaseDocumentCompressor:
-        api_key = (
-            self._credentials.api_key.get_secret_value()
-            if self._credentials.api_key
-            else None
-        )
-        kwargs = {}
+        kwargs: dict[str, Any] = {}
         if config.truncation is not None:
             kwargs["truncation"] = config.truncation
+        if self._credentials.api_key is not None:
+            kwargs["api_key"] = self._credentials.api_key
 
         return VoyageAIRerank(
             model=config.model,
-            voyage_api_key=api_key,
             top_k=config.top_k,
             **kwargs,
         )

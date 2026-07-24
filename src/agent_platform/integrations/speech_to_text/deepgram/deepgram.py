@@ -1,15 +1,20 @@
 from __future__ import annotations
 
 import asyncio
-from typing import AsyncIterator
+from collections.abc import AsyncIterator
 
-from agent_platform.integrations.credentials import DeepgramCredentials
+from agent_platform.core.errors import (
+    MissingCredentialError,
+    ProviderError,
+    error_logged,
+    with_retry,
+)
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
-from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
+from agent_platform.integrations.credentials import DeepgramCredentials
+from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
 from agent_platform.integrations.speech_to_text.utils import parse_language
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 
 class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
@@ -21,6 +26,11 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
     def _default_config(self) -> DeepgramConfig:
         return DeepgramConfig()
 
+    def _api_key(self) -> str:
+        if self._credentials.api_key is None:
+            raise MissingCredentialError("Deepgram API key is required")
+        return self._credentials.api_key.get_secret_value()
+
     @error_logged(re_raise=ProviderError, message="Speech-to-text failed")
     @with_retry()
     async def transcribe(
@@ -29,7 +39,7 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
         config = config or self._default_config()
         from deepgram import DeepgramClient, PrerecordedOptions
 
-        client = DeepgramClient(self._credentials.api_key.get_secret_value())
+        client = DeepgramClient(self._api_key())
 
         options_kwargs = dict(
             model=config.model,
@@ -88,7 +98,7 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
             queue: asyncio.Queue[str] = asyncio.Queue()
             from deepgram import DeepgramClient, LiveOptions, LiveTranscriptionEvents
 
-            client = DeepgramClient(self._credentials.api_key.get_secret_value())
+            client = DeepgramClient(self._api_key())
             dg_live = client.listen.asyncwebsocket.v("1")
 
             def _on_result(result: str) -> None:

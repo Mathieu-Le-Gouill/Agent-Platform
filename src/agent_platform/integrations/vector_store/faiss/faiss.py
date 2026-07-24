@@ -9,16 +9,16 @@ from langchain_community.vectorstores import FAISS
 from langchain_community.vectorstores.utils import DistanceStrategy
 from langchain_core.embeddings import Embeddings
 
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
 from agent_platform.core.interfaces.vector_store.config import DistanceMetric
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.vector_store.faiss.config import FAISSConfig
 from agent_platform.integrations.vector_store.langchain_base import (
     _chunk_to_lc,
     _lc_to_chunk,
 )
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.score import Score
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
 
 # DistanceMetric has no JACCARD/MAX_INNER_PRODUCT/DOT counterpart, so those
 # LangChain strategies are unreachable via config; COSINE/EUCLIDEAN/DOT map 1:1.
@@ -45,6 +45,8 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
         if self._store is not None:
             return self._store
         if config.index_path and Path(config.index_path).exists():
+            if self._embeddings is None:
+                raise ProviderError("Embeddings are required to load a FAISS index")
             self._store = FAISS.load_local(
                 config.index_path,
                 embeddings=self._embeddings,
@@ -117,8 +119,7 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
         store = self._load_or_none(config)
         if store is None:
             return []
-        results = await asyncio.to_thread(
-            store.similarity_search_by_vector_with_relevance_scores,
+        results = await store.asimilarity_search_with_score_by_vector(
             query_vector,
             k,
             filter=filter,

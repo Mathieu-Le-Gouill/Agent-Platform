@@ -1,9 +1,5 @@
-from unittest.mock import MagicMock, patch, mock_open
-from uuid import uuid4
+from unittest.mock import MagicMock, mock_open, patch
 
-import pytest
-
-from agent_platform.core.interfaces.loader.video.config import VideoLoaderConfig
 from agent_platform.core.schemas.enums import VideoFormat
 
 
@@ -18,7 +14,6 @@ class TestPyAVLoader:
         )
 
         mock_video = MagicMock()
-        mock_video.type = "video"
         mock_video.average_rate = 24.0
         mock_video.width = 1920
         mock_video.height = 1080
@@ -26,18 +21,18 @@ class TestPyAVLoader:
         mock_video.bit_rate = 5000000
 
         mock_audio = MagicMock()
-        mock_audio.type = "audio"
         mock_audio.codec.name = "aac"
         mock_audio.channels = 2
         mock_audio.rate = 48000
         mock_audio.format.name = "fltp"
 
         mock_container = MagicMock()
-        mock_container.streams = [mock_video, mock_audio]
+        mock_container.streams.video = (mock_video,)
+        mock_container.streams.audio = (mock_audio,)
         mock_container.duration = 30 * 1000000
 
         mock_av.open.return_value.__enter__.return_value = mock_container
-        mock_av.utils.time_base = 1000000
+        mock_av.time_base = 1000000
 
         loader = PyAVLoader()
         results = await loader.load("/test/video.mp4")
@@ -68,10 +63,10 @@ class TestPyAVLoader:
         )
 
         mock_audio = MagicMock()
-        mock_audio.type = "audio"
 
         mock_container = MagicMock()
-        mock_container.streams = [mock_audio]
+        mock_container.streams.video = ()
+        mock_container.streams.audio = (mock_audio,)
         mock_av.open.return_value.__enter__.return_value = mock_container
 
         loader = PyAVLoader()
@@ -87,7 +82,6 @@ class TestPyAVLoader:
         )
 
         mock_video = MagicMock()
-        mock_video.type = "video"
         mock_video.average_rate = 24.0
         mock_video.width = 640
         mock_video.height = 480
@@ -95,10 +89,11 @@ class TestPyAVLoader:
         mock_video.bit_rate = 1000000
 
         mock_container = MagicMock()
-        mock_container.streams = [mock_video]
+        mock_container.streams.video = (mock_video,)
+        mock_container.streams.audio = ()
         mock_container.duration = None
         mock_av.open.return_value.__enter__.return_value = mock_container
-        mock_av.utils.time_base = 1000000
+        mock_av.time_base = 1000000
 
         loader = PyAVLoader()
         results = await loader.load("/test/video_no_audio.mp4")
@@ -117,7 +112,6 @@ class TestPyAVLoader:
         )
 
         mock_video = MagicMock()
-        mock_video.type = "video"
         mock_video.average_rate = None
         mock_video.width = 1280
         mock_video.height = 720
@@ -125,10 +119,11 @@ class TestPyAVLoader:
         mock_video.bit_rate = None
 
         mock_container = MagicMock()
-        mock_container.streams = [mock_video]
+        mock_container.streams.video = (mock_video,)
+        mock_container.streams.audio = ()
         mock_container.duration = None
         mock_av.open.return_value.__enter__.return_value = mock_container
-        mock_av.utils.time_base = 1000000
+        mock_av.time_base = 1000000
 
         loader = PyAVLoader()
         results = await loader.load("/test/stream.ts")

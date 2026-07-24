@@ -5,13 +5,17 @@ from typing import Any
 
 from openai import AsyncOpenAI
 
-from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.core.errors import (
+    MissingCredentialError,
+    ProviderError,
+    error_logged,
+    with_retry,
+)
 from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
-from agent_platform.integrations.image_generation.dalle.config import DalleConfig
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.schemas.document import DocumentMetadata, ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat
-
+from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.image_generation.dalle.config import DalleConfig
 
 _MODEL_MAP: dict[str, str] = {
     "dall-e-2": "dall-e-2",
@@ -47,6 +51,11 @@ class DallEImageGenerator(BaseImageGenerator[DalleConfig]):
     def _default_config(self) -> DalleConfig:
         return DalleConfig()
 
+    def _api_key(self) -> str:
+        if self._credentials.api_key is None:
+            raise MissingCredentialError("OpenAI API key is required")
+        return self._credentials.api_key.get_secret_value()
+
     @error_logged(re_raise=ProviderError, message="Image generation failed")
     @with_retry()
     async def generate(
@@ -61,7 +70,7 @@ class DallEImageGenerator(BaseImageGenerator[DalleConfig]):
             raise ValueError(
                 f"Unsupported model: {config.model}. Use dall-e-2, dall-e-3, or gpt-image-1."
             )
-        client = AsyncOpenAI(api_key=self._credentials.api_key.get_secret_value())
+        client = AsyncOpenAI(api_key=self._api_key())
 
         size = size or _SIZE_MAP[config.model][0]
         _validate_size(config.model, size)
@@ -112,7 +121,7 @@ class DallEImageGenerator(BaseImageGenerator[DalleConfig]):
             raise ValueError(
                 f"Unsupported model: {config.model}. Use dall-e-2, dall-e-3, or gpt-image-1."
             )
-        client = AsyncOpenAI(api_key=self._credentials.api_key.get_secret_value())
+        client = AsyncOpenAI(api_key=self._api_key())
 
         size = size or _SIZE_MAP[config.model][0]
         _validate_size(config.model, size)

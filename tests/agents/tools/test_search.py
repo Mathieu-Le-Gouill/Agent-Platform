@@ -19,7 +19,7 @@ from agent_platform.core.schemas.score import Score
 @pytest.fixture
 def mock_embedder():
     embedder = AsyncMock()
-    embedder.embed_document = AsyncMock(
+    embedder.aembed_document = AsyncMock(
         return_value=EmbeddingResponse(
             embeddings=[Embedding.from_list([0.1, 0.2, 0.3])],
             model="test-model",
@@ -101,7 +101,7 @@ class TestSearchTool:
         assert isinstance(results[0], SearchResult)
         assert results[0].chunk.text == "result 1"
         assert results[0].score.value == 0.95
-        mock_embedder.embed_document.assert_awaited_once()
+        mock_embedder.aembed_document.assert_awaited_once()
         mock_store.search_with_scores.assert_awaited_once()
 
     @pytest.mark.asyncio
@@ -112,7 +112,7 @@ class TestSearchTool:
 
     @pytest.mark.asyncio
     async def test_run_empty_embeddings_raises(self, tool, mock_embedder, mock_store):
-        mock_embedder.embed_document = AsyncMock(
+        mock_embedder.aembed_document = AsyncMock(
             return_value=EmbeddingResponse(embeddings=[], model="test")
         )
         with pytest.raises(ToolError, match="no vectors"):
@@ -126,7 +126,7 @@ class TestSearchTool:
 
     @pytest.mark.asyncio
     async def test_run_embedder_error_wrapped(self, tool, mock_embedder, mock_store):
-        mock_embedder.embed_document = AsyncMock(
+        mock_embedder.aembed_document = AsyncMock(
             side_effect=RuntimeError("embed failed")
         )
         with pytest.raises(ToolError, match="Embedding failed"):

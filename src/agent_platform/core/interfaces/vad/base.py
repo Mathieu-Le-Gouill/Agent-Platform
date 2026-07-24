@@ -1,18 +1,20 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Generic, TypeVar, Sequence, AsyncIterator
+from collections.abc import AsyncIterator, Sequence
+from typing import Generic, TypeVar
 
 from agent_platform.core.interfaces.vad.config import VADConfig
-from agent_platform.core.schemas.span import SampleSpan
-from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
+from agent_platform.core.schemas.chunk import AudioChunk
+from agent_platform.core.schemas.span import SampleSpan
 
 ConfigT = TypeVar("ConfigT", bound="VADConfig")
 
 
 class BaseVAD(ABC, Generic[ConfigT]):
     @property
+    @abstractmethod
     def requirements(self) -> AudioRequirements: ...
 
     @abstractmethod

@@ -1,15 +1,18 @@
 from __future__ import annotations
 
 import asyncio
-from typing import Any
+from typing import Any, cast
 from uuid import UUID
 
 import weaviate
 import weaviate.auth
-from langchain_weaviate import WeaviateVectorStore
 from langchain_core.embeddings import Embeddings
+from langchain_weaviate import WeaviateVectorStore
 from weaviate.classes.query import Filter
 
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import WeaviateCredentials
 from agent_platform.integrations.vector_store.langchain_base import (
     LangChainVectorStore,
@@ -17,9 +20,6 @@ from agent_platform.integrations.vector_store.langchain_base import (
     _lc_to_chunk,
 )
 from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.score import Score
 
 
 def _parse_url(url: str) -> tuple[str, int, bool]:
@@ -160,8 +160,18 @@ class WeaviateStore(LangChainVectorStore[WeaviateConfig]):
         raw_client = self._connect(config)
         try:
             client = self._build_client(config, raw_client=raw_client)
-            results = await client.asimilarity_search_with_score(
-                query_vector, k, **self._search_kwargs(config, filter)
+            # `WeaviateVectorStore` has no public by-vector search that also
+            # returns scores; `return_score` is forwarded to `_perform_asearch`
+            # (undocumented but supported), giving `list[tuple[Document, float]]`
+            # instead of the `list[Document]` the stub declares.
+            results = cast(
+                list[tuple[Any, float]],
+                await client.asimilarity_search_by_vector(
+                    query_vector,
+                    k,
+                    return_score=True,
+                    **self._search_kwargs(config, filter),
+                ),
             )
             return [
                 (_lc_to_chunk(doc), Score.similarity(float(score)))
