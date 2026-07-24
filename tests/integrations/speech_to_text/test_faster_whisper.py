@@ -1,5 +1,5 @@
 import threading
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -60,7 +60,7 @@ class TestFasterWhisperSTTDefaults:
 
 
 class TestFasterWhisperTranscribeThreadOffload:
-    async def test_transcribe_materializes_segments_inside_thread(self):
+    async def test_transcribe_materializes_segments_inside_thread(self, mocker):
         stt = FasterWhisperSTT()
         mock_model = MagicMock()
         segments = [_make_segment("hello", 0.0, 0.5)]
@@ -76,15 +76,15 @@ class TestFasterWhisperTranscribeThreadOffload:
 
         mock_model.transcribe = _tracking_transcribe
 
-        with patch.object(stt, "_get_model", return_value=mock_model):
-            main_thread = threading.current_thread().ident
-            result = await stt.transcribe(_make_audio())
+        mocker.patch.object(stt, "_get_model", return_value=mock_model)
+        main_thread = threading.current_thread().ident
+        result = await stt.transcribe(_make_audio())
 
         assert calling_thread["thread"] != main_thread
         assert len(result.utterances) == 1
         assert result.utterances[0].text == "hello"
 
-    async def test_transcribe_returns_expected_utterances(self):
+    async def test_transcribe_returns_expected_utterances(self, mocker):
         stt = FasterWhisperSTT()
         mock_model = MagicMock()
         segments = [
@@ -93,28 +93,28 @@ class TestFasterWhisperTranscribeThreadOffload:
         ]
         mock_model.transcribe.return_value = (iter(segments), _make_info())
 
-        with patch.object(stt, "_get_model", return_value=mock_model):
-            result = await stt.transcribe(_make_audio())
+        mocker.patch.object(stt, "_get_model", return_value=mock_model)
+        result = await stt.transcribe(_make_audio())
 
         assert [u.text for u in result.utterances] == ["hello", "world"]
         assert result.metadata["stt_provider"] == "faster-whisper"
 
 
 class TestFasterWhisperWordTimestamps:
-    async def test_word_timestamps_disabled_by_default(self):
+    async def test_word_timestamps_disabled_by_default(self, mocker):
         stt = FasterWhisperSTT()
         mock_model = MagicMock()
         words = [_make_word("hello", 0.0, 0.5, 0.9)]
         segments = [_make_segment("hello", 0.0, 0.5, words=words)]
         mock_model.transcribe.return_value = (iter(segments), _make_info())
 
-        with patch.object(stt, "_get_model", return_value=mock_model):
-            result = await stt.transcribe(_make_audio())
+        mocker.patch.object(stt, "_get_model", return_value=mock_model)
+        result = await stt.transcribe(_make_audio())
 
         assert len(result.utterances) == 1
         assert result.utterances[0].text == "hello"
 
-    async def test_word_timestamps_enabled_expands_to_per_word_utterances(self):
+    async def test_word_timestamps_enabled_expands_to_per_word_utterances(self, mocker):
         stt = FasterWhisperSTT()
         mock_model = MagicMock()
         words = [
@@ -124,10 +124,10 @@ class TestFasterWhisperWordTimestamps:
         segments = [_make_segment("hello world", 0.0, 0.6, words=words)]
         mock_model.transcribe.return_value = (iter(segments), _make_info())
 
-        with patch.object(stt, "_get_model", return_value=mock_model):
-            result = await stt.transcribe(
-                _make_audio(), FasterWhisperConfig(word_timestamps=True)
-            )
+        mocker.patch.object(stt, "_get_model", return_value=mock_model)
+        result = await stt.transcribe(
+            _make_audio(), FasterWhisperConfig(word_timestamps=True)
+        )
 
         assert len(result.utterances) == 2
         assert result.utterances[0].text == "hello"
@@ -137,38 +137,36 @@ class TestFasterWhisperWordTimestamps:
         assert result.utterances[1].text == "world"
         assert result.utterances[1].confidence == 0.85
 
-    async def test_word_timestamps_enabled_forwarded_to_model(self):
+    async def test_word_timestamps_enabled_forwarded_to_model(self, mocker):
         stt = FasterWhisperSTT()
         mock_model = MagicMock()
         segments = [_make_segment("hello", 0.0, 0.5, words=None)]
         mock_model.transcribe.return_value = (iter(segments), _make_info())
 
-        with patch.object(stt, "_get_model", return_value=mock_model):
-            await stt.transcribe(
-                _make_audio(), FasterWhisperConfig(word_timestamps=True)
-            )
+        mocker.patch.object(stt, "_get_model", return_value=mock_model)
+        await stt.transcribe(_make_audio(), FasterWhisperConfig(word_timestamps=True))
 
         _, kwargs = mock_model.transcribe.call_args
         assert kwargs["word_timestamps"] is True
 
-    async def test_condition_on_previous_text_forwarded(self):
+    async def test_condition_on_previous_text_forwarded(self, mocker):
         stt = FasterWhisperSTT()
         mock_model = MagicMock()
         segments = [_make_segment("hello", 0.0, 0.5)]
         mock_model.transcribe.return_value = (iter(segments), _make_info())
 
-        with patch.object(stt, "_get_model", return_value=mock_model):
-            await stt.transcribe(
-                _make_audio(),
-                FasterWhisperConfig(condition_on_previous_text=False),
-            )
+        mocker.patch.object(stt, "_get_model", return_value=mock_model)
+        await stt.transcribe(
+            _make_audio(),
+            FasterWhisperConfig(condition_on_previous_text=False),
+        )
 
         _, kwargs = mock_model.transcribe.call_args
         assert kwargs["condition_on_previous_text"] is False
 
 
 class TestFasterWhisperStream:
-    async def test_stream_yields_transcripts(self):
+    async def test_stream_yields_transcripts(self, mocker):
         stt = FasterWhisperSTT()
         mock_model = MagicMock()
         segments = [_make_segment("hello world", 0.0, 1.0)]
@@ -177,13 +175,11 @@ class TestFasterWhisperStream:
         async def _frames():
             yield _make_audio()
 
-        with patch.object(stt, "_get_model", return_value=mock_model):
-            results = [
-                t
-                async for t in stt.stream(
-                    _frames(), FasterWhisperConfig(min_duration_ms=0)
-                )
-            ]
+        mocker.patch.object(stt, "_get_model", return_value=mock_model)
+        results = [
+            t
+            async for t in stt.stream(_frames(), FasterWhisperConfig(min_duration_ms=0))
+        ]
 
         assert len(results) == 1
         assert results[0].utterances[0].text == "hello world"

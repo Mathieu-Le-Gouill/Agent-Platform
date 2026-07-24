@@ -8,6 +8,7 @@ from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
 from agent_platform.integrations.vector_store.qdrant.qdrant import (
     QdrantVectorStoreProvider,
 )
+from tests.helpers import assert_custom_construction_stored, assert_default_construction
 
 
 @pytest.fixture
@@ -27,22 +28,21 @@ def test_qdrant_config_prefer_grpc_custom():
     assert QdrantConfig(prefer_grpc=True).prefer_grpc is True
 
 
+class TestQdrantConstruction:
+    def test_default_credentials_and_embeddings(self):
+        assert_default_construction(QdrantVectorStoreProvider, QdrantConfig)
+
+    def test_custom_credentials_and_embeddings_stored(self):
+        assert_custom_construction_stored(
+            QdrantVectorStoreProvider, QdrantCredentials(api_key="secret"), object()
+        )
+
+
 class TestQdrantBuildClient:
-    def test_build_client_forwards_prefer_grpc(self, monkeypatch):
+    def test_build_client_forwards_prefer_grpc(self, capture_client_kwargs):
         import agent_platform.integrations.vector_store.qdrant.qdrant as mod
 
-        captured = {}
-
-        class FakeQdrantClient:
-            def __init__(self, **kwargs):
-                captured.update(kwargs)
-
-        class FakeQdrantVectorStore:
-            def __init__(self, **kwargs):
-                pass
-
-        monkeypatch.setattr(mod, "QdrantClient", FakeQdrantClient)
-        monkeypatch.setattr(mod, "QdrantVectorStore", FakeQdrantVectorStore)
+        captured = capture_client_kwargs(mod, "QdrantClient", "QdrantVectorStore")
 
         provider = QdrantVectorStoreProvider.__new__(QdrantVectorStoreProvider)
         provider._credentials = QdrantCredentials(api_key=None)
@@ -52,21 +52,10 @@ class TestQdrantBuildClient:
 
         assert captured["prefer_grpc"] is True
 
-    def test_build_client_still_uses_credentials_api_key(self, monkeypatch):
+    def test_build_client_still_uses_credentials_api_key(self, capture_client_kwargs):
         import agent_platform.integrations.vector_store.qdrant.qdrant as mod
 
-        captured = {}
-
-        class FakeQdrantClient:
-            def __init__(self, **kwargs):
-                captured.update(kwargs)
-
-        class FakeQdrantVectorStore:
-            def __init__(self, **kwargs):
-                pass
-
-        monkeypatch.setattr(mod, "QdrantClient", FakeQdrantClient)
-        monkeypatch.setattr(mod, "QdrantVectorStore", FakeQdrantVectorStore)
+        captured = capture_client_kwargs(mod, "QdrantClient", "QdrantVectorStore")
 
         provider = QdrantVectorStoreProvider.__new__(QdrantVectorStoreProvider)
         provider._credentials = QdrantCredentials(api_key="topsecret")

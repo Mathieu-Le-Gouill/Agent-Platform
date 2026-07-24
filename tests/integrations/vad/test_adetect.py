@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -36,8 +36,10 @@ def _int16_chunk(num_samples: int, start: int, sample_rate: int = 16000) -> Audi
     )
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-async def test_webrtc_adetect_yields_span(mock_webrtcvad):
+async def test_webrtc_adetect_yields_span(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_vad.is_speech.side_effect = [True, True, False]
     mock_webrtcvad.Vad.return_value = mock_vad
@@ -56,8 +58,10 @@ async def test_webrtc_adetect_yields_span(mock_webrtcvad):
     assert results[0] == SampleSpan(start=0, end=990)
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-async def test_webrtc_adetect_all_silence(mock_webrtcvad):
+async def test_webrtc_adetect_all_silence(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_vad.is_speech.return_value = False
     mock_webrtcvad.Vad.return_value = mock_vad
@@ -74,13 +78,15 @@ async def test_webrtc_adetect_all_silence(mock_webrtcvad):
 
 
 @pytest.mark.skipif(not _HAS_PVCOBRA, reason="pvcobra not installed")
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-async def test_pvcobra_adetect_yields_span(mock_pvcobra):
+async def test_pvcobra_adetect_yields_span(mocker):
     from pydantic import SecretStr
 
     from agent_platform.integrations.credentials import PicoVoiceCredentials
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = MagicMock()
     mock_handle.frame_length = 512
     mock_handle.process.side_effect = [0.9, 0.1]
@@ -97,13 +103,15 @@ async def test_pvcobra_adetect_yields_span(mock_pvcobra):
 
 
 @pytest.mark.skipif(not _HAS_PVCOBRA, reason="pvcobra not installed")
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-async def test_pvcobra_adetect_all_silence(mock_pvcobra):
+async def test_pvcobra_adetect_all_silence(mocker):
     from pydantic import SecretStr
 
     from agent_platform.integrations.credentials import PicoVoiceCredentials
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = MagicMock()
     mock_handle.frame_length = 512
     mock_handle.process.return_value = 0.1
@@ -119,13 +127,15 @@ async def test_pvcobra_adetect_all_silence(mock_pvcobra):
 
 
 @pytest.mark.skipif(not _HAS_PVCOBRA, reason="pvcobra not installed")
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-async def test_pvcobra_adetect_before_detect_does_not_raise(mock_pvcobra):
+async def test_pvcobra_adetect_before_detect_does_not_raise(mocker):
     from pydantic import SecretStr
 
     from agent_platform.integrations.credentials import PicoVoiceCredentials
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = MagicMock()
     mock_handle.frame_length = 512
     mock_handle.process.return_value = 0.1
@@ -141,8 +151,8 @@ async def test_pvcobra_adetect_before_detect_does_not_raise(mock_pvcobra):
 
 
 @pytest.mark.skipif(not _HAS_TEN_VAD, reason="ten-vad not installed")
-@patch("agent_platform.integrations.vad.ten.ten.TenVad")
-async def test_ten_adetect_all_silence(mock_ten_vad_cls):
+async def test_ten_adetect_all_silence(mocker):
+    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
     mock_handle = MagicMock()
     mock_handle.process.return_value = (0.1, 0)
     mock_ten_vad_cls.return_value = mock_handle
@@ -159,10 +169,8 @@ async def test_ten_adetect_all_silence(mock_ten_vad_cls):
 
 
 @pytest.mark.skipif(not _HAS_TEN_VAD, reason="ten-vad not installed")
-@patch("agent_platform.integrations.vad.ten.ten.TenVad")
-async def test_ten_adetect_before_detect_does_not_raise_attribute_error(
-    mock_ten_vad_cls,
-):
+async def test_ten_adetect_before_detect_does_not_raise_attribute_error(mocker):
+    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
     mock_handle = MagicMock()
     mock_handle.process.return_value = (0.1, 0)
     mock_ten_vad_cls.return_value = mock_handle
@@ -179,9 +187,13 @@ async def test_ten_adetect_before_detect_does_not_raise_attribute_error(
     assert results == []
 
 
-@patch("agent_platform.integrations.vad.silero.silero.load_silero_vad")
-@patch("agent_platform.integrations.vad.silero.silero.get_speech_timestamps")
-async def test_silero_adetect_buffer_flush(mock_get_speech_timestamps, mock_load):
+async def test_silero_adetect_buffer_flush(mocker):
+    mock_get_speech_timestamps = mocker.patch(
+        "agent_platform.integrations.vad.silero.silero.get_speech_timestamps"
+    )
+    mock_load = mocker.patch(
+        "agent_platform.integrations.vad.silero.silero.load_silero_vad"
+    )
     mock_load.return_value = MagicMock()
     mock_get_speech_timestamps.return_value = [{"start": 0, "end": 160}]
 

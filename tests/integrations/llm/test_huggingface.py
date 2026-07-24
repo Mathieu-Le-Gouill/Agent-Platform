@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 from pydantic import SecretStr
@@ -154,11 +154,13 @@ class TestHuggingFaceMissingCredential:
 
 
 class TestHuggingFaceClient:
-    @patch("agent_platform.integrations.llm.huggingface.huggingface.ChatHuggingFace")
-    @patch(
-        "agent_platform.integrations.llm.huggingface.huggingface.HuggingFaceEndpoint"
-    )
-    def test_client_creation(self, mock_endpoint, mock_chat):
+    def test_client_creation(self, mocker):
+        mock_endpoint = mocker.patch(
+            "agent_platform.integrations.llm.huggingface.huggingface.HuggingFaceEndpoint"
+        )
+        mock_chat = mocker.patch(
+            "agent_platform.integrations.llm.huggingface.huggingface.ChatHuggingFace"
+        )
         from agent_platform.integrations.llm.huggingface.huggingface import (
             HuggingFaceLLM,
         )

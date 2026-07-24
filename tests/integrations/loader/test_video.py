@@ -1,14 +1,16 @@
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, mock_open
 
 from agent_platform.core.schemas.enums import VideoFormat
 
 
 class TestPyAVLoader:
-    @patch("agent_platform.integrations.loader.strategies.pyav.pyav.av")
-    @patch("builtins.open", new_callable=mock_open, read_data=b"fake_video_data")
-    async def test_load_mp4_with_video_and_audio(
-        self, mock_file, mock_av, mock_pil_image
-    ):
+    async def test_load_mp4_with_video_and_audio(self, mocker, mock_pil_image):
+        mocker.patch(
+            "builtins.open", new_callable=mock_open, read_data=b"fake_video_data"
+        )
+        mock_av = mocker.patch(
+            "agent_platform.integrations.loader.strategies.pyav.pyav.av"
+        )
         from agent_platform.integrations.loader.strategies.pyav.pyav import (
             PyAVLoader,
         )
@@ -53,11 +55,13 @@ class TestPyAVLoader:
         assert doc.audio_sample_rate == 48000
         assert doc.content == b"fake_video_data"
 
-    @patch("agent_platform.integrations.loader.strategies.pyav.pyav.av")
-    @patch("builtins.open", new_callable=mock_open, read_data=b"data")
     async def test_load_returns_empty_when_no_video_stream(
-        self, mock_file, mock_av, mock_pil_image
+        self, mocker, mock_pil_image
     ):
+        mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
+        mock_av = mocker.patch(
+            "agent_platform.integrations.loader.strategies.pyav.pyav.av"
+        )
         from agent_platform.integrations.loader.strategies.pyav.pyav import (
             PyAVLoader,
         )
@@ -74,9 +78,11 @@ class TestPyAVLoader:
 
         assert results == []
 
-    @patch("agent_platform.integrations.loader.strategies.pyav.pyav.av")
-    @patch("builtins.open", new_callable=mock_open, read_data=b"data")
-    async def test_no_audio_stream(self, mock_file, mock_av, mock_pil_image):
+    async def test_no_audio_stream(self, mocker, mock_pil_image):
+        mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
+        mock_av = mocker.patch(
+            "agent_platform.integrations.loader.strategies.pyav.pyav.av"
+        )
         from agent_platform.integrations.loader.strategies.pyav.pyav import (
             PyAVLoader,
         )
@@ -104,9 +110,11 @@ class TestPyAVLoader:
         assert results[0].audio_channels is None
         assert results[0].duration is None
 
-    @patch("agent_platform.integrations.loader.strategies.pyav.pyav.av")
-    @patch("builtins.open", new_callable=mock_open, read_data=b"data")
-    async def test_no_frame_rate(self, mock_file, mock_av, mock_pil_image):
+    async def test_no_frame_rate(self, mocker, mock_pil_image):
+        mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
+        mock_av = mocker.patch(
+            "agent_platform.integrations.loader.strategies.pyav.pyav.av"
+        )
         from agent_platform.integrations.loader.strategies.pyav.pyav import (
             PyAVLoader,
         )

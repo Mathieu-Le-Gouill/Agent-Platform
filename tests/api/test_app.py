@@ -1,6 +1,8 @@
+from unittest.mock import MagicMock
+
 from fastapi.testclient import TestClient
 
-from agent_platform.api.app import create_app
+from agent_platform.api.app import create_app, main
 
 
 class FakeAgent:
@@ -32,3 +34,17 @@ class TestChat:
             response = client.post("/chat", json={})
 
         assert response.status_code == 422
+
+
+class TestMain:
+    def test_runs_uvicorn_with_settings_host_and_port(self, mocker):
+        mock_uvicorn = MagicMock()
+        mocker.patch.dict("sys.modules", {"uvicorn": mock_uvicorn})
+        mock_get_settings = mocker.patch("agent_platform.api.app.get_settings")
+        mock_get_settings.return_value = MagicMock(api_host="0.0.0.0", api_port=9000)
+        main()
+
+        mock_uvicorn.run.assert_called_once()
+        _, kwargs = mock_uvicorn.run.call_args
+        assert kwargs["host"] == "0.0.0.0"
+        assert kwargs["port"] == 9000

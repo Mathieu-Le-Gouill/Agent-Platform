@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import pytest
 
@@ -13,102 +13,102 @@ _MODULE = "agent_platform.integrations.loader.strategies.unstructured.unstructur
 
 
 class TestUnstructuredFileLoader:
-    def test_loader_selects_pdf_class(self):
+    def test_loader_selects_pdf_class(self, mocker):
         mock_cls = MagicMock(return_value="pdf_loader")
-        with patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.PDF: mock_cls}):
-            with patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.PDF):
-                from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
-                    UnstructuredFileLoader,
-                )
+        mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.PDF: mock_cls})
+        mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.PDF)
+        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+            UnstructuredFileLoader,
+        )
 
-                loader = UnstructuredFileLoader()
-                config = UnstructuredLoaderConfig()
-                result = loader._loader("doc.pdf", config)
-                assert result == "pdf_loader"
+        loader = UnstructuredFileLoader()
+        config = UnstructuredLoaderConfig()
+        result = loader._loader("doc.pdf", config)
+        assert result == "pdf_loader"
 
-    def test_loader_selects_markdown_class(self):
+    def test_loader_selects_markdown_class(self, mocker):
         mock_cls = MagicMock(return_value="md_loader")
-        with patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.MARKDOWN: mock_cls}):
-            with patch(
-                f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.MARKDOWN
-            ):
-                from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
-                    UnstructuredFileLoader,
-                )
+        mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.MARKDOWN: mock_cls})
+        mocker.patch(
+            f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.MARKDOWN
+        )
+        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+            UnstructuredFileLoader,
+        )
 
-                loader = UnstructuredFileLoader()
-                config = UnstructuredLoaderConfig()
-                result = loader._loader("doc.md", config)
-                assert result == "md_loader"
+        loader = UnstructuredFileLoader()
+        config = UnstructuredLoaderConfig()
+        result = loader._loader("doc.md", config)
+        assert result == "md_loader"
 
-    def test_loader_selects_html_class(self):
+    def test_loader_selects_html_class(self, mocker):
         mock_cls = MagicMock(return_value="html_loader")
-        with patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.HTML: mock_cls}):
-            with patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.HTML):
-                from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
-                    UnstructuredFileLoader,
-                )
+        mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.HTML: mock_cls})
+        mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.HTML)
+        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+            UnstructuredFileLoader,
+        )
 
-                loader = UnstructuredFileLoader()
-                config = UnstructuredLoaderConfig()
-                result = loader._loader("doc.html", config)
-                assert result == "html_loader"
+        loader = UnstructuredFileLoader()
+        config = UnstructuredLoaderConfig()
+        result = loader._loader("doc.html", config)
+        assert result == "html_loader"
 
-    def test_loader_selects_docx_class(self):
+    def test_loader_selects_docx_class(self, mocker):
         mock_cls = MagicMock(return_value="docx_loader")
-        with patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.DOCX: mock_cls}):
-            with patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.DOCX):
-                from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
-                    UnstructuredFileLoader,
-                )
+        mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.DOCX: mock_cls})
+        mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.DOCX)
+        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+            UnstructuredFileLoader,
+        )
 
-                loader = UnstructuredFileLoader()
-                config = UnstructuredLoaderConfig()
-                result = loader._loader("doc.docx", config)
-                assert result == "docx_loader"
+        loader = UnstructuredFileLoader()
+        config = UnstructuredLoaderConfig()
+        result = loader._loader("doc.docx", config)
+        assert result == "docx_loader"
 
-    def test_loader_unknown_format_falls_back(self):
+    def test_loader_unknown_format_falls_back(self, mocker):
         mock_fallback = MagicMock(return_value="fallback_loader")
-        with patch(f"{_MODULE}._LC_LOADER_MAP", {}):
-            with patch(f"{_MODULE}.LC_FallbackLoader", mock_fallback):
-                with patch(
-                    f"{_MODULE}.FileFormat.from_path",
-                    return_value=FileFormat.UNKNOWN,
-                ):
-                    from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
-                        UnstructuredFileLoader,
-                    )
+        mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {})
+        mocker.patch(f"{_MODULE}.LC_FallbackLoader", mock_fallback)
+        mocker.patch(
+            f"{_MODULE}.FileFormat.from_path",
+            return_value=FileFormat.UNKNOWN,
+        )
+        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+            UnstructuredFileLoader,
+        )
 
-                    loader = UnstructuredFileLoader()
-                    config = UnstructuredLoaderConfig()
-                    result = loader._loader("doc.xyz", config)
-                    assert result == "fallback_loader"
+        loader = UnstructuredFileLoader()
+        config = UnstructuredLoaderConfig()
+        result = loader._loader("doc.xyz", config)
+        assert result == "fallback_loader"
 
-    def test_loader_sets_mode_elements_default(self):
+    def test_loader_sets_mode_elements_default(self, mocker):
         mock_cls = MagicMock()
-        with patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.PDF: mock_cls}):
-            with patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.PDF):
-                from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
-                    UnstructuredFileLoader,
-                )
+        mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.PDF: mock_cls})
+        mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.PDF)
+        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+            UnstructuredFileLoader,
+        )
 
-                loader = UnstructuredFileLoader()
-                config = UnstructuredLoaderConfig(mode="elements")
-                loader._loader("doc.pdf", config)
-                mock_cls.assert_called_once_with("doc.pdf", mode="elements")
+        loader = UnstructuredFileLoader()
+        config = UnstructuredLoaderConfig(mode="elements")
+        loader._loader("doc.pdf", config)
+        mock_cls.assert_called_once_with("doc.pdf", mode="elements")
 
-    def test_loader_respects_custom_mode_kwarg(self):
+    def test_loader_respects_custom_mode_kwarg(self, mocker):
         mock_cls = MagicMock()
-        with patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.PDF: mock_cls}):
-            with patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.PDF):
-                from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
-                    UnstructuredFileLoader,
-                )
+        mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.PDF: mock_cls})
+        mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.PDF)
+        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+            UnstructuredFileLoader,
+        )
 
-                loader = UnstructuredFileLoader()
-                config = UnstructuredLoaderConfig(mode="single")
-                loader._loader("doc.pdf", config)
-                mock_cls.assert_called_once_with("doc.pdf", mode="single")
+        loader = UnstructuredFileLoader()
+        config = UnstructuredLoaderConfig(mode="single")
+        loader._loader("doc.pdf", config)
+        mock_cls.assert_called_once_with("doc.pdf", mode="single")
 
     def test_loader_map_contains_expected_keys(self):
         from agent_platform.integrations.loader.strategies.unstructured.unstructured import (

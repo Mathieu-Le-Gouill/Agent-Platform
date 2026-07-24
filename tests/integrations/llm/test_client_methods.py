@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 from pydantic import SecretStr
 
@@ -21,8 +19,8 @@ from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 
 
-@patch("agent_platform.integrations.llm.ollama.ollama.ChatOllama")
-async def test_ollama_client_creation(mock_chat):
+async def test_ollama_client_creation(mocker):
+    mock_chat = mocker.patch("agent_platform.integrations.llm.ollama.ollama.ChatOllama")
     from agent_platform.integrations.llm.ollama.ollama import OllamaLLM
 
     provider = OllamaLLM(OllamaCredentials())
@@ -32,8 +30,8 @@ async def test_ollama_client_creation(mock_chat):
     assert client is mock_chat.return_value
 
 
-@patch("agent_platform.integrations.llm.ollama.ollama.ChatOllama")
-async def test_ollama_client_none_config(mock_chat):
+async def test_ollama_client_none_config(mocker):
+    mock_chat = mocker.patch("agent_platform.integrations.llm.ollama.ollama.ChatOllama")
     from agent_platform.integrations.llm.ollama.ollama import OllamaLLM
 
     provider = OllamaLLM(OllamaCredentials())
@@ -42,8 +40,10 @@ async def test_ollama_client_none_config(mock_chat):
     mock_chat.assert_called_once()
 
 
-@patch("agent_platform.integrations.llm.mistral.mistral.ChatMistralAI")
-async def test_mistral_client_creation(mock_chat):
+async def test_mistral_client_creation(mocker):
+    mock_chat = mocker.patch(
+        "agent_platform.integrations.llm.mistral.mistral.ChatMistralAI"
+    )
     from agent_platform.integrations.llm.mistral.mistral import MistralLLM
 
     provider = MistralLLM(MistralCredentials(api_key=SecretStr("key")))
@@ -53,8 +53,10 @@ async def test_mistral_client_creation(mock_chat):
     assert client is mock_chat.return_value
 
 
-@patch("agent_platform.integrations.llm.mistral.mistral.ChatMistralAI")
-async def test_mistral_client_none_config(mock_chat):
+async def test_mistral_client_none_config(mocker):
+    mock_chat = mocker.patch(
+        "agent_platform.integrations.llm.mistral.mistral.ChatMistralAI"
+    )
     from agent_platform.integrations.llm.mistral.mistral import MistralLLM
 
     provider = MistralLLM(MistralCredentials(api_key=SecretStr("key")))
@@ -63,8 +65,10 @@ async def test_mistral_client_none_config(mock_chat):
     mock_chat.assert_called_once()
 
 
-@patch("agent_platform.integrations.llm.anthropic.anthropic.ChatAnthropic")
-async def test_anthropic_client_creation(mock_chat):
+async def test_anthropic_client_creation(mocker):
+    mock_chat = mocker.patch(
+        "agent_platform.integrations.llm.anthropic.anthropic.ChatAnthropic"
+    )
     from agent_platform.integrations.llm.anthropic.anthropic import AnthropicLLM
 
     provider = AnthropicLLM(AnthropicCredentials(api_key=SecretStr("key")))
@@ -74,8 +78,10 @@ async def test_anthropic_client_creation(mock_chat):
     assert client is mock_chat.return_value
 
 
-@patch("agent_platform.integrations.llm.anthropic.anthropic.ChatAnthropic")
-async def test_anthropic_client_none_config(mock_chat):
+async def test_anthropic_client_none_config(mocker):
+    mock_chat = mocker.patch(
+        "agent_platform.integrations.llm.anthropic.anthropic.ChatAnthropic"
+    )
     from agent_platform.integrations.llm.anthropic.anthropic import AnthropicLLM
 
     provider = AnthropicLLM(AnthropicCredentials(api_key=SecretStr("key")))
@@ -84,8 +90,8 @@ async def test_anthropic_client_none_config(mock_chat):
     mock_chat.assert_called_once()
 
 
-@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
-async def test_openai_client_creation(mock_chat):
+async def test_openai_client_creation(mocker):
+    mock_chat = mocker.patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
     from agent_platform.integrations.llm.openai.openai import OpenAILLM
 
     provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("key")))
@@ -95,8 +101,8 @@ async def test_openai_client_creation(mock_chat):
     assert client is mock_chat.return_value
 
 
-@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
-async def test_openai_client_none_config(mock_chat):
+async def test_openai_client_none_config(mocker):
+    mock_chat = mocker.patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
     from agent_platform.integrations.llm.openai.openai import OpenAILLM
 
     provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("key")))
@@ -105,8 +111,8 @@ async def test_openai_client_none_config(mock_chat):
     mock_chat.assert_called_once()
 
 
-@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
-async def test_openai_client_no_max_retries(mock_chat):
+async def test_openai_client_no_max_retries(mocker):
+    mocker.patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
     from agent_platform.integrations.llm.openai.openai import _to_langchain_openai
 
     cfg = OpenAIGenerationConfig(max_retries=None)
@@ -118,8 +124,8 @@ async def test_openai_client_no_max_retries(mock_chat):
 # --- MissingCredentialError tests ---
 
 
-@patch("agent_platform.integrations.llm.anthropic.anthropic.ChatAnthropic")
-async def test_anthropic_missing_credential_error(mock_chat):
+async def test_anthropic_missing_credential_error(mocker):
+    mocker.patch("agent_platform.integrations.llm.anthropic.anthropic.ChatAnthropic")
     from agent_platform.integrations.llm.anthropic.anthropic import AnthropicLLM
 
     provider = AnthropicLLM()
@@ -129,8 +135,8 @@ async def test_anthropic_missing_credential_error(mock_chat):
         provider._client(cfg)
 
 
-@patch("agent_platform.integrations.llm.mistral.mistral.ChatMistralAI")
-async def test_mistral_missing_credential_error(mock_chat):
+async def test_mistral_missing_credential_error(mocker):
+    mocker.patch("agent_platform.integrations.llm.mistral.mistral.ChatMistralAI")
     from agent_platform.integrations.llm.mistral.mistral import MistralLLM
 
     provider = MistralLLM()
@@ -140,8 +146,8 @@ async def test_mistral_missing_credential_error(mock_chat):
         provider._client(cfg)
 
 
-@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
-async def test_openai_missing_credential_error(mock_chat):
+async def test_openai_missing_credential_error(mocker):
+    mocker.patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
     from agent_platform.integrations.llm.openai.openai import OpenAILLM
 
     provider = OpenAILLM()

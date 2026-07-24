@@ -1,5 +1,5 @@
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -143,38 +143,38 @@ class _ConcreteLoader(UnstructuredBaseLoader):
 
 
 class TestLoad:
-    async def test_load_with_mocked_to_thread(self):
+    async def test_load_with_mocked_to_thread(self, mocker):
         mock_doc = LCDocument(
             page_content="Test content",
             metadata={"source": "/test.txt", "filetype": "text/plain"},
         )
         loader = _ConcreteLoader()
 
-        with patch(
+        mocker.patch(
             "agent_platform.integrations.loader.strategies.unstructured.unstructured.asyncio.to_thread",
             return_value=[mock_doc],
-        ):
-            results = await loader.load("test.txt")
+        )
+        results = await loader.load("test.txt")
 
         assert len(results) == 1
         assert results[0].text == "Test content"
         assert results[0].source == "/test.txt"
         assert results[0].format == DocumentFormat.TXT
 
-    async def test_load_empty_docs_returns_empty_list(self):
+    async def test_load_empty_docs_returns_empty_list(self, mocker):
         loader = _ConcreteLoader()
 
-        with patch(
+        mocker.patch(
             "agent_platform.integrations.loader.strategies.unstructured.unstructured.asyncio.to_thread",
             return_value=[],
-        ):
-            results = await loader.load("test.txt")
+        )
+        results = await loader.load("test.txt")
 
         assert results == []
 
 
 class TestLoadMany:
-    async def test_load_many_yields_results(self):
+    async def test_load_many_yields_results(self, mocker):
         loader = _ConcreteLoader()
 
         mock_doc1 = LCDocument(
@@ -189,14 +189,14 @@ class TestLoadMany:
         async def fake_load(source: str, config=None):
             return [_text_from_langchain(mock_doc1 if "a" in source else mock_doc2)]
 
-        with patch.object(loader, "load", side_effect=fake_load):
-            results = [docs async for docs in loader.load_many(["/a.txt", "/b.txt"])]
+        mocker.patch.object(loader, "load", side_effect=fake_load)
+        results = [docs async for docs in loader.load_many(["/a.txt", "/b.txt"])]
 
         assert len(results) == 2
         assert results[0][0].text == "Doc1 content"
         assert results[1][0].text == "Doc2 content"
 
-    async def test_load_many_skips_exceptions(self):
+    async def test_load_many_skips_exceptions(self, mocker):
         loader = _ConcreteLoader()
 
         mock_doc = LCDocument(
@@ -209,8 +209,8 @@ class TestLoadMany:
                 raise ValueError("Failed")
             return [_text_from_langchain(mock_doc)]
 
-        with patch.object(loader, "load", side_effect=fake_load):
-            results = [docs async for docs in loader.load_many(["/a.txt", "/fail.txt"])]
+        mocker.patch.object(loader, "load", side_effect=fake_load)
+        results = [docs async for docs in loader.load_many(["/a.txt", "/fail.txt"])]
 
         assert len(results) == 1
         assert results[0][0].text == "Doc content"

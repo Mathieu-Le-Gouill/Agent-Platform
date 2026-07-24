@@ -36,18 +36,16 @@ def test_default_config_return_each_element_default():
     assert cfg.return_each_element is False
 
 
-def test_chunk_forwards_return_each_element():
-    from unittest.mock import patch
-
+def test_chunk_forwards_return_each_element(mocker):
     provider = HTMLStructureChunkerProvider()
     doc = TextDocument(text=HTML_DOC, format=DocumentFormat.HTML)
     config = HTMLChunkerConfig(return_each_element=True)
 
-    with patch(
+    mock_splitter_cls = mocker.patch(
         "agent_platform.integrations.chunking.html.html.HTMLHeaderTextSplitter"
-    ) as mock_splitter_cls:
-        mock_splitter_cls.return_value.split_text.return_value = []
-        provider.chunk([doc], config)
+    )
+    mock_splitter_cls.return_value.split_text.return_value = []
+    provider.chunk([doc], config)
 
     _, kwargs = mock_splitter_cls.call_args
     assert kwargs["return_each_element"] is True

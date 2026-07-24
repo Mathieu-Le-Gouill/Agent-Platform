@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 
@@ -12,10 +12,10 @@ from agent_platform.integrations.image_generation.stable_diffusion.config import
 )
 
 
-@patch(
-    "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
-)
-async def test_load_early_return(mock_pipe_cls):
+async def test_load_early_return(mocker):
+    mock_pipe_cls = mocker.patch(
+        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+    )
     from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
         StableDiffusionGenerator,
     )
@@ -26,10 +26,10 @@ async def test_load_early_return(mock_pipe_cls):
     mock_pipe_cls.from_pretrained.assert_not_called()
 
 
-@patch(
-    "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
-)
-async def test_load_safety_checker_none(mock_pipe_cls):
+async def test_load_safety_checker_none(mocker):
+    mock_pipe_cls = mocker.patch(
+        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+    )
     mock_pipe = MagicMock()
     mock_pipe.to.return_value = mock_pipe
     mock_pipe_cls.from_pretrained.return_value = mock_pipe
@@ -45,18 +45,18 @@ async def test_load_safety_checker_none(mock_pipe_cls):
     async def _mock_run(executor, fn):
         return fn()
 
-    with patch.object(loop, "run_in_executor", side_effect=_mock_run):
-        await gen._load()
+    mocker.patch.object(loop, "run_in_executor", side_effect=_mock_run)
+    await gen._load()
 
     mock_pipe_cls.from_pretrained.assert_called_once()
     call_kwargs = mock_pipe_cls.from_pretrained.call_args[1]
     assert call_kwargs["safety_checker"] is None
 
 
-@patch(
-    "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
-)
-async def test_generate_pipeline_none(mock_pipe_cls):
+async def test_generate_pipeline_none(mocker):
+    mocker.patch(
+        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+    )
     from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
         StableDiffusionGenerator,
     )
@@ -64,17 +64,15 @@ async def test_generate_pipeline_none(mock_pipe_cls):
     gen = StableDiffusionGenerator(StableDiffusionConfig())
     gen._pipeline = None
 
-    with patch.object(gen, "_load", AsyncMock()):
-        with pytest.raises(
-            ProviderError, match="Failed to load Stable Diffusion pipeline"
-        ):
-            await gen.generate("test prompt")
+    mocker.patch.object(gen, "_load", AsyncMock())
+    with pytest.raises(ProviderError, match="Failed to load Stable Diffusion pipeline"):
+        await gen.generate("test prompt")
 
 
-@patch(
-    "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
-)
-async def test_generate_many_pipeline_none(mock_pipe_cls):
+async def test_generate_many_pipeline_none(mocker):
+    mocker.patch(
+        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+    )
     from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
         StableDiffusionGenerator,
     )
@@ -82,17 +80,15 @@ async def test_generate_many_pipeline_none(mock_pipe_cls):
     gen = StableDiffusionGenerator(StableDiffusionConfig())
     gen._pipeline = None
 
-    with patch.object(gen, "_load", AsyncMock()):
-        with pytest.raises(
-            ProviderError, match="Failed to load Stable Diffusion pipeline"
-        ):
-            await gen.generate_many("test prompt", n=2)
+    mocker.patch.object(gen, "_load", AsyncMock())
+    with pytest.raises(ProviderError, match="Failed to load Stable Diffusion pipeline"):
+        await gen.generate_many("test prompt", n=2)
 
 
-@patch(
-    "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
-)
-async def test_generate_success(mock_pipe_cls):
+async def test_generate_success(mocker):
+    mock_pipe_cls = mocker.patch(
+        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+    )
     mock_pipe = MagicMock()
     mock_pipe.to.return_value = mock_pipe
     mock_pipe_cls.from_pretrained.return_value = mock_pipe
@@ -112,8 +108,8 @@ async def test_generate_success(mock_pipe_cls):
     gen = StableDiffusionGenerator(StableDiffusionConfig())
     gen._pipeline = mock_pipe
 
-    with patch("torch.no_grad"):
-        result = await gen.generate("test", size="256x256")
+    mocker.patch("torch.no_grad")
+    result = await gen.generate("test", size="256x256")
 
     assert result.dimensions.width == 512
     assert result.dimensions.height == 512

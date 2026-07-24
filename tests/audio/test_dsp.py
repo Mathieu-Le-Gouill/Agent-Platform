@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import io
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -14,8 +14,8 @@ from agent_platform.core.schemas.enums import AudioFormat, DataType
 
 
 class TestDecode:
-    @patch("torchaudio.load")
-    def test_decode(self, mock_load):
+    def test_decode(self, mocker):
+        mock_load = mocker.patch("torchaudio.load")
         mock_waveform = torch.tensor([[0.1, 0.2, 0.3]], dtype=torch.float32)
         mock_load.return_value = (mock_waveform, 16000)
 
@@ -71,8 +71,8 @@ class TestChunkWaveform:
 
 
 class TestBuildChunks:
-    @patch("agent_platform.audio.dsp.AudioIO.from_tensor")
-    def test_metadata_propagation(self, mock_from_tensor):
+    def test_metadata_propagation(self, mocker):
+        mock_from_tensor = mocker.patch("agent_platform.audio.dsp.AudioIO.from_tensor")
         doc_id = uuid4()
         audio = AudioDocument(
             id=doc_id,
@@ -97,8 +97,8 @@ class TestBuildChunks:
         with pytest.raises(ValueError, match="sample_rate is required"):
             AudioDSP.build_chunks(torch.randn(1, 16000), audio)
 
-    @patch("agent_platform.audio.dsp.AudioIO.from_tensor")
-    def test_chunk_indices_and_bounds(self, mock_from_tensor):
+    def test_chunk_indices_and_bounds(self, mocker):
+        mock_from_tensor = mocker.patch("agent_platform.audio.dsp.AudioIO.from_tensor")
         audio = AudioDocument(content=b"", sample_rate=16000)
         mock_from_tensor.return_value = MagicMock(spec=AudioChunk)
 
@@ -114,8 +114,8 @@ class TestBuildChunks:
         assert second["start"] == 16000
         assert second["end"] == 32000
 
-    @patch("agent_platform.audio.dsp.AudioIO.from_tensor")
-    def test_partial_final_chunk(self, mock_from_tensor):
+    def test_partial_final_chunk(self, mocker):
+        mock_from_tensor = mocker.patch("agent_platform.audio.dsp.AudioIO.from_tensor")
         audio = AudioDocument(content=b"", sample_rate=16000)
         mock_from_tensor.return_value = MagicMock(spec=AudioChunk)
 
@@ -137,10 +137,12 @@ class TestResample:
         result = AudioDSP.resample(chunk, 16000)
         assert result is chunk
 
-    @patch("agent_platform.audio.dsp.torchaudio.functional.resample")
-    @patch("agent_platform.audio.dsp.AudioIO.to_tensor")
-    @patch("agent_platform.audio.dsp.AudioIO.from_tensor")
-    def test_different_rate(self, mock_from_tensor, mock_to_tensor, mock_resample):
+    def test_different_rate(self, mocker):
+        mock_from_tensor = mocker.patch("agent_platform.audio.dsp.AudioIO.from_tensor")
+        mock_to_tensor = mocker.patch("agent_platform.audio.dsp.AudioIO.to_tensor")
+        mock_resample = mocker.patch(
+            "agent_platform.audio.dsp.torchaudio.functional.resample"
+        )
         chunk = AudioChunk(
             data=b"\x00\x00\x80?",
             sample_rate=16000,
@@ -174,9 +176,9 @@ class TestResample:
 
 
 class TestProcess:
-    @patch.object(AudioDSP, "decode")
-    @patch.object(AudioDSP, "build_chunks")
-    def test_default(self, mock_build_chunks, mock_decode):
+    def test_default(self, mocker):
+        mock_build_chunks = mocker.patch.object(AudioDSP, "build_chunks")
+        mock_decode = mocker.patch.object(AudioDSP, "decode")
         audio = MagicMock(spec=AudioDocument)
         mock_waveform = torch.tensor([[0.1, 0.2]], dtype=torch.float32)
         mock_decode.return_value = (mock_waveform, 16000)
@@ -188,10 +190,12 @@ class TestProcess:
         mock_build_chunks.assert_called_once_with(mock_waveform, audio, 10000)
         assert len(result) == 1
 
-    @patch.object(AudioDSP, "decode")
-    @patch.object(AudioDSP, "build_chunks")
-    @patch("agent_platform.audio.dsp.torchaudio.functional.resample")
-    def test_with_target_rate(self, mock_resample, mock_build_chunks, mock_decode):
+    def test_with_target_rate(self, mocker):
+        mock_resample = mocker.patch(
+            "agent_platform.audio.dsp.torchaudio.functional.resample"
+        )
+        mock_build_chunks = mocker.patch.object(AudioDSP, "build_chunks")
+        mock_decode = mocker.patch.object(AudioDSP, "decode")
         audio = MagicMock(spec=AudioDocument)
         mock_waveform = torch.tensor([[0.1, 0.2]], dtype=torch.float32)
         mock_resampled = torch.tensor([[0.1, 0.2]], dtype=torch.float32)
@@ -204,9 +208,9 @@ class TestProcess:
         mock_resample.assert_called_once_with(mock_waveform, 16000, 44100)
         mock_build_chunks.assert_called_once_with(mock_resampled, audio, 10000)
 
-    @patch.object(AudioDSP, "decode")
-    @patch.object(AudioDSP, "build_chunks")
-    def test_target_rate_matches_source(self, mock_build_chunks, mock_decode):
+    def test_target_rate_matches_source(self, mocker):
+        mock_build_chunks = mocker.patch.object(AudioDSP, "build_chunks")
+        mock_decode = mocker.patch.object(AudioDSP, "decode")
         audio = MagicMock(spec=AudioDocument)
         mock_waveform = torch.tensor([[0.1, 0.2]], dtype=torch.float32)
         mock_decode.return_value = (mock_waveform, 16000)
@@ -216,9 +220,9 @@ class TestProcess:
 
         mock_build_chunks.assert_called_once_with(mock_waveform, audio, 10000)
 
-    @patch.object(AudioDSP, "decode")
-    @patch.object(AudioDSP, "build_chunks")
-    def test_custom_chunk_duration(self, mock_build_chunks, mock_decode):
+    def test_custom_chunk_duration(self, mocker):
+        mock_build_chunks = mocker.patch.object(AudioDSP, "build_chunks")
+        mock_decode = mocker.patch.object(AudioDSP, "decode")
         audio = MagicMock(spec=AudioDocument)
         mock_waveform = torch.tensor([[0.1, 0.2]], dtype=torch.float32)
         mock_decode.return_value = (mock_waveform, 16000)

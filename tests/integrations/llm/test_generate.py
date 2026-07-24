@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import SecretStr
@@ -38,8 +38,8 @@ async def test_generate():
     assert result.model == "gpt-4"
 
 
-@patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
-async def test_generate_with_openai_client(mock_chat):
+async def test_generate_with_openai_client(mocker):
+    mock_chat = mocker.patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
     mock_instance = MagicMock()
     mock_chat.return_value = mock_instance
     mock_response = MagicMock()

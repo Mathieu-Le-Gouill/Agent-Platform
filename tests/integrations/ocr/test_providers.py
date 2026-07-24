@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, mock_open, patch
+from unittest.mock import MagicMock, mock_open
 
 import pytest
 
@@ -11,28 +11,32 @@ from agent_platform.integrations.ocr.utils import load_bytes
 
 
 class TestOCRLoadBytes:
-    def test_url_source(self):
+    def test_url_source(self, mocker):
         source = "https://example.com/image.jpg"
         fake_bytes = b"fake-image-bytes"
-        with patch("agent_platform.integrations.ocr.utils.urlopen") as mock_urlopen:
-            mock_response = MagicMock()
-            mock_response.read.return_value = fake_bytes
-            mock_urlopen.return_value.__enter__.return_value = mock_response
-            result = load_bytes(source)
+        mock_urlopen = mocker.patch("agent_platform.integrations.ocr.utils.urlopen")
+        mock_response = MagicMock()
+        mock_response.read.return_value = fake_bytes
+        mock_urlopen.return_value.__enter__.return_value = mock_response
+        result = load_bytes(source)
         assert result == fake_bytes
         mock_urlopen.assert_called_once_with(source)
 
-    def test_file_path(self):
+    def test_file_path(self, mocker):
         fake_bytes = b"fake-image-content"
-        with patch("builtins.open", mock_open(read_data=fake_bytes)):
-            result = load_bytes("/path/to/image.png")
+        mocker.patch("builtins.open", mock_open(read_data=fake_bytes))
+        result = load_bytes("/path/to/image.png")
         assert result == fake_bytes
 
 
 class TestTesseractLoadImage:
-    @patch("agent_platform.integrations.ocr.tesseract.tesseract.Image")
-    @patch("agent_platform.integrations.ocr.tesseract.tesseract.urlopen")
-    def test_url_source(self, mock_urlopen, MockImage):
+    def test_url_source(self, mocker):
+        mock_urlopen = mocker.patch(
+            "agent_platform.integrations.ocr.tesseract.tesseract.urlopen"
+        )
+        MockImage = mocker.patch(
+            "agent_platform.integrations.ocr.tesseract.tesseract.Image"
+        )
         source = "https://example.com/image.png"
         mock_response = MagicMock()
         mock_urlopen.return_value.__enter__.return_value = mock_response
@@ -42,9 +46,13 @@ class TestTesseractLoadImage:
         MockImage.open.return_value.convert.assert_called_once_with("RGB")
         assert result == "fake-rgb-image"
 
-    @patch("agent_platform.integrations.ocr.tesseract.tesseract.Image")
-    @patch("agent_platform.integrations.ocr.tesseract.tesseract.Path")
-    def test_file_path(self, MockPath, MockImage):
+    def test_file_path(self, mocker):
+        MockPath = mocker.patch(
+            "agent_platform.integrations.ocr.tesseract.tesseract.Path"
+        )
+        MockImage = mocker.patch(
+            "agent_platform.integrations.ocr.tesseract.tesseract.Image"
+        )
         source = "/path/to/image.png"
         MockImage.open.return_value.convert.return_value = "fake-rgb-image"
         result = TesseractOCR._load_image(source)

@@ -11,11 +11,63 @@ from agent_platform.integrations.vector_store.weaviate.weaviate import (
     WeaviateStore,
     _parse_url,
 )
+from tests.helpers import assert_custom_construction_stored
 
 
 @pytest.fixture
 def provider():
     return WeaviateStore.__new__(WeaviateStore)
+
+
+class TestWeaviateConstruction:
+    def test_default_credentials_and_config(self, monkeypatch):
+        monkeypatch.delenv("WEAVIATE_URL", raising=False)
+        monkeypatch.delenv("WEAVIATE_API_KEY", raising=False)
+        store = WeaviateStore()
+        assert store._embeddings is None
+        assert store._credentials.url == "http://localhost:8080"
+        assert isinstance(store._default_config(), WeaviateConfig)
+
+    def test_custom_credentials_and_embeddings_stored(self):
+        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+
+        creds = mod.WeaviateCredentials(url="http://localhost:8080", api_key=None)
+        assert_custom_construction_stored(WeaviateStore, creds, object())
+
+
+class TestWeaviateConnect:
+    def test_connect_to_local_without_api_key(self, provider, monkeypatch):
+        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+
+        provider._credentials = mod.WeaviateCredentials(
+            url="http://localhost:8080", api_key=None
+        )
+        captured = {}
+        monkeypatch.setattr(
+            mod.weaviate,
+            "connect_to_local",
+            lambda **kw: captured.update(kw) or "local-client",
+        )
+        result = provider._connect(WeaviateConfig())
+        assert result == "local-client"
+        assert captured["host"] == "localhost"
+
+    def test_connect_to_custom_with_api_key(self, provider, monkeypatch):
+        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+
+        provider._credentials = mod.WeaviateCredentials(
+            url="https://weaviate.example.com:8443", api_key="secret"
+        )
+        captured = {}
+        monkeypatch.setattr(
+            mod.weaviate,
+            "connect_to_custom",
+            lambda **kw: captured.update(kw) or "custom-client",
+        )
+        result = provider._connect(WeaviateConfig())
+        assert result == "custom-client"
+        assert captured["http_host"] == "weaviate.example.com"
+        assert captured["http_secure"] is True
 
 
 class TestWeaviateSearchKwargs:
@@ -51,17 +103,11 @@ class TestWeaviateSearchKwargs:
         assert "tenant" not in kwargs
 
     def test_build_client_enables_multi_tenancy_when_namespace_set(
-        self, provider, monkeypatch
+        self, provider, monkeypatch, capture_client_kwargs
     ):
         import agent_platform.integrations.vector_store.weaviate.weaviate as mod
 
-        captured = {}
-
-        class FakeWeaviateVectorStore:
-            def __init__(self, **kwargs):
-                captured.update(kwargs)
-
-        monkeypatch.setattr(mod, "WeaviateVectorStore", FakeWeaviateVectorStore)
+        captured = capture_client_kwargs(mod, "WeaviateVectorStore")
         provider._credentials = mod.WeaviateCredentials(api_key=None)
 
         class FakeClient:
@@ -79,17 +125,11 @@ class TestWeaviateSearchKwargs:
         assert captured["use_multi_tenancy"] is True
 
     def test_build_client_disables_multi_tenancy_without_namespace(
-        self, provider, monkeypatch
+        self, provider, monkeypatch, capture_client_kwargs
     ):
         import agent_platform.integrations.vector_store.weaviate.weaviate as mod
 
-        captured = {}
-
-        class FakeWeaviateVectorStore:
-            def __init__(self, **kwargs):
-                captured.update(kwargs)
-
-        monkeypatch.setattr(mod, "WeaviateVectorStore", FakeWeaviateVectorStore)
+        captured = capture_client_kwargs(mod, "WeaviateVectorStore")
         provider._credentials = mod.WeaviateCredentials(api_key=None)
 
         class FakeClient:
@@ -249,3 +289,72 @@ class TestWeaviateConnectionLifecycle:
             await provider.search(query_vector=[0.1, 0.2], config=WeaviateConfig())
 
         assert closed["count"] >= 1
+
+    async def test_delete_closes_client_after_use(self, provider, monkeypatch):
+        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+
+        self._patch_store(monkeypatch, mod)
+
+        closed = {"called": False}
+        deleted = {}
+
+        class FakeRawClient:
+            def close(self):
+                closed["called"] = True
+
+        provider._credentials = mod.WeaviateCredentials(api_key=None)
+        provider._embeddings = None
+        monkeypatch.setattr(provider, "_connect", lambda config: FakeRawClient())
+
+        class FakeVectorStoreWithDelete:
+            def __init__(self, **kwargs):
+                pass
+
+            def delete(self, ids):
+                deleted["ids"] = ids
+
+        monkeypatch.setattr(mod, "WeaviateVectorStore", FakeVectorStoreWithDelete)
+
+        doc_id = __import__("uuid").uuid4()
+        await provider.delete([doc_id], config=WeaviateConfig())
+
+        assert closed["called"] is True
+        assert deleted["ids"] == [str(doc_id)]
+
+    async def test_search_with_scores_maps_results_and_closes_client(
+        self, provider, monkeypatch
+    ):
+        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        from agent_platform.integrations.vector_store.langchain_base import (
+            _chunk_to_lc,
+        )
+
+        closed = {"called": False}
+
+        class FakeRawClient:
+            def close(self):
+                closed["called"] = True
+
+        provider._credentials = mod.WeaviateCredentials(api_key=None)
+        provider._embeddings = None
+        monkeypatch.setattr(provider, "_connect", lambda config: FakeRawClient())
+
+        doc = _chunk_to_lc(TextChunk(text="hello", index=0))
+
+        class FakeVectorStoreWithScores:
+            def __init__(self, **kwargs):
+                pass
+
+            async def asimilarity_search_by_vector(self, *a, **k):
+                assert k.get("return_score") is True
+                return [(doc, 0.75)]
+
+        monkeypatch.setattr(mod, "WeaviateVectorStore", FakeVectorStoreWithScores)
+
+        results = await provider.search_with_scores(
+            query_vector=[0.1, 0.2], config=WeaviateConfig()
+        )
+
+        assert len(results) == 1
+        assert results[0][1].value == 0.75
+        assert closed["called"] is True

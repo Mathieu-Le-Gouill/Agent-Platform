@@ -1,5 +1,5 @@
 from types import SimpleNamespace
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -70,70 +70,64 @@ class TestFromMistral:
 
 class TestMistralOCRExtract:
     @pytest.mark.asyncio
-    async def test_extract_forwards_new_config_fields(self):
-        with patch(
+    async def test_extract_forwards_new_config_fields(self, mocker):
+        mock_mistral_cls = mocker.patch(
             "agent_platform.integrations.ocr.mistral.mistral.Mistral"
-        ) as mock_mistral_cls:
-            mock_client = MagicMock()
-            mock_client.ocr.process.return_value = SimpleNamespace(
-                pages=[_page(0, "text")]
-            )
-            mock_mistral_cls.return_value = mock_client
+        )
+        mock_client = MagicMock()
+        mock_client.ocr.process.return_value = SimpleNamespace(pages=[_page(0, "text")])
+        mock_mistral_cls.return_value = mock_client
 
-            creds = MistralCredentials(api_key="fake-key")
-            ocr = MistralOCR(creds)
-            config = MistralOCRConfig(
-                confidence_scores_granularity="word",
-                pages=[0, 1],
-                table_format="markdown",
-            )
+        creds = MistralCredentials(api_key="fake-key")
+        ocr = MistralOCR(creds)
+        config = MistralOCRConfig(
+            confidence_scores_granularity="word",
+            pages=[0, 1],
+            table_format="markdown",
+        )
 
-            await ocr.extract("https://example.com/doc.pdf", config=config)
+        await ocr.extract("https://example.com/doc.pdf", config=config)
 
-            call_kwargs = mock_client.ocr.process.call_args.kwargs
-            assert call_kwargs["confidence_scores_granularity"] == "word"
-            assert call_kwargs["pages"] == [0, 1]
-            assert call_kwargs["table_format"] == "markdown"
+        call_kwargs = mock_client.ocr.process.call_args.kwargs
+        assert call_kwargs["confidence_scores_granularity"] == "word"
+        assert call_kwargs["pages"] == [0, 1]
+        assert call_kwargs["table_format"] == "markdown"
 
     @pytest.mark.asyncio
-    async def test_extract_omits_optional_fields_when_unset(self):
-        with patch(
+    async def test_extract_omits_optional_fields_when_unset(self, mocker):
+        mock_mistral_cls = mocker.patch(
             "agent_platform.integrations.ocr.mistral.mistral.Mistral"
-        ) as mock_mistral_cls:
-            mock_client = MagicMock()
-            mock_client.ocr.process.return_value = SimpleNamespace(
-                pages=[_page(0, "text")]
-            )
-            mock_mistral_cls.return_value = mock_client
+        )
+        mock_client = MagicMock()
+        mock_client.ocr.process.return_value = SimpleNamespace(pages=[_page(0, "text")])
+        mock_mistral_cls.return_value = mock_client
 
-            creds = MistralCredentials(api_key="fake-key")
-            ocr = MistralOCR(creds)
+        creds = MistralCredentials(api_key="fake-key")
+        ocr = MistralOCR(creds)
 
-            await ocr.extract("https://example.com/doc.pdf")
+        await ocr.extract("https://example.com/doc.pdf")
 
-            call_kwargs = mock_client.ocr.process.call_args.kwargs
-            assert "confidence_scores_granularity" not in call_kwargs
-            assert "pages" not in call_kwargs
-            assert "table_format" not in call_kwargs
+        call_kwargs = mock_client.ocr.process.call_args.kwargs
+        assert "confidence_scores_granularity" not in call_kwargs
+        assert "pages" not in call_kwargs
+        assert "table_format" not in call_kwargs
 
     @pytest.mark.asyncio
-    async def test_client_is_cached_across_calls(self):
-        with patch(
+    async def test_client_is_cached_across_calls(self, mocker):
+        mock_mistral_cls = mocker.patch(
             "agent_platform.integrations.ocr.mistral.mistral.Mistral"
-        ) as mock_mistral_cls:
-            mock_client = MagicMock()
-            mock_client.ocr.process.return_value = SimpleNamespace(
-                pages=[_page(0, "text")]
-            )
-            mock_mistral_cls.return_value = mock_client
+        )
+        mock_client = MagicMock()
+        mock_client.ocr.process.return_value = SimpleNamespace(pages=[_page(0, "text")])
+        mock_mistral_cls.return_value = mock_client
 
-            creds = MistralCredentials(api_key="fake-key")
-            ocr = MistralOCR(creds)
+        creds = MistralCredentials(api_key="fake-key")
+        ocr = MistralOCR(creds)
 
-            await ocr.extract("https://example.com/doc1.pdf")
-            await ocr.extract("https://example.com/doc2.pdf")
+        await ocr.extract("https://example.com/doc1.pdf")
+        await ocr.extract("https://example.com/doc2.pdf")
 
-            mock_mistral_cls.assert_called_once()
+        mock_mistral_cls.assert_called_once()
 
     @pytest.mark.asyncio
     async def test_missing_credentials_raises(self):
@@ -143,16 +137,16 @@ class TestMistralOCRExtract:
             await ocr.extract("https://example.com/doc.pdf")
 
     @pytest.mark.asyncio
-    async def test_client_error_is_translated_to_provider_error(self):
-        with patch(
+    async def test_client_error_is_translated_to_provider_error(self, mocker):
+        mock_mistral_cls = mocker.patch(
             "agent_platform.integrations.ocr.mistral.mistral.Mistral"
-        ) as mock_mistral_cls:
-            mock_client = MagicMock()
-            mock_client.ocr.process.side_effect = RuntimeError("boom")
-            mock_mistral_cls.return_value = mock_client
+        )
+        mock_client = MagicMock()
+        mock_client.ocr.process.side_effect = RuntimeError("boom")
+        mock_mistral_cls.return_value = mock_client
 
-            creds = MistralCredentials(api_key="fake-key")
-            ocr = MistralOCR(creds)
+        creds = MistralCredentials(api_key="fake-key")
+        ocr = MistralOCR(creds)
 
-            with pytest.raises(ProviderError, match="boom"):
-                await ocr.extract("https://example.com/doc.pdf")
+        with pytest.raises(ProviderError, match="boom"):
+            await ocr.extract("https://example.com/doc.pdf")

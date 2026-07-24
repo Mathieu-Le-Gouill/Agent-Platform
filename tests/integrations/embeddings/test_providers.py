@@ -1,5 +1,5 @@
 import importlib.util
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -416,19 +416,19 @@ class TestMissingCredentialError:
 
 @requires_huggingface
 class TestHuggingFaceClient:
-    @patch(
-        "agent_platform.integrations.embeddings.huggingface.huggingface.HuggingFaceEmbeddings"
-    )
-    def test_local_mode_calls_local_embeddings(self, mock_local):
+    def test_local_mode_calls_local_embeddings(self, mocker):
+        mock_local = mocker.patch(
+            "agent_platform.integrations.embeddings.huggingface.huggingface.HuggingFaceEmbeddings"
+        )
         cfg = HuggingFaceEmbeddingConfig(mode=HuggingFaceEmbeddingMode.LOCAL)
         provider = HuggingFaceEmbeddingProvider()
         provider._client(cfg)
         mock_local.assert_called_once()
 
-    @patch(
-        "agent_platform.integrations.embeddings.huggingface.huggingface.HuggingFaceEndpointEmbeddings"
-    )
-    def test_hosted_mode_calls_hosted_embeddings(self, mock_hosted):
+    def test_hosted_mode_calls_hosted_embeddings(self, mocker):
+        mock_hosted = mocker.patch(
+            "agent_platform.integrations.embeddings.huggingface.huggingface.HuggingFaceEndpointEmbeddings"
+        )
         cfg = HuggingFaceEmbeddingConfig(
             mode=HuggingFaceEmbeddingMode.HOSTED,
             model="bert-base-uncased",

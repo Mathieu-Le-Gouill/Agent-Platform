@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -45,8 +45,10 @@ def test_config_defaults():
     assert cfg.threshold == 0.5
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_provider_requirements(mock_pvcobra):
+def test_provider_requirements(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = _mock_handle()
@@ -57,8 +59,10 @@ def test_provider_requirements(mock_pvcobra):
     assert req.dtype == DataType.INT16
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_requirements_rejects_invalid_sample_rate(mock_pvcobra):
+def test_requirements_rejects_invalid_sample_rate(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = _mock_handle()
@@ -68,8 +72,10 @@ def test_requirements_rejects_invalid_sample_rate(mock_pvcobra):
         vad.requirements.validate(chunk)
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_requirements_rejects_invalid_dtype(mock_pvcobra):
+def test_requirements_rejects_invalid_dtype(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = _mock_handle()
@@ -87,8 +93,10 @@ def test_requirements_rejects_invalid_dtype(mock_pvcobra):
         vad.requirements.validate(chunk)
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_requirements_rejects_invalid_channels(mock_pvcobra):
+def test_requirements_rejects_invalid_channels(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = _mock_handle()
@@ -106,8 +114,10 @@ def test_requirements_rejects_invalid_channels(mock_pvcobra):
         vad.requirements.validate(chunk)
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_requirements_accepts_valid(mock_pvcobra):
+def test_requirements_accepts_valid(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
     mock_pvcobra.create.return_value = _mock_handle()
@@ -116,8 +126,10 @@ def test_requirements_accepts_valid(mock_pvcobra):
     vad.requirements.validate(chunk)
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_detect_with_speech_spans(mock_pvcobra):
+def test_detect_with_speech_spans(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle(side_effect=[0.9, 0.8, 0.1])
     mock_pvcobra.create.return_value = mock_handle
 
@@ -135,8 +147,10 @@ def test_detect_with_speech_spans(mock_pvcobra):
     assert len(result) == 1
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_is_speech_above_threshold(mock_pvcobra):
+def test_is_speech_above_threshold(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle(return_value=0.9)
     mock_pvcobra.create.return_value = mock_handle
 
@@ -151,8 +165,10 @@ def test_is_speech_above_threshold(mock_pvcobra):
     mock_handle.process.assert_called_once_with(chunk.data)
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_is_speech_below_threshold(mock_pvcobra):
+def test_is_speech_below_threshold(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle(return_value=0.1)
     mock_pvcobra.create.return_value = mock_handle
 
@@ -166,8 +182,10 @@ def test_is_speech_below_threshold(mock_pvcobra):
     assert vad._is_speech(chunk, config) is False
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_is_speech_wrong_frame_length_raises_provider_error(mock_pvcobra):
+def test_is_speech_wrong_frame_length_raises_provider_error(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle()
     mock_pvcobra.create.return_value = mock_handle
 
@@ -183,8 +201,10 @@ def test_is_speech_wrong_frame_length_raises_provider_error(mock_pvcobra):
     mock_handle.process.assert_not_called()
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_is_speech_native_error_translated_to_provider_error(mock_pvcobra):
+def test_is_speech_native_error_translated_to_provider_error(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle()
     mock_handle.process.side_effect = ValueError("native failure")
     mock_pvcobra.create.return_value = mock_handle
@@ -200,8 +220,8 @@ def test_is_speech_native_error_translated_to_provider_error(mock_pvcobra):
         vad._is_speech(chunk, config)
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_is_speech_raises_runtime_error_when_handle_not_initialized(mock_pvcobra):
+def test_is_speech_raises_runtime_error_when_handle_not_initialized(mocker):
+    mocker.patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
     vad = PvcobraVAD(_credentials())
@@ -211,8 +231,10 @@ def test_is_speech_raises_runtime_error_when_handle_not_initialized(mock_pvcobra
         vad._is_speech(chunk, PvcobraVadConfig())
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_close_deletes_native_handle(mock_pvcobra):
+def test_close_deletes_native_handle(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle()
     mock_pvcobra.create.return_value = mock_handle
 
@@ -227,8 +249,8 @@ def test_close_deletes_native_handle(mock_pvcobra):
     assert vad._handle is None
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_close_is_noop_when_handle_never_created(mock_pvcobra):
+def test_close_is_noop_when_handle_never_created(mocker):
+    mocker.patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
     vad = PvcobraVAD(_credentials())
@@ -236,8 +258,10 @@ def test_close_is_noop_when_handle_never_created(mock_pvcobra):
     assert vad._handle is None
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_del_calls_close_without_raising(mock_pvcobra):
+def test_del_calls_close_without_raising(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle()
     mock_pvcobra.create.return_value = mock_handle
 
@@ -251,8 +275,10 @@ def test_del_calls_close_without_raising(mock_pvcobra):
     mock_handle.delete.assert_called_once()
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_detect_empty_returns_empty(mock_pvcobra):
+def test_detect_empty_returns_empty(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_pvcobra.create.return_value = _mock_handle()
     from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
 
@@ -260,8 +286,10 @@ def test_detect_empty_returns_empty(mock_pvcobra):
     assert vad.detect([]) == []
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-def test_detect_no_span_when_silence_before_speech(mock_pvcobra):
+def test_detect_no_span_when_silence_before_speech(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle(side_effect=[0.1, 0.1])
     mock_pvcobra.create.return_value = mock_handle
 
@@ -278,8 +306,10 @@ def test_detect_no_span_when_silence_before_speech(mock_pvcobra):
     assert result == []
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-async def test_adetect_yields_span(mock_pvcobra):
+async def test_adetect_yields_span(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle(side_effect=[0.9, 0.1])
     mock_pvcobra.create.return_value = mock_handle
 
@@ -295,8 +325,10 @@ async def test_adetect_yields_span(mock_pvcobra):
     assert len(results) == 1
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-async def test_adetect_before_detect_does_not_raise_attribute_error(mock_pvcobra):
+async def test_adetect_before_detect_does_not_raise_attribute_error(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle(return_value=0.1)
     mock_pvcobra.create.return_value = mock_handle
 
@@ -311,8 +343,10 @@ async def test_adetect_before_detect_does_not_raise_attribute_error(mock_pvcobra
     assert results == []
 
 
-@patch("agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra")
-async def test_adetect_validate_chunk_raises(mock_pvcobra):
+async def test_adetect_validate_chunk_raises(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
     mock_handle = _mock_handle(return_value=0.1)
     mock_pvcobra.create.return_value = mock_handle
 

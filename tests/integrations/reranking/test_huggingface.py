@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 
@@ -11,35 +11,35 @@ from agent_platform.integrations.reranking.huggingface.huggingface import (
 )
 
 
-def _client(config: HuggingFaceRerankerConfig):
-    with patch(
+def _client(mocker, config: HuggingFaceRerankerConfig):
+    mock_encoder_cls = mocker.patch(
         "agent_platform.integrations.reranking.huggingface.huggingface.HuggingFaceCrossEncoder"
-    ) as mock_encoder_cls:
-        mock_encoder_cls.return_value = MagicMock(spec=HuggingFaceCrossEncoder)
-        provider = HuggingFaceRerankerProvider()
-        client = provider._client(config)
-        return client, mock_encoder_cls
+    )
+    mock_encoder_cls.return_value = MagicMock(spec=HuggingFaceCrossEncoder)
+    provider = HuggingFaceRerankerProvider()
+    client = provider._client(config)
+    return client, mock_encoder_cls
 
 
-def test_device_routed_through_model_kwargs():
-    _, mock_encoder_cls = _client(HuggingFaceRerankerConfig(device="cuda:0"))
+def test_device_routed_through_model_kwargs(mocker):
+    _, mock_encoder_cls = _client(mocker, HuggingFaceRerankerConfig(device="cuda:0"))
     _, kwargs = mock_encoder_cls.call_args
     assert kwargs["model_kwargs"] == {"device": "cuda:0"}
 
 
-def test_default_device_is_cpu():
-    _, mock_encoder_cls = _client(HuggingFaceRerankerConfig())
+def test_default_device_is_cpu(mocker):
+    _, mock_encoder_cls = _client(mocker, HuggingFaceRerankerConfig())
     _, kwargs = mock_encoder_cls.call_args
     assert kwargs["model_kwargs"] == {"device": "cpu"}
 
 
-def test_top_k_forwarded_as_top_n():
-    client, _ = _client(HuggingFaceRerankerConfig(top_k=2))
+def test_top_k_forwarded_as_top_n(mocker):
+    client, _ = _client(mocker, HuggingFaceRerankerConfig(top_k=2))
     assert client.top_n == 2
 
 
-def test_top_n_none_when_top_k_unset():
-    client, _ = _client(HuggingFaceRerankerConfig())
+def test_top_n_none_when_top_k_unset(mocker):
+    client, _ = _client(mocker, HuggingFaceRerankerConfig())
     assert client.top_n is None
 
 

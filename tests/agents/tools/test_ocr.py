@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, patch
+from unittest.mock import AsyncMock
 from uuid import uuid4
 
 import pytest
@@ -147,11 +147,11 @@ class TestOCRToolToBlocks:
         assert blocks[0].image == "https://example.com/img.png"
         assert blocks[1] == TextBlock(text="Hello")
 
-    def test_local_source_loads_image_document(self, tool):
+    def test_local_source_loads_image_document(self, tool, mocker):
         chunks = [TextChunk(id=uuid4(), text="Hello", index=0)]
         fake_doc = ImageDocument(content=b"\x89PNG", format=ImageFormat.PNG)
-        with patch.object(ImageDocument, "load_content", return_value=fake_doc):
-            blocks = tool.to_blocks("/path/to/image.png", chunks)
+        mocker.patch.object(ImageDocument, "load_content", return_value=fake_doc)
+        blocks = tool.to_blocks("/path/to/image.png", chunks)
         assert isinstance(blocks[0], ImageBlock)
         assert blocks[0].image is fake_doc
 

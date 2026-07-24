@@ -65,7 +65,7 @@ reranking = ["agent_platform[reranking-cohere,reranking-jina,reranking-huggingfa
 # --- Speech-to-Text ---
 stt-whisperx = ["whisperx"]
 stt-faster-whisper = ["faster-whisper"]
-stt-deepgram = ["deepgram-sdk"]
+stt-deepgram = ["deepgram-sdk>=7"]
 stt-openai = ["openai"]
 stt = ["agent_platform[stt-whisperx,stt-faster-whisper,stt-deepgram,stt-openai]"]
 
@@ -138,6 +138,7 @@ dev = [
     "pytest",
     "pytest-asyncio",
     "pytest-cov",
+    "pytest-mock",
     "ruff",
     "mypy",
     "import-linter",
@@ -190,9 +191,22 @@ warn_redundant_casts = true
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
 testpaths = ["tests"]
+addopts = "--cov=src/agent_platform --cov-report=term-missing --cov-fail-under=90"
 markers = [
     "unit: fast, no external services",
     "integration: hits a real external provider/network",
+]
+
+[tool.coverage.run]
+source = ["src/agent_platform"]
+omit = [
+    "*/__init__.py",
+]
+
+[tool.coverage.report]
+exclude_also = [
+    "if TYPE_CHECKING:",
+    "if typing.TYPE_CHECKING:",
 ]
 
 [tool.importlinter]

@@ -47,7 +47,7 @@ Purpose only, enough to know which README to open next.
 | `src/agent_platform/config/` | Logging setup, `Settings` (pydantic-settings), `build_agent()` DI factory, generic `build_provider(domain_module, provider_name)` factory reused by any future domain wiring | no |
 | `src/agent_platform/api/` | FastAPI app wiring `build_agent()` behind `/chat` and `/health` | no |
 | `src/agent_platform/workflows/` | Scaffold stub (LangGraph state machine), not yet implemented | no |
-| `tests/` | Test suite, mirrors `src/agent_platform` structure | no |
+| `tests/` | Test suite, one file per source module; provider domains (`integrations/<domain>/<provider>/`) are flattened to `tests/integrations/<domain>/test_<provider>.py` with shared `test_base.py`/`test_config.py`/`test_providers.py` per domain rather than a strict 1:1 path mirror | no |
 
 Read `src/agent_platform/README.md` first for the full layer diagram before
 diving into a specific directory's README.
@@ -63,7 +63,7 @@ paragraph.
 
 ```bash
 uv run --extra dev pytest -v                          # full suite (creates/updates .venv from pyproject on first run)
-uv run pytest -v -m unit                               # unit tests only
+uv run pytest -v -m unit                               # unit tests only (currently: all of them, see below)
 uv run pytest -v tests/agents/test_executor.py          # single file
 uv run mypy src/                                       # type-check
 uv run lint-imports                                     # enforce the layered-architecture rules in §6
@@ -77,10 +77,43 @@ and CI still installs via `pip install -e ".[dev]"`, so `uv run --extra dev
 --extra <providers-you-need>` is the local equivalent, not a separate
 dependency system. No `uv.lock` is committed.
 
-- Tests live in `tests/<mirror-of-src-path>`, one test file per source file
-  (e.g. `agents/executor.py` → `tests/agents/test_executor.py`).
+- Tests live in `tests/<mirror-of-src-path>`, generally one test file per
+  source file (e.g. `agents/executor.py` → `tests/agents/test_executor.py`),
+  except provider domains under `integrations/<domain>/<provider>/`, which
+  are flattened to `tests/integrations/<domain>/test_<provider>.py` plus
+  shared `test_base.py`/`test_config.py`/`test_providers.py`/
+  `test_langchain_base.py` per domain, don't force a strict 1:1 split there.
 - Async tests run automatically (`asyncio_mode = "auto"` in `pyproject.toml`),
   no `@pytest.mark.asyncio` needed.
+- **Coverage gate**: `pyproject.toml [tool.pytest.ini_options] addopts` runs
+  every local and CI invocation with `--cov=src/agent_platform
+  --cov-fail-under=90`; `[tool.coverage.*]` lives in `pyproject.toml`, not a
+  separate `.coveragerc` (a stale `.coveragerc` silently overriding it was
+  removed, don't reintroduce one). Coverage config only makes the number
+  honest, it doesn't chase 100%, known 0%-covered files are tracked in
+  `CLAUDE.md` "Known issues", not hidden via `omit =`.
+- **Mocking**: use the `mocker` fixture (`pytest-mock`) for
+  patching/monkeypatching, not raw `unittest.mock.patch`/`@patch`
+  (`mocker.patch(...)`/`mocker.patch.object(...)` auto-unwind at teardown
+  the same way `with patch(...)` did, just without the indentation and
+  decorator-argument-order footguns). Direct `MagicMock()`/`AsyncMock()`
+  construction is unaffected and still idiomatic. `monkeypatch` remains fine
+  for `setattr`/`setenv`/`delenv` outside the patch/patch.object case.
+- **Markers**: every collected test is auto-tagged `unit` by a
+  `pytest_collection_modifyitems` hook in `tests/conftest.py` unless it
+  already carries `@pytest.mark.integration`. As of this writing zero tests
+  are marked `integration`, every `importorskip`/`skipif` guard in the suite
+  gates on an optional SDK not being installed, not a real network call, so
+  `-m unit` currently selects the whole suite. Add
+  `@pytest.mark.integration` explicitly on any future test that genuinely
+  hits a live provider (e.g. an opt-in smoke test).
+- Shared fixtures live in the `conftest.py` at the narrowest scope that
+  covers their users (root `tests/conftest.py` for cross-domain fixtures
+  like `fake_text_chunk`/`mock_llm`; a domain-level `conftest.py`, e.g.
+  `tests/integrations/vector_store/conftest.py`, for fixtures specific to
+  that domain's provider tests). Common assertion helpers and response
+  builders live in `tests/helpers/` (`assertions.py`, `responses.py`), not
+  duplicated per test file.
 - **Rule:** any new function/branch/edge case gets a corresponding test in
   the same change. No exceptions for "small" changes, small changes are
   where regressions hide.
@@ -91,12 +124,13 @@ dependency system. No `uv.lock` is committed.
   - **components**, test `arun()` including error propagation
   - **pipelines**, failure-path and retry logic with fake components
   - **agents**, think/act loop termination with mocked tools and LLM
-- Prefer extending an existing test file's patterns (fixtures, mocks) over
-  introducing a new testing style in the same module.
+- Prefer extending an existing test file's patterns (fixtures, mocks,
+  helpers in `tests/helpers/`) over introducing a new testing style in the
+  same module.
 - CI (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check`,
-  `mypy src/`, `lint-imports`, and the pytest suite (with coverage) on every
-  push/PR to `main`, on Python 3.11 and 3.12. A change that fails any of
-  these locally will fail CI the same way.
+  `mypy src/`, `lint-imports`, and the pytest suite (with the coverage gate
+  above) on every push/PR to `main`, on Python 3.11 and 3.12. A change that
+  fails any of these locally will fail CI the same way.
 - **Run the checks locally before committing/pushing, don't rely on CI to
   catch it first.** `pre-commit install` (see `README.md` Git hooks) wires
   ruff, mypy, and lint-imports into `git commit`, and the full `pytest`

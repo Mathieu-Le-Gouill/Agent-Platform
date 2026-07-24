@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock, patch
+from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
@@ -283,7 +283,7 @@ class _TestReranker(LangChainReranker):
 
 
 class TestLangChainReranker:
-    async def test_rerank_returns_text_chunks(self):
+    async def test_rerank_returns_text_chunks(self, mocker):
         uid = uuid4()
         item = TextChunk(id=uid, text="test doc", index=0)
 
@@ -306,15 +306,15 @@ class TestLangChainReranker:
         mock_client.acompress_documents = AsyncMock(return_value=[mock_result_lc])
 
         reranker = _TestReranker()
-        with patch.object(reranker, "_client", return_value=mock_client):
-            results = await reranker.rerank(query="test query", items=[item])
+        mocker.patch.object(reranker, "_client", return_value=mock_client)
+        results = await reranker.rerank(query="test query", items=[item])
 
         assert len(results) == 1
         assert isinstance(results[0], TextChunk)
         assert results[0].id == result_uid
         assert results[0].text == "reranked result"
 
-    async def test_rerank_with_top_k(self):
+    async def test_rerank_with_top_k(self, mocker):
         items = [TextChunk(id=uuid4(), text=f"doc{i}", index=i) for i in range(5)]
         mock_results_lc = [
             LC_Document(
@@ -339,22 +339,22 @@ class TestLangChainReranker:
         config = RerankerConfig(top_k=3)
 
         reranker = _TestReranker()
-        with patch.object(reranker, "_client", return_value=mock_client):
-            results = await reranker.rerank(query="q", items=items, config=config)
+        mocker.patch.object(reranker, "_client", return_value=mock_client)
+        results = await reranker.rerank(query="q", items=items, config=config)
 
         assert len(results) == 3
 
-    async def test_rerank_empty_items(self):
+    async def test_rerank_empty_items(self, mocker):
         mock_client = MagicMock()
         mock_client.acompress_documents = AsyncMock(return_value=[])
 
         reranker = _TestReranker()
-        with patch.object(reranker, "_client", return_value=mock_client):
-            results = await reranker.rerank(query="q", items=[])
+        mocker.patch.object(reranker, "_client", return_value=mock_client)
+        results = await reranker.rerank(query="q", items=[])
 
         assert results == []
 
-    async def test_rerank_calls_acompress_documents(self):
+    async def test_rerank_calls_acompress_documents(self, mocker):
         uid = uuid4()
         item = TextChunk(id=uid, text="hello", index=0)
 
@@ -362,8 +362,8 @@ class TestLangChainReranker:
         mock_client.acompress_documents = AsyncMock(return_value=[])
 
         reranker = _TestReranker()
-        with patch.object(reranker, "_client", return_value=mock_client):
-            await reranker.rerank(query="the query", items=[item])
+        mocker.patch.object(reranker, "_client", return_value=mock_client)
+        await reranker.rerank(query="the query", items=[item])
 
         mock_client.acompress_documents.assert_awaited_once()
         args, _ = mock_client.acompress_documents.await_args
@@ -371,7 +371,7 @@ class TestLangChainReranker:
         assert args[0][0].page_content == "hello"
         assert args[1] == "the query"
 
-    async def test_rerank_without_top_k_returns_all(self):
+    async def test_rerank_without_top_k_returns_all(self, mocker):
         items = [TextChunk(id=uuid4(), text=f"doc{i}", index=i) for i in range(3)]
         mock_results_lc = [
             LC_Document(
@@ -396,12 +396,12 @@ class TestLangChainReranker:
         config = RerankerConfig(top_k=None)
 
         reranker = _TestReranker()
-        with patch.object(reranker, "_client", return_value=mock_client):
-            results = await reranker.rerank(query="q", items=items, config=config)
+        mocker.patch.object(reranker, "_client", return_value=mock_client)
+        results = await reranker.rerank(query="q", items=items, config=config)
 
         assert len(results) == 3
 
-    async def test_rerank_propagates_relevance_score(self):
+    async def test_rerank_propagates_relevance_score(self, mocker):
         items = [TextChunk(id=uuid4(), text="a", index=0)]
         mock_result_lc = LC_Document(
             page_content="a",
@@ -422,13 +422,13 @@ class TestLangChainReranker:
 
         config = RerankerConfig(return_scores=True, normalize_scores=False)
         reranker = _TestReranker()
-        with patch.object(reranker, "_client", return_value=mock_client):
-            results = await reranker.rerank(query="q", items=items, config=config)
+        mocker.patch.object(reranker, "_client", return_value=mock_client)
+        results = await reranker.rerank(query="q", items=items, config=config)
 
         assert results[0].confidence is not None
         assert results[0].confidence.value == 0.42
 
-    async def test_rerank_return_scores_false_leaves_confidence_none(self):
+    async def test_rerank_return_scores_false_leaves_confidence_none(self, mocker):
         items = [TextChunk(id=uuid4(), text="a", index=0)]
         mock_result_lc = LC_Document(
             page_content="a",
@@ -448,14 +448,14 @@ class TestLangChainReranker:
         mock_client.acompress_documents = AsyncMock(return_value=[mock_result_lc])
 
         reranker = _TestReranker()
-        with patch.object(reranker, "_client", return_value=mock_client):
-            results = await reranker.rerank(query="q", items=items)
+        mocker.patch.object(reranker, "_client", return_value=mock_client)
+        results = await reranker.rerank(query="q", items=items)
 
         assert results[0].confidence is None
 
 
 class TestRerankRetryAndTranslation:
-    async def test_retries_transient_failure_then_succeeds(self, monkeypatch):
+    async def test_retries_transient_failure_then_succeeds(self, monkeypatch, mocker):
         import agent_platform.core.errors as errors_mod
 
         monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
@@ -472,12 +472,14 @@ class TestRerankRetryAndTranslation:
         mock_client.acompress_documents = flaky
 
         reranker = _TestReranker()
-        with patch.object(reranker, "_client", return_value=mock_client):
-            await reranker.rerank(query="q", items=[])
+        mocker.patch.object(reranker, "_client", return_value=mock_client)
+        await reranker.rerank(query="q", items=[])
 
         assert calls["n"] == 2
 
-    async def test_translates_permanent_failure_to_provider_error(self, monkeypatch):
+    async def test_translates_permanent_failure_to_provider_error(
+        self, monkeypatch, mocker
+    ):
         import agent_platform.core.errors as errors_mod
 
         monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
@@ -489,6 +491,6 @@ class TestRerankRetryAndTranslation:
         mock_client.acompress_documents = always_fails
 
         reranker = _TestReranker()
-        with patch.object(reranker, "_client", return_value=mock_client):
-            with pytest.raises(ProviderError, match="Reranking failed"):
-                await reranker.rerank(query="q", items=[])
+        mocker.patch.object(reranker, "_client", return_value=mock_client)
+        with pytest.raises(ProviderError, match="Reranking failed"):
+            await reranker.rerank(query="q", items=[])

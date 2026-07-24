@@ -37,16 +37,14 @@ def test_default_config_new_field_defaults():
     assert cfg.strip_whitespace is True
 
 
-def test_splitter_forwards_new_fields_to_from_language():
-    from unittest.mock import patch
-
+def test_splitter_forwards_new_fields_to_from_language(mocker):
     provider = LatexChunkerProvider()
     config = LatexChunkerConfig(keep_separator="end", strip_whitespace=False)
 
-    with patch(
+    mock_from_language = mocker.patch(
         "agent_platform.integrations.chunking.latex.latex.RecursiveCharacterTextSplitter.from_language"
-    ) as mock_from_language:
-        provider._splitter(config)
+    )
+    provider._splitter(config)
 
     _, kwargs = mock_from_language.call_args
     assert kwargs["keep_separator"] == "end"

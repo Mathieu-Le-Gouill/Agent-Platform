@@ -81,3 +81,9 @@ def mock_llm():
     llm = MagicMock()
     llm.agenerate = AsyncMock()
     return llm
+
+
+def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
+    for item in items:
+        if not any(item.iter_markers(name="integration")):
+            item.add_marker("unit")

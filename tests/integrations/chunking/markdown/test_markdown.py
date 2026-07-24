@@ -40,51 +40,45 @@ def test_default_config_new_field_defaults():
     assert cfg.custom_header_patterns is None
 
 
-def test_chunk_forwards_return_each_line():
-    from unittest.mock import patch
-
+def test_chunk_forwards_return_each_line(mocker):
     provider = MarkdownStructureChunkerProvider()
     doc = TextDocument(text=MARKDOWN_DOC, format=DocumentFormat.MARKDOWN)
     config = MarkdownChunkerConfig(return_each_line=True)
 
-    with patch(
+    mock_splitter_cls = mocker.patch(
         "agent_platform.integrations.chunking.markdown.markdown.MarkdownHeaderTextSplitter"
-    ) as mock_splitter_cls:
-        mock_splitter_cls.return_value.split_text.return_value = []
-        provider.chunk([doc], config)
+    )
+    mock_splitter_cls.return_value.split_text.return_value = []
+    provider.chunk([doc], config)
 
     _, kwargs = mock_splitter_cls.call_args
     assert kwargs["return_each_line"] is True
 
 
-def test_chunk_forwards_custom_header_patterns_when_set():
-    from unittest.mock import patch
-
+def test_chunk_forwards_custom_header_patterns_when_set(mocker):
     provider = MarkdownStructureChunkerProvider()
     doc = TextDocument(text=MARKDOWN_DOC, format=DocumentFormat.MARKDOWN)
     config = MarkdownChunkerConfig(custom_header_patterns={"**": 1})
 
-    with patch(
+    mock_splitter_cls = mocker.patch(
         "agent_platform.integrations.chunking.markdown.markdown.MarkdownHeaderTextSplitter"
-    ) as mock_splitter_cls:
-        mock_splitter_cls.return_value.split_text.return_value = []
-        provider.chunk([doc], config)
+    )
+    mock_splitter_cls.return_value.split_text.return_value = []
+    provider.chunk([doc], config)
 
     _, kwargs = mock_splitter_cls.call_args
     assert kwargs["custom_header_patterns"] == {"**": 1}
 
 
-def test_chunk_omits_custom_header_patterns_when_unset():
-    from unittest.mock import patch
-
+def test_chunk_omits_custom_header_patterns_when_unset(mocker):
     provider = MarkdownStructureChunkerProvider()
     doc = TextDocument(text=MARKDOWN_DOC, format=DocumentFormat.MARKDOWN)
 
-    with patch(
+    mock_splitter_cls = mocker.patch(
         "agent_platform.integrations.chunking.markdown.markdown.MarkdownHeaderTextSplitter"
-    ) as mock_splitter_cls:
-        mock_splitter_cls.return_value.split_text.return_value = []
-        provider.chunk([doc], None)
+    )
+    mock_splitter_cls.return_value.split_text.return_value = []
+    provider.chunk([doc], None)
 
     _, kwargs = mock_splitter_cls.call_args
     assert "custom_header_patterns" not in kwargs

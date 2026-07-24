@@ -85,9 +85,7 @@ def test_splitter_without_add_start_index():
     assert all(i is None for i in start_indices)
 
 
-def test_splitter_forwards_new_fields_to_constructor():
-    from unittest.mock import patch
-
+def test_splitter_forwards_new_fields_to_constructor(mocker):
     provider = RecursiveChunkerProvider()
     config = RecursiveChunkerConfig(
         keep_separator="start",
@@ -95,10 +93,10 @@ def test_splitter_forwards_new_fields_to_constructor():
         strip_whitespace=False,
     )
 
-    with patch(
+    mock_splitter_cls = mocker.patch(
         "agent_platform.integrations.chunking.recursive.recursive.RecursiveCharacterTextSplitter"
-    ) as mock_splitter_cls:
-        provider._splitter(config)
+    )
+    provider._splitter(config)
 
     _, kwargs = mock_splitter_cls.call_args
     assert kwargs["keep_separator"] == "start"

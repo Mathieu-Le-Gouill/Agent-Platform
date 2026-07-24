@@ -1,7 +1,7 @@
 import builtins
 import importlib
 import sys
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -26,8 +26,8 @@ from agent_platform.integrations.clustering.kmeans.kmeans import (
 # ---------------------------------------------------------------------------
 
 
-@patch("hdbscan.HDBSCAN")
-async def test_hdbscan_empty_items(mock_hdbscan):
+async def test_hdbscan_empty_items(mocker):
+    mock_hdbscan = mocker.patch("hdbscan.HDBSCAN")
     clusterer = HDBSCANClusterer()
     result = await clusterer.clusterize([])
     assert result.clusters == []
@@ -35,8 +35,10 @@ async def test_hdbscan_empty_items(mock_hdbscan):
     mock_hdbscan.assert_not_called()
 
 
-@patch("agent_platform.integrations.clustering.kmeans.kmeans.KMeans")
-async def test_kmeans_empty_items(mock_kmeans):
+async def test_kmeans_empty_items(mocker):
+    mock_kmeans = mocker.patch(
+        "agent_platform.integrations.clustering.kmeans.kmeans.KMeans"
+    )
     clusterer = KMeansClusterer()
     result = await clusterer.clusterize([])
     assert result.clusters == []
@@ -99,8 +101,8 @@ async def test_kmeans_n_clusters_exceeds_items():
 # ---------------------------------------------------------------------------
 
 
-@patch("hdbscan.HDBSCAN")
-async def test_hdbscan_clusterize(mock_hdbscan_cls):
+async def test_hdbscan_clusterize(mocker):
+    mock_hdbscan_cls = mocker.patch("hdbscan.HDBSCAN")
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0, 0, -1])
     mock_instance.probabilities_ = np.array([0.95, 0.92, 0.0])
@@ -130,8 +132,10 @@ async def test_hdbscan_clusterize(mock_hdbscan_cls):
     assert result.items[2].probability == 0.0
 
 
-@patch("agent_platform.integrations.clustering.kmeans.kmeans.KMeans")
-async def test_kmeans_clusterize(mock_kmeans_cls):
+async def test_kmeans_clusterize(mocker):
+    mock_kmeans_cls = mocker.patch(
+        "agent_platform.integrations.clustering.kmeans.kmeans.KMeans"
+    )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0, 0, 1, 1])
     mock_instance.cluster_centers_ = np.array([[0.1, 0.2], [0.3, 0.4]])
@@ -173,8 +177,10 @@ async def test_kmeans_clusterize(mock_kmeans_cls):
 # ---------------------------------------------------------------------------
 
 
-@patch("agent_platform.integrations.clustering.kmeans.kmeans.KMeans")
-async def test_kmeans_forwards_init_to_constructor(mock_kmeans_cls):
+async def test_kmeans_forwards_init_to_constructor(mocker):
+    mock_kmeans_cls = mocker.patch(
+        "agent_platform.integrations.clustering.kmeans.kmeans.KMeans"
+    )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0])
     mock_instance.transform.return_value = np.array([[0.1]])
@@ -189,8 +195,10 @@ async def test_kmeans_forwards_init_to_constructor(mock_kmeans_cls):
     assert kwargs["init"] == "random"
 
 
-@patch("agent_platform.integrations.clustering.kmeans.kmeans.KMeans")
-async def test_kmeans_forwards_copy_x_and_verbose(mock_kmeans_cls):
+async def test_kmeans_forwards_copy_x_and_verbose(mocker):
+    mock_kmeans_cls = mocker.patch(
+        "agent_platform.integrations.clustering.kmeans.kmeans.KMeans"
+    )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0])
     mock_instance.transform.return_value = np.array([[0.1]])
@@ -211,8 +219,10 @@ async def test_kmeans_forwards_copy_x_and_verbose(mock_kmeans_cls):
 # ---------------------------------------------------------------------------
 
 
-@patch("agent_platform.integrations.clustering.gmm.gmm.GaussianMixture")
-async def test_gmm_clusterize(mock_gmm_cls):
+async def test_gmm_clusterize(mocker):
+    mock_gmm_cls = mocker.patch(
+        "agent_platform.integrations.clustering.gmm.gmm.GaussianMixture"
+    )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0, 0, 1, 1])
     mock_instance.predict_proba.return_value = np.array(
@@ -241,8 +251,10 @@ async def test_gmm_clusterize(mock_gmm_cls):
     assert result.items[2].cluster_id == 1
 
 
-@patch("agent_platform.integrations.clustering.gmm.gmm.GaussianMixture")
-async def test_gmm_forwards_reg_covar_and_init_params(mock_gmm_cls):
+async def test_gmm_forwards_reg_covar_and_init_params(mocker):
+    mock_gmm_cls = mocker.patch(
+        "agent_platform.integrations.clustering.gmm.gmm.GaussianMixture"
+    )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0])
     mock_instance.predict_proba.return_value = np.array([[1.0]])
@@ -258,13 +270,31 @@ async def test_gmm_forwards_reg_covar_and_init_params(mock_gmm_cls):
     assert kwargs["init_params"] == "random"
 
 
+def test_gmm_default_config():
+    assert isinstance(GMMClusterer()._default_config(), GMMConfig)
+
+
+async def test_gmm_empty_items_returns_empty_result():
+    clusterer = GMMClusterer()
+    result = await clusterer.clusterize([])
+    assert result.clusters == []
+    assert result.items == []
+
+
+async def test_gmm_missing_embedding_raises():
+    clusterer = GMMClusterer()
+    items = [TextChunk(text="a", metadata={})]
+    with pytest.raises(ValueError, match="missing embedding"):
+        await clusterer.clusterize(items)
+
+
 # ---------------------------------------------------------------------------
 # HDBSCAN config forwarding
 # ---------------------------------------------------------------------------
 
 
-@patch("hdbscan.HDBSCAN")
-async def test_hdbscan_forwards_new_fields(mock_hdbscan_cls):
+async def test_hdbscan_forwards_new_fields(mocker):
+    mock_hdbscan_cls = mocker.patch("hdbscan.HDBSCAN")
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0])
     mock_instance.probabilities_ = np.array([0.9])

@@ -22,6 +22,7 @@ The platform is **structurally complete** at the integration and agent layers. T
 - **Components**, `Embedder`, `Chunker`, `Reranker`, `SimilarityScorer`, `EmbeddingClassifier`, `LLMClassifier`: complete
 - **Agents**, `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, `TranscribeTool`, `SearchTool`, `OCRTool`: complete
 - **Tooling**, mypy and import-linter are wired into CI (`.github/workflows/ci.yml`) alongside ruff and pytest; the layered-architecture and core-isolation rules in AGENTS.md §6 are enforced by `lint-imports`, not just convention
+- **Test suite**, `tests/` (1521 tests, structural + coverage-gate pass done): `pyproject.toml [tool.pytest.ini_options] addopts` enforces `--cov-fail-under=90` locally and in CI (config lives in `pyproject.toml [tool.coverage.*]`, no `.coveragerc`); mocking goes through the `pytest-mock` `mocker` fixture, not raw `unittest.mock.patch`; every test is auto-marked `unit` via a `pytest_collection_modifyitems` hook in `tests/conftest.py` unless explicitly marked `integration` (currently 0 tests are, the suite is fully mocked); shared helpers live in `tests/helpers/`. See AGENTS.md §3 for the full convention
 
 ### Known issues (prioritized)
 
@@ -31,8 +32,10 @@ The platform is **structurally complete** at the integration and agent layers. T
 | P0 | RAG query pipeline missing embed → rerank → generate steps (currently just `store.search(vector)`) | `pipelines/rag/query.py` |
 | P1 | `speech_translation.py` body is pseudocode in a docstring, `run()` raises `NotImplementedError` | `pipelines/speech_translation.py` |
 | P1 | `classification` has no integration/provider layer at all (interface only defines response models, no `base.py` ABC, no `integrations/classification/` directory); classification today is implemented entirely in `components/embed_classifier` and `components/llm_classifier` instead | `core/interfaces/classification/`, `integrations/classification/` (missing) |
+| P1 | WhisperX diarization (`_diarize`/`_load_diarize_pipeline_sync`) does `from whisperx.diarize import ...` at call time, but that submodule fails to import in this environment (`pyannote.audio` -> `torchaudio.AudioMetaData` AttributeError from a torchaudio/pyannote version mismatch). Plain transcribe/align paths are unaffected; only `WhisperXConfig(diarize=True)` breaks at runtime. Tests cover the diarize logic via a `sys.modules` stand-in, not the real import chain | `integrations/speech_to_text/whisperx/whisperx.py` |
 | P2 | `uv run --extra chunking-pdf` (and `--extra all`) fails: uv resolves `unstructured==0.18.32` -> `numba==0.53.1`, incompatible with Python >=3.10; `pip install -e ".[chunking-pdf]"` resolves a newer, working `unstructured` for the same file. Needs an explicit floor pin on `unstructured` in that extra | `pyproject.toml` |
 | P3 | `classification-transformers` extra is declared in `pyproject.toml` but nothing imports `transformers`, no consuming code exists yet | `pyproject.toml` |
+| P2 | Zero test coverage despite being listed as complete under "What is solid": `components/llm_classifier/*` (component, config, all strategy files), `components/embed_classifier/*`, `components/similarity_scorer.py`, `audio/dsp.py` (0%); `audio/io.py` (56%), `components/similarity.py` (77%), `components/chunker.py` (79%) are partially covered. Surfaced by the honest coverage gate (`AGENTS.md §3`); writing the missing tests was out of scope for the gate-adding pass itself | `components/llm_classifier/`, `components/embed_classifier/`, `components/similarity_scorer.py`, `audio/dsp.py`, `audio/io.py`, `components/similarity.py`, `components/chunker.py` |
 
 ## Near-term build priorities
 

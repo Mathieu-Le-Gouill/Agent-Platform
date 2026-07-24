@@ -1,4 +1,4 @@
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -36,28 +36,30 @@ def test_aggressiveness_field_removed():
     assert "aggressiveness" not in WebrtcVadConfig.model_fields
 
 
-def test_requirements():
-    with patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"):
-        from agent_platform.integrations.vad.webrtc.webrtc import Webrtcvad
+def test_requirements(mocker):
+    mocker.patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
+    from agent_platform.integrations.vad.webrtc.webrtc import Webrtcvad
 
-        vad = Webrtcvad()
-        req = vad.requirements
-        assert req.sample_rates == (8000, 16000, 32000, 48000)
-        assert req.channels == 1
-        assert req.dtype == DataType.INT16
-        assert req.normalized is False
-
-
-def test_empty_sequence_detect():
-    with patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"):
-        from agent_platform.integrations.vad.webrtc.webrtc import Webrtcvad
-
-        vad = Webrtcvad()
-        assert vad.detect([]) == []
+    vad = Webrtcvad()
+    req = vad.requirements
+    assert req.sample_rates == (8000, 16000, 32000, 48000)
+    assert req.channels == 1
+    assert req.dtype == DataType.INT16
+    assert req.normalized is False
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-def test_constructor(mock_webrtcvad):
+def test_empty_sequence_detect(mocker):
+    mocker.patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
+    from agent_platform.integrations.vad.webrtc.webrtc import Webrtcvad
+
+    vad = Webrtcvad()
+    assert vad.detect([]) == []
+
+
+def test_constructor(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_webrtcvad.Vad.return_value = mock_vad
     from agent_platform.integrations.vad.webrtc.webrtc import Webrtcvad
@@ -67,8 +69,10 @@ def test_constructor(mock_webrtcvad):
     mock_webrtcvad.Vad.assert_called_once_with()
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-def test_detect_with_speech_spans(mock_webrtcvad):
+def test_detect_with_speech_spans(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_vad.is_speech.side_effect = [True, True, False]
     mock_webrtcvad.Vad.return_value = mock_vad
@@ -89,8 +93,10 @@ def test_detect_with_speech_spans(mock_webrtcvad):
     mock_vad.set_mode.assert_called_once_with(1)
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-def test_detect_sample_rate_mismatch_raises_value_error(mock_webrtcvad):
+def test_detect_sample_rate_mismatch_raises_value_error(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_webrtcvad.Vad.return_value = mock_vad
 
@@ -104,8 +110,10 @@ def test_detect_sample_rate_mismatch_raises_value_error(mock_webrtcvad):
         vad.detect(chunks)
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-def test_detect_invalid_frame_duration_raises_value_error(mock_webrtcvad):
+def test_detect_invalid_frame_duration_raises_value_error(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_webrtcvad.Vad.return_value = mock_vad
 
@@ -120,8 +128,10 @@ def test_detect_invalid_frame_duration_raises_value_error(mock_webrtcvad):
 
 
 @pytest.mark.parametrize("num_samples", [160, 320, 480])
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-def test_validate_chunk_accepts_10_20_30ms_frames(mock_webrtcvad, num_samples):
+def test_validate_chunk_accepts_10_20_30ms_frames(mocker, num_samples):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_webrtcvad.Vad.return_value = MagicMock()
     from agent_platform.integrations.vad.webrtc.webrtc import Webrtcvad
 
@@ -130,8 +140,10 @@ def test_validate_chunk_accepts_10_20_30ms_frames(mock_webrtcvad, num_samples):
     vad._validate_chunk(chunk, 16000)
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-def test_is_speech(mock_webrtcvad):
+def test_is_speech(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_vad.is_speech.return_value = True
     mock_webrtcvad.Vad.return_value = mock_vad
@@ -146,8 +158,10 @@ def test_is_speech(mock_webrtcvad):
     mock_vad.is_speech.assert_called_once()
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-def test_detect_no_span_when_silence_before_speech(mock_webrtcvad):
+def test_detect_no_span_when_silence_before_speech(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_vad.is_speech.return_value = False
     mock_webrtcvad.Vad.return_value = mock_vad
@@ -162,8 +176,10 @@ def test_detect_no_span_when_silence_before_speech(mock_webrtcvad):
     assert result == []
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-async def test_adetect_yields_span(mock_webrtcvad):
+async def test_adetect_yields_span(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_vad.is_speech.side_effect = [True, False]
     mock_webrtcvad.Vad.return_value = mock_vad
@@ -181,8 +197,10 @@ async def test_adetect_yields_span(mock_webrtcvad):
     assert results[0] == SampleSpan(start=0, end=510)
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-async def test_adetect_validate_chunk_raises(mock_webrtcvad):
+async def test_adetect_validate_chunk_raises(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_vad.is_speech.return_value = True
     mock_webrtcvad.Vad.return_value = mock_vad
@@ -199,8 +217,10 @@ async def test_adetect_validate_chunk_raises(mock_webrtcvad):
             pass
 
 
-@patch("agent_platform.integrations.vad.webrtc.webrtc.webrtcvad")
-async def test_adetect_invalid_frame_duration_raises(mock_webrtcvad):
+async def test_adetect_invalid_frame_duration_raises(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
     mock_vad = MagicMock()
     mock_vad.is_speech.return_value = True
     mock_webrtcvad.Vad.return_value = mock_vad

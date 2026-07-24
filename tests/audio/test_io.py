@@ -1,5 +1,5 @@
 import base64
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 
 import numpy as np
 import pytest
@@ -159,9 +159,9 @@ class TestAudioIO:
         result = AudioIO.to_numpy(chunk)
         np.testing.assert_array_almost_equal(arr, result)
 
-    @patch("soundfile.read")
-    @patch("soundfile.info")
-    def test_from_file(self, mock_info, mock_read):
+    def test_from_file(self, mocker):
+        mock_read = mocker.patch("soundfile.read")
+        mock_info = mocker.patch("soundfile.info")
         mock_info.return_value = MagicMock(
             format="wav", channels=1, frames=16000, subtype="PCM_16"
         )
@@ -175,9 +175,9 @@ class TestAudioIO:
         assert doc.duration == 1.0
         assert doc.subtype == "PCM_16"
 
-    @patch("soundfile.read")
-    @patch("soundfile.info")
-    def test_from_file_unknown_format(self, mock_info, mock_read):
+    def test_from_file_unknown_format(self, mocker):
+        mock_read = mocker.patch("soundfile.read")
+        mock_info = mocker.patch("soundfile.info")
         mock_info.return_value = MagicMock(
             format=None, channels=1, frames=16000, subtype=None
         )
@@ -186,9 +186,9 @@ class TestAudioIO:
         doc = AudioIO.from_file("/fake/path.xyz")
         assert doc.format == AudioFormat.UNKNOWN
 
-    @patch("soundfile.read")
-    @patch("soundfile.info")
-    def test_from_file_zero_frames(self, mock_info, mock_read):
+    def test_from_file_zero_frames(self, mocker):
+        mock_read = mocker.patch("soundfile.read")
+        mock_info = mocker.patch("soundfile.info")
         mock_info.return_value = MagicMock(
             format="wav", channels=1, frames=0, subtype="PCM_16"
         )

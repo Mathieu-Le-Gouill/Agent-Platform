@@ -1,5 +1,3 @@
-from unittest.mock import patch
-
 import pytest
 
 from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
@@ -15,8 +13,8 @@ class TestBaseImageGeneratorABC:
         abstract = set(BaseImageGenerator.__abstractmethods__)
         assert abstract == expected
 
-    @patch.object(BaseImageGenerator, "__abstractmethods__", set())
-    def test_generate_signature(self):
+    def test_generate_signature(self, mocker):
+        mocker.patch.object(BaseImageGenerator, "__abstractmethods__", set())
         instance = BaseImageGenerator()
         import inspect
 
@@ -24,8 +22,8 @@ class TestBaseImageGeneratorABC:
         params = list(sig.parameters.keys())
         assert params == ["prompt", "config", "size", "format"]
 
-    @patch.object(BaseImageGenerator, "__abstractmethods__", set())
-    def test_generate_many_signature(self):
+    def test_generate_many_signature(self, mocker):
+        mocker.patch.object(BaseImageGenerator, "__abstractmethods__", set())
         instance = BaseImageGenerator()
         import inspect
 

@@ -1,5 +1,5 @@
 from datetime import datetime
-from unittest.mock import MagicMock, patch
+from unittest.mock import MagicMock
 from uuid import UUID, uuid4
 
 import pytest
@@ -259,7 +259,7 @@ class _TestChunker(LangChainChunker):
 
 
 class TestLangChainChunker:
-    def test_chunk_returns_text_chunks(self):
+    def test_chunk_returns_text_chunks(self, mocker):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = [
             LC_Document(page_content="chunk1", metadata={"format": "txt"}),
@@ -267,14 +267,14 @@ class TestLangChainChunker:
         ]
 
         chunker = _TestChunker()
-        with patch.object(chunker, "_splitter", return_value=mock_splitter):
-            docs = [TextDocument(text="full text")]
-            result = chunker.chunk(docs, config=None)
+        mocker.patch.object(chunker, "_splitter", return_value=mock_splitter)
+        docs = [TextDocument(text="full text")]
+        result = chunker.chunk(docs, config=None)
 
         assert len(result) == 2
         assert all(isinstance(c, TextChunk) for c in result)
 
-    def test_chunk_passes_config_to_splitter(self):
+    def test_chunk_passes_config_to_splitter(self, mocker):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = [
             LC_Document(page_content="c", metadata={"format": "txt"}),
@@ -282,34 +282,34 @@ class TestLangChainChunker:
 
         config = ChunkerConfig(chunk_size=256, chunk_overlap=32)
         chunker = _TestChunker()
-        with patch.object(chunker, "_splitter", return_value=mock_splitter) as spy:
-            chunker.chunk([TextDocument(text="some text")], config=config)
+        spy = mocker.patch.object(chunker, "_splitter", return_value=mock_splitter)
+        chunker.chunk([TextDocument(text="some text")], config=config)
 
         spy.assert_called_once_with(config)
 
-    def test_chunk_empty_documents(self):
+    def test_chunk_empty_documents(self, mocker):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = []
 
         chunker = _TestChunker()
-        with patch.object(chunker, "_splitter", return_value=mock_splitter):
-            result = chunker.chunk([], config=None)
+        mocker.patch.object(chunker, "_splitter", return_value=mock_splitter)
+        result = chunker.chunk([], config=None)
 
         assert result == []
 
-    def test_chunk_with_config_none(self):
+    def test_chunk_with_config_none(self, mocker):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = [
             LC_Document(page_content="data", metadata={"format": "txt"}),
         ]
 
         chunker = _TestChunker()
-        with patch.object(chunker, "_splitter", return_value=mock_splitter):
-            result = chunker.chunk([TextDocument(text="data")], config=None)
+        mocker.patch.object(chunker, "_splitter", return_value=mock_splitter)
+        result = chunker.chunk([TextDocument(text="data")], config=None)
 
         assert len(result) == 1
 
-    def test_chunk_multiple_documents(self):
+    def test_chunk_multiple_documents(self, mocker):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = [
             LC_Document(page_content="doc1-chunk", metadata={"format": "txt"}),
@@ -317,33 +317,33 @@ class TestLangChainChunker:
         ]
 
         chunker = _TestChunker()
-        with patch.object(chunker, "_splitter", return_value=mock_splitter):
-            docs = [TextDocument(text="doc1"), TextDocument(text="doc2")]
-            result = chunker.chunk(docs, config=None)
+        mocker.patch.object(chunker, "_splitter", return_value=mock_splitter)
+        docs = [TextDocument(text="doc1"), TextDocument(text="doc2")]
+        result = chunker.chunk(docs, config=None)
 
         assert len(result) == 2
 
-    def test_empty_text_document(self):
+    def test_empty_text_document(self, mocker):
         mock_splitter = MagicMock()
         mock_splitter.split_documents.return_value = [
             LC_Document(page_content="", metadata={"format": "txt"}),
         ]
 
         chunker = _TestChunker()
-        with patch.object(chunker, "_splitter", return_value=mock_splitter):
-            result = chunker.chunk([TextDocument(text="")], config=ChunkerConfig())
+        mocker.patch.object(chunker, "_splitter", return_value=mock_splitter)
+        result = chunker.chunk([TextDocument(text="")], config=ChunkerConfig())
 
         assert len(result) == 1
         assert result[0].text == ""
 
-    def test_splitter_error_propagates(self):
+    def test_splitter_error_propagates(self, mocker):
         chunker = _TestChunker()
         mock_splitter = MagicMock()
         mock_splitter.split_documents.side_effect = RuntimeError("split failed")
 
-        with patch.object(chunker, "_splitter", return_value=mock_splitter):
-            with pytest.raises(RuntimeError, match="split failed"):
-                chunker.chunk([TextDocument(text="fail")], config=ChunkerConfig())
+        mocker.patch.object(chunker, "_splitter", return_value=mock_splitter)
+        with pytest.raises(RuntimeError, match="split failed"):
+            chunker.chunk([TextDocument(text="fail")], config=ChunkerConfig())
 
 
 # ================================================================
