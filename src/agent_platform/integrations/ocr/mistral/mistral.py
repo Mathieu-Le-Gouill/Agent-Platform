@@ -7,13 +7,14 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
-try:
-    from mistralai import Mistral
-except ImportError:  # pragma: no cover - depends on installed mistralai version
-    from mistralai.client import Mistral
-
 if TYPE_CHECKING:
+    from mistralai.client import Mistral
     from mistralai.client.models.ocrresponse import OCRResponse
+else:
+    try:
+        from mistralai import Mistral
+    except ImportError:  # pragma: no cover - depends on installed mistralai version
+        from mistralai.client import Mistral
 
 from agent_platform.core.errors import (
     MissingCredentialError,
