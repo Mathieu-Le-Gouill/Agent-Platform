@@ -158,3 +158,10 @@ rather than guessing silently.
 - If no convention exists anywhere for what you're doing, pick the simplest
   approach consistent with the rest of the codebase and document it in the
   relevant README as part of your change.
+- **Keep the directory README in sync with your change.** If what you did
+  makes that directory's `README.md` inaccurate or incomplete, i.e. you
+  added/removed/renamed a public component, changed an extension point,
+  introduced a new convention, or fixed something the README lists as a
+  known issue, update the README in the same change. Skip this for changes
+  that don't shift what the README describes (internal refactors, bug fixes
+  that don't change behavior described there, test-only changes).

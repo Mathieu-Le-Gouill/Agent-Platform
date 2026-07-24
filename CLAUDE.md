@@ -53,6 +53,10 @@ Both pipelines should accept injected backends (not hardcode providers). Use `Co
 ### 4. Add missing tools (P2)
 `agents/tools/translate.py`, `agents/tools/classify.py`, `agents/tools/generate_image.py`, `agents/tools/summarize.py`. Follow `OCRTool` as a reference, it is the cleanest existing example.
 
+## Keeping this file current
+
+This file is a snapshot, not a spec, so it goes stale unless changes update it. When a change closes a row in "Known issues" or a step in "Near-term build priorities", remove or update that entry in the same change rather than leaving it for later. When a change makes "What is solid" or "Current state" inaccurate (a new layer becomes complete, `workflows/` stops being a stub, etc.), update those sections too and refresh the "as of" date.
+
 ## See also
 
 - `AGENTS.md §3`, testing conventions and commands
