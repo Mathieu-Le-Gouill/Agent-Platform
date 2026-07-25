@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import asyncio
 
-from google.cloud import translate_v2 as google_translate
+from google.cloud import translate_v2 as google_translate  # type: ignore[attr-defined]
 
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.translation.base import BaseTranslator
