@@ -4,6 +4,9 @@
 
 ```
 ┌──────────────────────────────────────────────────┐
+│  evals/      ← regression testing (EvalRunner,    │
+│                 EvalDataset, Scorer, evals/cli.py) │
+├──────────────────────────────────────────────────┤
 │  agents/         ← composition (Agent, Executor,  │
 │                     ConversationAgent, Tool ABC,  │
 │                     ToolRegistry, 3 tools)        │

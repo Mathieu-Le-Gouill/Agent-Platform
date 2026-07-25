@@ -42,6 +42,7 @@ Purpose only, enough to know which README to open next.
 | `src/agent_platform/components/` | Reusable processing units wrapping one or more integrations (`Chunker`, `Embedder`, `Reranker`, classifiers) | yes |
 | `src/agent_platform/pipelines/` | Multi-step orchestration flows composing components (ingestion, RAG, speech translation) | yes |
 | `src/agent_platform/agents/` | Top-level composition: `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, tools | yes |
+| `src/agent_platform/evals/` | Regression testing for agents/pipelines: `EvalCase`/`EvalDataset`/`EvalRunner`/`Scorer`/`EvalReport`, `agent-platform-eval` CLI | yes |
 | `src/agent_platform/audio/` | DSP utilities, resampling, waveform chunking, tensor/numpy/base64 conversion | no |
 | `src/agent_platform/utils/` | Shared helpers: async batching, env var parsing, score utilities | no |
 | `src/agent_platform/config/` | Logging setup, `Settings` (pydantic-settings), `build_agent()` DI factory, generic `build_provider(domain_module, provider_name)` factory reused by any future domain wiring | no |
@@ -176,10 +177,11 @@ rather than guessing silently.
 
 - **Never import upward.** `core/` → nothing; `integrations/` → `core/`
   only; `components/` → `integrations/` + `core/`; `pipelines/` →
-  `components/`; `agents/` → `pipelines/` + `components/`. This is not just
-  convention: `[tool.importlinter]` in `pyproject.toml` enforces the layer
-  order and that `core/` never imports a sibling layer; run `lint-imports`
-  to check, CI fails the same way.
+  `components/`; `agents/` → `pipelines/` + `components/`; `evals/` →
+  `agents/` + `pipelines/` + `components/` + `core/` (nothing imports
+  `evals/`). This is not just convention: `[tool.importlinter]` in
+  `pyproject.toml` enforces the layer order and that `core/` never imports
+  a sibling layer; run `lint-imports` to check, CI fails the same way.
 - **`core/` has no external deps** beyond `pydantic`, `abc`, `typing`,
   `uuid`, `datetime`, `opentelemetry` (tracing only).
 - **All IO is async.** Use `asyncio.to_thread()` for blocking calls; `run()`

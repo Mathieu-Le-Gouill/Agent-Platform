@@ -8,9 +8,9 @@ Coding-agent guide for this repository. Read this before writing any code. For l
 - **`src/agent_platform/README.md`**, layer map and known issues
 - **`src/agent_platform/<layer>/README.md`**, local patterns for that layer; read before touching it
 
-## Current state (as of 2026-07-25)
+## Current state (as of 2026-07-25, evals landed)
 
-The platform is **structurally complete** at the integration, component, pipeline, and agent layers. The remaining gap is `workflows/`, still an empty scaffold; `api/` has a real FastAPI entrypoint (`api/app.py`) wiring one `ConversationAgent` via `config/container.py::build_agent()`, driven by `config/settings.py::Settings`.
+The platform is **structurally complete** at the integration, component, pipeline, agent, and evals layers. The remaining gap is `workflows/`, still an empty scaffold; `api/` has a real FastAPI entrypoint (`api/app.py`) wiring one `ConversationAgent` via `config/container.py::build_agent()`, driven by `config/settings.py::Settings`.
 
 ### What is solid
 
@@ -19,8 +19,9 @@ The platform is **structurally complete** at the integration, component, pipelin
 - **Components**, `Embedder`, `Chunker`, `Loader`, `Reranker`, `Generator`, `VectorSearch`, `SimilarityScorer`, `EmbeddingClassifier`, `LLMClassifier`: complete
 - **Pipelines**, `pipelines/rag/ingest.py` (loader → chunk → store, embedding happens inside the vector store's own injected backend, see `AGENTS.md §5`), `pipelines/rag/query.py` (embed query → search → rerank → generate), `pipelines/speech_translation.py` (`SpeechTranslationPipeline.run()`/`.stream()`, audio → STT → translate with streaming support): complete
 - **Agents**, `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, `TranscribeTool`, `SearchTool`, `OCRTool`, `TranslateTool`, `ClassifyTool`, `GenerateImageTool`, `SummarizeTool`: complete
-- **Tooling**, mypy and import-linter are wired into CI (`.github/workflows/ci.yml`) alongside ruff and pytest; the layered-architecture and core-isolation rules in AGENTS.md §6 are enforced by `lint-imports`, not just convention
-- **Test suite**, `tests/` (1673 tests, 1670 passed + 3 skipped, structural + coverage-gate pass done): `pyproject.toml [tool.pytest.ini_options] addopts` enforces `--cov-fail-under=90` locally and in CI (config lives in `pyproject.toml [tool.coverage.*]`, no `.coveragerc`); actual coverage is 97.67%. Mocking goes through the `pytest-mock` `mocker` fixture, not raw `unittest.mock.patch`; every test is auto-marked `unit` via a `pytest_collection_modifyitems` hook in `tests/conftest.py` unless explicitly marked `integration` (currently 0 tests are, the suite is fully mocked); shared helpers live in `tests/helpers/`. See AGENTS.md §3 for the full convention
+- **Evals**, `evals/` package (`EvalCase`/`EvalDataset`/`EvalRunner`/`Scorer`/`EvalReport`, `agent-platform-eval` CLI, golden `ConversationAgent`/`AgentExecutor` tool-selection dataset), Phase 1 of the agents-layer roadmap: complete, see `evals/README.md`
+- **Tooling**, mypy and import-linter are wired into CI (`.github/workflows/ci.yml`) alongside ruff and pytest; the layered-architecture and core-isolation rules in AGENTS.md §6 are enforced by `lint-imports`, not just convention; an optional `evals` CI job runs the golden dataset against a real provider when `OPENAI_API_KEY` is set (`continue-on-error: true` until a real-run baseline validates the threshold)
+- **Test suite**, `tests/` (structural + coverage-gate pass done): `pyproject.toml [tool.pytest.ini_options] addopts` enforces `--cov-fail-under=90` locally and in CI (config lives in `pyproject.toml [tool.coverage.*]`, no `.coveragerc`). Mocking goes through the `pytest-mock` `mocker` fixture, not raw `unittest.mock.patch`; every test is auto-marked `unit` via a `pytest_collection_modifyitems` hook in `tests/conftest.py` unless explicitly marked `integration` (currently 0 tests are, the suite is fully mocked); shared helpers live in `tests/helpers/`. See AGENTS.md §3 for the full convention
 
 ### Known issues
 
@@ -28,7 +29,15 @@ None currently tracked. Git history carries the record of what was fixed and whe
 
 ## Near-term build priorities
 
-Nothing urgent is queued. The next largest gap is `workflows/` (still an empty scaffold) if that becomes a priority; otherwise defer to the user.
+A phased roadmap for closing the gap with modern agent platforms (evals,
+orchestration, harness hardening, observability polish) lives in
+`src/agent_platform/agents/README.md` ("Roadmap: closing the gap with modern
+agent platforms"). Phase 1 (evals) is done, see `evals/README.md`. Phase 2
+(`workflows/` orchestration, still an empty scaffold) is next: it needs a
+user decision on the orchestration engine (LangGraph vs. an in-house DAG
+executor) before implementation starts, see that README's Phase 2 section.
+Keep that README's phase list in sync as items land, and update this
+section only if the overall priority order changes.
 
 ## Keeping this file current
 

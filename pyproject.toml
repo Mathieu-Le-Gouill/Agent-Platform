@@ -152,6 +152,7 @@ Issues = "https://github.com/Mathieu-Le-Gouill/Agent-Platform/issues"
 
 [project.scripts]
 agent-platform-api = "agent_platform.api.app:main"
+agent-platform-eval = "agent_platform.evals.cli:main"
 
 [tool.setuptools]
 package-dir = {"" = "src"}
@@ -217,6 +218,7 @@ exclude_type_checking_imports = true
 name = "Layered architecture"
 type = "layers"
 layers = [
+    "agent_platform.evals",
     "agent_platform.agents",
     "agent_platform.pipelines",
     "agent_platform.components",

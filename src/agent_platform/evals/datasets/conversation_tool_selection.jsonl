@@ -1,0 +1,12 @@
+{"id": "search-001", "input": "Find documents about our refund policy.", "tags": ["tool_selection"], "reference": {"expected_tools": ["search"]}}
+{"id": "search-002", "input": "What do our indexed docs say about onboarding new employees?", "tags": ["tool_selection"], "reference": {"expected_tools": ["search"]}}
+{"id": "search-003", "input": "Look up any prior mentions of the Q3 roadmap in our knowledge base.", "tags": ["tool_selection"], "reference": {"expected_tools": ["search"]}}
+{"id": "ocr-001", "input": "Extract the text from the receipt image at receipts/2026-01.png.", "tags": ["tool_selection"], "reference": {"expected_tools": ["ocr"]}}
+{"id": "ocr-002", "input": "What does the scanned invoice image say?", "tags": ["tool_selection"], "reference": {"expected_tools": ["ocr"]}}
+{"id": "translate-001", "input": "Translate 'good morning' into Spanish.", "tags": ["tool_selection"], "reference": {"expected_tools": ["translate"]}}
+{"id": "translate-002", "input": "How do you say 'thank you very much' in Japanese?", "tags": ["tool_selection"], "reference": {"expected_tools": ["translate"]}}
+{"id": "negative-001", "input": "What is 12 multiplied by 7?", "tags": ["tool_selection"], "reference": {"expected_tools": []}}
+{"id": "negative-002", "input": "Write a short poem about autumn.", "tags": ["tool_selection"], "reference": {"expected_tools": []}}
+{"id": "negative-003", "input": "Explain what a binary search tree is.", "tags": ["tool_selection"], "reference": {"expected_tools": []}}
+{"id": "search-004", "input": "Search the knowledge base for our data retention policy.", "tags": ["tool_selection"], "reference": {"expected_tools": ["search"]}}
+{"id": "ocr-003", "input": "Read the handwritten note in the attached photo.", "tags": ["tool_selection"], "reference": {"expected_tools": ["ocr"]}}
