@@ -9,7 +9,7 @@
 ```
 core/
 ├── base.py           # Entity (UUID mixin), Timestamped
-├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends)
+├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains)
 ├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
 ├── credentials.py    # BaseCredentials, ProviderCredentials
 ├── tracing.py        # TracingBackend, TracingConfig, configure_tracing(), traced_span()/traced_operation_span(), record_token_usage(), GenAIAttributes
@@ -51,7 +51,7 @@ interfaces/<domain>/
 └── response.py       # Pydantic response model(s)
 ```
 
-An interface ABC **never imports from `integrations/`**, **never imports from `components/`**, and **never imports from `pipelines/`**. It may only use `core/schemas/`, `core/config.py`, `core/errors.py`, and `core/credentials.py`. Every domain's `config.py` defines a `<Domain>Config` that extends `core/config.py`'s `ProviderConfig`, the shared base for all provider configs.
+An interface ABC **never imports from `integrations/`**, **never imports from `components/`**, and **never imports from `pipelines/`**. It may only use `core/schemas/`, `core/config.py`, `core/errors.py`, and `core/credentials.py`. Every domain's `config.py` defines a `<Domain>Config` that extends `core/config.py`'s `ProviderConfig`, the shared base for all provider configs. Domains whose providers are parameterized by a model id (llm, embeddings, reranking, speech, image_generation) extend `ModelConfig` instead, which adds `model: str` on top of `ProviderConfig`; domains without a model concept (loader, chunking, clustering, vad, ocr, translation, classification, vector_store) extend `ProviderConfig` directly.
 
 ### `schemas/`: Shared Data Structures
 

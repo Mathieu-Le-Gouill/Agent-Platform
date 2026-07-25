@@ -1,7 +1,7 @@
-from agent_platform.core.config import ProviderConfig
+from agent_platform.core.config import ModelConfig
 
 
-class ImageGenConfig(ProviderConfig):
+class ImageGenConfig(ModelConfig):
     # Default is OpenAI-shaped; each provider overrides with its own model identifier.
     # https://platform.openai.com/docs/api-reference/images/create#images-create-model
     model: str = "dall-e-3"

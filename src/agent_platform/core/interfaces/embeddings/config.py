@@ -1,9 +1,7 @@
-from agent_platform.core.config import ProviderConfig
+from agent_platform.core.config import ModelConfig
 
 
-class EmbeddingConfig(ProviderConfig):
-    # Provider-specific model identifier; each provider overrides the default.
-    model: str = ""
+class EmbeddingConfig(ModelConfig):
     # Local input-list batching size used by `components/embedder.py` before
     # calling the provider (see `chunked(input, batch_size)`), independent of
     # any provider-side request-batching knob.

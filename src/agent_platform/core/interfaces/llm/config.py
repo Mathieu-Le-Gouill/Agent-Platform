@@ -1,12 +1,10 @@
 from __future__ import annotations
 
-from agent_platform.core.config import ProviderConfig
+from agent_platform.core.config import ModelConfig
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 
 
-class GenerationConfig(ProviderConfig):
-    # Identifier of the model/deployment to call; provider-specific meaning, see each provider's config.
-    model: str = ""
+class GenerationConfig(ModelConfig):
     # Sampling randomness: 0 is near-deterministic, higher values increase diversity.
     # https://platform.openai.com/docs/api-reference/chat/create#chat-create-temperature
     temperature: float = 0.7

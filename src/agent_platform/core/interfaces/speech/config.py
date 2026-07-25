@@ -1,6 +1,5 @@
-from agent_platform.core.config import ProviderConfig
+from agent_platform.core.config import ModelConfig
 
 
-class SpeechConfig(ProviderConfig):
-    # No sensible provider-agnostic default; every provider overrides this.
-    model: str = ""
+class SpeechConfig(ModelConfig):
+    pass

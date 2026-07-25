@@ -1,7 +1,7 @@
-from agent_platform.core.config import ProviderConfig
+from agent_platform.core.config import ModelConfig
 
 
-class RerankerConfig(ProviderConfig):
+class RerankerConfig(ModelConfig):
     # Provider-neutral placeholder; every provider subclass overrides this
     # with its own current model id. Kept as a currently-valid Cohere id
     # (docs.cohere.com/reference/rerank) rather than the previous stale
