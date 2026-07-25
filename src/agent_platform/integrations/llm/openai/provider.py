@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Any
 from langchain_openai import ChatOpenAI
 
 from agent_platform.core.credentials import (
+    resolve_credentials,
     resolve_max_retries,
     resolve_timeout,
 )
-from agent_platform.core.errors import MissingCredentialError
+from agent_platform.core.errors import require_secret
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.core.schemas import model_schema
 from agent_platform.integrations.credentials import OpenAICredentials
@@ -21,9 +22,7 @@ if TYPE_CHECKING:
 
 class OpenAILLM(LangChainLLMProvider[OpenAIGenerationConfig]):
     def __init__(self, credentials: OpenAICredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else OpenAICredentials()
-        )
+        self._credentials = resolve_credentials(credentials, OpenAICredentials)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
@@ -35,15 +34,14 @@ class OpenAILLM(LangChainLLMProvider[OpenAIGenerationConfig]):
         }
 
     def _client(self, config: OpenAIGenerationConfig) -> ChatOpenAI:
-
-        if self._credentials.api_key is None:
-            raise MissingCredentialError(
-                "OPENAI API key is required but was not provided"
-            )
+        api_key = require_secret(
+            self._credentials.api_key,
+            "OPENAI API key is required but was not provided",
+        )
 
         return ChatOpenAI(
             model=config.model,
-            api_key=self._credentials.api_key,
+            api_key=api_key,
             base_url=self._credentials.base_url,
             **_to_langchain_openai(config, self._credentials),
         )

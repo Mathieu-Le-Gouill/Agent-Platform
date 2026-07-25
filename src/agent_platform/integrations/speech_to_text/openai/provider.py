@@ -5,10 +5,11 @@ from collections.abc import AsyncIterator
 
 from openai import AsyncOpenAI
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import (
-    MissingCredentialError,
     ProviderError,
     error_logged,
+    require_secret,
     with_retry,
 )
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
@@ -21,17 +22,16 @@ from agent_platform.integrations.speech_to_text.utils import parse_language
 
 class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
     def __init__(self, credentials: OpenAICredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else OpenAICredentials()
-        )
+        self._credentials = resolve_credentials(credentials, OpenAICredentials)
 
     def _default_config(self) -> OpenAIWhisperConfig:
         return OpenAIWhisperConfig()
 
     def _build_client(self) -> AsyncOpenAI:
-        if not self._credentials.api_key:
-            raise MissingCredentialError("OpenAI API key is required")
-        return AsyncOpenAI(api_key=self._credentials.api_key.get_secret_value())
+        api_key = require_secret(
+            self._credentials.api_key, "OpenAI API key is required"
+        )
+        return AsyncOpenAI(api_key=api_key.get_secret_value())
 
     @error_logged(re_raise=ProviderError, message="Speech-to-text failed")
     @with_retry()

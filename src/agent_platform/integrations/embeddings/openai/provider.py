@@ -3,10 +3,11 @@ from typing import Any
 from langchain_openai import OpenAIEmbeddings
 
 from agent_platform.core.credentials import (
+    resolve_credentials,
     resolve_max_retries,
     resolve_timeout,
 )
-from agent_platform.core.errors import MissingCredentialError
+from agent_platform.core.errors import require_secret
 from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
 from agent_platform.integrations.embeddings.openai.config import OpenAIEmbeddingConfig
@@ -14,20 +15,17 @@ from agent_platform.integrations.embeddings.openai.config import OpenAIEmbedding
 
 class OpenAIEmbeddingProvider(LangChainEmbedder[OpenAIEmbeddingConfig]):
     def __init__(self, credentials: OpenAICredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else OpenAICredentials()
-        )
+        self._credentials = resolve_credentials(credentials, OpenAICredentials)
 
     def _client(self, config: OpenAIEmbeddingConfig) -> OpenAIEmbeddings:
-
-        if self._credentials.api_key is None:
-            raise MissingCredentialError(
-                "OpenAI API key is required but was not provided"
-            )
+        api_key = require_secret(
+            self._credentials.api_key,
+            "OpenAI API key is required but was not provided",
+        )
 
         return OpenAIEmbeddings(
             model=config.model,
-            api_key=self._credentials.api_key,
+            api_key=api_key,
             **_to_langchain_openai(config, self._credentials),
         )
 

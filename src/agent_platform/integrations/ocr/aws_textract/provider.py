@@ -6,6 +6,7 @@ from uuid import UUID, uuid4
 import boto3
 from botocore.client import BaseClient
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.schemas.bounding_box import BoundingBox
@@ -58,9 +59,7 @@ def _from_textract(
 
 class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
     def __init__(self, credentials: AWSTextractCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else AWSTextractCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, AWSTextractCredentials)
         self._clients: dict[str, Any] = {}
 
     def _default_config(self) -> AWSTextractConfig:

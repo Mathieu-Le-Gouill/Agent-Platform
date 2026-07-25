@@ -8,10 +8,11 @@ import deepl
 if TYPE_CHECKING:
     from deepl import TextResult
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import (
-    MissingCredentialError,
     ProviderError,
     error_logged,
+    require_secret,
     with_retry,
 )
 from agent_platform.core.interfaces.translation.base import BaseTranslator
@@ -27,9 +28,7 @@ _DEEPL_TARGETS: dict[Language, str] = {
 
 class DeepLTranslator(BaseTranslator[DeepLConfig]):
     def __init__(self, credentials: DeepLCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else DeepLCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, DeepLCredentials)
         self._client: deepl.Translator | None = None
 
     def _default_config(self) -> DeepLConfig:
@@ -37,12 +36,11 @@ class DeepLTranslator(BaseTranslator[DeepLConfig]):
 
     def _get_client(self) -> deepl.Translator:
         if self._client is None:
-            if self._credentials.auth_key is None:
-                raise MissingCredentialError("DeepL auth key is required")
+            auth_key = require_secret(
+                self._credentials.auth_key, "DeepL auth key is required"
+            )
             try:
-                self._client = deepl.Translator(
-                    self._credentials.auth_key.get_secret_value()
-                )
+                self._client = deepl.Translator(auth_key.get_secret_value())
             except deepl.DeepLException as exc:
                 raise ProviderError(
                     f"DeepL client initialization failed: {exc}"

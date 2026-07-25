@@ -1,6 +1,7 @@
 import logging
 
 import pytest
+from pydantic import SecretStr
 
 from agent_platform.agents.errors import (
     AgentActError,
@@ -18,6 +19,7 @@ from agent_platform.core.errors import (
     ValidationError,
     catch_noraise,
     error_logged,
+    require_secret,
     with_retry,
 )
 from agent_platform.core.interfaces.llm.errors import (
@@ -101,6 +103,16 @@ class TestErrorHierarchy:
 
     def test_missing_credential_error(self):
         assert issubclass(MissingCredentialError, PlatformError)
+
+
+class TestRequireSecret:
+    def test_returns_secret_when_present(self):
+        secret = SecretStr("value")
+        assert require_secret(secret, "missing") is secret
+
+    def test_raises_missing_credential_error_when_none(self):
+        with pytest.raises(MissingCredentialError, match="missing"):
+            require_secret(None, "missing")
 
 
 class TestStructuredFields:

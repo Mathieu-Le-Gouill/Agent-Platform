@@ -3,6 +3,7 @@ from typing import Any
 from langchain_ollama import OllamaEmbeddings
 
 from agent_platform.core.credentials import (
+    resolve_credentials,
     resolve_timeout,
 )
 from agent_platform.integrations.credentials import OllamaCredentials
@@ -12,9 +13,7 @@ from agent_platform.integrations.embeddings.ollama.config import OllamaEmbedding
 
 class OllamaEmbeddingProvider(LangChainEmbedder[OllamaEmbeddingConfig]):
     def __init__(self, credentials: OllamaCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else OllamaCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, OllamaCredentials)
 
     def _client(self, config: OllamaEmbeddingConfig) -> OllamaEmbeddings:
         return OllamaEmbeddings(

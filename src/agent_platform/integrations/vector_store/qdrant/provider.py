@@ -4,6 +4,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_qdrant import QdrantVectorStore
 from qdrant_client import QdrantClient, models
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.integrations.credentials import QdrantCredentials
 from agent_platform.integrations.vector_store.langchain_base import LangChainVectorStore
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
@@ -16,9 +17,7 @@ class QdrantVectorStoreProvider(LangChainVectorStore[QdrantConfig]):
         embeddings: Embeddings | None = None,
     ) -> None:
         super().__init__(embeddings)
-        self._credentials = (
-            credentials if credentials is not None else QdrantCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, QdrantCredentials)
 
     def _default_config(self) -> QdrantConfig:
         return QdrantConfig()

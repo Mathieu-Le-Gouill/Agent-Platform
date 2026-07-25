@@ -3,6 +3,7 @@ from pydantic import SecretStr
 from agent_platform.core.credentials import (
     BaseCredentials,
     ProviderCredentials,
+    resolve_credentials,
     resolve_max_retries,
     resolve_timeout,
 )
@@ -157,6 +158,18 @@ class TestAWSTextractCredentials:
     def test_can_be_instantiated(self):
         creds = AWSTextractCredentials()
         assert isinstance(creds, ProviderCredentials)
+
+
+class TestResolveCredentials:
+    def test_returns_given_credentials_when_not_none(self):
+        creds = OpenAICredentials(api_key=SecretStr("key"))
+        result = resolve_credentials(creds, OpenAICredentials)
+        assert result is creds
+
+    def test_builds_default_when_none(self):
+        result = resolve_credentials(None, OpenAICredentials)
+        assert isinstance(result, OpenAICredentials)
+        assert result.api_key is None
 
 
 class TestResolveTimeout:

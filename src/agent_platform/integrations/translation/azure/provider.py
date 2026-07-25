@@ -6,10 +6,11 @@ from azure.ai.translation.text import TextTranslationClient
 from azure.ai.translation.text.models import TranslateInputItem, TranslationTarget
 from azure.core.credentials import AzureKeyCredential
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import (
-    MissingCredentialError,
     ProviderError,
     error_logged,
+    require_secret,
     with_retry,
 )
 from agent_platform.core.interfaces.translation.base import BaseTranslator
@@ -23,17 +24,16 @@ from agent_platform.integrations.translation.azure.config import AzureTranslator
 
 class AzureTranslator(BaseTranslator[AzureTranslatorConfig]):
     def __init__(self, credentials: AzureTranslatorCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else AzureTranslatorCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, AzureTranslatorCredentials)
 
     def _default_config(self) -> AzureTranslatorConfig:
         return AzureTranslatorConfig()
 
     def _build_client(self, config: AzureTranslatorConfig) -> TextTranslationClient:
-        if not self._credentials.api_key:
-            raise MissingCredentialError("Azure Translator API key is required")
-        credential = AzureKeyCredential(self._credentials.api_key.get_secret_value())
+        api_key = require_secret(
+            self._credentials.api_key, "Azure Translator API key is required"
+        )
+        credential = AzureKeyCredential(api_key.get_secret_value())
         return TextTranslationClient(
             endpoint=self._credentials.endpoint,
             credential=credential,

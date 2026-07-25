@@ -5,6 +5,7 @@ from typing import TYPE_CHECKING, Any
 from langchain_ollama import ChatOllama
 
 from agent_platform.core.credentials import (
+    resolve_credentials,
     resolve_timeout,
 )
 from agent_platform.core.interfaces.llm.response import ResponseFormat
@@ -19,9 +20,7 @@ if TYPE_CHECKING:
 
 class OllamaLLM(LangChainLLMProvider[OllamaGenerationConfig]):
     def __init__(self, credentials: OllamaCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else OllamaCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, OllamaCredentials)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         schema = model_schema(tool.input_schema)

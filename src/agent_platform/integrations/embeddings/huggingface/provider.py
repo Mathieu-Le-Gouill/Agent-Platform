@@ -3,7 +3,8 @@ from typing import Any
 from langchain_core.embeddings import Embeddings
 from langchain_huggingface import HuggingFaceEmbeddings, HuggingFaceEndpointEmbeddings
 
-from agent_platform.core.errors import MissingCredentialError
+from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.errors import require_secret
 from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingConfig,
@@ -14,19 +15,17 @@ from agent_platform.integrations.embeddings.langchain_base import LangChainEmbed
 
 class HuggingFaceEmbeddingProvider(LangChainEmbedder[HuggingFaceEmbeddingConfig]):
     def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else HuggingFaceCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, HuggingFaceCredentials)
 
     def _client(self, config: HuggingFaceEmbeddingConfig) -> Embeddings:
         if config.mode is HuggingFaceEmbeddingMode.HOSTED:
-            if self._credentials.api_key is None:
-                raise MissingCredentialError(
-                    "Hugging Face Hub API token is required for hosted inference"
-                )
+            api_key = require_secret(
+                self._credentials.api_key,
+                "Hugging Face Hub API token is required for hosted inference",
+            )
             return HuggingFaceEndpointEmbeddings(
                 model=config.model,
-                huggingfacehub_api_token=self._credentials.api_key.get_secret_value(),
+                huggingfacehub_api_token=api_key.get_secret_value(),
                 **_to_langchain_huggingface_hosted(config, self._credentials),
             )
 

@@ -16,10 +16,11 @@ else:
     except ImportError:  # pragma: no cover - depends on installed mistralai version
         from mistralai.client import Mistral
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import (
-    MissingCredentialError,
     ProviderError,
     error_logged,
+    require_secret,
     with_retry,
 )
 from agent_platform.core.interfaces.ocr.base import BaseOCR
@@ -40,9 +41,7 @@ _MIME_MAP = {
 
 class MistralOCR(BaseOCR[MistralOCRConfig]):
     def __init__(self, credentials: MistralCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else MistralCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, MistralCredentials)
         self._client: Mistral | None = None
 
     def _default_config(self) -> MistralOCRConfig:
@@ -50,9 +49,10 @@ class MistralOCR(BaseOCR[MistralOCRConfig]):
 
     def _get_client(self) -> Mistral:
         if self._client is None:
-            if not self._credentials.api_key:
-                raise MissingCredentialError("Mistral API key is required")
-            self._client = Mistral(api_key=self._credentials.api_key.get_secret_value())
+            api_key = require_secret(
+                self._credentials.api_key, "Mistral API key is required"
+            )
+            self._client = Mistral(api_key=api_key.get_secret_value())
         return self._client
 
     @error_logged(re_raise=ProviderError, message="OCR extraction failed")

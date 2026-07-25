@@ -8,6 +8,8 @@ from collections.abc import Callable, Coroutine, Iterator
 from contextlib import contextmanager
 from typing import Any, TypeVar
 
+from pydantic import SecretStr
+
 _CompatibleFunc = TypeVar("_CompatibleFunc", bound=Callable[..., Any])
 _AsyncFunc = TypeVar("_AsyncFunc", bound=Callable[..., Coroutine[Any, Any, Any]])
 _T = TypeVar("_T")
@@ -21,6 +23,7 @@ __all__ = [
     "ValidationError",
     "MissingCredentialError",
     # Utilities
+    "require_secret",
     "error_logged",
     "with_retry",
     "catch_noraise",
@@ -63,6 +66,12 @@ class MissingCredentialError(PlatformError):
 
 
 # --- Utilities ---
+
+
+def require_secret(secret: SecretStr | None, message: str) -> SecretStr:
+    if secret is None:
+        raise MissingCredentialError(message)
+    return secret
 
 
 def error_logged(

@@ -5,10 +5,11 @@ from typing import Any
 
 import httpx
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import (
-    MissingCredentialError,
     ProviderError,
     error_logged,
+    require_secret,
     with_retry,
 )
 from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
@@ -22,17 +23,16 @@ from agent_platform.integrations.image_generation.midjourney.config import (
 
 class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
     def __init__(self, credentials: MidjourneyCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else MidjourneyCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, MidjourneyCredentials)
 
     def _default_config(self) -> MidjourneyConfig:
         return MidjourneyConfig()
 
     def _api_key(self) -> str:
-        if self._credentials.api_key is None:
-            raise MissingCredentialError("Midjourney API key is required")
-        return self._credentials.api_key.get_secret_value()
+        api_key = require_secret(
+            self._credentials.api_key, "Midjourney API key is required"
+        )
+        return api_key.get_secret_value()
 
     @error_logged(re_raise=ProviderError, message="Image generation failed")
     @with_retry()

@@ -1,5 +1,6 @@
 from langchain_cohere import CohereRerank
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.integrations.credentials import CohereCredentials
 from agent_platform.integrations.reranking.cohere.config import CohereRerankerConfig
 from agent_platform.integrations.reranking.langchain_base import LangChainReranker
@@ -7,9 +8,7 @@ from agent_platform.integrations.reranking.langchain_base import LangChainRerank
 
 class CohereRerankerProvider(LangChainReranker[CohereRerankerConfig]):
     def __init__(self, credentials: CohereCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else CohereCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, CohereCredentials)
 
     def _default_config(self) -> CohereRerankerConfig:
         return CohereRerankerConfig()

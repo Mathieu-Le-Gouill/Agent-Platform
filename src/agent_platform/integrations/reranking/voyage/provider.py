@@ -3,6 +3,7 @@ from typing import Any
 from langchain_core.documents import BaseDocumentCompressor
 from langchain_voyageai import VoyageAIRerank
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.integrations.credentials import VoyageCredentials
 from agent_platform.integrations.reranking.langchain_base import LangChainReranker
 from agent_platform.integrations.reranking.voyage.config import VoyageRerankerConfig
@@ -10,9 +11,7 @@ from agent_platform.integrations.reranking.voyage.config import VoyageRerankerCo
 
 class VoyageRerankerProvider(LangChainReranker[VoyageRerankerConfig]):
     def __init__(self, credentials: VoyageCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else VoyageCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, VoyageCredentials)
 
     def _default_config(self) -> VoyageRerankerConfig:
         return VoyageRerankerConfig()

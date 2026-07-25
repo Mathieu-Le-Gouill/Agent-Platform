@@ -3,10 +3,11 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import (
-    MissingCredentialError,
     ProviderError,
     error_logged,
+    require_secret,
     with_retry,
 )
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
@@ -19,17 +20,16 @@ from agent_platform.integrations.speech_to_text.utils import parse_language
 
 class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
     def __init__(self, credentials: DeepgramCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else DeepgramCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, DeepgramCredentials)
 
     def _default_config(self) -> DeepgramConfig:
         return DeepgramConfig()
 
     def _api_key(self) -> str:
-        if self._credentials.api_key is None:
-            raise MissingCredentialError("Deepgram API key is required")
-        return self._credentials.api_key.get_secret_value()
+        api_key = require_secret(
+            self._credentials.api_key, "Deepgram API key is required"
+        )
+        return api_key.get_secret_value()
 
     def _build_client(self):
         from deepgram import AsyncDeepgramClient

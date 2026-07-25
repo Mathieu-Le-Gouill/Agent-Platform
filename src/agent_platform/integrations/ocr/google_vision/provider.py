@@ -5,6 +5,7 @@ from uuid import UUID, uuid4
 
 from google.cloud import vision
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.schemas.chunk import TextChunk
@@ -60,9 +61,7 @@ def _from_google_vision(
 
 class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
     def __init__(self, credentials: GoogleVisionCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else GoogleVisionCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, GoogleVisionCredentials)
         self._client: vision.ImageAnnotatorClient | None = None
 
     def _default_config(self) -> GoogleVisionConfig:

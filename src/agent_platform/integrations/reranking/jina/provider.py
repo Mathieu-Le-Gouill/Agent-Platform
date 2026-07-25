@@ -1,5 +1,6 @@
 from langchain_community.document_compressors import JinaRerank
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.integrations.credentials import JinaCredentials
 from agent_platform.integrations.reranking.jina.config import JinaRerankerConfig
 from agent_platform.integrations.reranking.langchain_base import LangChainReranker
@@ -7,9 +8,7 @@ from agent_platform.integrations.reranking.langchain_base import LangChainRerank
 
 class JinaRerankerProvider(LangChainReranker[JinaRerankerConfig]):
     def __init__(self, credentials: JinaCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else JinaCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, JinaCredentials)
 
     def _default_config(self) -> JinaRerankerConfig:
         return JinaRerankerConfig()

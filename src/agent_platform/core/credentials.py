@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from typing import TypeVar
+
 from pydantic import BaseModel, ConfigDict, SecretStr
 
 
@@ -15,6 +17,14 @@ class ProviderCredentials(BaseCredentials, frozen=True):
 
 
 # --- Utils ---
+
+_CredT = TypeVar("_CredT", bound=BaseCredentials)
+
+
+def resolve_credentials(
+    credentials: _CredT | None, credentials_cls: type[_CredT]
+) -> _CredT:
+    return credentials if credentials is not None else credentials_cls()
 
 
 def resolve_timeout(

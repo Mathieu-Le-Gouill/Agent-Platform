@@ -1,6 +1,7 @@
 from langchain_chroma import Chroma
 from langchain_core.embeddings import Embeddings
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.integrations.credentials import ChromaCredentials
 from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
 from agent_platform.integrations.vector_store.langchain_base import LangChainVectorStore
@@ -13,9 +14,7 @@ class ChromaStore(LangChainVectorStore[ChromaConfig]):
         embeddings: Embeddings | None = None,
     ) -> None:
         super().__init__(embeddings)
-        self._credentials = (
-            credentials if credentials is not None else ChromaCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, ChromaCredentials)
 
     def _default_config(self) -> ChromaConfig:
         return ChromaConfig()

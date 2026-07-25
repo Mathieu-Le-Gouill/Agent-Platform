@@ -5,6 +5,7 @@ from collections.abc import AsyncIterator, Sequence
 import pvcobra
 
 from agent_platform.audio.io import AudioIO
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
@@ -18,9 +19,7 @@ from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
 
 class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
     def __init__(self, credentials: PicoVoiceCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else PicoVoiceCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, PicoVoiceCredentials)
         self._handle: pvcobra.Cobra | None = None
 
     def _default_config(self) -> PvcobraVadConfig:

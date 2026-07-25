@@ -5,10 +5,11 @@ from typing import TYPE_CHECKING, Any
 from langchain_huggingface import ChatHuggingFace, HuggingFaceEndpoint
 
 from agent_platform.core.credentials import (
+    resolve_credentials,
     resolve_max_retries,
     resolve_timeout,
 )
-from agent_platform.core.errors import MissingCredentialError
+from agent_platform.core.errors import require_secret
 from agent_platform.core.schemas import model_schema
 from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.integrations.llm.huggingface.config import (
@@ -22,9 +23,7 @@ if TYPE_CHECKING:
 
 class HuggingFaceLLM(LangChainLLMProvider[HuggingFaceGenerationConfig]):
     def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else HuggingFaceCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, HuggingFaceCredentials)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         schema = model_schema(tool.input_schema)
@@ -38,16 +37,16 @@ class HuggingFaceLLM(LangChainLLMProvider[HuggingFaceGenerationConfig]):
         }
 
     def _client(self, config: HuggingFaceGenerationConfig) -> ChatHuggingFace:
-        if self._credentials.api_key is None:
-            raise MissingCredentialError(
-                "Hugging Face Hub API token is required but was not provided"
-            )
+        api_key = require_secret(
+            self._credentials.api_key,
+            "Hugging Face Hub API token is required but was not provided",
+        )
 
         llm = HuggingFaceEndpoint(
             task=config.task,
             repo_id=config.repo_id,
             provider=config.provider,
-            huggingfacehub_api_token=self._credentials.api_key.get_secret_value(),
+            huggingfacehub_api_token=api_key.get_secret_value(),
             **_to_langchain_hugging_face(config, self._credentials),
         )
 

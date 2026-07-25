@@ -10,6 +10,7 @@ from langchain_core.embeddings import Embeddings
 from langchain_weaviate import WeaviateVectorStore
 from weaviate.classes.query import Filter
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
@@ -41,9 +42,7 @@ class WeaviateStore(LangChainVectorStore[WeaviateConfig]):
         embeddings: Embeddings | None = None,
     ) -> None:
         super().__init__(embeddings)
-        self._credentials = (
-            credentials if credentials is not None else WeaviateCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, WeaviateCredentials)
 
     def _default_config(self) -> WeaviateConfig:
         return WeaviateConfig()

@@ -4,6 +4,7 @@ import asyncio
 
 from google.cloud import translate_v2 as google_translate  # type: ignore[attr-defined]
 
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.translation.base import BaseTranslator
 from agent_platform.core.schemas.chunk import TextChunk
@@ -22,9 +23,7 @@ _GOOGLE_TARGETS: dict[Language, str] = {
 
 class GoogleTranslator(BaseTranslator[GoogleTranslateConfig]):
     def __init__(self, credentials: GoogleTranslateCredentials | None = None) -> None:
-        self._credentials = (
-            credentials if credentials is not None else GoogleTranslateCredentials()
-        )
+        self._credentials = resolve_credentials(credentials, GoogleTranslateCredentials)
 
     def _default_config(self) -> GoogleTranslateConfig:
         return GoogleTranslateConfig()
