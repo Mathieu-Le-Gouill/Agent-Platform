@@ -68,7 +68,7 @@ class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
 
         if self._diarize_pipeline is None:
             self._diarize_pipeline = DiarizationPipeline(
-                use_auth_token=config.hf_token, device=config.device
+                token=config.hf_token, device=config.device
             )
         return self._diarize_pipeline
 

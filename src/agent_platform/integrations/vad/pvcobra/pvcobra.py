@@ -4,6 +4,7 @@ from collections.abc import AsyncIterator, Sequence
 
 import pvcobra
 
+from agent_platform.audio.io import AudioIO
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
@@ -124,7 +125,7 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
             )
 
         try:
-            voice_prob = self._handle.process(chunk.data)
+            voice_prob = self._handle.process(AudioIO.to_numpy(chunk).tolist())
         except Exception as exc:
             raise ProviderError(
                 f"Cobra voice activity processing failed: {exc}"

@@ -5,7 +5,6 @@ with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
     import webrtcvad
 
-from agent_platform.audio.io import AudioIO
 from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
 from agent_platform.core.interfaces.vad.state import VADState
@@ -110,6 +109,6 @@ class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
     ) -> bool:
 
         return self.model.is_speech(
-            AudioIO.to_numpy(chunk),
+            chunk.data,
             config.sample_rate,
         )

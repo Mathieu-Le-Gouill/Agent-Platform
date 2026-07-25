@@ -464,7 +464,7 @@ class TestWhisperXDiarization:
 
         result = await stt._diarize(audio_np, {"segments": []}, config)
 
-        fake_pipeline_cls.assert_called_once_with(use_auth_token="tok", device="cpu")
+        fake_pipeline_cls.assert_called_once_with(token="tok", device="cpu")
         fake_pipeline_instance.assert_called_once_with(
             audio_np, min_speakers=1, max_speakers=2
         )

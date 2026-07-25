@@ -6,6 +6,7 @@ from pydantic import SecretStr
 
 pytest.importorskip("pvcobra")
 
+from agent_platform.audio.io import AudioIO
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.enums import DataType
@@ -162,7 +163,28 @@ def test_is_speech_above_threshold(mocker):
     chunk = _chunk(FRAME_LENGTH, 0)
     config = PvcobraVadConfig()
     assert vad._is_speech(chunk, config) is True
-    mock_handle.process.assert_called_once_with(chunk.data)
+    mock_handle.process.assert_called_once_with(AudioIO.to_numpy(chunk).tolist())
+
+
+def test_is_speech_passes_int_samples_not_raw_bytes(mocker):
+    mock_pvcobra = mocker.patch(
+        "agent_platform.integrations.vad.pvcobra.pvcobra.pvcobra"
+    )
+    mock_handle = _mock_handle(return_value=0.9)
+    mock_pvcobra.create.return_value = mock_handle
+
+    from agent_platform.integrations.vad.pvcobra.pvcobra import PvcobraVAD
+
+    vad = PvcobraVAD(_credentials())
+    vad._ensure_handle(PvcobraVadConfig())
+
+    chunk = _chunk(FRAME_LENGTH, 0)
+    vad._is_speech(chunk, PvcobraVadConfig())
+
+    sent = mock_handle.process.call_args.args[0]
+    assert isinstance(sent, list)
+    assert len(sent) == FRAME_LENGTH
+    assert all(isinstance(sample, int) for sample in sent)
 
 
 def test_is_speech_below_threshold(mocker):

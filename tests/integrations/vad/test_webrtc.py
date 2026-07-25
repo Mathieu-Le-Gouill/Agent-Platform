@@ -155,7 +155,27 @@ def test_is_speech(mocker):
     chunk = _chunk(160, 0)
     config = WebrtcVadConfig()
     assert vad._is_speech(chunk, config) is True
-    mock_vad.is_speech.assert_called_once()
+    mock_vad.is_speech.assert_called_once_with(chunk.data, config.sample_rate)
+
+
+def test_is_speech_passes_raw_bytes_not_numpy_array(mocker):
+    mock_webrtcvad = mocker.patch(
+        "agent_platform.integrations.vad.webrtc.webrtc.webrtcvad"
+    )
+    mock_vad = MagicMock()
+    mock_vad.is_speech.return_value = True
+    mock_webrtcvad.Vad.return_value = mock_vad
+
+    from agent_platform.integrations.vad.webrtc.webrtc import Webrtcvad
+
+    vad = Webrtcvad()
+
+    chunk = _chunk(160, 0)
+    vad._is_speech(chunk, WebrtcVadConfig())
+
+    sent = mock_vad.is_speech.call_args.args[0]
+    assert isinstance(sent, bytes)
+    assert sent == chunk.data
 
 
 def test_detect_no_span_when_silence_before_speech(mocker):
