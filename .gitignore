@@ -35,3 +35,4 @@ uv.lock
 # --- Local agent/tool data ---
 .codegraph/
 .opencode/
+opencode.json
