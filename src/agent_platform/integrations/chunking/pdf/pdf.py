@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Sequence
+from typing import Any
 from uuid import uuid4
 
 from unstructured.chunking.title import chunk_by_title
@@ -46,7 +47,7 @@ class PDFStructureChunkerProvider(
             try:
                 elements = partition_pdf(filename=doc.source)
 
-                chunk_kwargs = dict(
+                chunk_kwargs: dict[str, Any] = dict(
                     max_characters=config.chunk_size,
                     overlap=config.chunk_overlap,
                     overlap_all=config.overlap_all,

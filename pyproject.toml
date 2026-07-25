@@ -63,7 +63,7 @@ reranking-voyage = ["langchain-voyageai~=0.4"]
 reranking = ["agent_platform[reranking-cohere,reranking-jina,reranking-huggingface,reranking-flashrank,reranking-voyage]"]
 
 # --- Speech-to-Text ---
-stt-whisperx = ["whisperx"]
+stt-whisperx = ["whisperx", "torchaudio<2.9"]
 stt-faster-whisper = ["faster-whisper"]
 stt-deepgram = ["deepgram-sdk>=7"]
 stt-openai = ["openai"]
@@ -122,7 +122,7 @@ chunking-recursive = ["langchain-text-splitters~=1.0"]
 chunking-html = ["langchain-text-splitters~=1.0"]
 chunking-latex = ["langchain-text-splitters~=1.0"]
 chunking-markdown = ["langchain-text-splitters~=1.0"]
-chunking-pdf = ["unstructured[pdf]"]
+chunking-pdf = ["unstructured[pdf]>=0.21,<0.23"]
 chunking = ["agent_platform[chunking-recursive,chunking-html,chunking-latex,chunking-markdown,chunking-pdf]"]
 
 # --- Loader strategies ---

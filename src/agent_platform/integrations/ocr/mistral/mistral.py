@@ -8,8 +8,8 @@ from typing import TYPE_CHECKING, Any
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
-    from mistralai.client import Mistral
-    from mistralai.client.models.ocrresponse import OCRResponse
+    from mistralai import Mistral
+    from mistralai.models import OCRResponse
 else:
     try:
         from mistralai import Mistral

@@ -36,7 +36,7 @@ class FewShotStrategy:
             "examples": examples,
         }
 
-        if multi_label:
+        if not multi_label:
             values["unknown"] = config.unknown_label
 
         return template.format(**values)

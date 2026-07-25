@@ -3,6 +3,8 @@ from __future__ import annotations
 import logging
 from typing import Generic, TypeVar, cast
 
+from pydantic import ValidationError as PydanticValidationError
+
 from agent_platform.components.base import Component
 from agent_platform.components.llm_classifier.config import LLMClassifierConfig
 from agent_platform.components.llm_classifier.strategies.registry import get_strategy
@@ -88,7 +90,7 @@ def _extract_pred(
                 label=arguments["label"],
                 score=arguments["score"],
             )
-        except ValidationError:
+        except (ValidationError, PydanticValidationError):
             logger.warning(
                 "Failed to parse classification prediction: label=%s, score=%s",
                 arguments.get("label"),

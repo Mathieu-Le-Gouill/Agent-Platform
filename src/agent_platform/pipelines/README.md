@@ -16,52 +16,41 @@ TextDocument → [RecursiveCharacterTextSplitter] → list[TextChunk]
 **Missing:** Multi-format support (PDF via loader first), semantic chunking, metadata propagation, deduplication.
 
 ### Speech Translation (`speech_translation.py`)
-**Status: Commented-out pseudocode**
+**Status: Complete**
 
 ```
-Audio → [STT] → Text → [Translator] → Translated Text
+Audio → [STT] → Transcript → [Translator] → Translated Transcript
 ```
 
-`SpeechTranslationPipeline` class exists with constructor and method signatures, but `run()` body is in a docstring comment. STT and Translation providers are now implemented (WhisperX, Deepgram, DeepL, Google Translate), so this pipeline needs actual wiring + streaming support.
+`SpeechTranslationPipeline.run()` transcribes an `AudioChunk` and translates each utterance (skipped when the detected language already matches the target). `.stream()` does the same over an `AsyncIterator[AudioChunk]`, translating each `Transcript` as the STT backend yields it.
 
 ### RAG - Ingest (`rag/ingest.py`)
-**Status: Minimal**
+**Status: Complete**
 
 ```python
-async def ingest(chunks: list[TextChunk], store: VectorStore) -> None:
-    await store.add(chunks)
+async def ingest(sources, loader: Loader, chunker: Chunker, store: VectorStore, config=None) -> None:
+    documents = await loader.arun(sources)
+    chunks = await chunker.arun(documents)
+    await store.add(chunks, config=config)
 ```
 
-**Missing:** Embedding step, chunking, document preprocessing, metadata handling, batching.
+Embedding happens inside `store.add()` via each `VectorStore` provider's own injected LangChain `Embeddings` adapter (see `integrations/vector_store/langchain_base.py`); there is no separate embed step here since `VectorStore.add()` has no vector parameter to feed one into.
 
 ### RAG - Query (`rag/query.py`)
-**Status: Minimal**
+**Status: Complete**
 
 ```python
-async def query(vector: list[float], store: VectorStore, k: int = 5) -> list[TextChunk]:
-    return await store.search(vector, k=k)
+async def query(query_text, embedder: Embedder, vector_search: VectorSearch, reranker: Reranker, generator: Generator, k=5, filter=None) -> LLMResponse:
+    ...  # embed query → search → rerank → generate
 ```
-
-**Missing:** Full pipeline (embed → search → rerank → generate).
 
 ## Planned Pipelines
 
 | Pipeline | Dependencies | Priority |
 |---|---|---|
-| **Transcription** | Speech provider (ready) | P0 |
-| **Translation** | Translation provider (ready) | P0 |
-| **Audio Translation** | Speech + Translation providers (ready) | P0 |
 | **TTS / Synthesis** | Speech synthesis provider | P1 |
-| **Conversation** | All of the above + LLM | P1 |
-| **Summarization** | LLM provider | P1 |
+| **Conversation** | RAG + speech translation + LLM | P1 |
 | **Document QA** | RAG pipeline + LLM | P1 |
 | **Multi-modal QA** | OCR + RAG + LLM | P2 |
 | **Clustering Pipeline** | Clustering providers | P2 |
-| **Classification Pipeline** | Classification providers | P2 |
-
-## Implementation Order
-
-1. Add embedding step to `rag/ingest.py`
-2. Implement full RAG query pipeline (embed → search → rerank → generate)
-3. Wire `speech_translation.py` (STT and Translation providers already exist)
-4. Add ingestion chain (loader → chunk → embed → store)
+| **Classification Pipeline** | Classification providers (ready) | P2 |

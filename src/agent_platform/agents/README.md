@@ -51,14 +51,7 @@ ToolError
 
 ## What's Left to Build
 
-### Remaining Tools
-
-| Tool | Backing Integration | Status |
-|---|---|---|
-| `TranslateTool` | `BaseTranslator`, text → target language | Not started |
-| `SummarizeTool` | LLM, text → summary | Not started |
-| `ClassifyTool` | `BaseClassificationProvider`, text → label | Not started |
-| `GenerateImageTool` | `BaseImageGenerator`, prompt → image | Not started |
+All planned tools (`OCRTool`, `SearchTool`, `TranscribeTool`, `TranslateTool`, `SummarizeTool`, `ClassifyTool`, `GenerateImageTool`) are implemented under `agents/tools/`.
 
 ### Infrastructure
 
