@@ -31,8 +31,8 @@ src/agent_platform/
 ├── agents/            # LLM reasoning loop, tool registry, conversation management
 ├── audio/             # Audio I/O + DSP utilities
 ├── utils/             # Shared helpers
-├── config/            # Logging + wiring (DI container currently commented out)
-├── api/               # FastAPI layer (empty stub)
+├── config/            # Settings, logging, DI container (build_agent, build_provider)
+├── api/               # FastAPI app, /chat and /health
 └── workflows/         # LangGraph state machine (empty stub)
 ```
 
@@ -52,8 +52,7 @@ src/agent_platform/
 | Clustering | HDBSCAN, KMeans, GMM |
 | Loader | Unstructured, PIL, PyAV, SoundFile |
 | Image Generation | DALL-E, Stable Diffusion, Midjourney |
-
-Classification (`components/embed_classifier`, `components/llm_classifier`) is built directly on the LLM/embeddings integrations above rather than its own provider domain, see `src/agent_platform/README.md` known issues.
+| Classification | Transformers (zero-shot) |
 
 ## Setup
 
@@ -74,8 +73,6 @@ pip install -e ".[dev,all]"
 ```
 
 Extras are named `<domain>-<provider>` (e.g. `stt-whisperx`, `ocr-tesseract`); see `pyproject.toml` for the full list. Requires Python 3.11. Some providers have system dependencies (Tesseract, CUDA for WhisperX). No `uv` installed? `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"` works the same, `uv` just removes the activation step.
-
-**Known uv/pip resolver divergence:** `uv run --extra chunking-pdf` (and therefore `--extra all`, which includes it) currently fails, uv resolves `unstructured==0.18.32` -> `numba==0.53.1`, which refuses to install on Python >=3.10. `pip install -e ".[chunking-pdf]"` resolves a newer, compatible `unstructured` for the same `pyproject.toml` and works fine. Until the `chunking-pdf` extra gets an explicit floor pin, use `pip` for that one extra (or `all`); every other extra works through `uv run` as shown above.
 
 ## Development
 

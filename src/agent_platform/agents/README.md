@@ -55,14 +55,8 @@ All planned tools (`OCRTool`, `SearchTool`, `TranscribeTool`, `TranslateTool`, `
 
 ### Infrastructure
 
-- **Workflows** (`workflows/`), LangGraph state machine for multi-turn agents (empty stub directory exists)
-- **API Layer** (`api/`), FastAPI REST + WebSocket exposing agents (empty stub directory exists)
-- **Factories** (`factories/`), provider resolution from config/env (not started, no directory yet, see `config/container.py` for the commented-out DI approach it would replace)
-- **Streaming**, `Agent.think()` does not yet support streaming responses
-
-### Specialized Agents
-
-`MeetingNotesAgent`, `DocumentQAAgent`, `TranslationAgent`, each is a `ConversationAgent` subclass with a fixed system prompt, tool set, and domain-specific logic.
+- **Workflows** (`workflows/`), LangGraph state machine for multi-turn agents, empty stub
+- **Streaming**, `Agent.think()` does not yet support streaming responses (tool-call streaming via `act_stream()` already exists)
 
 ## Adding a New Tool
 

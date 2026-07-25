@@ -140,9 +140,4 @@ so this is the only code needed, no new registry, no per-domain dict.
 
 | Issue | Location | Status |
 |---|---|---|
-| `speech_translation.py` is pseudocode, `run()` raises `NotImplementedError` | `pipelines/speech_translation.py` | Open |
-| Minimal RAG pipelines | `rag/ingest.py`, `rag/query.py` missing chunk/embed/rerank/generate steps | Open |
-| `classification` has no `integrations/` layer, only interface response models and component-level use | `core/interfaces/classification/`, `integrations/classification/` (missing) | Open |
-| `classification-transformers` extra declared but unused | `pyproject.toml` | Open |
-| `uv run --extra chunking-pdf`/`--extra all` fails (uv resolves an old `unstructured`→`numba` pin incompatible with Python >=3.10); `pip install -e ".[chunking-pdf]"` works | `pyproject.toml` | Open |
 | Empty stub | `workflows/` | By design |
