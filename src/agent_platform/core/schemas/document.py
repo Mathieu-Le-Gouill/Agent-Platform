@@ -3,10 +3,10 @@ from __future__ import annotations
 import os
 from datetime import datetime
 from typing import Any
-from uuid import UUID, uuid4
 
 from pydantic import BaseModel, Field
 
+from agent_platform.core.base import Entity
 from agent_platform.core.schemas.dimensions import Dimensions, bit_depth_for_mode
 from agent_platform.core.schemas.enums import (
     AudioFormat,
@@ -27,9 +27,8 @@ class DocumentMetadata(BaseModel, frozen=True):
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
-class Document(BaseModel, frozen=True):
+class Document(Entity, frozen=True):
     media_type: MediaType
-    id: UUID = Field(default_factory=uuid4)
     source: str = ""
     metadata: DocumentMetadata = Field(default_factory=DocumentMetadata)
 

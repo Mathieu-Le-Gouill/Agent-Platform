@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 from typing import Any
-from uuid import UUID, uuid4
+from uuid import UUID
 
-from pydantic import BaseModel, Field
+from pydantic import Field
 
+from agent_platform.core.base import Entity
 from agent_platform.core.schemas.bounding_box import BoundingBox
 from agent_platform.core.schemas.dimensions import Dimensions
 from agent_platform.core.schemas.enums import (
@@ -17,9 +18,8 @@ from agent_platform.core.schemas.enums import (
 from agent_platform.core.schemas.score import Score
 
 
-class Chunk(BaseModel, frozen=True):
+class Chunk(Entity, frozen=True):
     media_type: MediaType
-    id: UUID = Field(default_factory=uuid4)
     index: int | None = None
     document_id: UUID | None = None
     metadata: dict[str, Any] = Field(default_factory=dict)
