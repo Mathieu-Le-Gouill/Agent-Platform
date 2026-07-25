@@ -1,57 +1,51 @@
-from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
 
 from agent_platform.core.schemas.chunk import TextChunk
+from tests.helpers import make_provider_with_mock_client
+
+_ASYNC_METHODS = ("aembed_documents", "aembed_query")
+_SYNC_METHODS = ("embed_documents", "embed_query")
 
 
 @pytest.fixture
 def openai_provider():
-    from agent_platform.integrations.embeddings.openai.openai import (
+    from agent_platform.integrations.embeddings.openai.provider import (
         OpenAIEmbeddingProvider,
     )
 
-    provider = OpenAIEmbeddingProvider()
-    mock_lc = MagicMock()
-    mock_lc.aembed_documents = AsyncMock()
-    mock_lc.embed_documents = MagicMock()
-    mock_lc.aembed_query = AsyncMock()
-    mock_lc.embed_query = MagicMock()
-    provider._client = MagicMock(return_value=mock_lc)
-    return provider, mock_lc
+    return make_provider_with_mock_client(
+        OpenAIEmbeddingProvider,
+        async_methods=_ASYNC_METHODS,
+        sync_methods=_SYNC_METHODS,
+    )
 
 
 @pytest.fixture
 def mistral_provider():
-    from agent_platform.integrations.embeddings.mistral.mistral import (
+    from agent_platform.integrations.embeddings.mistral.provider import (
         MistralEmbeddingProvider,
     )
 
-    provider = MistralEmbeddingProvider()
-    mock_lc = MagicMock()
-    mock_lc.aembed_documents = AsyncMock()
-    mock_lc.embed_documents = MagicMock()
-    mock_lc.aembed_query = AsyncMock()
-    mock_lc.embed_query = MagicMock()
-    provider._client = MagicMock(return_value=mock_lc)
-    return provider, mock_lc
+    return make_provider_with_mock_client(
+        MistralEmbeddingProvider,
+        async_methods=_ASYNC_METHODS,
+        sync_methods=_SYNC_METHODS,
+    )
 
 
 @pytest.fixture
 def ollama_provider():
-    from agent_platform.integrations.embeddings.ollama.ollama import (
+    from agent_platform.integrations.embeddings.ollama.provider import (
         OllamaEmbeddingProvider,
     )
 
-    provider = OllamaEmbeddingProvider()
-    mock_lc = MagicMock()
-    mock_lc.aembed_documents = AsyncMock()
-    mock_lc.embed_documents = MagicMock()
-    mock_lc.aembed_query = AsyncMock()
-    mock_lc.embed_query = MagicMock()
-    provider._client = MagicMock(return_value=mock_lc)
-    return provider, mock_lc
+    return make_provider_with_mock_client(
+        OllamaEmbeddingProvider,
+        async_methods=_ASYNC_METHODS,
+        sync_methods=_SYNC_METHODS,
+    )
 
 
 @pytest.fixture

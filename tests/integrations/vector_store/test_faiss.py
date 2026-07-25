@@ -6,7 +6,7 @@ from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.vector_store.config import DistanceMetric
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.vector_store.faiss.config import FAISSConfig
-from agent_platform.integrations.vector_store.faiss.faiss import (
+from agent_platform.integrations.vector_store.faiss.provider import (
     _DISTANCE_STRATEGY_MAP,
     FAISSStore,
 )
@@ -53,7 +53,7 @@ class TestFAISSAdd:
             await store.add([TextChunk(text="hello", index=0)])
 
     async def test_creates_new_store_when_none(self, monkeypatch):
-        import agent_platform.integrations.vector_store.faiss.faiss as mod
+        import agent_platform.integrations.vector_store.faiss.provider as mod
 
         new_store = MagicMock()
         monkeypatch.setattr(mod.FAISS, "from_documents", lambda *a, **kw: new_store)
@@ -138,12 +138,8 @@ class TestFAISSSearchWithScoresMapping:
 
 class TestFAISSSearchRetryAndTranslation:
     async def test_search_retries_transient_failure_then_succeeds(
-        self, store, monkeypatch
+        self, store, no_retry_sleep
     ):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
         calls = {"n": 0}
 
         def flaky(*args, **kwargs):
@@ -159,12 +155,8 @@ class TestFAISSSearchRetryAndTranslation:
         assert calls["n"] == 2
 
     async def test_search_translates_permanent_failure_to_provider_error(
-        self, store, monkeypatch
+        self, store, no_retry_sleep
     ):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
         def always_fails(*args, **kwargs):
             raise ConnectionError("boom")
 
@@ -174,12 +166,8 @@ class TestFAISSSearchRetryAndTranslation:
             await store.search(query_vector=[0.1, 0.2], config=FAISSConfig())
 
     async def test_search_with_scores_translates_permanent_failure(
-        self, store, monkeypatch
+        self, store, no_retry_sleep
     ):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
         def always_fails(*args, **kwargs):
             raise ConnectionError("boom")
 
@@ -205,7 +193,7 @@ class TestFAISSDistanceStrategy:
         )
 
     async def test_add_passes_distance_strategy_to_from_documents(self, monkeypatch):
-        import agent_platform.integrations.vector_store.faiss.faiss as mod
+        import agent_platform.integrations.vector_store.faiss.provider as mod
 
         captured = {}
 
@@ -228,7 +216,7 @@ class TestFAISSDistanceStrategy:
         assert captured["distance_strategy"] == DistanceStrategy.EUCLIDEAN_DISTANCE
 
     async def test_load_local_passes_distance_strategy(self, monkeypatch, tmp_path):
-        import agent_platform.integrations.vector_store.faiss.faiss as mod
+        import agent_platform.integrations.vector_store.faiss.provider as mod
 
         captured = {}
         index_path = tmp_path / "index"

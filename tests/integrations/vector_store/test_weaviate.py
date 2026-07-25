@@ -1,5 +1,3 @@
-from unittest.mock import AsyncMock
-
 import pytest
 
 pytest.importorskip("weaviate")
@@ -7,7 +5,7 @@ pytest.importorskip("langchain_weaviate")
 
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
-from agent_platform.integrations.vector_store.weaviate.weaviate import (
+from agent_platform.integrations.vector_store.weaviate.provider import (
     WeaviateStore,
     _parse_url,
 )
@@ -29,7 +27,7 @@ class TestWeaviateConstruction:
         assert isinstance(store._default_config(), WeaviateConfig)
 
     def test_custom_credentials_and_embeddings_stored(self):
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         creds = mod.WeaviateCredentials(url="http://localhost:8080", api_key=None)
         assert_custom_construction_stored(WeaviateStore, creds, object())
@@ -37,7 +35,7 @@ class TestWeaviateConstruction:
 
 class TestWeaviateConnect:
     def test_connect_to_local_without_api_key(self, provider, monkeypatch):
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         provider._credentials = mod.WeaviateCredentials(
             url="http://localhost:8080", api_key=None
@@ -53,7 +51,7 @@ class TestWeaviateConnect:
         assert captured["host"] == "localhost"
 
     def test_connect_to_custom_with_api_key(self, provider, monkeypatch):
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         provider._credentials = mod.WeaviateCredentials(
             url="https://weaviate.example.com:8443", api_key="secret"
@@ -105,7 +103,7 @@ class TestWeaviateSearchKwargs:
     def test_build_client_enables_multi_tenancy_when_namespace_set(
         self, provider, monkeypatch, capture_client_kwargs
     ):
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         captured = capture_client_kwargs(mod, "WeaviateVectorStore")
         provider._credentials = mod.WeaviateCredentials(api_key=None)
@@ -127,7 +125,7 @@ class TestWeaviateSearchKwargs:
     def test_build_client_disables_multi_tenancy_without_namespace(
         self, provider, monkeypatch, capture_client_kwargs
     ):
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         captured = capture_client_kwargs(mod, "WeaviateVectorStore")
         provider._credentials = mod.WeaviateCredentials(api_key=None)
@@ -223,7 +221,7 @@ class TestWeaviateConnectionLifecycle:
         monkeypatch.setattr(mod, "WeaviateVectorStore", FakeVectorStore)
 
     async def test_search_closes_client_after_use(self, provider, monkeypatch):
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         self._patch_store(monkeypatch, mod)
 
@@ -242,7 +240,7 @@ class TestWeaviateConnectionLifecycle:
         assert closed["called"] is True
 
     async def test_add_closes_client_after_use(self, provider, monkeypatch):
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         self._patch_store(monkeypatch, mod)
 
@@ -260,11 +258,10 @@ class TestWeaviateConnectionLifecycle:
 
         assert closed["called"] is True
 
-    async def test_search_closes_client_even_on_failure(self, provider, monkeypatch):
-        import agent_platform.core.errors as errors_mod
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
+    async def test_search_closes_client_even_on_failure(
+        self, provider, monkeypatch, no_retry_sleep
+    ):
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         class FailingVectorStore:
             def __init__(self, **kwargs):
@@ -291,7 +288,7 @@ class TestWeaviateConnectionLifecycle:
         assert closed["count"] >= 1
 
     async def test_delete_closes_client_after_use(self, provider, monkeypatch):
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         self._patch_store(monkeypatch, mod)
 
@@ -324,7 +321,7 @@ class TestWeaviateConnectionLifecycle:
     async def test_search_with_scores_maps_results_and_closes_client(
         self, provider, monkeypatch
     ):
-        import agent_platform.integrations.vector_store.weaviate.weaviate as mod
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
         from agent_platform.integrations.vector_store.langchain_base import (
             _chunk_to_lc,
         )

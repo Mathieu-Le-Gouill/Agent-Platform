@@ -455,11 +455,9 @@ class TestLangChainReranker:
 
 
 class TestRerankRetryAndTranslation:
-    async def test_retries_transient_failure_then_succeeds(self, monkeypatch, mocker):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
+    async def test_retries_transient_failure_then_succeeds(
+        self, no_retry_sleep, mocker
+    ):
         calls = {"n": 0}
 
         async def flaky(*args, **kwargs):
@@ -478,12 +476,8 @@ class TestRerankRetryAndTranslation:
         assert calls["n"] == 2
 
     async def test_translates_permanent_failure_to_provider_error(
-        self, monkeypatch, mocker
+        self, no_retry_sleep, mocker
     ):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
         async def always_fails(*args, **kwargs):
             raise ConnectionError("boom")
 

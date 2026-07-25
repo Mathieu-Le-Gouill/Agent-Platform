@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
@@ -18,11 +18,7 @@ class _TestEmbedder(LangChainEmbedder):
 
 
 class TestAembedDocumentRetryAndTranslation:
-    async def test_retries_transient_failure_then_succeeds(self, monkeypatch):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
+    async def test_retries_transient_failure_then_succeeds(self, no_retry_sleep):
         calls = {"n": 0}
 
         async def flaky(_texts):
@@ -43,11 +39,7 @@ class TestAembedDocumentRetryAndTranslation:
         assert calls["n"] == 2
         assert result.embeddings[0].to_list() == [0.1, 0.2]
 
-    async def test_translates_permanent_failure_to_provider_error(self, monkeypatch):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
+    async def test_translates_permanent_failure_to_provider_error(self, no_retry_sleep):
         async def always_fails(_texts):
             raise ConnectionError("boom")
 
@@ -63,11 +55,7 @@ class TestAembedDocumentRetryAndTranslation:
 
 
 class TestAembedQueryRetryAndTranslation:
-    async def test_retries_transient_failure_then_succeeds(self, monkeypatch):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
+    async def test_retries_transient_failure_then_succeeds(self, no_retry_sleep):
         calls = {"n": 0}
 
         async def flaky(_query):
@@ -87,11 +75,7 @@ class TestAembedQueryRetryAndTranslation:
         assert calls["n"] == 2
         assert result.embeddings[0].to_list() == [0.3, 0.4]
 
-    async def test_translates_permanent_failure_to_provider_error(self, monkeypatch):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
+    async def test_translates_permanent_failure_to_provider_error(self, no_retry_sleep):
         async def always_fails(_query):
             raise ConnectionError("boom")
 

@@ -1,4 +1,4 @@
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import MagicMock
 
 import pytest
 from langchain_core.messages import (
@@ -310,11 +310,7 @@ class TestLangChainLLMProviderStream:
 
 
 class TestLangChainLLMProviderAgenerateRetryAndTranslation:
-    async def test_retries_transient_failure_then_succeeds(self, monkeypatch):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
+    async def test_retries_transient_failure_then_succeeds(self, no_retry_sleep):
         calls = {"n": 0}
         lc_response = LCAIMessage(content="ok")
 
@@ -339,11 +335,8 @@ class TestLangChainLLMProviderAgenerateRetryAndTranslation:
         assert calls["n"] == 2
         assert result.message.content == "ok"
 
-    async def test_translates_permanent_failure_to_provider_error(self, monkeypatch):
-        import agent_platform.core.errors as errors_mod
+    async def test_translates_permanent_failure_to_provider_error(self, no_retry_sleep):
         from agent_platform.core.errors import ProviderError
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
 
         mock_model = MagicMock()
 

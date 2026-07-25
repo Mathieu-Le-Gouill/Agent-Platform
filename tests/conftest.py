@@ -83,6 +83,14 @@ def mock_llm():
     return llm
 
 
+@pytest.fixture
+def no_retry_sleep(monkeypatch) -> None:
+    """Skip the real sleep delay in core.errors' retry-with-backoff helper."""
+    import agent_platform.core.errors as errors_mod
+
+    monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
+
+
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
     for item in items:
         if not any(item.iter_markers(name="integration")):

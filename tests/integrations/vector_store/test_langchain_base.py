@@ -396,11 +396,7 @@ class TestLangChainVectorStore:
 
 
 class TestSearchRetryAndTranslation:
-    async def test_search_retries_transient_failure_then_succeeds(self, monkeypatch):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
+    async def test_search_retries_transient_failure_then_succeeds(self, no_retry_sleep):
         calls = {"n": 0}
 
         async def flaky(*args, **kwargs):
@@ -420,12 +416,8 @@ class TestSearchRetryAndTranslation:
         assert calls["n"] == 2
 
     async def test_search_translates_permanent_failure_to_provider_error(
-        self, monkeypatch
+        self, no_retry_sleep
     ):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
         async def always_fails(*args, **kwargs):
             raise ConnectionError("boom")
 
@@ -438,11 +430,9 @@ class TestSearchRetryAndTranslation:
         with pytest.raises(ProviderError, match="Vector store search failed"):
             await store.search(query_vector=[0.1, 0.2])
 
-    async def test_search_with_scores_translates_permanent_failure(self, monkeypatch):
-        import agent_platform.core.errors as errors_mod
-
-        monkeypatch.setattr(errors_mod.asyncio, "sleep", AsyncMock())
-
+    async def test_search_with_scores_translates_permanent_failure(
+        self, no_retry_sleep
+    ):
         async def always_fails(*args, **kwargs):
             raise ConnectionError("boom")
 
