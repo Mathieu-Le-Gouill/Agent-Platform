@@ -9,7 +9,7 @@ pytest.importorskip("mistralai")
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.ocr.mistral.config import MistralOCRConfig
-from agent_platform.integrations.ocr.mistral.mistral import MistralOCR, _from_mistral
+from agent_platform.integrations.ocr.mistral.provider import MistralOCR, _from_mistral
 
 
 def _page(index, markdown, confidence_scores=None):
@@ -72,7 +72,7 @@ class TestMistralOCRExtract:
     @pytest.mark.asyncio
     async def test_extract_forwards_new_config_fields(self, mocker):
         mock_mistral_cls = mocker.patch(
-            "agent_platform.integrations.ocr.mistral.mistral.Mistral"
+            "agent_platform.integrations.ocr.mistral.provider.Mistral"
         )
         mock_client = MagicMock()
         mock_client.ocr.process.return_value = SimpleNamespace(pages=[_page(0, "text")])
@@ -96,7 +96,7 @@ class TestMistralOCRExtract:
     @pytest.mark.asyncio
     async def test_extract_omits_optional_fields_when_unset(self, mocker):
         mock_mistral_cls = mocker.patch(
-            "agent_platform.integrations.ocr.mistral.mistral.Mistral"
+            "agent_platform.integrations.ocr.mistral.provider.Mistral"
         )
         mock_client = MagicMock()
         mock_client.ocr.process.return_value = SimpleNamespace(pages=[_page(0, "text")])
@@ -115,7 +115,7 @@ class TestMistralOCRExtract:
     @pytest.mark.asyncio
     async def test_client_is_cached_across_calls(self, mocker):
         mock_mistral_cls = mocker.patch(
-            "agent_platform.integrations.ocr.mistral.mistral.Mistral"
+            "agent_platform.integrations.ocr.mistral.provider.Mistral"
         )
         mock_client = MagicMock()
         mock_client.ocr.process.return_value = SimpleNamespace(pages=[_page(0, "text")])
@@ -139,7 +139,7 @@ class TestMistralOCRExtract:
     @pytest.mark.asyncio
     async def test_client_error_is_translated_to_provider_error(self, mocker):
         mock_mistral_cls = mocker.patch(
-            "agent_platform.integrations.ocr.mistral.mistral.Mistral"
+            "agent_platform.integrations.ocr.mistral.provider.Mistral"
         )
         mock_client = MagicMock()
         mock_client.ocr.process.side_effect = RuntimeError("boom")

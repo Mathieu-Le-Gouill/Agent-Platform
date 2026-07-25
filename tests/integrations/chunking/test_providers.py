@@ -11,7 +11,7 @@ from agent_platform.integrations.chunking.langchain_base import (
     _doc_to_lc,
 )
 from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
-from agent_platform.integrations.chunking.recursive.recursive import (
+from agent_platform.integrations.chunking.recursive.provider import (
     RecursiveChunkerProvider,
 )
 
@@ -94,7 +94,7 @@ def test_splitter_forwards_new_fields_to_constructor(mocker):
     )
 
     mock_splitter_cls = mocker.patch(
-        "agent_platform.integrations.chunking.recursive.recursive.RecursiveCharacterTextSplitter"
+        "agent_platform.integrations.chunking.recursive.provider.RecursiveCharacterTextSplitter"
     )
     provider._splitter(config)
 

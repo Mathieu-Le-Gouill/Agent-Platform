@@ -15,7 +15,7 @@ class _TestConcreteLLM:
     """Helper that patches the langchain base _client to return a mock."""
 
     def __init__(self):
-        from agent_platform.integrations.llm.openai.openai import OpenAILLM
+        from agent_platform.integrations.llm.openai.provider import OpenAILLM
 
         self.provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")))
         self.mock_client = MagicMock()
@@ -39,7 +39,9 @@ async def test_generate():
 
 
 async def test_generate_with_openai_client(mocker):
-    mock_chat = mocker.patch("agent_platform.integrations.llm.openai.openai.ChatOpenAI")
+    mock_chat = mocker.patch(
+        "agent_platform.integrations.llm.openai.provider.ChatOpenAI"
+    )
     mock_instance = MagicMock()
     mock_chat.return_value = mock_instance
     mock_response = MagicMock()
@@ -48,7 +50,7 @@ async def test_generate_with_openai_client(mocker):
     mock_response.usage_metadata = None
     mock_instance.ainvoke = AsyncMock(return_value=mock_response)
 
-    from agent_platform.integrations.llm.openai.openai import OpenAILLM
+    from agent_platform.integrations.llm.openai.provider import OpenAILLM
 
     provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")))
 
@@ -64,7 +66,7 @@ async def test_generate_with_openai_client(mocker):
 async def test_sync_generate():
     from unittest.mock import MagicMock
 
-    from agent_platform.integrations.llm.openai.openai import OpenAILLM
+    from agent_platform.integrations.llm.openai.provider import OpenAILLM
 
     provider = OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")))
     mock_response = MagicMock()

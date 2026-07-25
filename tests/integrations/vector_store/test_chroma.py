@@ -3,8 +3,8 @@ import pytest
 pytest.importorskip("langchain_chroma")
 
 from agent_platform.integrations.credentials import ChromaCredentials
-from agent_platform.integrations.vector_store.chroma.chroma import ChromaStore
 from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
+from agent_platform.integrations.vector_store.chroma.provider import ChromaStore
 from tests.helpers import assert_custom_construction_stored, assert_default_construction
 
 
@@ -53,7 +53,7 @@ class TestChromaBuildClient:
         return store
 
     def test_persist_directory_uses_embedded_mode(self, capture_client_kwargs):
-        import agent_platform.integrations.vector_store.chroma.chroma as mod
+        import agent_platform.integrations.vector_store.chroma.provider as mod
 
         captured = capture_client_kwargs(mod, "Chroma")
         store = self._new_store()
@@ -65,7 +65,7 @@ class TestChromaBuildClient:
         assert "port" not in captured
 
     def test_no_persist_directory_uses_http_client_mode(self, capture_client_kwargs):
-        import agent_platform.integrations.vector_store.chroma.chroma as mod
+        import agent_platform.integrations.vector_store.chroma.provider as mod
 
         captured = capture_client_kwargs(mod, "Chroma")
         store = self._new_store()
@@ -78,7 +78,7 @@ class TestChromaBuildClient:
         assert "persist_directory" not in captured
 
     def test_tenant_and_database_always_forwarded(self, capture_client_kwargs):
-        import agent_platform.integrations.vector_store.chroma.chroma as mod
+        import agent_platform.integrations.vector_store.chroma.provider as mod
 
         captured = capture_client_kwargs(mod, "Chroma")
         store = self._new_store()
@@ -89,7 +89,7 @@ class TestChromaBuildClient:
         assert captured["database"] == "prod"
 
     def test_api_key_forwarded_when_present(self, capture_client_kwargs):
-        import agent_platform.integrations.vector_store.chroma.chroma as mod
+        import agent_platform.integrations.vector_store.chroma.provider as mod
 
         captured = capture_client_kwargs(mod, "Chroma")
         store = self._new_store(api_key="cloud-key")
@@ -99,7 +99,7 @@ class TestChromaBuildClient:
         assert captured["chroma_cloud_api_key"] == "cloud-key"
 
     def test_api_key_omitted_when_absent(self, capture_client_kwargs):
-        import agent_platform.integrations.vector_store.chroma.chroma as mod
+        import agent_platform.integrations.vector_store.chroma.provider as mod
 
         captured = capture_client_kwargs(mod, "Chroma")
         store = self._new_store()

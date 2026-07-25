@@ -9,7 +9,7 @@ from agent_platform.integrations.loader.strategies.unstructured.config import (
     UnstructuredLoaderConfig,
 )
 
-_MODULE = "agent_platform.integrations.loader.strategies.unstructured.unstructured"
+_MODULE = "agent_platform.integrations.loader.strategies.unstructured.provider"
 
 
 class TestUnstructuredFileLoader:
@@ -17,7 +17,7 @@ class TestUnstructuredFileLoader:
         mock_cls = MagicMock(return_value="pdf_loader")
         mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.PDF: mock_cls})
         mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.PDF)
-        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+        from agent_platform.integrations.loader.strategies.unstructured.provider import (
             UnstructuredFileLoader,
         )
 
@@ -32,7 +32,7 @@ class TestUnstructuredFileLoader:
         mocker.patch(
             f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.MARKDOWN
         )
-        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+        from agent_platform.integrations.loader.strategies.unstructured.provider import (
             UnstructuredFileLoader,
         )
 
@@ -45,7 +45,7 @@ class TestUnstructuredFileLoader:
         mock_cls = MagicMock(return_value="html_loader")
         mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.HTML: mock_cls})
         mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.HTML)
-        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+        from agent_platform.integrations.loader.strategies.unstructured.provider import (
             UnstructuredFileLoader,
         )
 
@@ -58,7 +58,7 @@ class TestUnstructuredFileLoader:
         mock_cls = MagicMock(return_value="docx_loader")
         mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.DOCX: mock_cls})
         mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.DOCX)
-        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+        from agent_platform.integrations.loader.strategies.unstructured.provider import (
             UnstructuredFileLoader,
         )
 
@@ -75,7 +75,7 @@ class TestUnstructuredFileLoader:
             f"{_MODULE}.FileFormat.from_path",
             return_value=FileFormat.UNKNOWN,
         )
-        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+        from agent_platform.integrations.loader.strategies.unstructured.provider import (
             UnstructuredFileLoader,
         )
 
@@ -88,7 +88,7 @@ class TestUnstructuredFileLoader:
         mock_cls = MagicMock()
         mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.PDF: mock_cls})
         mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.PDF)
-        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+        from agent_platform.integrations.loader.strategies.unstructured.provider import (
             UnstructuredFileLoader,
         )
 
@@ -101,7 +101,7 @@ class TestUnstructuredFileLoader:
         mock_cls = MagicMock()
         mocker.patch(f"{_MODULE}._LC_LOADER_MAP", {FileFormat.PDF: mock_cls})
         mocker.patch(f"{_MODULE}.FileFormat.from_path", return_value=FileFormat.PDF)
-        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+        from agent_platform.integrations.loader.strategies.unstructured.provider import (
             UnstructuredFileLoader,
         )
 
@@ -111,7 +111,7 @@ class TestUnstructuredFileLoader:
         mock_cls.assert_called_once_with("doc.pdf", mode="single")
 
     def test_loader_map_contains_expected_keys(self):
-        from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+        from agent_platform.integrations.loader.strategies.unstructured.provider import (
             _LC_LOADER_MAP,
         )
 

@@ -7,7 +7,7 @@ from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat
 from agent_platform.integrations.chunking.langchain_base import LangChainChunker
 from agent_platform.integrations.chunking.latex.config import LatexChunkerConfig
-from agent_platform.integrations.chunking.latex.latex import LatexChunkerProvider
+from agent_platform.integrations.chunking.latex.provider import LatexChunkerProvider
 
 LATEX_DOC = (
     r"\section{Intro}"
@@ -42,7 +42,7 @@ def test_splitter_forwards_new_fields_to_from_language(mocker):
     config = LatexChunkerConfig(keep_separator="end", strip_whitespace=False)
 
     mock_from_language = mocker.patch(
-        "agent_platform.integrations.chunking.latex.latex.RecursiveCharacterTextSplitter.from_language"
+        "agent_platform.integrations.chunking.latex.provider.RecursiveCharacterTextSplitter.from_language"
     )
     provider._splitter(config)
 

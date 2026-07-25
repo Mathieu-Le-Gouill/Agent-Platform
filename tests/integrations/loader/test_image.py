@@ -33,14 +33,14 @@ class TestPILImageLoader:
         for key, value in overrides.items():
             setattr(img, key, value)
         mock_image_cls = mocker.patch(
-            "agent_platform.integrations.loader.strategies.pil.pil.Image"
+            "agent_platform.integrations.loader.strategies.pil.provider.Image"
         )
         mock_image_cls.open.return_value.__enter__.return_value = img
         return img
 
     async def test_load_rgba(self, mocker):
         self._mock_image(mocker, "RGBA")
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 
@@ -60,7 +60,7 @@ class TestPILImageLoader:
 
     async def test_load_rgb(self, mocker):
         self._mock_image(mocker, "RGB")
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 
@@ -73,7 +73,7 @@ class TestPILImageLoader:
 
     async def test_load_grayscale(self, mocker):
         self._mock_image(mocker, "L")
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 
@@ -86,7 +86,7 @@ class TestPILImageLoader:
 
     async def test_load_palette_with_transparency(self, mocker):
         self._mock_image(mocker, "P", info={"transparency": 0})
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 
@@ -99,7 +99,7 @@ class TestPILImageLoader:
 
     async def test_load_palette_without_transparency(self, mocker):
         self._mock_image(mocker, "P")
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 
@@ -112,7 +112,7 @@ class TestPILImageLoader:
 
     async def test_load_other_mode_falls_back_to_getbands(self, mocker):
         self._mock_image(mocker, "CMYK")
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 
@@ -125,7 +125,7 @@ class TestPILImageLoader:
 
     async def test_load_unknown_extension_format(self, mocker):
         self._mock_image(mocker, "RGB")
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 
@@ -137,7 +137,7 @@ class TestPILImageLoader:
     async def test_load_extracts_exif_title_and_dimensions(self, mocker):
         img = self._mock_image(mocker, "RGB")
         img.getexif.return_value = {256: 1024, 257: 768, 270: "A description"}
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 
@@ -154,7 +154,7 @@ class TestPILImageLoader:
     async def test_load_exif_xp_title_used_when_no_description(self, mocker):
         img = self._mock_image(mocker, "RGB")
         img.getexif.return_value = {40091: "XP Title"}
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 
@@ -166,7 +166,7 @@ class TestPILImageLoader:
     async def test_load_getexif_raising_is_swallowed(self, mocker):
         img = self._mock_image(mocker, "RGB")
         img.getexif.side_effect = Exception("no exif support")
-        from agent_platform.integrations.loader.strategies.pil.pil import (
+        from agent_platform.integrations.loader.strategies.pil.provider import (
             PILImageLoader,
         )
 

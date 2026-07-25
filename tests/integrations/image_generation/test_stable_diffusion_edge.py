@@ -14,9 +14,9 @@ from agent_platform.integrations.image_generation.stable_diffusion.config import
 
 async def test_load_early_return(mocker):
     mock_pipe_cls = mocker.patch(
-        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+        "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline"
     )
-    from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
+    from agent_platform.integrations.image_generation.stable_diffusion.provider import (
         StableDiffusionGenerator,
     )
 
@@ -28,13 +28,13 @@ async def test_load_early_return(mocker):
 
 async def test_load_safety_checker_none(mocker):
     mock_pipe_cls = mocker.patch(
-        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+        "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline"
     )
     mock_pipe = MagicMock()
     mock_pipe.to.return_value = mock_pipe
     mock_pipe_cls.from_pretrained.return_value = mock_pipe
 
-    from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
+    from agent_platform.integrations.image_generation.stable_diffusion.provider import (
         StableDiffusionGenerator,
     )
 
@@ -55,9 +55,9 @@ async def test_load_safety_checker_none(mocker):
 
 async def test_generate_pipeline_none(mocker):
     mocker.patch(
-        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+        "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline"
     )
-    from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
+    from agent_platform.integrations.image_generation.stable_diffusion.provider import (
         StableDiffusionGenerator,
     )
 
@@ -71,9 +71,9 @@ async def test_generate_pipeline_none(mocker):
 
 async def test_generate_many_pipeline_none(mocker):
     mocker.patch(
-        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+        "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline"
     )
-    from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
+    from agent_platform.integrations.image_generation.stable_diffusion.provider import (
         StableDiffusionGenerator,
     )
 
@@ -87,7 +87,7 @@ async def test_generate_many_pipeline_none(mocker):
 
 async def test_generate_success(mocker):
     mock_pipe_cls = mocker.patch(
-        "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline"
+        "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline"
     )
     mock_pipe = MagicMock()
     mock_pipe.to.return_value = mock_pipe
@@ -101,7 +101,7 @@ async def test_generate_success(mocker):
     mock_output.images = [mock_img]
     mock_pipe.return_value = mock_output
 
-    from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
+    from agent_platform.integrations.image_generation.stable_diffusion.provider import (
         StableDiffusionGenerator,
     )
 
@@ -117,7 +117,7 @@ async def test_generate_success(mocker):
 
 
 def test_pluck_images_tuple():
-    from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
+    from agent_platform.integrations.image_generation.stable_diffusion.provider import (
         _pluck_images,
     )
 

@@ -5,7 +5,7 @@ import pytest
 pytest.importorskip("pytesseract")
 
 from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
-from agent_platform.integrations.ocr.tesseract.tesseract import TesseractOCR
+from agent_platform.integrations.ocr.tesseract.provider import TesseractOCR
 
 FAKE_TESSERACT_DATA = {
     "text": ["Total:", "42.00"],
@@ -26,7 +26,7 @@ async def test_extract_returns_chunks_for_given_document_id(mocker):
 
     mocker.patch.object(TesseractOCR, "_load_image", return_value="fake-image")
     mocker.patch(
-        "agent_platform.integrations.ocr.tesseract.tesseract.pytesseract.image_to_data",
+        "agent_platform.integrations.ocr.tesseract.provider.pytesseract.image_to_data",
         return_value=FAKE_TESSERACT_DATA,
     )
     chunks = await ocr.extract("some/path.png", document_id=document_id)
@@ -42,7 +42,7 @@ async def test_extract_mints_document_id_when_not_provided(mocker):
 
     mocker.patch.object(TesseractOCR, "_load_image", return_value="fake-image")
     mocker.patch(
-        "agent_platform.integrations.ocr.tesseract.tesseract.pytesseract.image_to_data",
+        "agent_platform.integrations.ocr.tesseract.provider.pytesseract.image_to_data",
         return_value=FAKE_TESSERACT_DATA,
     )
     chunks = await ocr.extract("some/path.png")
@@ -57,7 +57,7 @@ async def test_extract_applies_min_confidence_from_config(mocker):
 
     mocker.patch.object(TesseractOCR, "_load_image", return_value="fake-image")
     mocker.patch(
-        "agent_platform.integrations.ocr.tesseract.tesseract.pytesseract.image_to_data",
+        "agent_platform.integrations.ocr.tesseract.provider.pytesseract.image_to_data",
         return_value=FAKE_TESSERACT_DATA,
     )
     chunks = await ocr.extract(
@@ -70,7 +70,7 @@ async def test_extract_applies_min_confidence_from_config(mocker):
 
 async def test_custom_tesseract_cmd(mocker):
     mock_pytesseract = mocker.patch(
-        "agent_platform.integrations.ocr.tesseract.tesseract.pytesseract"
+        "agent_platform.integrations.ocr.tesseract.provider.pytesseract"
     )
     mock_pytesseract.image_to_data.return_value = FAKE_TESSERACT_DATA
     mock_pytesseract.Output.DICT = "dict"

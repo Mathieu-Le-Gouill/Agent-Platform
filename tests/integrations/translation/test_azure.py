@@ -7,10 +7,10 @@ from agent_platform.core.interfaces.translation.base import BaseTranslator
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
 from agent_platform.integrations.credentials import AzureTranslatorCredentials
-from agent_platform.integrations.translation.azure.azure import AzureTranslator
 from agent_platform.integrations.translation.azure.config import (
     AzureTranslatorConfig,
 )
+from agent_platform.integrations.translation.azure.provider import AzureTranslator
 
 
 def _azure_credentials(api_key: str | None = "test-key") -> AzureTranslatorCredentials:
@@ -51,7 +51,7 @@ class TestAzureTranslator:
         content = TextChunk(text="Hello", metadata={})
 
         mock_client_cls = mocker.patch(
-            "agent_platform.integrations.translation.azure.azure.TextTranslationClient"
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
         )
         mock_client = MagicMock()
         mock_client.translate.return_value = _make_response()
@@ -77,7 +77,7 @@ class TestAzureTranslator:
         content = TextChunk(text="Hello", metadata={})
 
         mock_client_cls = mocker.patch(
-            "agent_platform.integrations.translation.azure.azure.TextTranslationClient"
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
         )
         mock_client = MagicMock()
         mock_client.translate.return_value = _make_response()
@@ -94,7 +94,7 @@ class TestAzureTranslator:
         content = TextChunk(text="Hello", metadata={"idx": 1})
 
         mock_client_cls = mocker.patch(
-            "agent_platform.integrations.translation.azure.azure.TextTranslationClient"
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
         )
         mock_client = MagicMock()
         mock_client.translate.return_value = _make_response(
@@ -115,7 +115,7 @@ class TestAzureTranslator:
         config = AzureTranslatorConfig(api_version="2025-10-01-preview")
 
         mock_client_cls = mocker.patch(
-            "agent_platform.integrations.translation.azure.azure.TextTranslationClient"
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
         )
         mock_client = MagicMock()
         mock_client.translate.return_value = _make_response()
@@ -137,7 +137,7 @@ class TestAzureTranslator:
         )
 
         mock_client_cls = mocker.patch(
-            "agent_platform.integrations.translation.azure.azure.TextTranslationClient"
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
         )
         mock_client = MagicMock()
         mock_client.translate.return_value = _make_response()
@@ -159,7 +159,7 @@ class TestAzureTranslator:
         content = TextChunk(text="Hello", metadata={})
 
         mock_client_cls = mocker.patch(
-            "agent_platform.integrations.translation.azure.azure.TextTranslationClient"
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
         )
         mock_client = MagicMock()
         mock_client.translate.side_effect = RuntimeError("boom")

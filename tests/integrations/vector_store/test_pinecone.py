@@ -5,7 +5,7 @@ pytest.importorskip("langchain_pinecone")
 from agent_platform.core.errors import MissingCredentialError
 from agent_platform.integrations.credentials import PineconeCredentials
 from agent_platform.integrations.vector_store.pinecone.config import PineconeConfig
-from agent_platform.integrations.vector_store.pinecone.pinecone import PineconeStore
+from agent_platform.integrations.vector_store.pinecone.provider import PineconeStore
 from tests.helpers import assert_custom_construction_stored, assert_default_construction
 
 
@@ -43,7 +43,7 @@ class TestPineconeBuildClient:
             store._build_client(PineconeConfig())
 
     def test_build_client_omits_host_when_unset(self, capture_client_kwargs):
-        import agent_platform.integrations.vector_store.pinecone.pinecone as mod
+        import agent_platform.integrations.vector_store.pinecone.provider as mod
 
         captured = capture_client_kwargs(mod, "PineconeVectorStore")
 
@@ -56,7 +56,7 @@ class TestPineconeBuildClient:
         assert "host" not in captured
 
     def test_build_client_forwards_host_when_set(self, capture_client_kwargs):
-        import agent_platform.integrations.vector_store.pinecone.pinecone as mod
+        import agent_platform.integrations.vector_store.pinecone.provider as mod
 
         captured = capture_client_kwargs(mod, "PineconeVectorStore")
 

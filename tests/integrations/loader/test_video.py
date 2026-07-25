@@ -9,9 +9,9 @@ class TestPyAVLoader:
             "builtins.open", new_callable=mock_open, read_data=b"fake_video_data"
         )
         mock_av = mocker.patch(
-            "agent_platform.integrations.loader.strategies.pyav.pyav.av"
+            "agent_platform.integrations.loader.strategies.pyav.provider.av"
         )
-        from agent_platform.integrations.loader.strategies.pyav.pyav import (
+        from agent_platform.integrations.loader.strategies.pyav.provider import (
             PyAVLoader,
         )
 
@@ -60,9 +60,9 @@ class TestPyAVLoader:
     ):
         mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
         mock_av = mocker.patch(
-            "agent_platform.integrations.loader.strategies.pyav.pyav.av"
+            "agent_platform.integrations.loader.strategies.pyav.provider.av"
         )
-        from agent_platform.integrations.loader.strategies.pyav.pyav import (
+        from agent_platform.integrations.loader.strategies.pyav.provider import (
             PyAVLoader,
         )
 
@@ -81,9 +81,9 @@ class TestPyAVLoader:
     async def test_no_audio_stream(self, mocker, mock_pil_image):
         mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
         mock_av = mocker.patch(
-            "agent_platform.integrations.loader.strategies.pyav.pyav.av"
+            "agent_platform.integrations.loader.strategies.pyav.provider.av"
         )
-        from agent_platform.integrations.loader.strategies.pyav.pyav import (
+        from agent_platform.integrations.loader.strategies.pyav.provider import (
             PyAVLoader,
         )
 
@@ -113,9 +113,9 @@ class TestPyAVLoader:
     async def test_no_frame_rate(self, mocker, mock_pil_image):
         mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
         mock_av = mocker.patch(
-            "agent_platform.integrations.loader.strategies.pyav.pyav.av"
+            "agent_platform.integrations.loader.strategies.pyav.provider.av"
         )
-        from agent_platform.integrations.loader.strategies.pyav.pyav import (
+        from agent_platform.integrations.loader.strategies.pyav.provider import (
             PyAVLoader,
         )
 

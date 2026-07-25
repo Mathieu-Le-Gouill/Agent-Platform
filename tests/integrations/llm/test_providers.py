@@ -14,23 +14,23 @@ from agent_platform.integrations.credentials import (
     OllamaCredentials,
     OpenAICredentials,
 )
-from agent_platform.integrations.llm.anthropic.anthropic import (
+from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
+from agent_platform.integrations.llm.anthropic.provider import (
     AnthropicLLM,
     _to_langchain_anthropic,
 )
-from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
-from agent_platform.integrations.llm.mistral.mistral import (
+from agent_platform.integrations.llm.mistral.provider import (
     MistralLLM,
     _to_langchain_mistral,
 )
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
-from agent_platform.integrations.llm.ollama.ollama import (
+from agent_platform.integrations.llm.ollama.provider import (
     OllamaLLM,
     _to_langchain_ollama,
 )
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
-from agent_platform.integrations.llm.openai.openai import (
+from agent_platform.integrations.llm.openai.provider import (
     OpenAILLM,
     _to_langchain_openai,
 )

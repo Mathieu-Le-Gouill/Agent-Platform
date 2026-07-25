@@ -10,7 +10,7 @@ from agent_platform.core.schemas.conversation import Utterance
 from agent_platform.core.schemas.enums import AudioFormat, Language
 from agent_platform.integrations.credentials import DeepgramCredentials
 from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
-from agent_platform.integrations.speech_to_text.deepgram.deepgram import (
+from agent_platform.integrations.speech_to_text.deepgram.provider import (
     DeepgramSTT,
     _parse_deepgram_result,
 )

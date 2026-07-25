@@ -6,7 +6,7 @@ pytest.importorskip("boto3")
 pytest.importorskip("google.cloud")
 pytest.importorskip("pytesseract")
 
-from agent_platform.integrations.ocr.tesseract.tesseract import TesseractOCR
+from agent_platform.integrations.ocr.tesseract.provider import TesseractOCR
 from agent_platform.integrations.ocr.utils import load_bytes
 
 
@@ -32,10 +32,10 @@ class TestOCRLoadBytes:
 class TestTesseractLoadImage:
     def test_url_source(self, mocker):
         mock_urlopen = mocker.patch(
-            "agent_platform.integrations.ocr.tesseract.tesseract.urlopen"
+            "agent_platform.integrations.ocr.tesseract.provider.urlopen"
         )
         MockImage = mocker.patch(
-            "agent_platform.integrations.ocr.tesseract.tesseract.Image"
+            "agent_platform.integrations.ocr.tesseract.provider.Image"
         )
         source = "https://example.com/image.png"
         mock_response = MagicMock()
@@ -48,10 +48,10 @@ class TestTesseractLoadImage:
 
     def test_file_path(self, mocker):
         MockPath = mocker.patch(
-            "agent_platform.integrations.ocr.tesseract.tesseract.Path"
+            "agent_platform.integrations.ocr.tesseract.provider.Path"
         )
         MockImage = mocker.patch(
-            "agent_platform.integrations.ocr.tesseract.tesseract.Image"
+            "agent_platform.integrations.ocr.tesseract.provider.Image"
         )
         source = "/path/to/image.png"
         MockImage.open.return_value.convert.return_value = "fake-rgb-image"

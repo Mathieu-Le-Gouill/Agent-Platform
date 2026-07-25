@@ -1,8 +1,8 @@
 from pydantic import SecretStr
 
 from agent_platform.integrations.credentials import CohereCredentials
-from agent_platform.integrations.reranking.cohere.cohere import CohereRerankerProvider
 from agent_platform.integrations.reranking.cohere.config import CohereRerankerConfig
+from agent_platform.integrations.reranking.cohere.provider import CohereRerankerProvider
 
 
 def _provider() -> CohereRerankerProvider:

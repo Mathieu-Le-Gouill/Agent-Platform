@@ -17,7 +17,7 @@ class TestHuggingFaceToLangchain:
         return HuggingFaceCredentials(api_key=SecretStr("hf_test"))
 
     def test_default_config(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             _to_langchain_hugging_face,
         )
 
@@ -27,7 +27,7 @@ class TestHuggingFaceToLangchain:
         assert result["temperature"] == 0.7
 
     def test_with_all_fields(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             _to_langchain_hugging_face,
         )
 
@@ -50,7 +50,7 @@ class TestHuggingFaceToLangchain:
         assert result["max_retries"] == 5
 
     def test_temperature_zero(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             _to_langchain_hugging_face,
         )
 
@@ -59,7 +59,7 @@ class TestHuggingFaceToLangchain:
         assert "temperature" not in result
 
     def test_max_tokens_zero(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             _to_langchain_hugging_face,
         )
 
@@ -68,7 +68,7 @@ class TestHuggingFaceToLangchain:
         assert "max_new_tokens" not in result
 
     def test_new_fields_omitted_when_unset(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             _to_langchain_hugging_face,
         )
 
@@ -78,7 +78,7 @@ class TestHuggingFaceToLangchain:
             assert key not in result
 
     def test_new_fields_forwarded_when_set(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             _to_langchain_hugging_face,
         )
 
@@ -97,7 +97,7 @@ class TestHuggingFaceToLangchain:
     def test_do_sample_false_is_forwarded(self):
         # Regression: `if config.do_sample:` would drop an explicit False;
         # must use `is not None` gating.
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             _to_langchain_hugging_face,
         )
 
@@ -106,7 +106,7 @@ class TestHuggingFaceToLangchain:
         assert result["do_sample"] is False
 
     def test_return_full_text_false_is_forwarded(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             _to_langchain_hugging_face,
         )
 
@@ -117,7 +117,7 @@ class TestHuggingFaceToLangchain:
 
 class TestHuggingFaceLLMConstruction:
     def test_construct(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             HuggingFaceLLM,
         )
 
@@ -125,7 +125,7 @@ class TestHuggingFaceLLMConstruction:
         assert provider._credentials.api_key.get_secret_value() == "hf_test"
 
     def test_default_config(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             HuggingFaceLLM,
         )
 
@@ -139,7 +139,7 @@ class TestHuggingFaceLLMConstruction:
 
 class TestHuggingFaceMissingCredential:
     def test_missing_api_key_raises(self):
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             HuggingFaceLLM,
         )
 
@@ -156,12 +156,12 @@ class TestHuggingFaceMissingCredential:
 class TestHuggingFaceClient:
     def test_client_creation(self, mocker):
         mock_endpoint = mocker.patch(
-            "agent_platform.integrations.llm.huggingface.huggingface.HuggingFaceEndpoint"
+            "agent_platform.integrations.llm.huggingface.provider.HuggingFaceEndpoint"
         )
         mock_chat = mocker.patch(
-            "agent_platform.integrations.llm.huggingface.huggingface.ChatHuggingFace"
+            "agent_platform.integrations.llm.huggingface.provider.ChatHuggingFace"
         )
-        from agent_platform.integrations.llm.huggingface.huggingface import (
+        from agent_platform.integrations.llm.huggingface.provider import (
             HuggingFaceLLM,
         )
 

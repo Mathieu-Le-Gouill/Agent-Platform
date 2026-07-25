@@ -5,7 +5,7 @@ from langchain_community.cross_encoders import HuggingFaceCrossEncoder
 from agent_platform.integrations.reranking.huggingface.config import (
     HuggingFaceRerankerConfig,
 )
-from agent_platform.integrations.reranking.huggingface.huggingface import (
+from agent_platform.integrations.reranking.huggingface.provider import (
     HuggingFaceRerankerProvider,
     _ScoredCrossEncoderReranker,
 )
@@ -13,7 +13,7 @@ from agent_platform.integrations.reranking.huggingface.huggingface import (
 
 def _client(mocker, config: HuggingFaceRerankerConfig):
     mock_encoder_cls = mocker.patch(
-        "agent_platform.integrations.reranking.huggingface.huggingface.HuggingFaceCrossEncoder"
+        "agent_platform.integrations.reranking.huggingface.provider.HuggingFaceCrossEncoder"
     )
     mock_encoder_cls.return_value = MagicMock(spec=HuggingFaceCrossEncoder)
     provider = HuggingFaceRerankerProvider()

@@ -6,11 +6,11 @@ import pytest
 pytest.importorskip("boto3")
 
 from agent_platform.integrations.credentials import AWSTextractCredentials
-from agent_platform.integrations.ocr.aws_textract.aws_textract import (
+from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
+from agent_platform.integrations.ocr.aws_textract.provider import (
     AWSTextractOCR,
     _from_textract,
 )
-from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
 
 FAKE_TEXTRACT_RESPONSE = {
     "Blocks": [
@@ -26,7 +26,7 @@ async def test_extract_returns_chunks_from_line_blocks(mocker):
     document_id = uuid4()
 
     mock_boto = mocker.patch(
-        "agent_platform.integrations.ocr.aws_textract.aws_textract.boto3.client"
+        "agent_platform.integrations.ocr.aws_textract.provider.boto3.client"
     )
     mock_client = MagicMock()
     mock_client.detect_document_text.return_value = FAKE_TEXTRACT_RESPONSE
@@ -35,7 +35,7 @@ async def test_extract_returns_chunks_from_line_blocks(mocker):
     ocr = AWSTextractOCR(AWSTextractCredentials())
 
     mocker.patch(
-        "agent_platform.integrations.ocr.aws_textract.aws_textract.load_bytes",
+        "agent_platform.integrations.ocr.aws_textract.provider.load_bytes",
         return_value=b"fake-bytes",
     )
     chunks = await ocr.extract("some/path.png", document_id=document_id)
@@ -60,7 +60,7 @@ def test_from_textract_only_keeps_line_blocks():
 @pytest.mark.asyncio
 async def test_client_is_cached_across_calls_for_same_region(mocker):
     mock_boto = mocker.patch(
-        "agent_platform.integrations.ocr.aws_textract.aws_textract.boto3.client"
+        "agent_platform.integrations.ocr.aws_textract.provider.boto3.client"
     )
     mock_client = MagicMock()
     mock_client.detect_document_text.return_value = FAKE_TEXTRACT_RESPONSE
@@ -69,7 +69,7 @@ async def test_client_is_cached_across_calls_for_same_region(mocker):
     ocr = AWSTextractOCR(AWSTextractCredentials())
 
     mocker.patch(
-        "agent_platform.integrations.ocr.aws_textract.aws_textract.load_bytes",
+        "agent_platform.integrations.ocr.aws_textract.provider.load_bytes",
         return_value=b"fake-bytes",
     )
     await ocr.extract("a.png")
@@ -81,7 +81,7 @@ async def test_client_is_cached_across_calls_for_same_region(mocker):
 @pytest.mark.asyncio
 async def test_client_is_recreated_for_a_different_region(mocker):
     mock_boto = mocker.patch(
-        "agent_platform.integrations.ocr.aws_textract.aws_textract.boto3.client"
+        "agent_platform.integrations.ocr.aws_textract.provider.boto3.client"
     )
     mock_client = MagicMock()
     mock_client.detect_document_text.return_value = FAKE_TEXTRACT_RESPONSE
@@ -90,7 +90,7 @@ async def test_client_is_recreated_for_a_different_region(mocker):
     ocr = AWSTextractOCR(AWSTextractCredentials())
 
     mocker.patch(
-        "agent_platform.integrations.ocr.aws_textract.aws_textract.load_bytes",
+        "agent_platform.integrations.ocr.aws_textract.provider.load_bytes",
         return_value=b"fake-bytes",
     )
     await ocr.extract("a.png", config=AWSTextractConfig(region_name="us-east-1"))

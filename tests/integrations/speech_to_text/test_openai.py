@@ -12,7 +12,7 @@ from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.speech_to_text.openai.config import (
     OpenAIWhisperConfig,
 )
-from agent_platform.integrations.speech_to_text.openai.openai import OpenAIWhisperSTT
+from agent_platform.integrations.speech_to_text.openai.provider import OpenAIWhisperSTT
 
 
 def _make_audio() -> AudioChunk:

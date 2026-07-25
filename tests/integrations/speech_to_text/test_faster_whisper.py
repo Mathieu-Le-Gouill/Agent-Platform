@@ -11,7 +11,7 @@ from agent_platform.core.schemas.enums import AudioFormat
 from agent_platform.integrations.speech_to_text.faster_whisper.config import (
     FasterWhisperConfig,
 )
-from agent_platform.integrations.speech_to_text.faster_whisper.faster_whisper import (
+from agent_platform.integrations.speech_to_text.faster_whisper.provider import (
     FasterWhisperSTT,
 )
 

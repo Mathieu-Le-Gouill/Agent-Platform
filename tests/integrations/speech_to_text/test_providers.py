@@ -5,7 +5,7 @@ import pytest
 pytest.importorskip("deepgram")
 
 from agent_platform.integrations.credentials import DeepgramCredentials
-from agent_platform.integrations.speech_to_text.deepgram.deepgram import (
+from agent_platform.integrations.speech_to_text.deepgram.provider import (
     DeepgramSTT,
     _parse_deepgram_result,
 )
@@ -15,7 +15,7 @@ from agent_platform.integrations.speech_to_text.utils import (
 from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXConfig
 
 try:
-    from agent_platform.integrations.speech_to_text.whisperx.whisperx import (
+    from agent_platform.integrations.speech_to_text.whisperx.provider import (
         WhisperXSTT,
     )
 
@@ -258,7 +258,7 @@ class TestWhisperXModelCaching:
 
         stt = WhisperXSTT()
         mock_load_model = mocker.patch(
-            "agent_platform.integrations.speech_to_text.whisperx.whisperx.whisperx.load_model",
+            "agent_platform.integrations.speech_to_text.whisperx.provider.whisperx.load_model",
             return_value="the-model",
         )
         result = stt._load_model_sync(
@@ -355,7 +355,7 @@ class TestWhisperXAlignment:
 
         stt = WhisperXSTT()
         mock_load_align = mocker.patch(
-            "agent_platform.integrations.speech_to_text.whisperx.whisperx.whisperx.load_align_model",
+            "agent_platform.integrations.speech_to_text.whisperx.provider.whisperx.load_align_model",
             return_value=("model_a", {"lang": "en"}),
         )
         asyncio.run(stt._ensure_align_model("en", "cpu"))
@@ -379,7 +379,7 @@ class TestWhisperXAlignment:
             return_value=("model_a", {"lang": "en"}),
         )
         mock_align = mocker.patch(
-            "agent_platform.integrations.speech_to_text.whisperx.whisperx.whisperx.align",
+            "agent_platform.integrations.speech_to_text.whisperx.provider.whisperx.align",
             return_value={"segments": [{"text": "hi aligned"}]},
         )
         aligned = await stt._align(result, audio_np, "en", WhisperXConfig())

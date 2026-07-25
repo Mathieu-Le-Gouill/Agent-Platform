@@ -6,7 +6,9 @@ from agent_platform.core.errors import ProviderError, ValidationError
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat
 from agent_platform.integrations.chunking.pdf.config import PDFChunkerConfig
-from agent_platform.integrations.chunking.pdf.pdf import PDFStructureChunkerProvider
+from agent_platform.integrations.chunking.pdf.provider import (
+    PDFStructureChunkerProvider,
+)
 
 
 class _FakeMetadata:
@@ -54,10 +56,10 @@ def test_chunk_rejects_mismatched_format():
 
 def test_chunk_accepts_unknown_format(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
     mock_chunk_by_title = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.chunk_by_title"
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
     )
     mock_partition.return_value = ["element"]
     mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
@@ -72,10 +74,10 @@ def test_chunk_accepts_unknown_format(mocker):
 
 def test_chunk_maps_sections_to_text_chunks(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
     mock_chunk_by_title = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.chunk_by_title"
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
     )
     mock_partition.return_value = ["element"]
     mock_chunk_by_title.return_value = [
@@ -98,9 +100,9 @@ def test_chunk_maps_sections_to_text_chunks(mocker):
 
 def test_chunk_wraps_unexpected_errors_as_provider_error(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
-    mocker.patch("agent_platform.integrations.chunking.pdf.pdf.chunk_by_title")
+    mocker.patch("agent_platform.integrations.chunking.pdf.provider.chunk_by_title")
     mock_partition.side_effect = RuntimeError("boom")
 
     provider = PDFStructureChunkerProvider()
@@ -117,10 +119,10 @@ def test_default_config_overlap_all_defaults_true():
 
 def test_chunk_forwards_overlap_all_by_default(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
     mock_chunk_by_title = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.chunk_by_title"
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
     )
     mock_partition.return_value = ["element"]
     mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
@@ -137,10 +139,10 @@ def test_chunk_forwards_overlap_all_by_default(mocker):
 
 def test_chunk_forwards_overlap_all_false_when_configured(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
     mock_chunk_by_title = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.chunk_by_title"
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
     )
     mock_partition.return_value = ["element"]
     mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
@@ -157,10 +159,10 @@ def test_chunk_forwards_overlap_all_false_when_configured(mocker):
 
 def test_chunk_forwards_include_orig_elements(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
     mock_chunk_by_title = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.chunk_by_title"
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
     )
     mock_partition.return_value = ["element"]
     mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
@@ -177,10 +179,10 @@ def test_chunk_forwards_include_orig_elements(mocker):
 
 def test_chunk_forwards_max_tokens_when_set(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
     mock_chunk_by_title = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.chunk_by_title"
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
     )
     mock_partition.return_value = ["element"]
     mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
@@ -197,10 +199,10 @@ def test_chunk_forwards_max_tokens_when_set(mocker):
 
 def test_chunk_omits_max_tokens_when_unset(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
     mock_chunk_by_title = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.chunk_by_title"
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
     )
     mock_partition.return_value = ["element"]
     mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
@@ -216,10 +218,10 @@ def test_chunk_omits_max_tokens_when_unset(mocker):
 
 def test_chunk_forwards_table_options_when_true(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
     mock_chunk_by_title = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.chunk_by_title"
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
     )
     mock_partition.return_value = ["element"]
     mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
@@ -242,10 +244,10 @@ def test_chunk_forwards_table_options_when_true(mocker):
 
 def test_chunk_omits_table_options_when_false(mocker):
     mock_partition = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.partition_pdf"
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
     )
     mock_chunk_by_title = mocker.patch(
-        "agent_platform.integrations.chunking.pdf.pdf.chunk_by_title"
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
     )
     mock_partition.return_value = ["element"]
     mock_chunk_by_title.return_value = [_FakeSection("Section body.")]

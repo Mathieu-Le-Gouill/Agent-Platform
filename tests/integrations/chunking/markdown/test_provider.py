@@ -6,7 +6,7 @@ from agent_platform.core.errors import ValidationError
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat
 from agent_platform.integrations.chunking.markdown.config import MarkdownChunkerConfig
-from agent_platform.integrations.chunking.markdown.markdown import (
+from agent_platform.integrations.chunking.markdown.provider import (
     MarkdownStructureChunkerProvider,
 )
 
@@ -46,7 +46,7 @@ def test_chunk_forwards_return_each_line(mocker):
     config = MarkdownChunkerConfig(return_each_line=True)
 
     mock_splitter_cls = mocker.patch(
-        "agent_platform.integrations.chunking.markdown.markdown.MarkdownHeaderTextSplitter"
+        "agent_platform.integrations.chunking.markdown.provider.MarkdownHeaderTextSplitter"
     )
     mock_splitter_cls.return_value.split_text.return_value = []
     provider.chunk([doc], config)
@@ -61,7 +61,7 @@ def test_chunk_forwards_custom_header_patterns_when_set(mocker):
     config = MarkdownChunkerConfig(custom_header_patterns={"**": 1})
 
     mock_splitter_cls = mocker.patch(
-        "agent_platform.integrations.chunking.markdown.markdown.MarkdownHeaderTextSplitter"
+        "agent_platform.integrations.chunking.markdown.provider.MarkdownHeaderTextSplitter"
     )
     mock_splitter_cls.return_value.split_text.return_value = []
     provider.chunk([doc], config)
@@ -75,7 +75,7 @@ def test_chunk_omits_custom_header_patterns_when_unset(mocker):
     doc = TextDocument(text=MARKDOWN_DOC, format=DocumentFormat.MARKDOWN)
 
     mock_splitter_cls = mocker.patch(
-        "agent_platform.integrations.chunking.markdown.markdown.MarkdownHeaderTextSplitter"
+        "agent_platform.integrations.chunking.markdown.provider.MarkdownHeaderTextSplitter"
     )
     mock_splitter_cls.return_value.split_text.return_value = []
     provider.chunk([doc], None)

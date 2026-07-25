@@ -5,7 +5,7 @@ pytest.importorskip("langchain_qdrant")
 
 from agent_platform.integrations.credentials import QdrantCredentials
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
-from agent_platform.integrations.vector_store.qdrant.qdrant import (
+from agent_platform.integrations.vector_store.qdrant.provider import (
     QdrantVectorStoreProvider,
 )
 from tests.helpers import assert_custom_construction_stored, assert_default_construction
@@ -40,7 +40,7 @@ class TestQdrantConstruction:
 
 class TestQdrantBuildClient:
     def test_build_client_forwards_prefer_grpc(self, capture_client_kwargs):
-        import agent_platform.integrations.vector_store.qdrant.qdrant as mod
+        import agent_platform.integrations.vector_store.qdrant.provider as mod
 
         captured = capture_client_kwargs(mod, "QdrantClient", "QdrantVectorStore")
 
@@ -53,7 +53,7 @@ class TestQdrantBuildClient:
         assert captured["prefer_grpc"] is True
 
     def test_build_client_still_uses_credentials_api_key(self, capture_client_kwargs):
-        import agent_platform.integrations.vector_store.qdrant.qdrant as mod
+        import agent_platform.integrations.vector_store.qdrant.provider as mod
 
         captured = capture_client_kwargs(mod, "QdrantClient", "QdrantVectorStore")
 

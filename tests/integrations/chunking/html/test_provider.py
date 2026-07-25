@@ -7,7 +7,9 @@ from agent_platform.core.errors import ValidationError
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat
 from agent_platform.integrations.chunking.html.config import HTMLChunkerConfig
-from agent_platform.integrations.chunking.html.html import HTMLStructureChunkerProvider
+from agent_platform.integrations.chunking.html.provider import (
+    HTMLStructureChunkerProvider,
+)
 
 HTML_DOC = (
     "<html><body>"
@@ -42,7 +44,7 @@ def test_chunk_forwards_return_each_element(mocker):
     config = HTMLChunkerConfig(return_each_element=True)
 
     mock_splitter_cls = mocker.patch(
-        "agent_platform.integrations.chunking.html.html.HTMLHeaderTextSplitter"
+        "agent_platform.integrations.chunking.html.provider.HTMLHeaderTextSplitter"
     )
     mock_splitter_cls.return_value.split_text.return_value = []
     provider.chunk([doc], config)

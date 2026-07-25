@@ -2,7 +2,7 @@ from pydantic import SecretStr
 
 from agent_platform.integrations.credentials import JinaCredentials
 from agent_platform.integrations.reranking.jina.config import JinaRerankerConfig
-from agent_platform.integrations.reranking.jina.jina import JinaRerankerProvider
+from agent_platform.integrations.reranking.jina.provider import JinaRerankerProvider
 
 
 def _provider() -> JinaRerankerProvider:

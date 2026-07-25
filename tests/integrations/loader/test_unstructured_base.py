@@ -9,7 +9,7 @@ pytest.importorskip("langchain_community")
 from langchain_core.documents import Document as LCDocument
 
 from agent_platform.core.schemas.enums import DocumentFormat, Language
-from agent_platform.integrations.loader.strategies.unstructured.unstructured import (
+from agent_platform.integrations.loader.strategies.unstructured.provider import (
     UnstructuredBaseLoader,
     _extract_format,
     _extract_title,
@@ -151,7 +151,7 @@ class TestLoad:
         loader = _ConcreteLoader()
 
         mocker.patch(
-            "agent_platform.integrations.loader.strategies.unstructured.unstructured.asyncio.to_thread",
+            "agent_platform.integrations.loader.strategies.unstructured.provider.asyncio.to_thread",
             return_value=[mock_doc],
         )
         results = await loader.load("test.txt")
@@ -165,7 +165,7 @@ class TestLoad:
         loader = _ConcreteLoader()
 
         mocker.patch(
-            "agent_platform.integrations.loader.strategies.unstructured.unstructured.asyncio.to_thread",
+            "agent_platform.integrations.loader.strategies.unstructured.provider.asyncio.to_thread",
             return_value=[],
         )
         results = await loader.load("test.txt")

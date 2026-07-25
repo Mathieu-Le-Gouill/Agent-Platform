@@ -354,7 +354,7 @@ class TestLangChainChunker:
 class TestRecursiveChunkerIntegration:
     @pytest.fixture
     def chunker(self):
-        from agent_platform.integrations.chunking.recursive.recursive import (
+        from agent_platform.integrations.chunking.recursive.provider import (
             RecursiveChunkerProvider,
         )
 

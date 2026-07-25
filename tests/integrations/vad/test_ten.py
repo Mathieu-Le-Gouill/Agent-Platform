@@ -18,8 +18,8 @@ def test_config_defaults():
 
 
 def test_provider_requirements(mocker):
-    mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    mocker.patch("agent_platform.integrations.vad.ten.provider.TenVad")
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     vad = TenVAD()
     req = vad.requirements
@@ -30,12 +30,14 @@ def test_provider_requirements(mocker):
 
 
 def test_detect_with_speech(mocker):
-    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
+    mock_ten_vad_cls = mocker.patch(
+        "agent_platform.integrations.vad.ten.provider.TenVad"
+    )
     mock_handle = MagicMock()
     mock_handle.process.side_effect = [(0.9, 1), (0.8, 1), (0.1, 0)]
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     vad = TenVAD()
 
@@ -75,12 +77,14 @@ def test_detect_with_speech(mocker):
 
 
 def test_is_speech_above_threshold(mocker):
-    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
+    mock_ten_vad_cls = mocker.patch(
+        "agent_platform.integrations.vad.ten.provider.TenVad"
+    )
     mock_handle = MagicMock()
     mock_handle.process.return_value = (0.9, 1)
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     vad = TenVAD()
     vad.handle = mock_handle
@@ -99,12 +103,14 @@ def test_is_speech_above_threshold(mocker):
 
 
 def test_is_speech_below_threshold(mocker):
-    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
+    mock_ten_vad_cls = mocker.patch(
+        "agent_platform.integrations.vad.ten.provider.TenVad"
+    )
     mock_handle = MagicMock()
     mock_handle.process.return_value = (0.1, 0)
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     vad = TenVAD()
     vad.handle = mock_handle
@@ -123,12 +129,14 @@ def test_is_speech_below_threshold(mocker):
 
 
 async def test_adetect_async_flow(mocker):
-    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
+    mock_ten_vad_cls = mocker.patch(
+        "agent_platform.integrations.vad.ten.provider.TenVad"
+    )
     mock_handle = MagicMock()
     mock_handle.process.side_effect = [(0.9, 1), (0.1, 0)]
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     vad = TenVAD()
     vad.handle = mock_handle
@@ -159,21 +167,25 @@ async def test_adetect_async_flow(mocker):
 
 
 def test_detect_empty_returns_empty(mocker):
-    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
+    mock_ten_vad_cls = mocker.patch(
+        "agent_platform.integrations.vad.ten.provider.TenVad"
+    )
     mock_ten_vad_cls.return_value = MagicMock()
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     vad = TenVAD()
     assert vad.detect([]) == []
 
 
 def test_detect_all_silence_returns_empty(mocker):
-    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
+    mock_ten_vad_cls = mocker.patch(
+        "agent_platform.integrations.vad.ten.provider.TenVad"
+    )
     mock_handle = MagicMock()
     mock_handle.process.return_value = (0.1, 0)
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     vad = TenVAD()
     vad.handle = mock_handle
@@ -195,12 +207,14 @@ def test_detect_all_silence_returns_empty(mocker):
 
 
 async def test_adetect_before_detect_does_not_raise_attribute_error(mocker):
-    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
+    mock_ten_vad_cls = mocker.patch(
+        "agent_platform.integrations.vad.ten.provider.TenVad"
+    )
     mock_handle = MagicMock()
     mock_handle.process.return_value = (0.1, 0)
     mock_ten_vad_cls.return_value = mock_handle
 
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     # Regression test: adetect() previously never initialized self.handle,
     # so calling it before detect() raised AttributeError.
@@ -223,8 +237,10 @@ async def test_adetect_before_detect_does_not_raise_attribute_error(mocker):
 
 
 def test_handle_is_none_before_first_use(mocker):
-    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    mock_ten_vad_cls = mocker.patch(
+        "agent_platform.integrations.vad.ten.provider.TenVad"
+    )
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     vad = TenVAD()
     assert vad.handle is None
@@ -232,10 +248,12 @@ def test_handle_is_none_before_first_use(mocker):
 
 
 def test_ensure_handle_reuses_existing_handle_for_same_config(mocker):
-    mock_ten_vad_cls = mocker.patch("agent_platform.integrations.vad.ten.ten.TenVad")
+    mock_ten_vad_cls = mocker.patch(
+        "agent_platform.integrations.vad.ten.provider.TenVad"
+    )
     mock_ten_vad_cls.return_value = MagicMock()
 
-    from agent_platform.integrations.vad.ten.ten import TenVAD
+    from agent_platform.integrations.vad.ten.provider import TenVAD
 
     vad = TenVAD()
     config = TenVadConfig()

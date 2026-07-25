@@ -12,14 +12,14 @@ from agent_platform.integrations.credentials import (
     GoogleTranslateCredentials,
 )
 from agent_platform.integrations.translation.deepl.config import DeepLConfig
-from agent_platform.integrations.translation.deepl.deepl import (
+from agent_platform.integrations.translation.deepl.provider import (
     _DEEPL_TARGETS,
     DeepLTranslator,
 )
 from agent_platform.integrations.translation.google_translate.config import (
     GoogleTranslateConfig,
 )
-from agent_platform.integrations.translation.google_translate.google_translate import (
+from agent_platform.integrations.translation.google_translate.provider import (
     _GOOGLE_TARGETS,
     GoogleTranslator,
 )
@@ -52,7 +52,7 @@ class TestDeepLTranslator:
         mock_result.detected_source_lang = "FR"
 
         mock_translator_cls = mocker.patch(
-            "agent_platform.integrations.translation.deepl.deepl.deepl.Translator"
+            "agent_platform.integrations.translation.deepl.provider.deepl.Translator"
         )
         mock_client = MagicMock()
         mock_client.translate_text.return_value = [mock_result]
@@ -78,7 +78,7 @@ class TestDeepLTranslator:
         mock_result.detected_source_lang = "EN"
 
         mock_translator_cls = mocker.patch(
-            "agent_platform.integrations.translation.deepl.deepl.deepl.Translator"
+            "agent_platform.integrations.translation.deepl.provider.deepl.Translator"
         )
         mock_client = MagicMock()
         mock_client.translate_text.return_value = [mock_result]
@@ -108,7 +108,7 @@ class TestDeepLTranslator:
         )
 
         mock_translator_cls = mocker.patch(
-            "agent_platform.integrations.translation.deepl.deepl.deepl.Translator"
+            "agent_platform.integrations.translation.deepl.provider.deepl.Translator"
         )
         mock_client = MagicMock()
         mock_client.translate_text.return_value = [mock_result]
@@ -130,7 +130,7 @@ class TestDeepLTranslator:
         content = TextChunk(text="Hi", metadata={})
 
         mock_translator_cls = mocker.patch(
-            "agent_platform.integrations.translation.deepl.deepl.deepl.Translator"
+            "agent_platform.integrations.translation.deepl.provider.deepl.Translator"
         )
         mock_client = MagicMock()
         mock_client.translate_text.side_effect = deepl.DeepLException("boom")
@@ -155,7 +155,7 @@ class TestGoogleTranslator:
         content = TextChunk(text="Hello & goodbye", metadata={"src": "test"})
 
         mock_module = mocker.patch(
-            "agent_platform.integrations.translation.google_translate.google_translate.google_translate"
+            "agent_platform.integrations.translation.google_translate.provider.google_translate"
         )
         mock_client = MagicMock()
         mock_client.translate.return_value = {
@@ -178,7 +178,7 @@ class TestGoogleTranslator:
         config = GoogleTranslateConfig(model="nmt")
 
         mock_module = mocker.patch(
-            "agent_platform.integrations.translation.google_translate.google_translate.google_translate"
+            "agent_platform.integrations.translation.google_translate.provider.google_translate"
         )
         mock_client = MagicMock()
         mock_client.translate.return_value = {
@@ -198,7 +198,7 @@ class TestGoogleTranslator:
         content = TextChunk(text="Hello", metadata={})
 
         mock_module = mocker.patch(
-            "agent_platform.integrations.translation.google_translate.google_translate.google_translate"
+            "agent_platform.integrations.translation.google_translate.provider.google_translate"
         )
         mock_client = MagicMock()
         mock_client.translate.side_effect = RuntimeError("boom")

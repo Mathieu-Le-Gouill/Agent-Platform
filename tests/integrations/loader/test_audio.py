@@ -8,9 +8,9 @@ class TestSoundFileLoader:
     async def test_load_wav(self, mocker, mock_pil_image):
         mocker.patch("builtins.open", new_callable=mock_open, read_data=b"fake_audio")
         mock_sf = mocker.patch(
-            "agent_platform.integrations.loader.strategies.soundfile.soundfile.sf"
+            "agent_platform.integrations.loader.strategies.soundfile.provider.sf"
         )
-        from agent_platform.integrations.loader.strategies.soundfile.soundfile import (
+        from agent_platform.integrations.loader.strategies.soundfile.provider import (
             SoundFileLoader,
         )
 
@@ -38,9 +38,9 @@ class TestSoundFileLoader:
     async def test_load_mp3(self, mocker, mock_pil_image):
         mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
         mock_sf = mocker.patch(
-            "agent_platform.integrations.loader.strategies.soundfile.soundfile.sf"
+            "agent_platform.integrations.loader.strategies.soundfile.provider.sf"
         )
-        from agent_platform.integrations.loader.strategies.soundfile.soundfile import (
+        from agent_platform.integrations.loader.strategies.soundfile.provider import (
             SoundFileLoader,
         )
 
@@ -62,9 +62,9 @@ class TestSoundFileLoader:
     async def test_load_with_config(self, mocker, mock_pil_image):
         mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
         mock_sf = mocker.patch(
-            "agent_platform.integrations.loader.strategies.soundfile.soundfile.sf"
+            "agent_platform.integrations.loader.strategies.soundfile.provider.sf"
         )
-        from agent_platform.integrations.loader.strategies.soundfile.soundfile import (
+        from agent_platform.integrations.loader.strategies.soundfile.provider import (
             SoundFileLoader,
         )
 
@@ -87,9 +87,9 @@ class TestSoundFileLoader:
     async def test_unknown_format(self, mocker, mock_pil_image):
         mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
         mock_sf = mocker.patch(
-            "agent_platform.integrations.loader.strategies.soundfile.soundfile.sf"
+            "agent_platform.integrations.loader.strategies.soundfile.provider.sf"
         )
-        from agent_platform.integrations.loader.strategies.soundfile.soundfile import (
+        from agent_platform.integrations.loader.strategies.soundfile.provider import (
             SoundFileLoader,
         )
 
@@ -113,9 +113,9 @@ class TestSoundFileLoaderDuration:
     async def test_duration_from_frames(self, mocker, mock_pil_image):
         mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
         mock_sf = mocker.patch(
-            "agent_platform.integrations.loader.strategies.soundfile.soundfile.sf"
+            "agent_platform.integrations.loader.strategies.soundfile.provider.sf"
         )
-        from agent_platform.integrations.loader.strategies.soundfile.soundfile import (
+        from agent_platform.integrations.loader.strategies.soundfile.provider import (
             SoundFileLoader,
         )
 
@@ -136,9 +136,9 @@ class TestSoundFileLoaderDuration:
     async def test_duration_none_when_zero_sample_rate(self, mocker, mock_pil_image):
         mocker.patch("builtins.open", new_callable=mock_open, read_data=b"data")
         mock_sf = mocker.patch(
-            "agent_platform.integrations.loader.strategies.soundfile.soundfile.sf"
+            "agent_platform.integrations.loader.strategies.soundfile.provider.sf"
         )
-        from agent_platform.integrations.loader.strategies.soundfile.soundfile import (
+        from agent_platform.integrations.loader.strategies.soundfile.provider import (
             SoundFileLoader,
         )
 

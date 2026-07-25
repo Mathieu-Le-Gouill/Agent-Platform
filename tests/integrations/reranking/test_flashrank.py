@@ -3,7 +3,7 @@ from uuid import uuid4
 
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.reranking.flashrank.config import FlashRankConfig
-from agent_platform.integrations.reranking.flashrank.flashrank import FlashRankReranker
+from agent_platform.integrations.reranking.flashrank.provider import FlashRankReranker
 
 
 def _items():
@@ -24,7 +24,7 @@ async def test_max_length_forwarded_to_ranker(monkeypatch):
             return [{"id": 0, "text": "a", "score": 0.5}]
 
     monkeypatch.setattr(
-        "agent_platform.integrations.reranking.flashrank.flashrank.Ranker", FakeRanker
+        "agent_platform.integrations.reranking.flashrank.provider.Ranker", FakeRanker
     )
 
     reranker = FlashRankReranker()
@@ -44,7 +44,7 @@ async def test_max_length_omitted_when_unset(monkeypatch):
             return [{"id": 0, "text": "a", "score": 0.5}]
 
     monkeypatch.setattr(
-        "agent_platform.integrations.reranking.flashrank.flashrank.Ranker", FakeRanker
+        "agent_platform.integrations.reranking.flashrank.provider.Ranker", FakeRanker
     )
 
     reranker = FlashRankReranker()

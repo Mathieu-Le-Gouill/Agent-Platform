@@ -14,7 +14,7 @@ from agent_platform.integrations.credentials import (
     OpenAICredentials,
 )
 from agent_platform.integrations.image_generation.dalle.config import DalleConfig
-from agent_platform.integrations.image_generation.dalle.dalle import (
+from agent_platform.integrations.image_generation.dalle.provider import (
     DallEImageGenerator,
     _validate_n,
     _validate_size,
@@ -22,7 +22,7 @@ from agent_platform.integrations.image_generation.dalle.dalle import (
 from agent_platform.integrations.image_generation.midjourney.config import (
     MidjourneyConfig,
 )
-from agent_platform.integrations.image_generation.midjourney.midjourney import (
+from agent_platform.integrations.image_generation.midjourney.provider import (
     MidjourneyGenerator,
     _size_to_aspect,
 )
@@ -31,7 +31,7 @@ from agent_platform.integrations.image_generation.stable_diffusion.config import
 )
 
 try:
-    from agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion import (
+    from agent_platform.integrations.image_generation.stable_diffusion.provider import (
         StableDiffusionGenerator,
         _parse_size,
     )
@@ -214,7 +214,7 @@ class TestSizeToAspect:
 class TestDallEGenerate:
     async def test_generate_returns_image_document(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -240,7 +240,7 @@ class TestDallEGenerate:
 
     async def test_generate_with_custom_size(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -262,7 +262,7 @@ class TestDallEGenerate:
 
     async def test_generate_many_returns_multiple_documents(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -290,7 +290,7 @@ class TestDallEGenerate:
 
     async def test_generate_dalle3_forwards_style(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -312,7 +312,7 @@ class TestDallEGenerate:
 
     async def test_generate_gpt_image_1_omits_response_format(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -338,7 +338,7 @@ class TestDallEGenerate:
 
     async def test_generate_dalle2_omits_quality(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -399,7 +399,7 @@ class TestDallEValidateN:
 class TestDallEGenerateErrorHandling:
     async def test_response_data_none_raises_error(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -414,7 +414,7 @@ class TestDallEGenerateErrorHandling:
 
     async def test_b64_json_none_raises_error_on_generate(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -431,7 +431,7 @@ class TestDallEGenerateErrorHandling:
 
     async def test_response_data_none_on_generate_many(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -446,7 +446,7 @@ class TestDallEGenerateErrorHandling:
 
     async def test_b64_json_none_skipped_in_generate_many(self, mocker):
         mock_openai_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.dalle.dalle.AsyncOpenAI"
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
         )
         mock_client = MagicMock()
         mock_openai_cls.return_value = mock_client
@@ -657,7 +657,7 @@ class TestMidjourneyGenerate:
 class TestStableDiffusionGenerate:
     async def test_generate_returns_image_document(self, mocker):
         mock_from_pretrained = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline.from_pretrained"
         )
         from PIL import Image
 
@@ -681,7 +681,7 @@ class TestStableDiffusionGenerate:
 
     async def test_generate_with_custom_size(self, mocker):
         mock_from_pretrained = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline.from_pretrained"
         )
         from PIL import Image
 
@@ -703,7 +703,7 @@ class TestStableDiffusionGenerate:
 
     async def test_generate_model_load_failure(self, mocker):
         mock_from_pretrained = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline.from_pretrained"
         )
         mock_pipeline = MagicMock()
         mock_pipeline.to.side_effect = RuntimeError(
@@ -717,7 +717,7 @@ class TestStableDiffusionGenerate:
 
     async def test_generate_many(self, mocker):
         mock_from_pretrained = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline.from_pretrained"
         )
         from PIL import Image
 
@@ -740,7 +740,7 @@ class TestStableDiffusionGenerate:
 
     async def test_generate_wires_guidance_and_steps(self, mocker):
         mock_from_pretrained = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline.from_pretrained"
         )
         from PIL import Image
 
@@ -767,7 +767,7 @@ class TestStableDiffusionGenerate:
 
     async def test_generate_wires_negative_prompt_from_config(self, mocker):
         mock_from_pretrained = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline.from_pretrained"
         )
         from PIL import Image
 
@@ -791,7 +791,7 @@ class TestStableDiffusionGenerate:
 
     async def test_generate_wires_negative_prompt_argument_override(self, mocker):
         mock_from_pretrained = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline.from_pretrained"
         )
         from PIL import Image
 
@@ -815,10 +815,10 @@ class TestStableDiffusionGenerate:
 
     async def test_generate_wires_seed_to_generator(self, mocker):
         mock_from_pretrained = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline.from_pretrained"
         )
         mock_generator_cls = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.torch.Generator"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.torch.Generator"
         )
         from PIL import Image
 
@@ -846,7 +846,7 @@ class TestStableDiffusionGenerate:
 
     async def test_generate_many_wires_guidance_and_steps(self, mocker):
         mock_from_pretrained = mocker.patch(
-            "agent_platform.integrations.image_generation.stable_diffusion.stable_diffusion.StableDiffusionPipeline.from_pretrained"
+            "agent_platform.integrations.image_generation.stable_diffusion.provider.StableDiffusionPipeline.from_pretrained"
         )
         from PIL import Image
 

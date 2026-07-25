@@ -27,23 +27,23 @@ from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingMode,
 )
 from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
-from agent_platform.integrations.embeddings.mistral.mistral import (
+from agent_platform.integrations.embeddings.mistral.provider import (
     MistralEmbeddingProvider,
     _to_langchain_mistral,
 )
 from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
-from agent_platform.integrations.embeddings.ollama.ollama import (
+from agent_platform.integrations.embeddings.ollama.provider import (
     OllamaEmbeddingProvider,
     _to_langchain_ollama,
 )
 from agent_platform.integrations.embeddings.openai.config import OpenAIEmbeddingConfig
-from agent_platform.integrations.embeddings.openai.openai import (
+from agent_platform.integrations.embeddings.openai.provider import (
     OpenAIEmbeddingProvider,
     _to_langchain_openai,
 )
 
 if HAS_HUGGINGFACE:
-    from agent_platform.integrations.embeddings.huggingface.huggingface import (
+    from agent_platform.integrations.embeddings.huggingface.provider import (
         HuggingFaceEmbeddingProvider,
         _to_langchain_huggingface_hosted,
         _to_langchain_huggingface_local,
@@ -418,7 +418,7 @@ class TestMissingCredentialError:
 class TestHuggingFaceClient:
     def test_local_mode_calls_local_embeddings(self, mocker):
         mock_local = mocker.patch(
-            "agent_platform.integrations.embeddings.huggingface.huggingface.HuggingFaceEmbeddings"
+            "agent_platform.integrations.embeddings.huggingface.provider.HuggingFaceEmbeddings"
         )
         cfg = HuggingFaceEmbeddingConfig(mode=HuggingFaceEmbeddingMode.LOCAL)
         provider = HuggingFaceEmbeddingProvider()
@@ -427,7 +427,7 @@ class TestHuggingFaceClient:
 
     def test_hosted_mode_calls_hosted_embeddings(self, mocker):
         mock_hosted = mocker.patch(
-            "agent_platform.integrations.embeddings.huggingface.huggingface.HuggingFaceEndpointEmbeddings"
+            "agent_platform.integrations.embeddings.huggingface.provider.HuggingFaceEndpointEmbeddings"
         )
         cfg = HuggingFaceEmbeddingConfig(
             mode=HuggingFaceEmbeddingMode.HOSTED,

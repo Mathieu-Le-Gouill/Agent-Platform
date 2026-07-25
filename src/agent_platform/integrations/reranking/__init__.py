@@ -3,11 +3,11 @@ from __future__ import annotations
 from agent_platform.utils.lazy_imports import make_lazy_provider_accessors
 
 _PROVIDERS: dict[str, str] = {
-    "CohereRerankerProvider": "agent_platform.integrations.reranking.cohere.cohere",
-    "JinaRerankerProvider": "agent_platform.integrations.reranking.jina.jina",
-    "HuggingFaceRerankerProvider": "agent_platform.integrations.reranking.huggingface.huggingface",
-    "FlashRankReranker": "agent_platform.integrations.reranking.flashrank.flashrank",
-    "VoyageRerankerProvider": "agent_platform.integrations.reranking.voyage.voyage",
+    "CohereRerankerProvider": "agent_platform.integrations.reranking.cohere.provider",
+    "JinaRerankerProvider": "agent_platform.integrations.reranking.jina.provider",
+    "HuggingFaceRerankerProvider": "agent_platform.integrations.reranking.huggingface.provider",
+    "FlashRankReranker": "agent_platform.integrations.reranking.flashrank.provider",
+    "VoyageRerankerProvider": "agent_platform.integrations.reranking.voyage.provider",
 }
 
 __getattr__, __dir__ = make_lazy_provider_accessors(_PROVIDERS, globals())

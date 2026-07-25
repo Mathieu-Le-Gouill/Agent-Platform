@@ -10,13 +10,13 @@ pytest.importorskip("sklearn")
 
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.clustering.gmm.config import GMMConfig
-from agent_platform.integrations.clustering.gmm.gmm import GMMClusterer
+from agent_platform.integrations.clustering.gmm.provider import GMMClusterer
 from agent_platform.integrations.clustering.hdbscan.config import HDBSCANConfig
-from agent_platform.integrations.clustering.hdbscan.hdbscan import (
+from agent_platform.integrations.clustering.hdbscan.provider import (
     HDBSCANClusterer,
 )
 from agent_platform.integrations.clustering.kmeans.config import KMeansConfig
-from agent_platform.integrations.clustering.kmeans.kmeans import (
+from agent_platform.integrations.clustering.kmeans.provider import (
     KMeansClusterer,
     _softmax,
 )
@@ -37,7 +37,7 @@ async def test_hdbscan_empty_items(mocker):
 
 async def test_kmeans_empty_items(mocker):
     mock_kmeans = mocker.patch(
-        "agent_platform.integrations.clustering.kmeans.kmeans.KMeans"
+        "agent_platform.integrations.clustering.kmeans.provider.KMeans"
     )
     clusterer = KMeansClusterer()
     result = await clusterer.clusterize([])
@@ -134,7 +134,7 @@ async def test_hdbscan_clusterize(mocker):
 
 async def test_kmeans_clusterize(mocker):
     mock_kmeans_cls = mocker.patch(
-        "agent_platform.integrations.clustering.kmeans.kmeans.KMeans"
+        "agent_platform.integrations.clustering.kmeans.provider.KMeans"
     )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0, 0, 1, 1])
@@ -179,7 +179,7 @@ async def test_kmeans_clusterize(mocker):
 
 async def test_kmeans_forwards_init_to_constructor(mocker):
     mock_kmeans_cls = mocker.patch(
-        "agent_platform.integrations.clustering.kmeans.kmeans.KMeans"
+        "agent_platform.integrations.clustering.kmeans.provider.KMeans"
     )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0])
@@ -197,7 +197,7 @@ async def test_kmeans_forwards_init_to_constructor(mocker):
 
 async def test_kmeans_forwards_copy_x_and_verbose(mocker):
     mock_kmeans_cls = mocker.patch(
-        "agent_platform.integrations.clustering.kmeans.kmeans.KMeans"
+        "agent_platform.integrations.clustering.kmeans.provider.KMeans"
     )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0])
@@ -221,7 +221,7 @@ async def test_kmeans_forwards_copy_x_and_verbose(mocker):
 
 async def test_gmm_clusterize(mocker):
     mock_gmm_cls = mocker.patch(
-        "agent_platform.integrations.clustering.gmm.gmm.GaussianMixture"
+        "agent_platform.integrations.clustering.gmm.provider.GaussianMixture"
     )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0, 0, 1, 1])
@@ -253,7 +253,7 @@ async def test_gmm_clusterize(mocker):
 
 async def test_gmm_forwards_reg_covar_and_init_params(mocker):
     mock_gmm_cls = mocker.patch(
-        "agent_platform.integrations.clustering.gmm.gmm.GaussianMixture"
+        "agent_platform.integrations.clustering.gmm.provider.GaussianMixture"
     )
     mock_instance = MagicMock()
     mock_instance.fit_predict.return_value = np.array([0])
@@ -323,7 +323,7 @@ def test_hdbscan_module_import_error_surfaces_at_load_time(monkeypatch):
     monkeypatch.delitem(sys.modules, "hdbscan", raising=False)
     monkeypatch.delitem(
         sys.modules,
-        "agent_platform.integrations.clustering.hdbscan.hdbscan",
+        "agent_platform.integrations.clustering.hdbscan.provider",
         raising=False,
     )
 
@@ -338,7 +338,7 @@ def test_hdbscan_module_import_error_surfaces_at_load_time(monkeypatch):
 
     with pytest.raises(ImportError):
         importlib.import_module(
-            "agent_platform.integrations.clustering.hdbscan.hdbscan"
+            "agent_platform.integrations.clustering.hdbscan.provider"
         )
 
 

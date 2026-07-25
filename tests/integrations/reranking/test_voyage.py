@@ -2,7 +2,7 @@ from pydantic import SecretStr
 
 from agent_platform.integrations.credentials import VoyageCredentials
 from agent_platform.integrations.reranking.voyage.config import VoyageRerankerConfig
-from agent_platform.integrations.reranking.voyage.voyage import VoyageRerankerProvider
+from agent_platform.integrations.reranking.voyage.provider import VoyageRerankerProvider
 
 
 def _provider() -> VoyageRerankerProvider:

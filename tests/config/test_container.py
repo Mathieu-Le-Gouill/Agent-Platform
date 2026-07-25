@@ -5,7 +5,7 @@ from agent_platform.config.container import build_agent, build_provider
 from agent_platform.config.settings import Settings
 from agent_platform.core.errors import ConfigError
 from agent_platform.integrations import llm as llm_module
-from agent_platform.integrations.llm.openai.openai import OpenAILLM
+from agent_platform.integrations.llm.openai.provider import OpenAILLM
 
 
 class TestBuildAgent:
