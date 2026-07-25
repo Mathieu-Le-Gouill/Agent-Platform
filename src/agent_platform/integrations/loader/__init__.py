@@ -11,6 +11,8 @@ _PROVIDERS: dict[str, str] = {
     "UnstructuredFileLoader": (
         "agent_platform.integrations.loader.strategies.unstructured.unstructured"
     ),
+    "AutoLoader": "agent_platform.integrations.loader.composite.auto",
+    "MultiLoader": "agent_platform.integrations.loader.composite.multi",
 }
 
 __getattr__, __dir__ = make_lazy_provider_accessors(_PROVIDERS, globals())

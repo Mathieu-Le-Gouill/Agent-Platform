@@ -25,7 +25,7 @@ integrations/
 └── …
 ```
 
-**Exception:** `loader/` uses `strategies/` instead of `<provider>/` because each strategy handles a different media type (text, image, audio, video) rather than a different vendor. The top-level `loader/text/`, `loader/image/`, `loader/audio/`, `loader/video/`, `loader/composite/` directories are empty placeholders left over from an earlier layout, all current implementation lives under `loader/strategies/`.
+**Exception:** `loader/` uses `strategies/` instead of `<provider>/` because each strategy handles a different media type (text, image, audio, video) rather than a different vendor; per-media-type ABCs and configs live in `core/interfaces/loader/{text,image,audio,video}/`, concrete loaders in `loader/strategies/`. `loader/composite/` holds `AutoLoader` (dispatches to the right strategy by file extension) and `MultiLoader` (loads heterogeneous sources via `AutoLoader`), both re-exported through `loader/__init__.py` like any other provider.
 
 ## Credentials
 

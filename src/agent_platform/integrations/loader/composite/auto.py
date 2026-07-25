@@ -1,17 +1,15 @@
 import os
 from collections.abc import AsyncIterator, Sequence
 
-from agent_platform.core.interfaces.loader.audio.strategies.soundfile import (
-    SoundFileLoader,
-)
 from agent_platform.core.interfaces.loader.config import LoaderConfig
-from agent_platform.core.interfaces.loader.image.strategies.pil import PILImageLoader
-from agent_platform.core.interfaces.loader.text.strategies.unstructured import (
-    UnstructuredFileLoader,
-)
-from agent_platform.core.interfaces.loader.video.strategies.pyav import PyAVLoader
 from agent_platform.core.schemas.document import Document
 from agent_platform.core.schemas.enums import FileFormat, MediaType
+from agent_platform.integrations.loader import (
+    PILImageLoader,
+    PyAVLoader,
+    SoundFileLoader,
+    UnstructuredFileLoader,
+)
 
 
 class AutoLoader:

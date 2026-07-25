@@ -6,7 +6,7 @@ import pytest
 
 pytest.importorskip(
     "agent_platform.integrations.loader.composite.auto",
-    reason="composite loader not yet implemented",
+    reason="requires the loader-av/loader-soundfile/chunking-pdf extras",
 )
 
 
