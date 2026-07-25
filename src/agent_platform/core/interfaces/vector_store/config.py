@@ -1,6 +1,6 @@
 from enum import StrEnum
 
-from agent_platform.core.schemas.config import ProviderConfig
+from agent_platform.core.config import ProviderConfig
 
 
 class DistanceMetric(StrEnum):

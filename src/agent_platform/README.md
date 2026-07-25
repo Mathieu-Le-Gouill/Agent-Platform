@@ -30,6 +30,7 @@ Near-zero external dependencies. Everything here is pure Python, `pydantic`, `ab
 | Path | Contents |
 |---|---|
 | `core/base.py` | `Entity` (UUID mixin), `Timestamped` |
+| `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends |
 | `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
 | `core/credentials.py` | `BaseCredentials`, `ProviderCredentials` |
 | `core/tracing.py` | Vendor-agnostic OpenTelemetry tracing: `TracingBackend`, `TracingConfig`, `configure_tracing()`, `traced_span()`/`traced_operation_span()`, `record_token_usage()`, `GenAIAttributes` |

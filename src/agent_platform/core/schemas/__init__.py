@@ -18,7 +18,6 @@ from agent_platform.core.schemas.chunk import (
     VideoChunk,
 )
 from agent_platform.core.schemas.cluster import Cluster
-from agent_platform.core.schemas.config import ProviderConfig
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.core.schemas.dimensions import Dimensions
 from agent_platform.core.schemas.document import (
@@ -123,6 +122,5 @@ __all__ = [
     "ClassificationResult",
     "ClassificationResponse",
     "SparseVector",
-    "ProviderConfig",
     "model_schema",
 ]

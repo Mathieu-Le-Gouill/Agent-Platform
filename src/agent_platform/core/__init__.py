@@ -1,4 +1,5 @@
 from agent_platform.core.base import Entity, Timestamped
+from agent_platform.core.config import ProviderConfig
 from agent_platform.core.credentials import BaseCredentials, ProviderCredentials
 from agent_platform.core.errors import (
     ConfigError,
@@ -42,7 +43,6 @@ from agent_platform.core.schemas import (
     MediaType,
     Message,
     MessageRole,
-    ProviderConfig,
     SampleSpan,
     Score,
     ScoreKind,

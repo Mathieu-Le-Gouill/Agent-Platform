@@ -1,7 +1,7 @@
 from __future__ import annotations
 
+from agent_platform.core.config import ProviderConfig
 from agent_platform.core.interfaces.llm.response import ResponseFormat
-from agent_platform.core.schemas.config import ProviderConfig
 
 
 class GenerationConfig(ProviderConfig):

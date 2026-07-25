@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent_platform.core.schemas.config import ProviderConfig
+from agent_platform.core.config import ProviderConfig
 
 
 class ClusteringConfig(ProviderConfig):
