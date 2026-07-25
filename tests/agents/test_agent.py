@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import MagicMock
 
 import pytest
@@ -182,6 +183,12 @@ class TestAgentThink:
         with pytest.raises(AgentThinkError, match="empty response"):
             await agent.think([UserMessage(content="Hi")])
 
+    @pytest.mark.asyncio
+    async def test_think_cancelled_error_propagates(self, agent, mock_llm):
+        mock_llm.agenerate.side_effect = asyncio.CancelledError()
+        with pytest.raises(asyncio.CancelledError):
+            await agent.think([UserMessage(content="Hi")])
+
 
 class TestAgentAct:
     @pytest.mark.asyncio
@@ -251,6 +258,84 @@ class TestAgentAct:
         results = await agent.act(msg)
         assert len(results) == 1
         assert results[0].result.content == ""
+
+
+class _StreamingWeatherTool(Tool):
+    name = "stream_weather"
+    description = "Streams weather updates"
+    input_schema = _WeatherInput
+    supports_streaming = True
+
+    async def astream(self, **kwargs):
+        yield "22 degrees, "
+        yield "sunny"
+
+
+class _FailingStreamingTool(Tool):
+    name = "failing_stream"
+    description = "Streaming tool that fails"
+    input_schema = BaseModel
+    supports_streaming = True
+
+    async def astream(self, **kwargs):
+        yield "partial"
+        raise RuntimeError("stream broke")
+
+
+class TestAgentActStream:
+    @pytest.mark.asyncio
+    async def test_non_streaming_tool_call(self, agent):
+        msg = AssistantMessage(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="call_1", name="get_weather", arguments={"location": "Paris"}
+                ),
+            ],
+        )
+        events = [e async for e in agent.act_stream(msg)]
+        tool_messages = [e for e in events if isinstance(e, ToolMessage)]
+        assert len(tool_messages) == 1
+        assert tool_messages[0].result.is_error is False
+        assert "sunny" in tool_messages[0].result.content
+
+    @pytest.mark.asyncio
+    async def test_streaming_tool_accumulates_content(self, mock_llm):
+        r = ToolRegistry()
+        r.register(_StreamingWeatherTool())
+        agent = Agent(name="streamer", llm=mock_llm, tool_registry=r)
+        msg = AssistantMessage(
+            content="",
+            tool_calls=[
+                ToolCall(
+                    id="call_1",
+                    name="stream_weather",
+                    arguments={"location": "Paris"},
+                ),
+            ],
+        )
+        events = [e async for e in agent.act_stream(msg)]
+        tool_messages = [e for e in events if isinstance(e, ToolMessage)]
+        assert len(tool_messages) == 1
+        assert tool_messages[0].result.content == "22 degrees, sunny"
+        assert tool_messages[0].result.is_error is False
+
+    @pytest.mark.asyncio
+    async def test_streaming_tool_error_captured(self, mock_llm):
+        r = ToolRegistry()
+        r.register(_FailingStreamingTool())
+        agent = Agent(name="failing-streamer", llm=mock_llm, tool_registry=r)
+        msg = AssistantMessage(
+            content="",
+            tool_calls=[
+                ToolCall(id="call_1", name="failing_stream", arguments={}),
+            ],
+        )
+        events = [e async for e in agent.act_stream(msg)]
+        tool_messages = [e for e in events if isinstance(e, ToolMessage)]
+        assert len(tool_messages) == 1
+        assert tool_messages[0].result.is_error is True
+        assert "stream broke" in tool_messages[0].result.content
 
 
 class TestAgentStep:

@@ -149,3 +149,16 @@ class TestSearchTool:
     async def test_run_missing_query_raises(self, tool):
         with pytest.raises(ValidationError):
             await tool.run(k=5)
+
+    @pytest.mark.asyncio
+    async def test_astream_yields_json_per_result(self, tool):
+        chunks = [chunk async for chunk in tool.astream(query="test query")]
+        assert len(chunks) == 2
+        assert '"result 1"' in chunks[0]
+        assert '"result 2"' in chunks[1]
+
+    @pytest.mark.asyncio
+    async def test_astream_empty_results_yields_nothing(self, tool, mock_store):
+        mock_store.search_with_scores = AsyncMock(return_value=[])
+        chunks = [chunk async for chunk in tool.astream(query="test")]
+        assert chunks == []

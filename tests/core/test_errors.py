@@ -163,6 +163,57 @@ class TestErrorLoggedDecorator:
             failing_sync()
 
 
+class TestErrorLoggedNoReRaise:
+    @pytest.mark.asyncio
+    async def test_async_success_passthrough(self):
+        @error_logged()
+        async def succeeds():
+            return "ok"
+
+        assert await succeeds() == "ok"
+
+    @pytest.mark.asyncio
+    async def test_async_platform_error_passthrough(self):
+        @error_logged()
+        async def raises_platform():
+            raise ProviderError("already a platform error")
+
+        with pytest.raises(ProviderError):
+            await raises_platform()
+
+    @pytest.mark.asyncio
+    async def test_async_raw_exception_reraised_unwrapped(self):
+        @error_logged()
+        async def raises_raw():
+            raise ValueError("boom")
+
+        with pytest.raises(ValueError, match="boom"):
+            await raises_raw()
+
+    def test_sync_success_passthrough(self):
+        @error_logged()
+        def succeeds():
+            return "ok"
+
+        assert succeeds() == "ok"
+
+    def test_sync_platform_error_passthrough(self):
+        @error_logged()
+        def raises_platform():
+            raise ConfigError("already a platform error")
+
+        with pytest.raises(ConfigError):
+            raises_platform()
+
+    def test_sync_raw_exception_reraised_unwrapped(self):
+        @error_logged()
+        def raises_raw():
+            raise ValueError("boom")
+
+        with pytest.raises(ValueError, match="boom"):
+            raises_raw()
+
+
 class TestWithRetry:
     @pytest.mark.asyncio
     async def test_succeeds_after_failures(self):

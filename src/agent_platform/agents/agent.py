@@ -99,6 +99,8 @@ class Agent:
                     is_error = chunk.is_error
                     if is_error:
                         content = chunk.delta
+                    else:
+                        content += chunk.delta
                 elif not chunk.is_error:
                     content += chunk.delta
 

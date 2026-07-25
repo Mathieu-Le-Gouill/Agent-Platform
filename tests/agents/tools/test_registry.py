@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock
 
 import pytest
@@ -23,6 +24,39 @@ class _OtherTool(Tool):
 
     async def run(self, **kwargs):
         return None
+
+
+class _StreamingTool(Tool):
+    name = "streamer"
+    description = "A tool that streams output"
+    input_schema = BaseModel
+    supports_streaming = True
+
+    async def astream(self, **kwargs):
+        yield "hello "
+        yield "world"
+
+
+class _FailingStreamingTool(Tool):
+    name = "failing_streamer"
+    description = "A streaming tool that raises mid-stream"
+    input_schema = BaseModel
+    supports_streaming = True
+
+    async def astream(self, **kwargs):
+        yield "partial"
+        raise RuntimeError("stream broke")
+
+
+class _CancelledStreamingTool(Tool):
+    name = "cancelled_streamer"
+    description = "A streaming tool that gets cancelled"
+    input_schema = BaseModel
+    supports_streaming = True
+
+    async def astream(self, **kwargs):
+        raise asyncio.CancelledError()
+        yield  # pragma: no cover
 
 
 @pytest.fixture
@@ -121,3 +155,61 @@ class TestToolRegistry:
         call = ToolCall(id="call_2", name="dummy", arguments={"key": "val"})
         await registry.resolve_call(call)
         tool.run.assert_awaited_once_with(key="val")  # type: ignore[attr-defined]
+
+
+class TestCallAndWrap:
+    @pytest.mark.asyncio
+    async def test_cancelled_error_propagates(self, registry):
+        tool = _DummyTool()
+        tool.run = AsyncMock(side_effect=asyncio.CancelledError())  # type: ignore[method-assign]
+        registry.register(tool)
+        call = ToolCall(id="c1", name="dummy", arguments={})
+        with pytest.raises(asyncio.CancelledError):
+            await registry.call_and_wrap(call)
+
+
+class TestCallAndStream:
+    @pytest.mark.asyncio
+    async def test_non_streaming_tool_yields_single_final_chunk(self, registry):
+        registry.register(_DummyTool())
+        call = ToolCall(id="c1", name="dummy", arguments={})
+        chunks = [c async for c in registry.call_and_stream(call)]
+        assert len(chunks) == 1
+        assert chunks[0].is_final is True
+        assert chunks[0].is_error is False
+        assert "handled" in chunks[0].delta
+
+    @pytest.mark.asyncio
+    async def test_streaming_tool_yields_deltas_then_final(self, registry):
+        registry.register(_StreamingTool())
+        call = ToolCall(id="c1", name="streamer", arguments={})
+        chunks = [c async for c in registry.call_and_stream(call)]
+        assert [c.delta for c in chunks] == ["hello ", "world", ""]
+        assert chunks[-1].is_final is True
+        assert chunks[-1].is_error is False
+
+    @pytest.mark.asyncio
+    async def test_streaming_tool_error_mid_stream(self, registry):
+        registry.register(_FailingStreamingTool())
+        call = ToolCall(id="c1", name="failing_streamer", arguments={})
+        chunks = [c async for c in registry.call_and_stream(call)]
+        assert chunks[0].delta == "partial"
+        assert chunks[0].is_final is False
+        assert chunks[-1].is_final is True
+        assert chunks[-1].is_error is True
+        assert "stream broke" in chunks[-1].delta
+
+    @pytest.mark.asyncio
+    async def test_unknown_tool_raises(self, registry):
+        call = ToolCall(id="c1", name="nonexistent", arguments={})
+        with pytest.raises(ToolError, match="Unknown tool"):
+            async for _ in registry.call_and_stream(call):
+                pass
+
+    @pytest.mark.asyncio
+    async def test_streaming_tool_cancelled_error_propagates(self, registry):
+        registry.register(_CancelledStreamingTool())
+        call = ToolCall(id="c1", name="cancelled_streamer", arguments={})
+        with pytest.raises(asyncio.CancelledError):
+            async for _ in registry.call_and_stream(call):
+                pass

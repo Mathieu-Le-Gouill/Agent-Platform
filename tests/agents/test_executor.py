@@ -1,12 +1,24 @@
 import pytest
+from pydantic import BaseModel
 
 from agent_platform.agents.agent import Agent
 from agent_platform.agents.errors import AgentMaxIterations, AgentThinkError
 from agent_platform.agents.executor import AgentExecutor
+from agent_platform.agents.tools.base import Tool
+from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from tests.helpers import make_fake_llm_response
+
+
+class _WeatherTool(Tool):
+    name = "get_weather"
+    description = "Get weather"
+    input_schema = BaseModel
+
+    async def run(self, **kwargs):
+        return {"temp": 22}
 
 
 @pytest.fixture
@@ -188,6 +200,64 @@ class TestExecutorRun:
         ex = AgentExecutor(agent)
         result = await ex.run("Say nothing")
         assert result == ""
+
+
+class TestExecutorRunStreaming:
+    @pytest.mark.asyncio
+    async def test_direct_response_yields_text(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hello world")
+        agent = Agent(name="test", llm=mock_llm)
+        ex = AgentExecutor(agent)
+        events = [e async for e in ex.run_streaming("Hi")]
+        assert events == ["Hello world"]
+
+    @pytest.mark.asyncio
+    async def test_tool_round_then_final_answer(self, mock_llm):
+        call_count = 0
+
+        async def generate_side_effect(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return make_fake_llm_response(
+                    content="",
+                    tool_calls=[
+                        {
+                            "id": "c1",
+                            "name": "get_weather",
+                            "args": {"location": "Paris"},
+                        },
+                    ],
+                )
+            return make_fake_llm_response(content="It's sunny in Paris!")
+
+        mock_llm.agenerate.side_effect = generate_side_effect
+
+        registry = ToolRegistry()
+        registry.register(_WeatherTool())
+        agent = Agent(name="weather-agent", llm=mock_llm, tool_registry=registry)
+        ex = AgentExecutor(agent)
+
+        events = [e async for e in ex.run_streaming("Weather in Paris?")]
+        assert events[-1] == "It's sunny in Paris!"
+        assert mock_llm.agenerate.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_max_iterations_reached(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content="",
+            tool_calls=[
+                {"id": "c1", "name": "get_weather", "args": {"location": "Paris"}},
+            ],
+        )
+        registry = ToolRegistry()
+        registry.register(_WeatherTool())
+        agent = Agent(name="loopy", llm=mock_llm, tool_registry=registry)
+        ex = AgentExecutor(agent, max_iterations=2)
+
+        with pytest.raises(AgentMaxIterations, match="exceeded max iterations"):
+            async for _ in ex.run_streaming("Weather?"):
+                pass
 
 
 class TestExecutorRunWithMessages:

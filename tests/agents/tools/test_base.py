@@ -4,6 +4,15 @@ from pydantic import BaseModel
 from agent_platform.agents.tools.base import Tool, ToolError
 
 
+class _DefaultAstreamTool(Tool):
+    name = "default_astream"
+    description = "Uses the default astream implementation"
+    input_schema = BaseModel
+
+    async def run(self, **kwargs):
+        return None
+
+
 def test_tool_cannot_instantiate_abc():
     with pytest.raises(TypeError):
         Tool()  # type: ignore[abstract]
@@ -116,3 +125,11 @@ def test_output_schema_can_be_set():
             return OutputModel(value="ok")
 
     assert WithOutput.output_schema is OutputModel
+
+
+@pytest.mark.asyncio
+async def test_default_astream_raises_not_implemented():
+    instance = _DefaultAstreamTool()
+    with pytest.raises(NotImplementedError, match="does not support streaming"):
+        async for _ in instance.astream():
+            pass

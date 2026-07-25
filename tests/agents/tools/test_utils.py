@@ -1,7 +1,7 @@
 import pytest
 from pydantic import BaseModel, Field
 
-from agent_platform.agents.tools._utils import safe_call
+from agent_platform.agents.tools._utils import safe_call, safe_stream
 from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.core.schemas import model_schema
 
@@ -42,6 +42,49 @@ class TestSafeCall:
 
         with pytest.raises(ToolError, match="Provider execution failed"):
             await safe_call(raises())
+
+
+class TestSafeStream:
+    @pytest.mark.asyncio
+    async def test_yields_all_items(self):
+        async def gen():
+            for i in range(3):
+                yield i
+
+        result = [item async for item in safe_stream(gen())]
+        assert result == [0, 1, 2]
+
+    @pytest.mark.asyncio
+    async def test_tool_error_passes_through(self):
+        async def gen():
+            raise ToolError("already wrapped")
+            yield  # pragma: no cover
+
+        with pytest.raises(ToolError, match="already wrapped"):
+            async for _ in safe_stream(gen()):
+                pass
+
+    @pytest.mark.asyncio
+    async def test_raw_exception_wrapped(self):
+        async def gen():
+            yield "partial"
+            raise ValueError("stream broke")
+
+        collected = []
+        with pytest.raises(ToolError, match="custom stream failure: stream broke"):
+            async for item in safe_stream(gen(), error_message="custom stream failure"):
+                collected.append(item)
+        assert collected == ["partial"]
+
+    @pytest.mark.asyncio
+    async def test_default_error_message(self):
+        async def gen():
+            raise RuntimeError("fail")
+            yield  # pragma: no cover
+
+        with pytest.raises(ToolError, match="Provider execution failed"):
+            async for _ in safe_stream(gen()):
+                pass
 
 
 # ---------------------------------------------------------------------------

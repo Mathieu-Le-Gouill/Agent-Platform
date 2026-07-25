@@ -150,3 +150,41 @@ class TestTranscribeToolToBlocks:
         blocks = tool.to_blocks(chunk, transcript)
         assert len(blocks) == 1
         assert isinstance(blocks[0], AudioBlock)
+
+
+class TestTranscribeToolAstream:
+    @pytest.mark.asyncio
+    async def test_astream_yields_utterance_texts(self, tool, mock_provider):
+        async def fake_stream(frames, config=None):
+            async for _ in frames:
+                pass
+            yield Transcript(utterances=[Utterance(text="hello")])
+            yield Transcript(utterances=[Utterance(text="world")])
+
+        mock_provider.stream = fake_stream
+
+        chunks = [c async for c in tool.astream(data=b"\x00\x01")]
+        assert chunks == ["hello", "world"]
+
+    @pytest.mark.asyncio
+    async def test_astream_skips_empty_utterance_text(self, tool, mock_provider):
+        async def fake_stream(frames, config=None):
+            yield Transcript(utterances=[Utterance(text="")])
+            yield Transcript(utterances=[Utterance(text="hi")])
+
+        mock_provider.stream = fake_stream
+
+        chunks = [c async for c in tool.astream(data=b"\x00\x01")]
+        assert chunks == ["hi"]
+
+    @pytest.mark.asyncio
+    async def test_astream_provider_error_wrapped(self, tool, mock_provider):
+        async def fake_stream(frames, config=None):
+            raise RuntimeError("stream failure")
+            yield  # pragma: no cover
+
+        mock_provider.stream = fake_stream
+
+        with pytest.raises(ToolError, match="Speech-to-text streaming failed"):
+            async for _ in tool.astream(data=b"\x00\x01"):
+                pass

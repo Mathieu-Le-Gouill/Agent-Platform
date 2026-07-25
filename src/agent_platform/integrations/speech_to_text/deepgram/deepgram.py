@@ -31,17 +31,20 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
             raise MissingCredentialError("Deepgram API key is required")
         return self._credentials.api_key.get_secret_value()
 
+    def _build_client(self):
+        from deepgram import AsyncDeepgramClient
+
+        return AsyncDeepgramClient(api_key=self._api_key())
+
     @error_logged(re_raise=ProviderError, message="Speech-to-text failed")
     @with_retry()
     async def transcribe(
         self, audio: AudioChunk, config: DeepgramConfig | None = None
     ) -> Transcript:
         config = config or self._default_config()
-        from deepgram import DeepgramClient, PrerecordedOptions
+        client = self._build_client()
 
-        client = DeepgramClient(self._api_key())
-
-        options_kwargs = dict(
+        kwargs = dict(
             model=config.model,
             smart_format=config.smart_format,
             punctuate=config.punctuate,
@@ -49,24 +52,18 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
             utterances=True,
         )
         if config.language:
-            options_kwargs["language"] = config.language
-        options = PrerecordedOptions(**options_kwargs)
+            kwargs["language"] = config.language
 
-        payload = {
-            "buffer": audio.data,
-            "mimetype": _mime_from_format(audio.format.value),
-        }
-
-        response = await client.listen.asyncprerecorded.v("1").transcribe(
-            payload, options
+        response = await client.listen.v1.media.transcribe_file(
+            request=audio.data, **kwargs
         )
 
         results = response.results
-        channels = results.channels[0]
+        channel = results.channels[0]
         language = parse_language(getattr(results, "language", None) or "en")
 
         utterances = []
-        for alt in channels.alternatives:
+        for alt in channel.alternatives:
             if not alt.words:
                 text = alt.paragraphs.transcript if alt.paragraphs else ""
                 utterances.append(Utterance(text=text, confidence=alt.confidence))
@@ -95,50 +92,35 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
         config = config or self._default_config()
 
         async def _stream() -> AsyncIterator[Transcript]:
-            queue: asyncio.Queue[str] = asyncio.Queue()
-            from deepgram import DeepgramClient, LiveOptions, LiveTranscriptionEvents
+            client = self._build_client()
 
-            client = DeepgramClient(self._api_key())
-            dg_live = client.listen.asyncwebsocket.v("1")
-
-            def _on_result(result: str) -> None:
-                queue.put_nowait(result)
-
-            live_kwargs = dict(
+            connect_kwargs = dict(
                 model=config.model,
                 smart_format=config.smart_format,
                 punctuate=config.punctuate,
                 utterance_end_ms="1000",
             )
             if config.language:
-                live_kwargs["language"] = config.language
-            options = LiveOptions(**live_kwargs)
+                connect_kwargs["language"] = config.language
 
-            dg_live.on(LiveTranscriptionEvents.Transcript, _on_result)
-            await dg_live.start(options)
+            async with client.listen.v1.connect(**connect_kwargs) as socket:
 
-            async def _send_frames() -> None:
-                async for chunk in frames:
-                    await dg_live.send(chunk.data)
-                await dg_live.finish()
-                queue.put_nowait("")
+                async def _send_frames() -> None:
+                    async for chunk in frames:
+                        await socket.send_media(chunk.data)
+                    await socket.send_close_stream()
 
-            async def _receive_results() -> AsyncIterator[Transcript]:
-                while True:
-                    raw = await queue.get()
-                    if not raw:
-                        break
-                    utterances = _parse_deepgram_result(raw)
+                sender = asyncio.create_task(_send_frames())
+                async for message in socket:
+                    if isinstance(message, bytes):
+                        continue
+                    utterances = _parse_deepgram_result(message.model_dump_json())
                     if utterances:
                         yield Transcript(
                             utterances=utterances,
                             metadata={"stt_provider": "deepgram", "streaming": True},
                         )
-
-            sender = asyncio.create_task(_send_frames())
-            async for transcript in _receive_results():
-                yield transcript
-            await sender
+                await sender
 
         return _stream()
 
@@ -170,13 +152,3 @@ def _parse_deepgram_result(raw: str) -> list[Utterance]:
         ]
 
     return [Utterance(text=transcript_text)]
-
-
-def _mime_from_format(fmt: str) -> str:
-    return {
-        "wav": "audio/wav",
-        "mp3": "audio/mpeg",
-        "flac": "audio/flac",
-        "ogg": "audio/ogg",
-        "m4a": "audio/mp4",
-    }.get(fmt, "audio/wav")

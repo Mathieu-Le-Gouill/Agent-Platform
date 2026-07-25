@@ -232,7 +232,7 @@ def _image_bit_depth(mode: str) -> int | None:
 def _infer_image_format(path: str) -> ImageFormat:
     from agent_platform.core.schemas.enums import FileFormat
 
-    ff = FileFormat.from_extension(path)
+    ff = FileFormat.from_path(path)
     if isinstance(ff.extension_format, ImageFormat):
         return ff.extension_format
     return ImageFormat.UNKNOWN
@@ -241,7 +241,7 @@ def _infer_image_format(path: str) -> ImageFormat:
 def _infer_audio_format(path: str) -> AudioFormat:
     from agent_platform.core.schemas.enums import FileFormat
 
-    ff = FileFormat.from_extension(path)
+    ff = FileFormat.from_path(path)
     if isinstance(ff.extension_format, AudioFormat):
         return ff.extension_format
     return AudioFormat.UNKNOWN
@@ -250,7 +250,7 @@ def _infer_audio_format(path: str) -> AudioFormat:
 def _infer_video_format(path: str) -> VideoFormat:
     from agent_platform.core.schemas.enums import FileFormat
 
-    ff = FileFormat.from_extension(path)
+    ff = FileFormat.from_path(path)
     if isinstance(ff.extension_format, VideoFormat):
         return ff.extension_format
     return VideoFormat.UNKNOWN
