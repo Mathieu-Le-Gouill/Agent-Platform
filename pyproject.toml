@@ -32,11 +32,11 @@ dependencies = [
 
 [project.optional-dependencies]
 # --- LLM ---
-llm-openai = ["langchain-openai~=1.3"]
-llm-anthropic = ["langchain-anthropic~=1.4"]
-llm-mistral = ["langchain-mistralai~=1.1"]
-llm-ollama = ["langchain-ollama~=1.1"]
-llm-huggingface = ["langchain-huggingface"]
+llm-openai = ["openai>=2.48"]
+llm-anthropic = ["anthropic>=0.116"]
+llm-mistral = ["mistralai>=1.12"]
+llm-ollama = ["ollama>=0.6"]
+llm-huggingface = ["huggingface_hub>=1.24"]
 llm = ["agent_platform[llm-openai,llm-anthropic,llm-mistral,llm-ollama,llm-huggingface]"]
 
 # --- Embeddings ---

@@ -5,7 +5,9 @@ from agent_platform.core.interfaces.llm.config import GenerationConfig
 
 class HuggingFaceGenerationConfig(GenerationConfig):
     task: str = "text-generation"
-    """Inference task type passed to the HuggingFace endpoint, e.g. "text-generation"."""
+    """Inference task type; unused since the provider moved to the OpenAI-compatible
+    `InferenceClient.chat_completion` API, which has no task concept. Kept for
+    config backward-compatibility."""
 
     repo_id: str = "deepseek-ai/DeepSeek-R1-0528"
     """HuggingFace Hub model repository id to run inference against."""
@@ -27,4 +29,4 @@ class HuggingFaceGenerationConfig(GenerationConfig):
     """Whether to prepend the prompt to the generated text."""
 
 
-# sources: https://reference.langchain.com/python/langchain-huggingface/llms/huggingface_endpoint/HuggingFaceEndpoint
+# sources: https://huggingface.co/docs/huggingface_hub/package_reference/inference_client
