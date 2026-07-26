@@ -29,11 +29,12 @@ src/agent_platform/
 ├── components/        # Reusable processing units composing integrations
 ├── pipelines/         # Multi-step orchestration flows
 ├── agents/            # LLM reasoning loop, tool registry, conversation management
+├── evals/             # Regression testing: EvalRunner, EvalDataset, Scorer, agent-platform-eval CLI
 ├── audio/             # Audio I/O + DSP utilities
 ├── utils/             # Shared helpers
-├── config/            # Settings, logging, DI container (build_agent, build_provider)
+├── config/            # Settings (pydantic-settings), logging, DI container (build_agent, build_provider)
 ├── api/               # FastAPI app, /chat and /health
-└── workflows/         # LangGraph state machine (empty stub)
+└── workflows/         # Orchestration engine (empty stub)
 ```
 
 ## Integrations at a Glance
@@ -96,6 +97,27 @@ uv run --extra dev pre-commit install --hook-type pre-commit --hook-type pre-pus
 ```
 
 This runs `ruff check`, `ruff format`, `mypy`, and `lint-imports` on every commit, and the full `pytest` suite before every push, the same checks CI runs on `main`. Config lives in `.pre-commit-config.yaml`. To run everything on demand without committing: `uv run pre-commit run --all-files`.
+
+### Evals
+
+Regression testing for agents/pipelines lives in `evals/`, run via the
+`agent-platform-eval` CLI (needs a real provider credential, e.g.
+`OPENAI_API_KEY`, so it's separate from the mocked `pytest` suite):
+
+```bash
+uv run --extra llm-openai --extra dev agent-platform-eval \
+    src/agent_platform/evals/datasets/conversation_tool_selection.jsonl \
+    --provider OpenAILLM --scorer tool-selection --threshold 0.7
+```
+
+See `src/agent_platform/evals/README.md` for scorers, targets, and how to add a dataset.
+
+### Configuration
+
+`config/settings.py::Settings` (`pydantic-settings`) reads env vars prefixed
+`AGENT_PLATFORM_` (or a `.env` file), e.g. `AGENT_PLATFORM_DEFAULT_LLM_MODEL=anthropic:claude-sonnet-4-5`.
+`config/container.py::build_agent()` resolves those `"<provider>:<model>"` strings into
+provider instances and wires the `ConversationAgent` the API serves.
 
 ### Commit messages
 
