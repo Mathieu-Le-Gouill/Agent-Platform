@@ -8,14 +8,14 @@ Coding-agent guide for this repository. Read this before writing any code. For l
 - **`src/agent_platform/README.md`**, layer map and known issues
 - **`src/agent_platform/<layer>/README.md`**, local patterns for that layer; read before touching it
 
-## Current state (as of 2026-07-26, default provider selection landed)
+## Current state (as of 2026-07-26, llm/embeddings/vector_store migrated off LangChain to native vendor SDKs)
 
 The platform is **structurally complete** at the integration, component, pipeline, agent, and evals layers. The remaining gap is `workflows/`, still an empty scaffold; `api/` has a real FastAPI entrypoint (`api/app.py`) wiring one `ConversationAgent` via `config/container.py::build_agent()`, driven by `config/settings.py::Settings`. That agent already carries `GenerateImageTool`/`TranscribeTool`, not chat only: `Settings.default_llm_model`/`default_image_model`/`default_audio_model` are `"<provider>:<model>"` strings (`core/config.py::parse_model_string`) resolved against each domain's `PROVIDER_ALIASES` map (`integrations/<domain>/__init__.py`) by `build_provider`/`build_provider_from_model_string`.
 
 ### What is solid
 
 - **Core**, interfaces, schemas, error hierarchy, credentials: complete and stable, including `core/interfaces/classification/base.py` (`BaseClassificationProvider` ABC, added alongside the other domain ABCs)
-- **Integrations**, 13 domains with providers: complete (see `integrations/README.md` for the full table), including `classification/transformers` (zero-shot via `pipeline("zero-shot-classification")`, consuming the `classification-transformers` extra). Provider SDKs install via per-provider `pyproject.toml` extras (e.g. `llm-openai`, `vector-store-chroma`), not a monolithic dependency list
+- **Integrations**, 13 domains with providers: complete (see `integrations/README.md` for the full table), including `classification/transformers` (zero-shot via `pipeline("zero-shot-classification")`, consuming the `classification-transformers` extra). Provider SDKs install via per-provider `pyproject.toml` extras (e.g. `llm-openai`, `vector-store-chroma`), not a monolithic dependency list. The `llm`, `embeddings`, and `vector_store` domains (14 providers total) each call their vendor's native SDK directly now, no LangChain intermediate; each domain's shared `langchain_base.py` has been deleted along with the `langchain-*` deps it pulled in. `reranking` is the only domain that still has an (optional) shared LangChain wrapper
 - **Components**, `Embedder`, `Chunker`, `Loader`, `Reranker`, `Generator`, `VectorSearch`, `SimilarityScorer`, `EmbeddingClassifier`, `LLMClassifier`: complete
 - **Pipelines**, `pipelines/rag/ingest.py` (loader → chunk → embed via `Embedder` → store, `BaseVectorStore.add()` takes precomputed vectors directly), `pipelines/rag/query.py` (embed query → search → rerank → generate), `pipelines/speech_translation.py` (`SpeechTranslationPipeline.run()`/`.stream()`, audio → STT → translate with streaming support): complete
 - **Agents**, `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, `TranscribeTool`, `SearchTool`, `OCRTool`, `TranslateTool`, `ClassifyTool`, `GenerateImageTool`, `SummarizeTool`: complete

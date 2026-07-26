@@ -109,12 +109,16 @@ integrations/<domain>/<new_provider>/
 └── <new_provider>.py   # implements core/interfaces/<domain>/base.py ABC
 ```
 
-### Add a new LLM provider (LangChain-based)
+### Add a new LLM provider (native SDK)
 ```python
-class MyLLM(LangChainLLMProvider):
-    def _client(self, model, config):
-        return SomeLangChainModel(model, **_to_langchain_some(config))
+class MyLLM(BaseLLMProvider[MyGenerationConfig]):
+    def _client(self, config: MyGenerationConfig) -> SomeVendorClient:
+        return SomeVendorClient(api_key=..., **_to_native_params(config))
 ```
+
+`llm`, `embeddings`, and `vector_store` providers each call their vendor's
+native SDK directly, no shared LangChain wrapper. Only `reranking` still has
+an optional `langchain_base.py` (see `integrations/README.md`).
 
 ### Add a new integration domain
 1. Create the ABC in `core/interfaces/<domain>/` (see `core/README.md`)
