@@ -11,7 +11,15 @@ RerankerConfigT = TypeVar("RerankerConfigT", bound=RerankerConfig)
 
 class BaseReranker(ABC, Generic[ChunkT, RerankerConfigT]):
     @abstractmethod
-    async def rerank(
+    def rerank(
+        self,
+        query: str,
+        items: Sequence[ChunkT],
+        config: RerankerConfigT | None = None,
+    ) -> Sequence[ChunkT]: ...
+
+    @abstractmethod
+    async def arerank(
         self,
         query: str,
         items: Sequence[ChunkT],

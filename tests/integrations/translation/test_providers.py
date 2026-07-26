@@ -38,14 +38,14 @@ class TestDeepLTranslator:
         assert Language.EN in _DEEPL_TARGETS
         assert _DEEPL_TARGETS[Language.EN] == "EN-US"
 
-    async def test_missing_credentials_raises(self):
+    def test_missing_credentials_raises(self):
         translator = DeepLTranslator(_deepl_credentials(auth_key=None))
         content = TextChunk(text="Hello", metadata={})
 
         with pytest.raises(MissingCredentialError):
-            await translator.translate(content, target=Language.FR)
+            translator.translate(content, target=Language.FR)
 
-    async def test_translate_flow(self, mocker):
+    def test_translate_flow(self, mocker):
         content = TextChunk(text="Bonjour le monde", metadata={"idx": 1})
         mock_result = MagicMock(spec=["text", "detected_source_lang"])
         mock_result.text = "Hello world"
@@ -59,7 +59,7 @@ class TestDeepLTranslator:
         mock_translator_cls.return_value = mock_client
 
         translator = DeepLTranslator(_deepl_credentials())
-        result = await translator.translate(content, target=Language.EN)
+        result = translator.translate(content, target=Language.EN)
 
         assert result.text == "Hello world"
         assert result.metadata["translation_provider"] == "deepl"
@@ -71,7 +71,7 @@ class TestDeepLTranslator:
         assert kwargs["target_lang"] == "EN-US"
         assert "formality" not in kwargs
 
-    async def test_client_is_cached_across_calls(self, mocker):
+    def test_client_is_cached_across_calls(self, mocker):
         content = TextChunk(text="Hi", metadata={})
         mock_result = MagicMock(spec=["text", "detected_source_lang"])
         mock_result.text = "Salut"
@@ -85,13 +85,13 @@ class TestDeepLTranslator:
         mock_translator_cls.return_value = mock_client
 
         translator = DeepLTranslator(_deepl_credentials())
-        await translator.translate(content, target=Language.FR)
-        await translator.translate(content, target=Language.FR)
+        translator.translate(content, target=Language.FR)
+        translator.translate(content, target=Language.FR)
 
         mock_translator_cls.assert_called_once()
         assert mock_client.translate_text.call_count == 2
 
-    async def test_config_fields_threaded_through(self, mocker):
+    def test_config_fields_threaded_through(self, mocker):
         content = TextChunk(text="Hi", metadata={})
         mock_result = MagicMock(spec=["text", "detected_source_lang"])
         mock_result.text = "Salut"
@@ -115,7 +115,7 @@ class TestDeepLTranslator:
         mock_translator_cls.return_value = mock_client
 
         translator = DeepLTranslator(_deepl_credentials())
-        await translator.translate(content, target=Language.FR, config=config)
+        translator.translate(content, target=Language.FR, config=config)
 
         _, kwargs = mock_client.translate_text.call_args
         assert kwargs["formality"] == "more"
@@ -126,7 +126,7 @@ class TestDeepLTranslator:
         assert kwargs["split_sentences"] == "nonewlines"
         assert kwargs["tag_handling"] == "xml"
 
-    async def test_sdk_error_is_translated_to_provider_error(self, mocker):
+    def test_sdk_error_is_translated_to_provider_error_on_sync_path(self, mocker):
         content = TextChunk(text="Hi", metadata={})
 
         mock_translator_cls = mocker.patch(
@@ -139,7 +139,25 @@ class TestDeepLTranslator:
         translator = DeepLTranslator(_deepl_credentials())
 
         with pytest.raises(ProviderError, match="boom"):
-            await translator.translate(content, target=Language.FR)
+            translator.translate(content, target=Language.FR)
+
+    async def test_atranslate_delegates_to_sync(self, mocker):
+        content = TextChunk(text="Bonjour", metadata={})
+        mock_result = MagicMock(spec=["text", "detected_source_lang"])
+        mock_result.text = "Hello"
+        mock_result.detected_source_lang = "FR"
+
+        mock_translator_cls = mocker.patch(
+            "agent_platform.integrations.translation.deepl.provider.deepl.Translator"
+        )
+        mock_client = MagicMock()
+        mock_client.translate_text.return_value = [mock_result]
+        mock_translator_cls.return_value = mock_client
+
+        translator = DeepLTranslator(_deepl_credentials())
+        result = await translator.atranslate(content, target=Language.EN)
+
+        assert result.text == "Hello"
 
 
 class TestGoogleTranslator:
@@ -151,7 +169,7 @@ class TestGoogleTranslator:
         assert Language.CH in _GOOGLE_TARGETS
         assert _GOOGLE_TARGETS[Language.CH] == "zh-CN"
 
-    async def test_translate_passes_explicit_text_format(self, mocker):
+    def test_translate_passes_explicit_text_format(self, mocker):
         content = TextChunk(text="Hello & goodbye", metadata={"src": "test"})
 
         mock_module = mocker.patch(
@@ -165,7 +183,7 @@ class TestGoogleTranslator:
         mock_module.Client.return_value = mock_client
 
         translator = GoogleTranslator(GoogleTranslateCredentials())
-        result = await translator.translate(content, target=Language.FR)
+        result = translator.translate(content, target=Language.FR)
 
         assert result.text == "Bonjour & au revoir"
         mock_client.translate.assert_called_once()
@@ -173,7 +191,7 @@ class TestGoogleTranslator:
         assert kwargs["format_"] == "text"
         assert "model" not in kwargs
 
-    async def test_translate_forwards_model_when_set(self, mocker):
+    def test_translate_forwards_model_when_set(self, mocker):
         content = TextChunk(text="Hello", metadata={})
         config = GoogleTranslateConfig(model="nmt")
 
@@ -188,13 +206,13 @@ class TestGoogleTranslator:
         mock_module.Client.return_value = mock_client
 
         translator = GoogleTranslator(GoogleTranslateCredentials())
-        await translator.translate(content, target=Language.FR, config=config)
+        translator.translate(content, target=Language.FR, config=config)
 
         _, kwargs = mock_client.translate.call_args
         assert kwargs["format_"] == "text"
         assert kwargs["model"] == "nmt"
 
-    async def test_client_error_is_translated_to_provider_error(self, mocker):
+    def test_client_error_is_translated_to_provider_error_on_sync_path(self, mocker):
         content = TextChunk(text="Hello", metadata={})
 
         mock_module = mocker.patch(
@@ -207,4 +225,22 @@ class TestGoogleTranslator:
         translator = GoogleTranslator(GoogleTranslateCredentials())
 
         with pytest.raises(ProviderError, match="boom"):
-            await translator.translate(content, target=Language.FR)
+            translator.translate(content, target=Language.FR)
+
+    async def test_atranslate_delegates_to_sync(self, mocker):
+        content = TextChunk(text="Hello", metadata={})
+
+        mock_module = mocker.patch(
+            "agent_platform.integrations.translation.google_translate.provider.google_translate"
+        )
+        mock_client = MagicMock()
+        mock_client.translate.return_value = {
+            "translatedText": "Bonjour",
+            "detectedSourceLanguage": "en",
+        }
+        mock_module.Client.return_value = mock_client
+
+        translator = GoogleTranslator(GoogleTranslateCredentials())
+        result = await translator.atranslate(content, target=Language.FR)
+
+        assert result.text == "Bonjour"

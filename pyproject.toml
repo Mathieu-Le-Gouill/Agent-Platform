@@ -58,11 +58,11 @@ vector-store-weaviate = ["weaviate-client>=4.16"]
 vector-store = ["agent_platform[vector-store-chroma,vector-store-faiss,vector-store-pinecone,vector-store-qdrant,vector-store-weaviate]"]
 
 # --- Reranking ---
-reranking-cohere = ["langchain-cohere~=0.6"]
-reranking-jina = ["langchain-community~=0.4"]
-reranking-huggingface = ["langchain-community~=0.4"]
+reranking-cohere = ["cohere>=5"]
+reranking-jina = ["httpx"]
+reranking-huggingface = ["sentence-transformers>=5.6.1"]
 reranking-flashrank = ["flashrank"]
-reranking-voyage = ["langchain-voyageai~=0.4"]
+reranking-voyage = ["voyageai>=0.3"]
 reranking = ["agent_platform[reranking-cohere,reranking-jina,reranking-huggingface,reranking-flashrank,reranking-voyage]"]
 
 # --- Speech-to-Text ---

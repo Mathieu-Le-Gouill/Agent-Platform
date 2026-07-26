@@ -27,7 +27,9 @@ pipelines (RAG, speech translation, ingestion) on top of pluggable provider
 integrations, LLMs (OpenAI, Anthropic, Mistral, Ollama, HuggingFace), vector
 stores (Chroma, Qdrant, Pinecone, Weaviate, FAISS), embeddings, reranking,
 OCR, speech-to-text, translation, VAD, clustering, classification, and image
-generation, mostly via LangChain adapters. Everything is `pydantic` v2 typed
+generation, calling native vendor SDKs/REST endpoints directly (LangChain is
+only used inside `chunking`, wrapping `langchain-text-splitters`). Everything
+is `pydantic` v2 typed
 and layered strictly bottom-up: `core` → `integrations` → `components` →
 `pipelines` → `agents`.
 

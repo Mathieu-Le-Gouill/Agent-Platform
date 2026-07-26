@@ -10,7 +10,10 @@ class _FakeReranker(BaseReranker):
     def __init__(self) -> None:
         self.calls: list[tuple[str, list[TextChunk]]] = []
 
-    async def rerank(self, query, items, config=None):
+    def rerank(self, query, items, config=None):
+        raise NotImplementedError
+
+    async def arerank(self, query, items, config=None):
         self.calls.append((query, list(items)))
         return list(reversed(items))
 

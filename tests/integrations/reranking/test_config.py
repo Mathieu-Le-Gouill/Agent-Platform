@@ -47,6 +47,11 @@ def test_cohere_reranker_config_model():
     assert cfg.model == "rerank-v4.0-fast"
 
 
+def test_cohere_reranker_config_max_chunks_per_doc():
+    assert CohereRerankerConfig().max_chunks_per_doc is None
+    assert CohereRerankerConfig(max_chunks_per_doc=5).max_chunks_per_doc == 5
+
+
 def test_jina_reranker_config_defaults():
     cfg = JinaRerankerConfig()
     assert isinstance(cfg, RerankerConfig)

@@ -11,7 +11,7 @@ from agent_platform.core.schemas.enums import Language
 @pytest.fixture
 def mock_translator():
     translator = AsyncMock()
-    translator.translate = AsyncMock(return_value=TextChunk(text="Bonjour"))
+    translator.atranslate = AsyncMock(return_value=TextChunk(text="Bonjour"))
     return translator
 
 
@@ -44,18 +44,18 @@ class TestTranslateTool:
     async def test_run_success(self, tool, mock_translator):
         result = await tool.run(text="Hello", target=Language.FR)
         assert result.text == "Bonjour"
-        mock_translator.translate.assert_awaited_once()
-        call = mock_translator.translate.await_args
+        mock_translator.atranslate.assert_awaited_once()
+        call = mock_translator.atranslate.await_args
         assert call.args[0].text == "Hello"
         assert call.kwargs == {"target": Language.FR, "source": None}
 
     async def test_run_with_source(self, tool, mock_translator):
         await tool.run(text="Hello", target=Language.FR, source=Language.EN)
-        call = mock_translator.translate.await_args
+        call = mock_translator.atranslate.await_args
         assert call.kwargs == {"target": Language.FR, "source": Language.EN}
 
     async def test_run_provider_error_wrapped(self, tool, mock_translator):
-        mock_translator.translate = AsyncMock(side_effect=RuntimeError("boom"))
+        mock_translator.atranslate = AsyncMock(side_effect=RuntimeError("boom"))
         with pytest.raises(ToolError, match="Translation failed"):
             await tool.run(text="Hello", target=Language.FR)
 

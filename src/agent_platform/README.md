@@ -116,9 +116,10 @@ class MyLLM(BaseLLMProvider[MyGenerationConfig]):
         return SomeVendorClient(api_key=..., **_to_native_params(config))
 ```
 
-`llm`, `embeddings`, and `vector_store` providers each call their vendor's
-native SDK directly, no shared LangChain wrapper. Only `reranking` still has
-an optional `langchain_base.py` (see `integrations/README.md`).
+`llm`, `embeddings`, `vector_store`, and `reranking` providers each call their
+vendor's native SDK or REST endpoint directly, no shared LangChain wrapper.
+Only `chunking` still has an optional `langchain_base.py`, wrapping
+`langchain-text-splitters` (see `integrations/README.md`).
 
 ### Add a new integration domain
 1. Create the ABC in `core/interfaces/<domain>/` (see `core/README.md`)

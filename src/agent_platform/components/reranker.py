@@ -32,7 +32,7 @@ class Reranker(
 
         results: list[ChunkT] = []
         for batch in chunked(items, batch_size):
-            reranked = await self._backend.rerank(query, list(batch), self._config)
+            reranked = await self._backend.arerank(query, list(batch), self._config)
             results.extend(reranked)
 
         return results

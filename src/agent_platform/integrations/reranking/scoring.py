@@ -1,8 +1,15 @@
 from __future__ import annotations
 
+from collections.abc import Callable, Sequence
+from typing import TypeVar
+
+from agent_platform.core.interfaces.reranking.config import RerankerConfig
+from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score, ScoreKind
 
-__all__ = ["build_relevance_scores"]
+__all__ = ["apply_rerank_results", "build_relevance_scores"]
+
+ResultT = TypeVar("ResultT")
 
 
 def _min_max_normalize(raw: list[float | None]) -> list[float | None]:
@@ -31,3 +38,32 @@ def build_relevance_scores(
             # low/high to avoid a spurious Score validation error.
             scores.append(Score.logit(value, kind=ScoreKind.RELEVANCE))
     return scores
+
+
+def apply_rerank_results(
+    items: Sequence[TextChunk],
+    results: Sequence[ResultT],
+    config: RerankerConfig,
+    *,
+    index: Callable[[ResultT], int],
+    score: Callable[[ResultT], float | None],
+) -> list[TextChunk]:
+    """Map vendor-neutral rerank results (already in relevance order) back onto
+    `items`, attaching a `confidence` score when requested, then re-slicing to
+    `config.top_k`. Shared by every reranking provider regardless of whether it
+    calls a native SDK, a REST endpoint, or a local model."""
+    scores: list[Score | None]
+    if config.return_scores:
+        scores = build_relevance_scores(
+            [score(r) for r in results], normalize=config.normalize_scores
+        )
+    else:
+        scores = [None] * len(results)
+
+    reranked = [
+        items[index(r)].model_copy(update={"confidence": s})
+        for r, s in zip(results, scores)
+    ]
+    if config.top_k is not None:
+        reranked = reranked[: config.top_k]
+    return reranked

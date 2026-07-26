@@ -10,10 +10,6 @@ class VoyageRerankerConfig(RerankerConfig):
     # Whether to truncate inputs exceeding the model's context length instead of erroring.
     truncation: bool | None = None
 
-    # NOTE: langchain_voyageai.VoyageAIRerank (installed version) has no
-    # return_documents field -- compress_documents always returns full
-    # Document objects. Library gap: not exposed as a config field.
-
 
 """
 sources: https://docs.voyageai.com/docs/reranker

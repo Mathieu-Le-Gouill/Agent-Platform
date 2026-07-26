@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import asyncio
 from typing import TYPE_CHECKING, Any
 
 import deepl
@@ -9,16 +8,11 @@ if TYPE_CHECKING:
     from deepl import TextResult
 
 from agent_platform.core.credentials import resolve_credentials
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
-from agent_platform.core.interfaces.translation.base import BaseTranslator
+from agent_platform.core.errors import ProviderError, require_secret
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
 from agent_platform.integrations.credentials import DeepLCredentials
+from agent_platform.integrations.translation._base import NativeTranslator
 from agent_platform.integrations.translation.deepl.config import DeepLConfig
 
 _DEEPL_TARGETS: dict[Language, str] = {
@@ -26,39 +20,35 @@ _DEEPL_TARGETS: dict[Language, str] = {
 }
 
 
-class DeepLTranslator(BaseTranslator[DeepLConfig]):
+class DeepLTranslator(NativeTranslator[DeepLConfig, deepl.Translator]):
     def __init__(self, credentials: DeepLCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, DeepLCredentials)
-        self._client: deepl.Translator | None = None
+        self._client_cache: deepl.Translator | None = None
 
     def _default_config(self) -> DeepLConfig:
         return DeepLConfig()
 
-    def _get_client(self) -> deepl.Translator:
-        if self._client is None:
+    def _client(self, config: DeepLConfig) -> deepl.Translator:
+        if self._client_cache is None:
             auth_key = require_secret(
                 self._credentials.auth_key, "DeepL auth key is required"
             )
             try:
-                self._client = deepl.Translator(auth_key.get_secret_value())
+                self._client_cache = deepl.Translator(auth_key.get_secret_value())
             except deepl.DeepLException as exc:
                 raise ProviderError(
                     f"DeepL client initialization failed: {exc}"
                 ) from exc
-        return self._client
+        return self._client_cache
 
-    @error_logged(re_raise=ProviderError, message="Translation failed")
-    @with_retry()
-    async def translate(
+    def _invoke(
         self,
+        client: deepl.Translator,
         content: TextChunk,
         target: Language,
-        source: Language | None = None,
-        config: DeepLConfig | None = None,
+        source: Language | None,
+        config: DeepLConfig,
     ) -> TextChunk:
-        config = config or self._default_config()
-        client = self._get_client()
-
         target_lang = _DEEPL_TARGETS.get(target, target.value)
         source_lang = _DEEPL_TARGETS.get(source) if source else None
 
@@ -79,8 +69,7 @@ class DeepLTranslator(BaseTranslator[DeepLConfig]):
             extra_kwargs["tag_handling"] = config.tag_handling
 
         try:
-            raw = await asyncio.to_thread(
-                client.translate_text,
+            raw = client.translate_text(
                 content.text,
                 target_lang=target_lang,
                 source_lang=source_lang,

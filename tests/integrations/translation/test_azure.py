@@ -37,14 +37,14 @@ class TestAzureTranslator:
         translator = AzureTranslator(_azure_credentials())
         assert isinstance(translator, BaseTranslator)
 
-    async def test_missing_credentials_raises(self):
+    def test_missing_credentials_raises(self):
         translator = AzureTranslator(_azure_credentials(api_key=None))
         content = TextChunk(text="Hello", metadata={})
 
         with pytest.raises(MissingCredentialError):
-            await translator.translate(content, target=Language.FR)
+            translator.translate(content, target=Language.FR)
 
-    async def test_from_language_is_a_string_not_a_list(self, mocker):
+    def test_from_language_is_a_string_not_a_list(self, mocker):
         """Regression test: `TranslationTarget`/`TranslateInputItem` must receive
         plain strings for source/target languages, not single-element lists —
         the SDK's `TranslateInputItem.language` keyword is `str | None`."""
@@ -58,7 +58,7 @@ class TestAzureTranslator:
         mock_client_cls.return_value = mock_client
 
         translator = AzureTranslator(_azure_credentials())
-        await translator.translate(content, target=Language.FR, source=Language.EN)
+        translator.translate(content, target=Language.FR, source=Language.EN)
 
         mock_client.translate.assert_called_once()
         _, kwargs = mock_client.translate.call_args
@@ -73,7 +73,7 @@ class TestAzureTranslator:
         assert target_item.language == "fr"
         assert not isinstance(target_item.language, list)
 
-    async def test_source_none_leaves_language_unset(self, mocker):
+    def test_source_none_leaves_language_unset(self, mocker):
         content = TextChunk(text="Hello", metadata={})
 
         mock_client_cls = mocker.patch(
@@ -84,13 +84,13 @@ class TestAzureTranslator:
         mock_client_cls.return_value = mock_client
 
         translator = AzureTranslator(_azure_credentials())
-        await translator.translate(content, target=Language.FR)
+        translator.translate(content, target=Language.FR)
 
         _, kwargs = mock_client.translate.call_args
         input_item = kwargs["body"][0]
         assert input_item.language is None
 
-    async def test_translate_flow_and_response_mapping(self, mocker):
+    def test_translate_flow_and_response_mapping(self, mocker):
         content = TextChunk(text="Hello", metadata={"idx": 1})
 
         mock_client_cls = mocker.patch(
@@ -103,14 +103,14 @@ class TestAzureTranslator:
         mock_client_cls.return_value = mock_client
 
         translator = AzureTranslator(_azure_credentials())
-        result = await translator.translate(content, target=Language.FR)
+        result = translator.translate(content, target=Language.FR)
 
         assert result.text == "Bonjour"
         assert result.metadata["translation_provider"] == "azure"
         assert result.metadata["detected_source_lang"] == "en"
         assert result.metadata["idx"] == 1
 
-    async def test_api_version_threaded_to_client(self, mocker):
+    def test_api_version_threaded_to_client(self, mocker):
         content = TextChunk(text="Hello", metadata={})
         config = AzureTranslatorConfig(api_version="2025-10-01-preview")
 
@@ -122,12 +122,12 @@ class TestAzureTranslator:
         mock_client_cls.return_value = mock_client
 
         translator = AzureTranslator(_azure_credentials())
-        await translator.translate(content, target=Language.FR, config=config)
+        translator.translate(content, target=Language.FR, config=config)
 
         _, kwargs = mock_client_cls.call_args
         assert kwargs["api_version"] == "2025-10-01-preview"
 
-    async def test_config_fields_threaded_through(self, mocker):
+    def test_config_fields_threaded_through(self, mocker):
         content = TextChunk(text="Hello", metadata={})
         config = AzureTranslatorConfig(
             text_type="html",
@@ -144,7 +144,7 @@ class TestAzureTranslator:
         mock_client_cls.return_value = mock_client
 
         translator = AzureTranslator(_azure_credentials())
-        await translator.translate(content, target=Language.FR, config=config)
+        translator.translate(content, target=Language.FR, config=config)
 
         _, kwargs = mock_client.translate.call_args
         input_item = kwargs["body"][0]
@@ -155,7 +155,7 @@ class TestAzureTranslator:
         assert target_item.profanity_marker == "Asterisk"
         assert target_item.allow_fallback is False
 
-    async def test_client_error_is_translated_to_provider_error(self, mocker):
+    def test_client_error_is_translated_to_provider_error_on_sync_path(self, mocker):
         content = TextChunk(text="Hello", metadata={})
 
         mock_client_cls = mocker.patch(
@@ -168,4 +168,19 @@ class TestAzureTranslator:
         translator = AzureTranslator(_azure_credentials())
 
         with pytest.raises(ProviderError, match="boom"):
-            await translator.translate(content, target=Language.FR)
+            translator.translate(content, target=Language.FR)
+
+    async def test_atranslate_delegates_to_sync(self, mocker):
+        content = TextChunk(text="Hello", metadata={})
+
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
+        )
+        mock_client = MagicMock()
+        mock_client.translate.return_value = _make_response(text="Bonjour")
+        mock_client_cls.return_value = mock_client
+
+        translator = AzureTranslator(_azure_credentials())
+        result = await translator.atranslate(content, target=Language.FR)
+
+        assert result.text == "Bonjour"

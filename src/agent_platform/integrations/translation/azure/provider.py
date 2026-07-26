@@ -1,35 +1,26 @@
 from __future__ import annotations
 
-import asyncio
-
 from azure.ai.translation.text import TextTranslationClient
 from azure.ai.translation.text.models import TranslateInputItem, TranslationTarget
 from azure.core.credentials import AzureKeyCredential
 
 from agent_platform.core.credentials import resolve_credentials
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
-from agent_platform.core.interfaces.translation.base import BaseTranslator
+from agent_platform.core.errors import ProviderError, require_secret
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
-from agent_platform.integrations.credentials import (
-    AzureTranslatorCredentials,
-)
+from agent_platform.integrations.credentials import AzureTranslatorCredentials
+from agent_platform.integrations.translation._base import NativeTranslator
 from agent_platform.integrations.translation.azure.config import AzureTranslatorConfig
 
 
-class AzureTranslator(BaseTranslator[AzureTranslatorConfig]):
+class AzureTranslator(NativeTranslator[AzureTranslatorConfig, TextTranslationClient]):
     def __init__(self, credentials: AzureTranslatorCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, AzureTranslatorCredentials)
 
     def _default_config(self) -> AzureTranslatorConfig:
         return AzureTranslatorConfig()
 
-    def _build_client(self, config: AzureTranslatorConfig) -> TextTranslationClient:
+    def _client(self, config: AzureTranslatorConfig) -> TextTranslationClient:
         api_key = require_secret(
             self._credentials.api_key, "Azure Translator API key is required"
         )
@@ -41,18 +32,14 @@ class AzureTranslator(BaseTranslator[AzureTranslatorConfig]):
             api_version=config.api_version,
         )
 
-    @error_logged(re_raise=ProviderError, message="Translation failed")
-    @with_retry()
-    async def translate(
+    def _invoke(
         self,
+        client: TextTranslationClient,
         content: TextChunk,
         target: Language,
-        source: Language | None = None,
-        config: AzureTranslatorConfig | None = None,
+        source: Language | None,
+        config: AzureTranslatorConfig,
     ) -> TextChunk:
-        config = config or self._default_config()
-        client = self._build_client(config)
-
         target_item = TranslationTarget(
             language=target.value,
             profanity_action=config.profanity_action,
@@ -67,10 +54,7 @@ class AzureTranslator(BaseTranslator[AzureTranslatorConfig]):
         )
 
         try:
-            response = await asyncio.to_thread(
-                client.translate,
-                body=[input_item],
-            )
+            response = client.translate(body=[input_item])
         except Exception as exc:
             raise ProviderError(f"Azure Translator failed: {exc}") from exc
 

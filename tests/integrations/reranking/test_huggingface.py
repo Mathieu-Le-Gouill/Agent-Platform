@@ -1,88 +1,85 @@
 from unittest.mock import MagicMock
+from uuid import uuid4
 
-from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+from sentence_transformers import CrossEncoder
 
+from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.reranking.huggingface.config import (
     HuggingFaceRerankerConfig,
 )
 from agent_platform.integrations.reranking.huggingface.provider import (
     HuggingFaceRerankerProvider,
-    _ScoredCrossEncoderReranker,
 )
 
 
-def _client(mocker, config: HuggingFaceRerankerConfig):
-    mock_encoder_cls = mocker.patch(
-        "agent_platform.integrations.reranking.huggingface.provider.HuggingFaceCrossEncoder"
+def _mock_cross_encoder(mocker) -> MagicMock:
+    mock_cls = mocker.patch(
+        "agent_platform.integrations.reranking.huggingface.provider.CrossEncoder"
     )
-    mock_encoder_cls.return_value = MagicMock(spec=HuggingFaceCrossEncoder)
-    provider = HuggingFaceRerankerProvider()
-    client = provider._client(config)
-    return client, mock_encoder_cls
+    mock_cls.return_value = MagicMock(spec=CrossEncoder)
+    return mock_cls
 
 
-def test_device_routed_through_model_kwargs(mocker):
-    _, mock_encoder_cls = _client(mocker, HuggingFaceRerankerConfig(device="cuda:0"))
-    _, kwargs = mock_encoder_cls.call_args
-    assert kwargs["model_kwargs"] == {"device": "cuda:0"}
+def _items() -> list[TextChunk]:
+    return [
+        TextChunk(id=uuid4(), text="a", index=0),
+        TextChunk(id=uuid4(), text="b", index=1),
+    ]
 
 
-def test_default_device_is_cpu(mocker):
-    _, mock_encoder_cls = _client(mocker, HuggingFaceRerankerConfig())
-    _, kwargs = mock_encoder_cls.call_args
-    assert kwargs["model_kwargs"] == {"device": "cpu"}
+class TestSync:
+    def test_device_forwarded_to_client(self, mocker):
+        mock_cls = _mock_cross_encoder(mocker)
+        provider = HuggingFaceRerankerProvider()
+        provider._client(HuggingFaceRerankerConfig(device="cuda:0"))
+
+        args, kwargs = mock_cls.call_args
+        assert kwargs["device"] == "cuda:0"
+
+    def test_scores_reranked_descending(self, mocker):
+        mock_cls = _mock_cross_encoder(mocker)
+        mock_cls.return_value.predict.return_value = [0.1, 0.9]
+
+        provider = HuggingFaceRerankerProvider()
+        results = provider.rerank("q", _items())
+
+        assert [c.text for c in results] == ["b", "a"]
+
+    def test_empty_items_short_circuits(self, mocker):
+        mock_cls = _mock_cross_encoder(mocker)
+        provider = HuggingFaceRerankerProvider()
+
+        assert provider.rerank("q", []) == []
+        mock_cls.assert_not_called()
+
+    def test_return_scores_attaches_confidence(self, mocker):
+        mock_cls = _mock_cross_encoder(mocker)
+        mock_cls.return_value.predict.return_value = [0.2, 0.8]
+
+        provider = HuggingFaceRerankerProvider()
+        config = HuggingFaceRerankerConfig(return_scores=True, normalize_scores=True)
+        results = provider.rerank("q", _items(), config)
+
+        assert results[0].confidence.value == 1.0
+        assert results[1].confidence.value == 0.0
+
+    def test_top_k_applied(self, mocker):
+        mock_cls = _mock_cross_encoder(mocker)
+        mock_cls.return_value.predict.return_value = [0.1, 0.9]
+
+        provider = HuggingFaceRerankerProvider()
+        results = provider.rerank("q", _items(), HuggingFaceRerankerConfig(top_k=1))
+
+        assert len(results) == 1
+        assert results[0].text == "b"
 
 
-def test_top_k_forwarded_as_top_n(mocker):
-    client, _ = _client(mocker, HuggingFaceRerankerConfig(top_k=2))
-    assert client.top_n == 2
+class TestAsync:
+    async def test_arerank_delegates_to_sync(self, mocker):
+        mock_cls = _mock_cross_encoder(mocker)
+        mock_cls.return_value.predict.return_value = [0.1, 0.9]
 
+        provider = HuggingFaceRerankerProvider()
+        results = await provider.arerank("q", _items())
 
-def test_top_n_none_when_top_k_unset(mocker):
-    client, _ = _client(mocker, HuggingFaceRerankerConfig())
-    assert client.top_n is None
-
-
-class TestScoredCrossEncoderReranker:
-    def test_compress_documents_attaches_relevance_score(self):
-        from langchain_core.documents import Document
-
-        model = MagicMock(spec=HuggingFaceCrossEncoder)
-        model.score.return_value = [0.1, 0.9]
-        reranker = _ScoredCrossEncoderReranker(model=model)
-
-        docs = [Document("a"), Document("b")]
-        result = reranker.compress_documents(docs, "query")
-
-        assert result[0].page_content == "b"
-        assert result[0].metadata["relevance_score"] == 0.9
-        assert result[1].page_content == "a"
-        assert result[1].metadata["relevance_score"] == 0.1
-
-    def test_compress_documents_respects_top_n(self):
-        from langchain_core.documents import Document
-
-        model = MagicMock(spec=HuggingFaceCrossEncoder)
-        model.score.return_value = [0.1, 0.9, 0.5]
-        reranker = _ScoredCrossEncoderReranker(model=model, top_n=1)
-
-        docs = [Document("a"), Document("b"), Document("c")]
-        result = reranker.compress_documents(docs, "query")
-
-        assert len(result) == 1
-        assert result[0].page_content == "b"
-
-    def test_compress_documents_empty_input(self):
-        model = MagicMock(spec=HuggingFaceCrossEncoder)
-        reranker = _ScoredCrossEncoderReranker(model=model)
-        assert reranker.compress_documents([], "query") == []
-
-    async def test_acompress_documents_delegates_to_sync(self):
-        from langchain_core.documents import Document
-
-        model = MagicMock(spec=HuggingFaceCrossEncoder)
-        model.score.return_value = [0.3]
-        reranker = _ScoredCrossEncoderReranker(model=model)
-
-        result = await reranker.acompress_documents([Document("a")], "query")
-        assert result[0].metadata["relevance_score"] == 0.3
+        assert [c.text for c in results] == ["b", "a"]

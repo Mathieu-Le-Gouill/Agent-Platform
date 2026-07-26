@@ -8,17 +8,29 @@ def test_base_translator_cannot_instantiate():
         BaseTranslator()  # type: ignore[abstract]
 
 
-def test_subclass_must_implement_translate():
-    class MissingTranslate(BaseTranslator):
+def test_subclass_must_implement_both_methods():
+    class MissingBoth(BaseTranslator):
         pass
 
     with pytest.raises(TypeError):
-        MissingTranslate()  # type: ignore[abstract]
+        MissingBoth()  # type: ignore[abstract]
+
+
+def test_subclass_missing_atranslate_cannot_instantiate():
+    class MissingATranslate(BaseTranslator):
+        def translate(self, content, target, source=None, config=None):
+            return content
+
+    with pytest.raises(TypeError):
+        MissingATranslate()  # type: ignore[abstract]
 
 
 def test_concrete_subclass_instantiates():
     class Concrete(BaseTranslator):
-        async def translate(self, content, target, source=None):
+        def translate(self, content, target, source=None, config=None):
+            return content
+
+        async def atranslate(self, content, target, source=None, config=None):
             return content
 
     instance = Concrete()

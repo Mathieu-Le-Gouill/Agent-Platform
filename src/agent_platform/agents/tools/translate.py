@@ -31,7 +31,7 @@ class TranslateTool(Tool):
     async def run(self, **kwargs: Any) -> TextChunk:
         validated = TranslateInput(**kwargs)
         return await safe_call(
-            self._translator.translate(
+            self._translator.atranslate(
                 TextChunk(text=validated.text),
                 target=validated.target,
                 source=validated.source,

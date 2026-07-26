@@ -46,7 +46,7 @@ class SpeechTranslationPipeline:
         if not utterance.text:
             return utterance
 
-        translated = await self._translator.translate(
+        translated = await self._translator.atranslate(
             TextChunk(text=utterance.text), target=target, source=source
         )
         return utterance.model_copy(update={"text": translated.text})

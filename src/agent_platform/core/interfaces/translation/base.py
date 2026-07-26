@@ -12,6 +12,19 @@ ConfigT = TypeVar("ConfigT", bound=TranslationConfig)
 
 class BaseTranslator(ABC, Generic[ConfigT]):
     @abstractmethod
-    async def translate(
-        self, content: TextChunk, target: Language, source: Language | None = None
+    def translate(
+        self,
+        content: TextChunk,
+        target: Language,
+        source: Language | None = None,
+        config: ConfigT | None = None,
+    ) -> TextChunk: ...
+
+    @abstractmethod
+    async def atranslate(
+        self,
+        content: TextChunk,
+        target: Language,
+        source: Language | None = None,
+        config: ConfigT | None = None,
     ) -> TextChunk: ...
