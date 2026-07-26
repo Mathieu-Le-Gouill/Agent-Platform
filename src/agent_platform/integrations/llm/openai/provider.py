@@ -3,22 +3,12 @@ from __future__ import annotations
 import base64
 import json
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from openai import AsyncOpenAI, OpenAI
+from openai import AsyncOpenAI, AsyncStream, OpenAI
+from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
-from agent_platform.core.credentials import (
-    resolve_credentials,
-    resolve_max_retries,
-    resolve_timeout,
-)
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
-from agent_platform.core.interfaces.llm.base import BaseLLMProvider
+from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -40,12 +30,9 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import (
-    GenAIAttributes,
-    record_token_usage,
-    traced_operation_span,
-)
+from agent_platform.core.tracing import record_token_usage
 from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 
 if TYPE_CHECKING:
@@ -65,7 +52,12 @@ def _is_reasoning_model(model: str) -> bool:
     return model_lower.startswith("gpt-5") and "chat" not in model_lower
 
 
-class OpenAILLM(BaseLLMProvider[OpenAIGenerationConfig]):
+class OpenAILLM(
+    NativeLLMProvider[OpenAIGenerationConfig, AsyncOpenAI, OpenAI, ChatCompletion]
+):
+    _provider_name = "openai"
+    _missing_api_key_message = "OPENAI API key is required but was not provided"
+
     def __init__(self, credentials: OpenAICredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, OpenAICredentials)
 
@@ -83,88 +75,50 @@ class OpenAILLM(BaseLLMProvider[OpenAIGenerationConfig]):
     def _default_config(self) -> OpenAIGenerationConfig:
         return OpenAIGenerationConfig()
 
-    def _client_kwargs(self, config: OpenAIGenerationConfig) -> dict[str, Any]:
-        api_key = require_secret(
-            self._credentials.api_key,
-            "OPENAI API key is required but was not provided",
-        )
-        kwargs: dict[str, Any] = {
-            "api_key": api_key.get_secret_value(),
-            "base_url": self._credentials.base_url,
-            "max_retries": resolve_max_retries(config.max_retries, self._credentials),
-        }
-        timeout = resolve_timeout(config.timeout, self._credentials)
-        if timeout is not None:
-            kwargs["timeout"] = timeout
-        return kwargs
-
     def _client(self, config: OpenAIGenerationConfig) -> AsyncOpenAI:
         return AsyncOpenAI(**self._client_kwargs(config))
 
     def _sync_client(self, config: OpenAIGenerationConfig) -> OpenAI:
         return OpenAI(**self._client_kwargs(config))
 
-    def generate(
+    def _invoke_sync(
         self,
+        client: OpenAI,
         prompt: Prompt,
-        config: OpenAIGenerationConfig | None = None,
-        tools: list[Tool] | None = None,
-    ) -> LLMResponse:
-        config = config or self._default_config()
+        config: OpenAIGenerationConfig,
+        tools: list[Tool] | None,
+    ) -> ChatCompletion:
+        messages = _to_native(prompt)
+        params = _to_native_params(config)
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "openai",
-                GenAIAttributes.REQUEST_MODEL: config.model,
-            },
-        ) as span:
-            client = self._sync_client(config)
-            messages = _to_native(prompt)
-            params = _to_native_params(config)
-            if tools:
-                params["tools"] = [self._tool_to_schema(t) for t in tools]
+        return client.chat.completions.create(
+            model=config.model,
+            messages=messages,  # type: ignore[arg-type]
+            **params,
+        )
 
-            response = client.chat.completions.create(
-                model=config.model,
-                messages=messages,  # type: ignore[arg-type]
-                **params,
-            )
-            result = _from_native(response, config.model)
-            record_token_usage(span, result.usage)
-            return result
-
-    @error_logged(re_raise=ProviderError, message="LLM generation failed")
-    @with_retry()
-    async def agenerate(
+    async def _invoke_async(
         self,
+        client: AsyncOpenAI,
         prompt: Prompt,
-        config: OpenAIGenerationConfig | None = None,
-        tools: list[Tool] | None = None,
-    ) -> LLMResponse:
-        config = config or self._default_config()
+        config: OpenAIGenerationConfig,
+        tools: list[Tool] | None,
+    ) -> ChatCompletion:
+        messages = _to_native(prompt)
+        params = _to_native_params(config)
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "openai",
-                GenAIAttributes.REQUEST_MODEL: config.model,
-            },
-        ) as span:
-            client = self._client(config)
-            messages = _to_native(prompt)
-            params = _to_native_params(config)
-            if tools:
-                params["tools"] = [self._tool_to_schema(t) for t in tools]
+        return await client.chat.completions.create(
+            model=config.model,
+            messages=messages,  # type: ignore[arg-type]
+            **params,
+        )
 
-            response = await client.chat.completions.create(
-                model=config.model,
-                messages=messages,  # type: ignore[arg-type]
-                **params,
-            )
-            result = _from_native(response, config.model)
-            record_token_usage(span, result.usage)
-            return result
+    def _from_native(self, response: ChatCompletion, model: str) -> LLMResponse:
+        return _from_native(response, model)
 
     async def stream(
         self,
@@ -177,19 +131,16 @@ class OpenAILLM(BaseLLMProvider[OpenAIGenerationConfig]):
         params = _to_native_params(config)
         params["stream_options"] = {"include_usage": True}
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "openai",
-                GenAIAttributes.REQUEST_MODEL: config.model,
-            },
-        ) as span:
+        with self._span(config) as span:
             usage_totals = TokenUsage.zero()
-            events: Any = await client.chat.completions.create(
-                model=config.model,
-                messages=messages,  # type: ignore[arg-type]
-                stream=True,
-                **params,
+            events = cast(
+                "AsyncStream[ChatCompletionChunk]",
+                await client.chat.completions.create(
+                    model=config.model,
+                    messages=messages,  # type: ignore[arg-type]
+                    stream=True,
+                    **params,
+                ),
             )
             async for chunk in events:
                 if chunk.choices:
@@ -326,14 +277,17 @@ def _to_native_params(config: OpenAIGenerationConfig) -> dict[str, Any]:
     return params
 
 
-def _from_native(response: Any, model: str) -> LLMResponse:
+def _from_native(response: ChatCompletion, model: str) -> LLMResponse:
     message = response.choices[0].message
 
     tool_calls = [
+        # `_tool_to_schema` only ever sends `"type": "function"` tools, so the
+        # response only ever carries function-tool calls, never the SDK's
+        # custom-tool-call variant.
         ToolCall(
             id=tc.id,
-            name=tc.function.name,
-            arguments=json.loads(tc.function.arguments),
+            name=tc.function.name,  # type: ignore[union-attr]
+            arguments=json.loads(tc.function.arguments),  # type: ignore[union-attr]
         )
         for tc in (message.tool_calls or [])
     ]

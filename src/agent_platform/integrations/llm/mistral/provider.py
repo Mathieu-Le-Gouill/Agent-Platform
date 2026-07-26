@@ -4,17 +4,13 @@ import base64
 import json
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
+from uuid import uuid4
 
 from mistralai import Mistral
+from mistralai.models import ChatCompletionResponse
 
 from agent_platform.core.credentials import resolve_credentials, resolve_timeout
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
-from agent_platform.core.interfaces.llm.base import BaseLLMProvider
+from agent_platform.core.errors import require_secret
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -36,19 +32,20 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import (
-    GenAIAttributes,
-    record_token_usage,
-    traced_operation_span,
-)
+from agent_platform.core.tracing import record_token_usage
 from agent_platform.integrations.credentials import MistralCredentials
+from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class MistralLLM(BaseLLMProvider[MistralGenerationConfig]):
+class MistralLLM(
+    NativeLLMProvider[MistralGenerationConfig, Mistral, Mistral, ChatCompletionResponse]
+):
+    _provider_name = "mistral"
+
     def __init__(self, credentials: MistralCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, MistralCredentials)
 
@@ -87,67 +84,44 @@ class MistralLLM(BaseLLMProvider[MistralGenerationConfig]):
         # attempt-count-based retry behavior.
         return Mistral(**kwargs)
 
-    def generate(
+    def _invoke_sync(
         self,
+        client: Mistral,
         prompt: Prompt,
-        config: MistralGenerationConfig | None = None,
-        tools: list[Tool] | None = None,
-    ) -> LLMResponse:
-        config = config or self._default_config()
+        config: MistralGenerationConfig,
+        tools: list[Tool] | None,
+    ) -> ChatCompletionResponse:
+        messages = _to_native(prompt)
+        params = _to_native_params(config)
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "mistral",
-                GenAIAttributes.REQUEST_MODEL: config.model,
-            },
-        ) as span:
-            client = self._client(config)
-            messages = _to_native(prompt)
-            params = _to_native_params(config)
-            if tools:
-                params["tools"] = [self._tool_to_schema(t) for t in tools]
+        return client.chat.complete(
+            model=config.model,
+            messages=messages,  # type: ignore[arg-type]
+            **params,
+        )
 
-            response = client.chat.complete(
-                model=config.model,
-                messages=messages,  # type: ignore[arg-type]
-                **params,
-            )
-            result = _from_native(response, config.model)
-            record_token_usage(span, result.usage)
-            return result
-
-    @error_logged(re_raise=ProviderError, message="LLM generation failed")
-    @with_retry()
-    async def agenerate(
+    async def _invoke_async(
         self,
+        client: Mistral,
         prompt: Prompt,
-        config: MistralGenerationConfig | None = None,
-        tools: list[Tool] | None = None,
-    ) -> LLMResponse:
-        config = config or self._default_config()
+        config: MistralGenerationConfig,
+        tools: list[Tool] | None,
+    ) -> ChatCompletionResponse:
+        messages = _to_native(prompt)
+        params = _to_native_params(config)
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "mistral",
-                GenAIAttributes.REQUEST_MODEL: config.model,
-            },
-        ) as span:
-            client = self._client(config)
-            messages = _to_native(prompt)
-            params = _to_native_params(config)
-            if tools:
-                params["tools"] = [self._tool_to_schema(t) for t in tools]
+        return await client.chat.complete_async(
+            model=config.model,
+            messages=messages,  # type: ignore[arg-type]
+            **params,
+        )
 
-            response = await client.chat.complete_async(
-                model=config.model,
-                messages=messages,  # type: ignore[arg-type]
-                **params,
-            )
-            result = _from_native(response, config.model)
-            record_token_usage(span, result.usage)
-            return result
+    def _from_native(self, response: ChatCompletionResponse, model: str) -> LLMResponse:
+        return _from_native(response, model)
 
     async def stream(
         self,
@@ -159,15 +133,9 @@ class MistralLLM(BaseLLMProvider[MistralGenerationConfig]):
         messages = _to_native(prompt)
         params = _to_native_params(config)
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "mistral",
-                GenAIAttributes.REQUEST_MODEL: config.model,
-            },
-        ) as span:
+        with self._span(config) as span:
             usage_totals = TokenUsage.zero()
-            events: Any = await client.chat.stream_async(
+            events = await client.chat.stream_async(
                 model=config.model,
                 messages=messages,  # type: ignore[arg-type]
                 **params,
@@ -299,12 +267,14 @@ def _to_native_params(config: MistralGenerationConfig) -> dict[str, Any]:
     return params
 
 
-def _from_native(response: Any, model: str) -> LLMResponse:
+def _from_native(response: ChatCompletionResponse, model: str) -> LLMResponse:
     message = response.choices[0].message
 
     tool_calls = [
         ToolCall(
-            id=tc.id,
+            # Mistral's SDK types `tc.id` as optional, but the API always assigns
+            # one; the uuid4 fallback only guards against that type/reality gap.
+            id=tc.id or uuid4().hex,
             name=tc.function.name,
             arguments=(
                 tc.function.arguments
@@ -321,8 +291,8 @@ def _from_native(response: Any, model: str) -> LLMResponse:
     return LLMResponse(
         message=AssistantMessage(content=content or "", tool_calls=tool_calls),
         usage=TokenUsage(
-            input_tokens=usage.prompt_tokens if usage else 0,
-            output_tokens=usage.completion_tokens if usage else 0,
+            input_tokens=(usage.prompt_tokens or 0) if usage else 0,
+            output_tokens=(usage.completion_tokens or 0) if usage else 0,
         ),
         model=model,
         finish_reason=FinishReason.STOP,

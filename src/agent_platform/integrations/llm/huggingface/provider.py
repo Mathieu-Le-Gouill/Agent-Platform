@@ -5,16 +5,10 @@ import json
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
-from huggingface_hub import AsyncInferenceClient, InferenceClient
+from huggingface_hub import AsyncInferenceClient, ChatCompletionOutput, InferenceClient
 
 from agent_platform.core.credentials import resolve_credentials, resolve_timeout
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
-from agent_platform.core.interfaces.llm.base import BaseLLMProvider
+from agent_platform.core.errors import ProviderError, require_secret
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -36,12 +30,9 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import (
-    GenAIAttributes,
-    record_token_usage,
-    traced_operation_span,
-)
+from agent_platform.core.tracing import record_token_usage
 from agent_platform.integrations.credentials import HuggingFaceCredentials
+from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
@@ -50,9 +41,21 @@ if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 
-class HuggingFaceLLM(BaseLLMProvider[HuggingFaceGenerationConfig]):
+class HuggingFaceLLM(
+    NativeLLMProvider[
+        HuggingFaceGenerationConfig,
+        AsyncInferenceClient,
+        InferenceClient,
+        ChatCompletionOutput,
+    ]
+):
+    _provider_name = "huggingface"
+
     def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, HuggingFaceCredentials)
+
+    def _model_name(self, config: HuggingFaceGenerationConfig) -> str:
+        return config.repo_id
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         return {
@@ -93,59 +96,36 @@ class HuggingFaceLLM(BaseLLMProvider[HuggingFaceGenerationConfig]):
     def _sync_client(self, config: HuggingFaceGenerationConfig) -> InferenceClient:
         return InferenceClient(**self._client_kwargs(config))
 
-    def generate(
+    def _invoke_sync(
         self,
+        client: InferenceClient,
         prompt: Prompt,
-        config: HuggingFaceGenerationConfig | None = None,
-        tools: list[Tool] | None = None,
-    ) -> LLMResponse:
-        config = config or self._default_config()
+        config: HuggingFaceGenerationConfig,
+        tools: list[Tool] | None,
+    ) -> ChatCompletionOutput:
+        messages = _to_native(prompt)
+        params = _to_native_params(config)
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "huggingface",
-                GenAIAttributes.REQUEST_MODEL: config.repo_id,
-            },
-        ) as span:
-            client = self._sync_client(config)
-            messages = _to_native(prompt)
-            params = _to_native_params(config)
-            if tools:
-                params["tools"] = [self._tool_to_schema(t) for t in tools]
+        return client.chat_completion(messages=messages, **params)
 
-            response = client.chat_completion(messages=messages, **params)
-            result = _from_native(response, config.repo_id)
-            record_token_usage(span, result.usage)
-            return result
-
-    @error_logged(re_raise=ProviderError, message="LLM generation failed")
-    @with_retry()
-    async def agenerate(
+    async def _invoke_async(
         self,
+        client: AsyncInferenceClient,
         prompt: Prompt,
-        config: HuggingFaceGenerationConfig | None = None,
-        tools: list[Tool] | None = None,
-    ) -> LLMResponse:
-        config = config or self._default_config()
+        config: HuggingFaceGenerationConfig,
+        tools: list[Tool] | None,
+    ) -> ChatCompletionOutput:
+        messages = _to_native(prompt)
+        params = _to_native_params(config)
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "huggingface",
-                GenAIAttributes.REQUEST_MODEL: config.repo_id,
-            },
-        ) as span:
-            client = self._client(config)
-            messages = _to_native(prompt)
-            params = _to_native_params(config)
-            if tools:
-                params["tools"] = [self._tool_to_schema(t) for t in tools]
+        return await client.chat_completion(messages=messages, **params)
 
-            response = await client.chat_completion(messages=messages, **params)
-            result = _from_native(response, config.repo_id)
-            record_token_usage(span, result.usage)
-            return result
+    def _from_native(self, response: ChatCompletionOutput, model: str) -> LLMResponse:
+        return _from_native(response, model)
 
     async def stream(
         self,
@@ -157,15 +137,9 @@ class HuggingFaceLLM(BaseLLMProvider[HuggingFaceGenerationConfig]):
         messages = _to_native(prompt)
         params = _to_native_params(config)
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "huggingface",
-                GenAIAttributes.REQUEST_MODEL: config.repo_id,
-            },
-        ) as span:
+        with self._span(config) as span:
             usage_totals = TokenUsage.zero()
-            events: Any = await client.chat_completion(
+            events = await client.chat_completion(
                 messages=messages, stream=True, **params
             )
             async for chunk in events:
@@ -310,7 +284,7 @@ def _to_native_params(config: HuggingFaceGenerationConfig) -> dict[str, Any]:
     return params
 
 
-def _from_native(response: Any, model: str) -> LLMResponse:
+def _from_native(response: ChatCompletionOutput, model: str) -> LLMResponse:
     message = response.choices[0].message
 
     tool_calls = [

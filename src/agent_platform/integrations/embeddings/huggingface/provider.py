@@ -8,24 +8,16 @@ from huggingface_hub import AsyncInferenceClient, InferenceClient
 from sentence_transformers import SentenceTransformer
 
 from agent_platform.core.credentials import resolve_credentials, resolve_timeout
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
-from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
-from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.embedding import Embedding
+from agent_platform.core.errors import require_secret
 from agent_platform.integrations.credentials import HuggingFaceCredentials
+from agent_platform.integrations.embeddings._base import NativeEmbeddingProvider
 from agent_platform.integrations.embeddings.huggingface.config import (
     HuggingFaceEmbeddingConfig,
     HuggingFaceEmbeddingMode,
 )
 
 
-class HuggingFaceEmbeddingProvider(BaseEmbeddingProvider[HuggingFaceEmbeddingConfig]):
+class HuggingFaceEmbeddingProvider(NativeEmbeddingProvider[HuggingFaceEmbeddingConfig]):
     def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, HuggingFaceCredentials)
 
@@ -96,88 +88,20 @@ class HuggingFaceEmbeddingProvider(BaseEmbeddingProvider[HuggingFaceEmbeddingCon
         params.update(config.extra_params)
         return params
 
-    def embed_document(
-        self,
-        items: Sequence[TextChunk],
-        config: HuggingFaceEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
-        texts = [item.text for item in items]
-
+    def _embed_sync(
+        self, texts: list[str], config: HuggingFaceEmbeddingConfig
+    ) -> Sequence[list[float]]:
         if config.mode is HuggingFaceEmbeddingMode.LOCAL:
-            vectors = self._local_encode(texts, config)
-        else:
-            client = self._hosted_sync_client(config)
-            array = client.feature_extraction(texts, **self._hosted_params(config))
-            vectors = [[float(x) for x in row] for row in array]
+            return self._local_encode(texts, config)
+        client = self._hosted_sync_client(config)
+        array = client.feature_extraction(texts, **self._hosted_params(config))
+        return [[float(x) for x in row] for row in array]
 
-        embeddings = [
-            Embedding.from_list(vector, model=config.model, id=item.id)
-            for item, vector in zip(items, vectors)
-        ]
-        return EmbeddingResponse(embeddings=embeddings, model=config.model)
-
-    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
-    @with_retry()
-    async def aembed_document(
-        self,
-        items: Sequence[TextChunk],
-        config: HuggingFaceEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
-        texts = [item.text for item in items]
-
+    async def _embed_async(
+        self, texts: list[str], config: HuggingFaceEmbeddingConfig
+    ) -> Sequence[list[float]]:
         if config.mode is HuggingFaceEmbeddingMode.LOCAL:
-            vectors = await asyncio.to_thread(self._local_encode, texts, config)
-        else:
-            client = self._hosted_client(config)
-            array = await client.feature_extraction(
-                texts, **self._hosted_params(config)
-            )
-            vectors = [[float(x) for x in row] for row in array]
-
-        embeddings = [
-            Embedding.from_list(vector, model=config.model, id=item.id)
-            for item, vector in zip(items, vectors)
-        ]
-        return EmbeddingResponse(embeddings=embeddings, model=config.model)
-
-    def embed_query(
-        self,
-        query: str,
-        config: HuggingFaceEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
-
-        if config.mode is HuggingFaceEmbeddingMode.LOCAL:
-            vectors = self._local_encode([query], config)
-        else:
-            client = self._hosted_sync_client(config)
-            array = client.feature_extraction([query], **self._hosted_params(config))
-            vectors = [[float(x) for x in row] for row in array]
-
-        return EmbeddingResponse(
-            embeddings=[Embedding.from_list(vectors[0])], model=config.model
-        )
-
-    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
-    @with_retry()
-    async def aembed_query(
-        self,
-        query: str,
-        config: HuggingFaceEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
-
-        if config.mode is HuggingFaceEmbeddingMode.LOCAL:
-            vectors = await asyncio.to_thread(self._local_encode, [query], config)
-        else:
-            client = self._hosted_client(config)
-            array = await client.feature_extraction(
-                [query], **self._hosted_params(config)
-            )
-            vectors = [[float(x) for x in row] for row in array]
-
-        return EmbeddingResponse(
-            embeddings=[Embedding.from_list(vectors[0])], model=config.model
-        )
+            return await asyncio.to_thread(self._local_encode, texts, config)
+        client = self._hosted_client(config)
+        array = await client.feature_extraction(texts, **self._hosted_params(config))
+        return [[float(x) for x in row] for row in array]

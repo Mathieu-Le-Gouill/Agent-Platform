@@ -7,21 +7,13 @@ from mistralai import Mistral
 from mistralai.models import EmbeddingResponseData
 
 from agent_platform.core.credentials import resolve_credentials, resolve_timeout
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
-from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
-from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.embedding import Embedding
+from agent_platform.core.errors import ProviderError, require_secret
 from agent_platform.integrations.credentials import MistralCredentials
+from agent_platform.integrations.embeddings._base import NativeEmbeddingProvider
 from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
 
 
-class MistralEmbeddingProvider(BaseEmbeddingProvider[MistralEmbeddingConfig]):
+class MistralEmbeddingProvider(NativeEmbeddingProvider[MistralEmbeddingConfig]):
     def __init__(self, credentials: MistralCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, MistralCredentials)
 
@@ -55,78 +47,20 @@ class MistralEmbeddingProvider(BaseEmbeddingProvider[MistralEmbeddingConfig]):
         params.update(config.extra_params)
         return params
 
-    def embed_document(
-        self,
-        items: Sequence[TextChunk],
-        config: MistralEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
+    def _embed_sync(
+        self, texts: list[str], config: MistralEmbeddingConfig
+    ) -> Sequence[list[float]]:
         client = self._client(config)
-
-        texts = [item.text for item in items]
         response = client.embeddings.create(
             model=config.model, inputs=texts, **self._params(config)
         )
+        return [self._vector(data) for data in response.data]
 
-        embeddings = [
-            Embedding.from_list(self._vector(data), model=config.model, id=item.id)
-            for item, data in zip(items, response.data)
-        ]
-
-        return EmbeddingResponse(embeddings=embeddings, model=config.model)
-
-    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
-    @with_retry()
-    async def aembed_document(
-        self,
-        items: Sequence[TextChunk],
-        config: MistralEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
+    async def _embed_async(
+        self, texts: list[str], config: MistralEmbeddingConfig
+    ) -> Sequence[list[float]]:
         client = self._client(config)
-
-        texts = [item.text for item in items]
         response = await client.embeddings.create_async(
             model=config.model, inputs=texts, **self._params(config)
         )
-
-        embeddings = [
-            Embedding.from_list(self._vector(data), model=config.model, id=item.id)
-            for item, data in zip(items, response.data)
-        ]
-
-        return EmbeddingResponse(embeddings=embeddings, model=config.model)
-
-    def embed_query(
-        self,
-        query: str,
-        config: MistralEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
-        client = self._client(config)
-
-        response = client.embeddings.create(
-            model=config.model, inputs=[query], **self._params(config)
-        )
-
-        embedding = Embedding.from_list(self._vector(response.data[0]))
-
-        return EmbeddingResponse(embeddings=[embedding], model=config.model)
-
-    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
-    @with_retry()
-    async def aembed_query(
-        self,
-        query: str,
-        config: MistralEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
-        client = self._client(config)
-
-        response = await client.embeddings.create_async(
-            model=config.model, inputs=[query], **self._params(config)
-        )
-
-        embedding = Embedding.from_list(self._vector(response.data[0]))
-
-        return EmbeddingResponse(embeddings=[embedding], model=config.model)
+        return [self._vector(data) for data in response.data]

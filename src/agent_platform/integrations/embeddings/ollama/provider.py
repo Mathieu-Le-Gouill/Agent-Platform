@@ -6,16 +6,12 @@ from typing import Any
 from ollama import AsyncClient, Client
 
 from agent_platform.core.credentials import resolve_credentials, resolve_timeout
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
-from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
-from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
-from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.embedding import Embedding
 from agent_platform.integrations.credentials import OllamaCredentials
+from agent_platform.integrations.embeddings._base import NativeEmbeddingProvider
 from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
 
 
-class OllamaEmbeddingProvider(BaseEmbeddingProvider[OllamaEmbeddingConfig]):
+class OllamaEmbeddingProvider(NativeEmbeddingProvider[OllamaEmbeddingConfig]):
     def __init__(self, credentials: OllamaCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, OllamaCredentials)
 
@@ -55,72 +51,18 @@ class OllamaEmbeddingProvider(BaseEmbeddingProvider[OllamaEmbeddingConfig]):
         params.update(config.extra_params)
         return params
 
-    def embed_document(
-        self,
-        items: Sequence[TextChunk],
-        config: OllamaEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
+    def _embed_sync(
+        self, texts: list[str], config: OllamaEmbeddingConfig
+    ) -> Sequence[list[float]]:
         client = self._sync_client(config)
-
-        texts = [item.text for item in items]
         response = client.embed(model=config.model, input=texts, **self._params(config))
+        return [list(vector) for vector in response.embeddings]
 
-        embeddings = [
-            Embedding.from_list(list(vector), model=config.model, id=item.id)
-            for item, vector in zip(items, response.embeddings)
-        ]
-        return EmbeddingResponse(embeddings=embeddings, model=config.model)
-
-    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
-    @with_retry()
-    async def aembed_document(
-        self,
-        items: Sequence[TextChunk],
-        config: OllamaEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
+    async def _embed_async(
+        self, texts: list[str], config: OllamaEmbeddingConfig
+    ) -> Sequence[list[float]]:
         client = self._client(config)
-
-        texts = [item.text for item in items]
         response = await client.embed(
             model=config.model, input=texts, **self._params(config)
         )
-
-        embeddings = [
-            Embedding.from_list(list(vector), model=config.model, id=item.id)
-            for item, vector in zip(items, response.embeddings)
-        ]
-        return EmbeddingResponse(embeddings=embeddings, model=config.model)
-
-    def embed_query(
-        self,
-        query: str,
-        config: OllamaEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
-        client = self._sync_client(config)
-
-        response = client.embed(
-            model=config.model, input=[query], **self._params(config)
-        )
-
-        embedding = Embedding.from_list(list(response.embeddings[0]))
-        return EmbeddingResponse(embeddings=[embedding], model=config.model)
-
-    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
-    @with_retry()
-    async def aembed_query(
-        self,
-        query: str,
-        config: OllamaEmbeddingConfig | None = None,
-    ) -> EmbeddingResponse:
-        config = config or self._default_config()
-        client = self._client(config)
-
-        response = await client.embed(
-            model=config.model, input=[query], **self._params(config)
-        )
-
-        embedding = Embedding.from_list(list(response.embeddings[0]))
-        return EmbeddingResponse(embeddings=[embedding], model=config.model)
+        return [list(vector) for vector in response.embeddings]

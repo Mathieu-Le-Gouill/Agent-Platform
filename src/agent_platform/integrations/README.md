@@ -18,6 +18,7 @@ integrations/
 ├── <domain>/
 │   ├── __init__.py
 │   ├── langchain_base.py  # Optional: LangChain intermediate abstract
+│   ├── _base.py           # Optional: native (non-LangChain) shared base, see below
 │   └── <provider>/
 │       ├── __init__.py
 │       ├── config.py      # Provider-specific Pydantic config
@@ -55,8 +56,8 @@ class OpenAILLMProvider(BaseLLMProvider[OpenAIGenerationConfig]):
 
 | Domain | Providers | ABC |
 |---|---|---|
-| `llm/` | openai, anthropic, mistral, ollama, huggingface (each calls its native SDK directly, no LangChain) | `BaseLLMProvider` |
-| `embeddings/` | openai, mistral, ollama, huggingface (each calls its native SDK directly, no LangChain) | `BaseEmbeddingProvider` |
+| `llm/` | openai, anthropic, mistral, ollama, huggingface (each calls its native SDK directly, no LangChain; share `_base.py::NativeLLMProvider`) | `BaseLLMProvider` |
+| `embeddings/` | openai, mistral, ollama, huggingface (each calls its native SDK directly, no LangChain; share `_base.py::NativeEmbeddingProvider`) | `BaseEmbeddingProvider` |
 | `vad/` | silero, webrtc, pvcobra, ten | `BaseVAD` |
 | `ocr/` | tesseract, google_vision, aws_textract, mistral | `BaseOCR` |
 | `vector_store/` | chroma, qdrant, pinecone, weaviate, faiss (each calls its native SDK directly, no LangChain) | `BaseVectorStore` |
@@ -105,7 +106,7 @@ Steps:
 - Errors are translated to `core/errors.py` types (`ProviderError`)
 - No integration imports from another integration
 - No integration imports from `components/`, `pipelines/`, or `agents/`
-- `langchain_base.py` is only used when multiple providers share a common LangChain wrapper pattern, it is optional. The `llm`, `embeddings`, and `vector_store` domains no longer have one: every provider in those three domains calls its vendor's native SDK directly (no LangChain dependency at all). `reranking` still has a shared `langchain_base.py`
+- `langchain_base.py` (or its native counterpart, `_base.py`) is only used when multiple providers within the *same domain* share a common wrapper pattern, it is optional, and never crosses domain boundaries (an integration never depends on another integration, per the rule above). `reranking` still has a shared `langchain_base.py`. The `llm` and `embeddings` domains have a native, LangChain-free equivalent instead: `integrations/llm/_base.py::NativeLLMProvider` and `integrations/embeddings/_base.py::NativeEmbeddingProvider` factor out the tracing/retry/token-usage (llm) or `TextChunk`/query → `EmbeddingResponse` (embeddings) plumbing that's otherwise identical across every provider in that domain, leaving each provider file with only its vendor-specific client construction, request/response mapping, and (for `llm`) `stream()`. Providers across *different* domains that happen to share a vendor (e.g. `llm/openai` and `embeddings/openai`) still duplicate their client-construction snippet on purpose, that duplication is the intentional cost of each domain staying self-contained, not an oversight. `vector_store` has no shared base: `add`/`delete`/`search`/`search_with_scores` bodies differ too much per vendor's filter DSL for a template to pay for itself
 - Each domain's `__init__.py` lazily re-exports its provider classes via a module-level `__getattr__` (PEP 562) over a `_PROVIDERS: dict[class_name, module_path]` map, so callers import `from agent_platform.integrations.<domain> import <ProviderClass>` instead of the nested `<domain>.<provider>.<provider>` path, without eagerly importing every provider's SDK. Add a provider by adding one entry to that map, no separate factory/registry layer
 - Provider SDKs are not in the base install, each provider's package(s) are declared as a `<domain>-<provider>` extra in `pyproject.toml`. When adding a new provider, add its package(s) as a new extra and append it to that domain's bundle extra and to `all`
 - Providers that make outbound network calls (OCR, translation, speech-to-text, DALL-E/Midjourney image generation, every `llm`/`embeddings`/`vector_store` provider, and the shared `langchain_base.py` for `reranking`) wrap their call in `@error_logged(re_raise=ProviderError, message=...)` outer + `@with_retry()` inner from `core/errors.py`, retry happens first, and if every attempt fails the final exception is logged and translated to `ProviderError`. The `reranking` shared base applies this uniformly to all providers built on it (including the locally-running `huggingface` cross-encoder), since one shared `rerank()` method serves them all. Purely local/offline compute with its own bespoke method (`tesseract`, `whisperx`, `vad`, `clustering`, `chunking`, `flashrank`, `stable_diffusion`, `classification`, and the local `faiss` vector store) is exempt from both, retrying a deterministic local failure wastes CPU/GPU time instead of recovering from it

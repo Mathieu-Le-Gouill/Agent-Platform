@@ -2,22 +2,13 @@ from __future__ import annotations
 
 import base64
 from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING, Any, cast
 
-from anthropic import Anthropic, AsyncAnthropic
+from anthropic import Anthropic, AsyncAnthropic, AsyncStream
+from anthropic.types import Message, RawMessageStreamEvent
 
-from agent_platform.core.credentials import (
-    resolve_credentials,
-    resolve_max_retries,
-    resolve_timeout,
-)
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
-from agent_platform.core.interfaces.llm.base import BaseLLMProvider
+from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -39,12 +30,9 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import (
-    GenAIAttributes,
-    record_token_usage,
-    traced_operation_span,
-)
+from agent_platform.core.tracing import record_token_usage
 from agent_platform.integrations.credentials import AnthropicCredentials
+from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 
 if TYPE_CHECKING:
@@ -58,7 +46,12 @@ _DEFAULT_THINKING_BUDGET = 5000
 _DEFAULT_MAX_TOKENS_WITH_THINKING = 8192
 
 
-class AnthropicLLM(BaseLLMProvider[AnthropicGenerationConfig]):
+class AnthropicLLM(
+    NativeLLMProvider[AnthropicGenerationConfig, AsyncAnthropic, Anthropic, Message]
+):
+    _provider_name = "anthropic"
+    _missing_api_key_message = "Anthropic API key is required but was not provided"
+
     def __init__(self, credentials: AnthropicCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, AnthropicCredentials)
 
@@ -72,92 +65,54 @@ class AnthropicLLM(BaseLLMProvider[AnthropicGenerationConfig]):
     def _default_config(self) -> AnthropicGenerationConfig:
         return AnthropicGenerationConfig()
 
-    def _client_kwargs(self, config: AnthropicGenerationConfig) -> dict[str, Any]:
-        api_key = require_secret(
-            self._credentials.api_key,
-            "Anthropic API key is required but was not provided",
-        )
-        kwargs: dict[str, Any] = {
-            "api_key": api_key.get_secret_value(),
-            "base_url": self._credentials.base_url,
-            "max_retries": resolve_max_retries(config.max_retries, self._credentials),
-        }
-        timeout = resolve_timeout(config.timeout, self._credentials)
-        if timeout is not None:
-            kwargs["timeout"] = timeout
-        return kwargs
-
     def _client(self, config: AnthropicGenerationConfig) -> AsyncAnthropic:
         return AsyncAnthropic(**self._client_kwargs(config))
 
     def _sync_client(self, config: AnthropicGenerationConfig) -> Anthropic:
         return Anthropic(**self._client_kwargs(config))
 
-    def generate(
+    def _invoke_sync(
         self,
+        client: Anthropic,
         prompt: Prompt,
-        config: AnthropicGenerationConfig | None = None,
-        tools: list[Tool] | None = None,
-    ) -> LLMResponse:
-        config = config or self._default_config()
+        config: AnthropicGenerationConfig,
+        tools: list[Tool] | None,
+    ) -> Message:
+        system, messages = _to_native(prompt)
+        params = _to_native_params(config)
+        if system:
+            params["system"] = system
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "anthropic",
-                GenAIAttributes.REQUEST_MODEL: config.model,
-            },
-        ) as span:
-            client = self._sync_client(config)
-            system, messages = _to_native(prompt)
-            params = _to_native_params(config)
-            if system:
-                params["system"] = system
-            if tools:
-                params["tools"] = [self._tool_to_schema(t) for t in tools]
+        return client.messages.create(
+            model=config.model,
+            messages=messages,  # type: ignore[arg-type]
+            **params,
+        )
 
-            response = client.messages.create(
-                model=config.model,
-                messages=messages,  # type: ignore[arg-type]
-                **params,
-            )
-            result = _from_native(response, config.model)
-            record_token_usage(span, result.usage)
-            return result
-
-    @error_logged(re_raise=ProviderError, message="LLM generation failed")
-    @with_retry()
-    async def agenerate(
+    async def _invoke_async(
         self,
+        client: AsyncAnthropic,
         prompt: Prompt,
-        config: AnthropicGenerationConfig | None = None,
-        tools: list[Tool] | None = None,
-    ) -> LLMResponse:
-        config = config or self._default_config()
+        config: AnthropicGenerationConfig,
+        tools: list[Tool] | None,
+    ) -> Message:
+        system, messages = _to_native(prompt)
+        params = _to_native_params(config)
+        if system:
+            params["system"] = system
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "anthropic",
-                GenAIAttributes.REQUEST_MODEL: config.model,
-            },
-        ) as span:
-            client = self._client(config)
-            system, messages = _to_native(prompt)
-            params = _to_native_params(config)
-            if system:
-                params["system"] = system
-            if tools:
-                params["tools"] = [self._tool_to_schema(t) for t in tools]
+        return await client.messages.create(
+            model=config.model,
+            messages=messages,  # type: ignore[arg-type]
+            **params,
+        )
 
-            response = await client.messages.create(
-                model=config.model,
-                messages=messages,  # type: ignore[arg-type]
-                **params,
-            )
-            result = _from_native(response, config.model)
-            record_token_usage(span, result.usage)
-            return result
+    def _from_native(self, response: Message, model: str) -> LLMResponse:
+        return _from_native(response, model)
 
     async def stream(
         self,
@@ -171,21 +126,21 @@ class AnthropicLLM(BaseLLMProvider[AnthropicGenerationConfig]):
         if system:
             params["system"] = system
 
-        with traced_operation_span(
-            "chat",
-            **{
-                GenAIAttributes.PROVIDER_NAME: "anthropic",
-                GenAIAttributes.REQUEST_MODEL: config.model,
-            },
-        ) as span:
+        with self._span(config) as span:
             usage_totals = TokenUsage.zero()
-            events: Any = await client.messages.create(
-                model=config.model,
-                messages=messages,  # type: ignore[arg-type]
-                stream=True,
-                **params,
+            events = cast(
+                "AsyncStream[RawMessageStreamEvent]",
+                await client.messages.create(
+                    model=config.model,
+                    messages=messages,  # type: ignore[arg-type]
+                    stream=True,
+                    **params,
+                ),
             )
             async for raw_event in events:
+                # Each variant of the discriminated union exposes different
+                # attributes; narrowing per-`type` would need an isinstance
+                # chain over all 6, so defer to the runtime `.type` checks below.
                 event: Any = raw_event
                 if (
                     event.type == "content_block_delta"
@@ -356,7 +311,7 @@ def _to_native_params(config: AnthropicGenerationConfig) -> dict[str, Any]:
     return params
 
 
-def _from_native(response: Any, model: str) -> LLMResponse:
+def _from_native(response: Message, model: str) -> LLMResponse:
     tool_calls = [
         ToolCall(id=block.id, name=block.name, arguments=block.input)
         for block in response.content
