@@ -22,9 +22,13 @@ class PDFChunkerConfig(ChunkerConfig):
     # If True, keeps the original (pre-combination) elements accessible in
     # each chunk's metadata alongside the combined chunk text.
     include_orig_elements: bool = False
-    # Token-based chunking alternative to max_characters; requires a
-    # tokenizer to be resolvable by the library when set.
+    # Token-based chunking alternative to max_characters; mutually exclusive
+    # with it. When set, `chunk_size` (max_characters) is omitted from the
+    # chunk_by_title call and `tokenizer` must also be set.
     max_tokens: int | None = None
+    # Encoding name (e.g. "cl100k_base") or model name (e.g. "gpt-4") used to
+    # count tokens when `max_tokens` is set; required by the library in that case.
+    tokenizer: str | None = None
     # If True, tables are left intact (not split by `chunk_size`) instead of
     # being chunked like other elements.
     skip_table_chunking: bool = False

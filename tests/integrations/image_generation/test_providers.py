@@ -113,7 +113,7 @@ class TestValidateSize:
 class TestStableDiffusionGenerator:
     def test_constructor_defaults(self):
         gen = StableDiffusionGenerator(StableDiffusionConfig())
-        assert gen._config.model == "runwayml/stable-diffusion-v1-5"
+        assert gen._config.model == "stable-diffusion-v1-5/stable-diffusion-v1-5"
         assert gen._config.device == "cpu"
         assert gen._config.safety_checker is True
 

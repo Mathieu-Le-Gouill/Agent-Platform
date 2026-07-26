@@ -67,6 +67,8 @@ class UnstructuredFileLoader(UnstructuredBaseLoader):
         kwargs = {"mode": config.mode}
         if config.chunking_strategy:
             kwargs["chunking_strategy"] = config.chunking_strategy
+        if config.strategy:
+            kwargs["strategy"] = config.strategy
         return lc_cls(source, **kwargs)
 
 

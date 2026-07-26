@@ -195,6 +195,28 @@ def test_chunk_forwards_max_tokens_when_set(mocker):
 
     _, kwargs = mock_chunk_by_title.call_args
     assert kwargs["max_tokens"] == 256
+    assert "max_characters" not in kwargs
+
+
+def test_chunk_forwards_max_characters_when_max_tokens_unset(mocker):
+    mock_partition = mocker.patch(
+        "agent_platform.integrations.chunking.pdf.provider.partition_pdf"
+    )
+    mock_chunk_by_title = mocker.patch(
+        "agent_platform.integrations.chunking.pdf.provider.chunk_by_title"
+    )
+    mock_partition.return_value = ["element"]
+    mock_chunk_by_title.return_value = [_FakeSection("Section body.")]
+
+    provider = PDFStructureChunkerProvider()
+    doc = TextDocument(text="", source="doc.pdf", format=DocumentFormat.PDF)
+    config = PDFChunkerConfig(chunk_size=512)
+
+    provider.chunk([doc], config)
+
+    _, kwargs = mock_chunk_by_title.call_args
+    assert kwargs["max_characters"] == 512
+    assert "max_tokens" not in kwargs
 
 
 def test_chunk_omits_max_tokens_when_unset(mocker):

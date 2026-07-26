@@ -53,6 +53,8 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
         )
         if config.language:
             kwargs["language"] = config.language
+        elif config.detect_language:
+            kwargs["detect_language"] = True
 
         response = await client.listen.v1.media.transcribe_file(
             request=audio.data, **kwargs
@@ -102,6 +104,7 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
             )
             if config.language:
                 connect_kwargs["language"] = config.language
+            # `detect_language` is not supported for streaming, only pre-recorded audio.
 
             async with client.listen.v1.connect(**connect_kwargs) as socket:
 

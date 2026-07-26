@@ -5,7 +5,7 @@ from agent_platform.core.interfaces.image_generation.config import ImageGenConfi
 
 class StableDiffusionConfig(ImageGenConfig):
     # HuggingFace hub repo id loaded via StableDiffusionPipeline.from_pretrained.
-    model: str = "runwayml/stable-diffusion-v1-5"
+    model: str = "stable-diffusion-v1-5/stable-diffusion-v1-5"
     # Torch device the pipeline is moved to (e.g. "cpu", "cuda", "mps").
     device: str = "cpu"
     # Torch dtype used to load pipeline weights.

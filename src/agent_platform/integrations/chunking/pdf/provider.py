@@ -48,7 +48,6 @@ class PDFStructureChunkerProvider(
                 elements = partition_pdf(filename=doc.source)
 
                 chunk_kwargs: dict[str, Any] = dict(
-                    max_characters=config.chunk_size,
                     overlap=config.chunk_overlap,
                     overlap_all=config.overlap_all,
                     combine_text_under_n_chars=config.combine_text_under_n_chars,
@@ -58,6 +57,9 @@ class PDFStructureChunkerProvider(
                 )
                 if config.max_tokens is not None:
                     chunk_kwargs["max_tokens"] = config.max_tokens
+                    chunk_kwargs["tokenizer"] = config.tokenizer
+                else:
+                    chunk_kwargs["max_characters"] = config.chunk_size
                 if config.skip_table_chunking:
                     chunk_kwargs["skip_table_chunking"] = config.skip_table_chunking
                 if config.repeat_table_headers:

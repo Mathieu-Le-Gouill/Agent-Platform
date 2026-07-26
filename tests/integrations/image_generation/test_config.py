@@ -66,7 +66,7 @@ class TestDalleConfig:
 class TestStableDiffusionConfig:
     def test_defaults(self):
         cfg = StableDiffusionConfig()
-        assert cfg.model == "runwayml/stable-diffusion-v1-5"
+        assert cfg.model == "stable-diffusion-v1-5/stable-diffusion-v1-5"
         assert cfg.device == "cpu"
         assert cfg.dtype == "float32"
         assert cfg.safety_checker is True
