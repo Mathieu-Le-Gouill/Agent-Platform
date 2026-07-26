@@ -26,8 +26,8 @@ from agent_platform.integrations.llm.anthropic.config import AnthropicGeneration
 from agent_platform.integrations.llm.anthropic.provider import (
     AnthropicLLM,
     _block_to_native,
-    _from_native,
-    _to_native,
+    _from_native_response,
+    _to_native_messages,
     _to_native_params,
 )
 
@@ -84,7 +84,7 @@ class TestBlockToNative:
 class TestToNative:
     def test_system_message_extracted_separately(self):
         prompt = Prompt(messages=[SystemMessage(content="Be helpful.")])
-        system, messages = _to_native(prompt)
+        system, messages = _to_native_messages(prompt)
         assert system == "Be helpful."
         assert messages == []
 
@@ -95,17 +95,17 @@ class TestToNative:
                 SystemMessage(content="Second."),
             ]
         )
-        system, _ = _to_native(prompt)
+        system, _ = _to_native_messages(prompt)
         assert system == "First.\n\nSecond."
 
     def test_user_message(self):
         prompt = Prompt(messages=[UserMessage(content="Hello")])
-        _, messages = _to_native(prompt)
+        _, messages = _to_native_messages(prompt)
         assert messages == [{"role": "user", "content": "Hello"}]
 
     def test_assistant_message_without_tool_calls(self):
         prompt = Prompt(messages=[AssistantMessage(content="Hi there!")])
-        _, messages = _to_native(prompt)
+        _, messages = _to_native_messages(prompt)
         assert messages == [
             {"role": "assistant", "content": [{"type": "text", "text": "Hi there!"}]}
         ]
@@ -117,7 +117,7 @@ class TestToNative:
                 ToolCall(id="call_1", name="get_weather", arguments={"loc": "Paris"})
             ],
         )
-        _, messages = _to_native(prompt)
+        _, messages = _to_native_messages(prompt)
         assert messages[0]["role"] == "assistant"
         tool_use = messages[0]["content"][-1]
         assert tool_use == {
@@ -139,7 +139,7 @@ class TestToNative:
                 )
             ]
         )
-        _, messages = _to_native(prompt)
+        _, messages = _to_native_messages(prompt)
         assert messages == [
             {
                 "role": "user",
@@ -155,7 +155,7 @@ class TestToNative:
         ]
 
     def test_empty_prompt(self):
-        system, messages = _to_native(Prompt(messages=[]))
+        system, messages = _to_native_messages(Prompt(messages=[]))
         assert system is None
         assert messages == []
 
@@ -163,7 +163,7 @@ class TestToNative:
         prompt = Prompt().add_user_content(
             [TextBlock(text="what is this?"), ImageBlock(image="https://x/y.png")]
         )
-        _, messages = _to_native(prompt)
+        _, messages = _to_native_messages(prompt)
         assert messages[0]["content"] == [
             {"type": "text", "text": "what is this?"},
             {"type": "image", "source": {"type": "url", "url": "https://x/y.png"}},
@@ -290,7 +290,7 @@ class TestFromNative:
         response = _response(
             [_text_block("Hello world")], input_tokens=1, output_tokens=2
         )
-        result = _from_native(response, model="claude-sonnet-4-6")
+        result = _from_native_response(response, model="claude-sonnet-4-6")
         assert result.message.content == "Hello world"
         assert result.message.tool_calls == []
         assert result.model == "claude-sonnet-4-6"
@@ -302,7 +302,7 @@ class TestFromNative:
         response = _response(
             [_tool_use_block("call_abc", "get_weather", {"location": "Paris"})]
         )
-        result = _from_native(response, model="claude-3")
+        result = _from_native_response(response, model="claude-3")
         assert result.message.content == ""
         assert len(result.message.tool_calls) == 1
         tc = result.message.tool_calls[0]
@@ -314,7 +314,7 @@ class TestFromNative:
         response = _response(
             [_text_block("Let me check."), _tool_use_block("1", "func_a", {"x": 1})]
         )
-        result = _from_native(response, model="claude-3")
+        result = _from_native_response(response, model="claude-3")
         assert result.message.content == "Let me check."
         assert len(result.message.tool_calls) == 1
 
@@ -356,7 +356,7 @@ class TestAnthropicLLMConstruction:
         with pytest.raises(
             MissingCredentialError, match="Anthropic API key is required"
         ):
-            provider._client(cfg)
+            provider._async_client(cfg)
 
     def test_client_kwargs_default_max_retries(self):
         provider = AnthropicLLM(_creds())

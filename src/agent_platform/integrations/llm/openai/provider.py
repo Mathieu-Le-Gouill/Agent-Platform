@@ -75,7 +75,7 @@ class OpenAILLM(
     def _default_config(self) -> OpenAIGenerationConfig:
         return OpenAIGenerationConfig()
 
-    def _client(self, config: OpenAIGenerationConfig) -> AsyncOpenAI:
+    def _async_client(self, config: OpenAIGenerationConfig) -> AsyncOpenAI:
         return AsyncOpenAI(**self._client_kwargs(config))
 
     def _sync_client(self, config: OpenAIGenerationConfig) -> OpenAI:
@@ -88,7 +88,7 @@ class OpenAILLM(
         config: OpenAIGenerationConfig,
         tools: list[Tool] | None,
     ) -> ChatCompletion:
-        messages = _to_native(prompt)
+        messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
@@ -106,7 +106,7 @@ class OpenAILLM(
         config: OpenAIGenerationConfig,
         tools: list[Tool] | None,
     ) -> ChatCompletion:
-        messages = _to_native(prompt)
+        messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
@@ -118,7 +118,7 @@ class OpenAILLM(
         )
 
     def _from_native(self, response: ChatCompletion, model: str) -> LLMResponse:
-        return _from_native(response, model)
+        return _from_native_response(response, model)
 
     async def stream(
         self,
@@ -126,8 +126,8 @@ class OpenAILLM(
         config: OpenAIGenerationConfig | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
-        client = self._client(config)
-        messages = _to_native(prompt)
+        client = self._async_client(config)
+        messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         params["stream_options"] = {"include_usage": True}
 
@@ -194,7 +194,7 @@ def _content_to_native(m: ContentMessage) -> str | list[dict[str, Any]]:
     return [_block_to_native(b) for b in m.blocks]
 
 
-def _to_native(prompt: Prompt) -> list[dict[str, Any]]:
+def _to_native_messages(prompt: Prompt) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for m in prompt.messages:
         match m:
@@ -277,7 +277,7 @@ def _to_native_params(config: OpenAIGenerationConfig) -> dict[str, Any]:
     return params
 
 
-def _from_native(response: ChatCompletion, model: str) -> LLMResponse:
+def _from_native_response(response: ChatCompletion, model: str) -> LLMResponse:
     message = response.choices[0].message
 
     tool_calls = [

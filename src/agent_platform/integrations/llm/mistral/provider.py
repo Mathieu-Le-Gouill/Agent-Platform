@@ -62,7 +62,7 @@ class MistralLLM(
     def _default_config(self) -> MistralGenerationConfig:
         return MistralGenerationConfig()
 
-    def _client(self, config: MistralGenerationConfig) -> Mistral:
+    def _async_client(self, config: MistralGenerationConfig) -> Mistral:
         api_key = require_secret(
             self._credentials.api_key,
             "Mistral API key is required but was not provided",
@@ -91,7 +91,7 @@ class MistralLLM(
         config: MistralGenerationConfig,
         tools: list[Tool] | None,
     ) -> ChatCompletionResponse:
-        messages = _to_native(prompt)
+        messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
@@ -109,7 +109,7 @@ class MistralLLM(
         config: MistralGenerationConfig,
         tools: list[Tool] | None,
     ) -> ChatCompletionResponse:
-        messages = _to_native(prompt)
+        messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
@@ -121,7 +121,7 @@ class MistralLLM(
         )
 
     def _from_native(self, response: ChatCompletionResponse, model: str) -> LLMResponse:
-        return _from_native(response, model)
+        return _from_native_response(response, model)
 
     async def stream(
         self,
@@ -129,8 +129,8 @@ class MistralLLM(
         config: MistralGenerationConfig | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
-        client = self._client(config)
-        messages = _to_native(prompt)
+        client = self._async_client(config)
+        messages = _to_native_messages(prompt)
         params = _to_native_params(config)
 
         with self._span(config) as span:
@@ -192,7 +192,7 @@ def _content_to_native(m: ContentMessage) -> str | list[dict[str, Any]]:
     return [_block_to_native(b) for b in m.blocks]
 
 
-def _to_native(prompt: Prompt) -> list[dict[str, Any]]:
+def _to_native_messages(prompt: Prompt) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for m in prompt.messages:
         match m:
@@ -267,7 +267,7 @@ def _to_native_params(config: MistralGenerationConfig) -> dict[str, Any]:
     return params
 
 
-def _from_native(response: ChatCompletionResponse, model: str) -> LLMResponse:
+def _from_native_response(response: ChatCompletionResponse, model: str) -> LLMResponse:
     message = response.choices[0].message
 
     tool_calls = [

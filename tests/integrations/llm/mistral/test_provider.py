@@ -26,8 +26,8 @@ from agent_platform.integrations.llm.mistral.config import MistralGenerationConf
 from agent_platform.integrations.llm.mistral.provider import (
     MistralLLM,
     _block_to_native,
-    _from_native,
-    _to_native,
+    _from_native_response,
+    _to_native_messages,
     _to_native_params,
 )
 
@@ -87,17 +87,17 @@ class TestBlockToNative:
 class TestToNative:
     def test_system_message(self):
         prompt = Prompt(messages=[SystemMessage(content="Be helpful.")])
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result == [{"role": "system", "content": "Be helpful."}]
 
     def test_user_message(self):
         prompt = Prompt(messages=[UserMessage(content="Hello")])
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result == [{"role": "user", "content": "Hello"}]
 
     def test_assistant_message_without_tool_calls(self):
         prompt = Prompt(messages=[AssistantMessage(content="Hi there!")])
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result == [{"role": "assistant", "content": "Hi there!"}]
 
     def test_assistant_message_with_tool_calls(self):
@@ -107,7 +107,7 @@ class TestToNative:
                 ToolCall(id="call_1", name="get_weather", arguments={"loc": "Paris"})
             ],
         )
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result[0]["tool_calls"] == [
             {
                 "id": "call_1",
@@ -128,7 +128,7 @@ class TestToNative:
                 )
             ]
         )
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result == [
             {
                 "role": "tool",
@@ -142,14 +142,14 @@ class TestToNative:
         prompt = Prompt().add_user_content(
             [TextBlock(text="what is this?"), ImageBlock(image="https://x/y.png")]
         )
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result[0]["content"] == [
             {"type": "text", "text": "what is this?"},
             {"type": "image_url", "image_url": "https://x/y.png"},
         ]
 
     def test_empty_prompt(self):
-        assert _to_native(Prompt(messages=[])) == []
+        assert _to_native_messages(Prompt(messages=[])) == []
 
 
 class TestToNativeParams:
@@ -223,7 +223,7 @@ class TestToNativeParams:
 class TestFromNative:
     def test_simple_message(self):
         response = _response("Hello world", prompt_tokens=1, completion_tokens=2)
-        result = _from_native(response, model="mistral-medium-latest")
+        result = _from_native_response(response, model="mistral-medium-latest")
         assert result.message.content == "Hello world"
         assert result.message.tool_calls == []
         assert result.model == "mistral-medium-latest"
@@ -236,7 +236,7 @@ class TestFromNative:
             None,
             tool_calls=[_tool_call("call_abc", "get_weather", '{"location": "Paris"}')],
         )
-        result = _from_native(response, model="mistral-medium-latest")
+        result = _from_native_response(response, model="mistral-medium-latest")
         tc = result.message.tool_calls[0]
         assert tc.id == "call_abc"
         assert tc.name == "get_weather"
@@ -247,12 +247,12 @@ class TestFromNative:
             None,
             tool_calls=[_tool_call("call_abc", "get_weather", {"location": "Paris"})],
         )
-        result = _from_native(response, model="mistral-medium-latest")
+        result = _from_native_response(response, model="mistral-medium-latest")
         assert result.message.tool_calls[0].arguments == {"location": "Paris"}
 
     def test_no_tool_calls(self):
         response = _response("Hi")
-        result = _from_native(response, model="mistral-medium-latest")
+        result = _from_native_response(response, model="mistral-medium-latest")
         assert result.message.tool_calls == []
 
 
@@ -289,7 +289,7 @@ class TestMistralLLMConstruction:
         provider._credentials = MistralCredentials()
         cfg = MistralGenerationConfig(model="mistral-large")
         with pytest.raises(MissingCredentialError, match="Mistral API key is required"):
-            provider._client(cfg)
+            provider._async_client(cfg)
 
 
 class TestMistralLLMClient:
@@ -299,7 +299,7 @@ class TestMistralLLMClient:
         )
         provider = MistralLLM(_creds())
         config = MistralGenerationConfig(model="mistral-large", timeout=30.0)
-        client = provider._client(config)
+        client = provider._async_client(config)
         assert client is mock_mistral.return_value
         _, kwargs = mock_mistral.call_args
         assert kwargs["timeout_ms"] == 30000
@@ -312,7 +312,7 @@ class TestMistralLLMClient:
             api_key=SecretStr("key"), base_url="https://custom.mistral"
         )
         provider = MistralLLM(creds)
-        provider._client(MistralGenerationConfig())
+        provider._async_client(MistralGenerationConfig())
         _, kwargs = mock_mistral.call_args
         assert kwargs["server_url"] == "https://custom.mistral"
 

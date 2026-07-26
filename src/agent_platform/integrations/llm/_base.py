@@ -93,13 +93,13 @@ class NativeLLMProvider(
         return kwargs
 
     @abstractmethod
-    def _client(self, config: GenerationConfigT) -> AsyncClientT: ...
+    def _async_client(self, config: GenerationConfigT) -> AsyncClientT: ...
 
     def _sync_client(self, config: GenerationConfigT) -> SyncClientT:
         # Default for vendors with one client class serving both sync and
         # async calls (e.g. Mistral); overridden where the SDK splits them
         # into distinct classes (e.g. `OpenAI`/`AsyncOpenAI`).
-        return cast(SyncClientT, self._client(config))
+        return cast(SyncClientT, self._async_client(config))
 
     @abstractmethod
     def _invoke_sync(
@@ -150,7 +150,7 @@ class NativeLLMProvider(
         config = config or self._default_config()
 
         with self._span(config) as span:
-            client = self._client(config)
+            client = self._async_client(config)
             response = await self._invoke_async(client, prompt, config, tools)
             result = self._from_native(response, self._model_name(config))
             record_token_usage(span, result.usage)

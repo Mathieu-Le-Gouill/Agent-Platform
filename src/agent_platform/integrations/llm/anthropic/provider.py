@@ -65,7 +65,7 @@ class AnthropicLLM(
     def _default_config(self) -> AnthropicGenerationConfig:
         return AnthropicGenerationConfig()
 
-    def _client(self, config: AnthropicGenerationConfig) -> AsyncAnthropic:
+    def _async_client(self, config: AnthropicGenerationConfig) -> AsyncAnthropic:
         return AsyncAnthropic(**self._client_kwargs(config))
 
     def _sync_client(self, config: AnthropicGenerationConfig) -> Anthropic:
@@ -78,7 +78,7 @@ class AnthropicLLM(
         config: AnthropicGenerationConfig,
         tools: list[Tool] | None,
     ) -> Message:
-        system, messages = _to_native(prompt)
+        system, messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         if system:
             params["system"] = system
@@ -98,7 +98,7 @@ class AnthropicLLM(
         config: AnthropicGenerationConfig,
         tools: list[Tool] | None,
     ) -> Message:
-        system, messages = _to_native(prompt)
+        system, messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         if system:
             params["system"] = system
@@ -112,7 +112,7 @@ class AnthropicLLM(
         )
 
     def _from_native(self, response: Message, model: str) -> LLMResponse:
-        return _from_native(response, model)
+        return _from_native_response(response, model)
 
     async def stream(
         self,
@@ -120,8 +120,8 @@ class AnthropicLLM(
         config: AnthropicGenerationConfig | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
-        client = self._client(config)
-        system, messages = _to_native(prompt)
+        client = self._async_client(config)
+        system, messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         if system:
             params["system"] = system
@@ -199,7 +199,7 @@ def _content_to_native(m: ContentMessage) -> str | list[dict[str, Any]]:
     return [_block_to_native(b) for b in m.blocks]
 
 
-def _to_native(prompt: Prompt) -> tuple[str | None, list[dict[str, Any]]]:
+def _to_native_messages(prompt: Prompt) -> tuple[str | None, list[dict[str, Any]]]:
     system_parts: list[str] = []
     messages: list[dict[str, Any]] = []
 
@@ -311,7 +311,7 @@ def _to_native_params(config: AnthropicGenerationConfig) -> dict[str, Any]:
     return params
 
 
-def _from_native(response: Message, model: str) -> LLMResponse:
+def _from_native_response(response: Message, model: str) -> LLMResponse:
     tool_calls = [
         ToolCall(id=block.id, name=block.name, arguments=block.input)
         for block in response.content

@@ -75,7 +75,7 @@ class OllamaLLM(
     def _max_retries(self, config: OllamaGenerationConfig) -> int:
         return resolve_max_retries(config.max_retries, self._credentials)
 
-    def _client(self, config: OllamaGenerationConfig) -> AsyncClient:
+    def _async_client(self, config: OllamaGenerationConfig) -> AsyncClient:
         # `Client`/`AsyncClient` forward unrecognized kwargs straight to the
         # underlying `httpx` client, so `max_retries` is wired through a
         # custom transport rather than dropped. Unlike the platform's own
@@ -102,7 +102,7 @@ class OllamaLLM(
         config: OllamaGenerationConfig,
         tools: list[Tool] | None,
     ) -> ChatResponse:
-        messages = _to_native(prompt)
+        messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
@@ -116,7 +116,7 @@ class OllamaLLM(
         config: OllamaGenerationConfig,
         tools: list[Tool] | None,
     ) -> ChatResponse:
-        messages = _to_native(prompt)
+        messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
@@ -124,7 +124,7 @@ class OllamaLLM(
         return await client.chat(model=config.model, messages=messages, **params)
 
     def _from_native(self, response: ChatResponse, model: str) -> LLMResponse:
-        return _from_native(response, model)
+        return _from_native_response(response, model)
 
     async def stream(
         self,
@@ -132,8 +132,8 @@ class OllamaLLM(
         config: OllamaGenerationConfig | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
-        client = self._client(config)
-        messages = _to_native(prompt)
+        client = self._async_client(config)
+        messages = _to_native_messages(prompt)
         params = _to_native_params(config)
 
         with self._span(config) as span:
@@ -185,7 +185,7 @@ def _message_content(m: ContentMessage) -> tuple[str, list[str]]:
     return "".join(text_parts), images
 
 
-def _to_native(prompt: Prompt) -> list[dict[str, Any]]:
+def _to_native_messages(prompt: Prompt) -> list[dict[str, Any]]:
     result: list[dict[str, Any]] = []
     for m in prompt.messages:
         match m:
@@ -262,7 +262,7 @@ def _to_native_params(config: OllamaGenerationConfig) -> dict[str, Any]:
     return params
 
 
-def _from_native(response: ChatResponse, model: str) -> LLMResponse:
+def _from_native_response(response: ChatResponse, model: str) -> LLMResponse:
     message = response.message
 
     tool_calls = [

@@ -25,9 +25,9 @@ from agent_platform.integrations.credentials import OllamaCredentials
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.ollama.provider import (
     OllamaLLM,
-    _from_native,
+    _from_native_response,
     _message_content,
-    _to_native,
+    _to_native_messages,
     _to_native_params,
 )
 
@@ -83,17 +83,17 @@ class TestMessageContent:
 class TestToNative:
     def test_system_message(self):
         prompt = Prompt(messages=[SystemMessage(content="Be helpful.")])
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result == [{"role": "system", "content": "Be helpful."}]
 
     def test_user_message(self):
         prompt = Prompt(messages=[UserMessage(content="Hello")])
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result == [{"role": "user", "content": "Hello"}]
 
     def test_assistant_message_without_tool_calls(self):
         prompt = Prompt(messages=[AssistantMessage(content="Hi there!")])
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result == [{"role": "assistant", "content": "Hi there!"}]
 
     def test_assistant_message_with_tool_calls(self):
@@ -103,7 +103,7 @@ class TestToNative:
                 ToolCall(id="call_1", name="get_weather", arguments={"loc": "Paris"})
             ],
         )
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result[0]["tool_calls"] == [
             {"function": {"name": "get_weather", "arguments": {"loc": "Paris"}}}
         ]
@@ -120,7 +120,7 @@ class TestToNative:
                 )
             ]
         )
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result == [
             {"role": "tool", "content": '{"temp": 72}', "tool_name": "get_weather"}
         ]
@@ -129,7 +129,7 @@ class TestToNative:
         prompt = Prompt().add_user_content(
             [TextBlock(text="what is this?"), ImageBlock(image="https://x/y.png")]
         )
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result == [
             {
                 "role": "user",
@@ -149,7 +149,7 @@ class TestToNative:
                 )
             ]
         )
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result[0]["images"] == ["https://x/y.png"]
 
     def test_assistant_message_with_images(self):
@@ -163,11 +163,11 @@ class TestToNative:
                 )
             ]
         )
-        result = _to_native(prompt)
+        result = _to_native_messages(prompt)
         assert result[0]["images"] == ["https://x/y.png"]
 
     def test_empty_prompt(self):
-        assert _to_native(Prompt(messages=[])) == []
+        assert _to_native_messages(Prompt(messages=[])) == []
 
 
 class TestToNativeParams:
@@ -257,7 +257,7 @@ class TestToNativeParams:
 class TestFromNative:
     def test_simple_message(self):
         response = _response("Hello world", prompt_eval_count=1, eval_count=2)
-        result = _from_native(response, model="llama3.2")
+        result = _from_native_response(response, model="llama3.2")
         assert result.message.content == "Hello world"
         assert result.message.tool_calls == []
         assert result.model == "llama3.2"
@@ -269,7 +269,7 @@ class TestFromNative:
         response = _response(
             None, tool_calls=[_tool_call("get_weather", {"location": "Paris"})]
         )
-        result = _from_native(response, model="llama3.2")
+        result = _from_native_response(response, model="llama3.2")
         tc = result.message.tool_calls[0]
         assert tc.id
         assert tc.name == "get_weather"
@@ -277,7 +277,7 @@ class TestFromNative:
 
     def test_no_tool_calls(self):
         response = _response("Hi")
-        result = _from_native(response, model="llama3.2")
+        result = _from_native_response(response, model="llama3.2")
         assert result.message.tool_calls == []
 
 
@@ -312,7 +312,7 @@ class TestOllamaLLMConstruction:
     def test_no_credential_needed(self):
         provider = OllamaLLM(OllamaCredentials())
         cfg = OllamaGenerationConfig(model="llama3")
-        client = provider._client(cfg)
+        client = provider._async_client(cfg)
         assert client is not None
 
     def test_client_kwargs_default_no_timeout(self):
@@ -336,7 +336,7 @@ class TestOllamaLLMConstruction:
 
     def test_client_wires_max_retries_into_async_transport(self):
         provider = OllamaLLM()
-        client = provider._client(OllamaGenerationConfig(max_retries=2))
+        client = provider._async_client(OllamaGenerationConfig(max_retries=2))
         transport = client._client._transport
         assert transport._pool._retries == 2
 
