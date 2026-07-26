@@ -4,9 +4,8 @@ from agent_platform.core.config import ModelConfig
 class RerankerConfig(ModelConfig):
     # Provider-neutral placeholder; every provider subclass overrides this
     # with its own current model id. Kept as a currently-valid Cohere id
-    # (docs.cohere.com/reference/rerank) rather than the previous stale
-    # "rerank-english-v3.0" so base-class instantiation stays usable.
-    model: str = "rerank-v3.5"
+    # (docs.cohere.com/reference/rerank) so base-class instantiation stays usable.
+    model: str = "rerank-v4.0-fast"
     # Number of top results to return; forwarded to the provider's own
     # top_n/top_k param where supported, then re-sliced client-side.
     top_k: int | None = None

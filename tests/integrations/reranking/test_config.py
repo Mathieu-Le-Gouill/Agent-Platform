@@ -22,7 +22,7 @@ def test_reranker_config_model_default_is_provider_neutral():
     # base default must not be the stale "rerank-english-v3.0" leak;
     # every provider subclass overrides it anyway.
     cfg = RerankerConfig()
-    assert cfg.model == "rerank-v3.5"
+    assert cfg.model == "rerank-v4.0-fast"
 
 
 def test_reranker_config_custom():
@@ -44,7 +44,7 @@ def test_cohere_reranker_config_defaults():
 
 def test_cohere_reranker_config_model():
     cfg = CohereRerankerConfig()
-    assert cfg.model == "rerank-v3.5"
+    assert cfg.model == "rerank-v4.0-fast"
 
 
 def test_jina_reranker_config_defaults():
@@ -54,7 +54,7 @@ def test_jina_reranker_config_defaults():
 
 def test_jina_reranker_config_model():
     cfg = JinaRerankerConfig()
-    assert cfg.model == "jina-reranker-v2-base-multilingual"
+    assert cfg.model == "jina-reranker-v3"
 
 
 def test_huggingface_reranker_config_defaults():

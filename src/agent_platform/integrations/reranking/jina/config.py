@@ -4,8 +4,8 @@ from agent_platform.core.interfaces.reranking.config import RerankerConfig
 
 
 class JinaRerankerConfig(RerankerConfig):
-    # Jina reranker model id, e.g. jina-reranker-v2-base-multilingual (jina.ai/reranker).
-    model: str = "jina-reranker-v2-base-multilingual"
+    # Jina reranker model id, e.g. jina-reranker-v3 (jina.ai/reranker).
+    model: str = "jina-reranker-v3"
 
     # NOTE: langchain_community.document_compressors.jina_rerank.JinaRerank
     # (installed version) has no truncation/return_documents fields at all

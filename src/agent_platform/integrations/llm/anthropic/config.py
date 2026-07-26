@@ -10,8 +10,10 @@ class AnthropicGenerationConfig(GenerationConfig):
     """Anthropic model identifier, e.g. "claude-sonnet-4-6" or "claude-opus-4-7"."""
 
     thinking: bool = False
-    """Enable legacy manual extended thinking (`budget_tokens`-style). Deprecated on
-    newer models (Opus 4.7+, Sonnet 5) in favor of `effort`."""
+    """Enable legacy manual extended thinking (`budget_tokens`-style). Deprecated
+    starting with the Claude 4.6 generation (incl. the default model above; still
+    accepted there) and rejected outright with a 400 starting at Claude 4.7+, in
+    favor of `effort`."""
 
     thinking_budget: int | None = None
     """Token budget for legacy `thinking`. Must be strictly less than the effective
@@ -26,7 +28,7 @@ class AnthropicGenerationConfig(GenerationConfig):
 
 
 """
-sources: https://docs.claude.com/en/docs/about-claude/models/overview
-         https://docs.claude.com/en/docs/build-with-claude/extended-thinking
-         https://docs.claude.com/en/docs/build-with-claude/prompt-caching
+sources: https://platform.claude.com/docs/en/about-claude/models/overview
+         https://platform.claude.com/docs/en/build-with-claude/extended-thinking
+         https://platform.claude.com/docs/en/build-with-claude/prompt-caching
 """

@@ -4,8 +4,9 @@ from agent_platform.core.interfaces.reranking.config import RerankerConfig
 
 
 class CohereRerankerConfig(RerankerConfig):
-    # Cohere rerank model id, e.g. rerank-v3.5 (docs.cohere.com/reference/rerank).
-    model: str = "rerank-v3.5"
+    # Cohere rerank model id, e.g. rerank-v4.0-fast (docs.cohere.com/reference/rerank).
+    # rerank-v3.5 is deprecated and auto-routes to rerank-4-fast as of 2026-08-01.
+    model: str = "rerank-v4.0-fast"
 
     # NOTE: langchain_cohere.CohereRerank.rerank() accepts a
     # max_tokens_per_doc kwarg, but it's a per-call argument on .rerank(),

@@ -23,5 +23,5 @@ def test_client_top_n_none_when_top_k_unset():
 
 def test_client_uses_configured_model():
     provider = _provider()
-    client = provider._client(CohereRerankerConfig(model="rerank-v3.5"))
-    assert client.model == "rerank-v3.5"
+    client = provider._client(CohereRerankerConfig(model="rerank-v4.0-pro"))
+    assert client.model == "rerank-v4.0-pro"
