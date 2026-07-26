@@ -10,6 +10,7 @@ from faster_whisper.transcribe import Segment, TranscriptionInfo
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
+from agent_platform.integrations.speech_to_text._base import buffered_stream
 from agent_platform.integrations.speech_to_text.faster_whisper.config import (
     FasterWhisperConfig,
 )
@@ -58,26 +59,12 @@ class FasterWhisperSTT(BaseSpeechToText[FasterWhisperConfig]):
     ) -> AsyncIterator[Transcript]:
         config = config or self._default_config()
 
-        async def _stream() -> AsyncIterator[Transcript]:
+        async def _transcribe(chunks: list[AudioChunk]) -> Transcript:
             model = await asyncio.to_thread(self._get_model, config)
-            buffer: list[np.ndarray] = []
-            buffer_ms = 0
+            buffer = [np.frombuffer(c.data, dtype=np.float32) for c in chunks]
+            return await _transcribe_buffer(model, buffer, config)
 
-            async for chunk in frames:
-                buffer.append(np.frombuffer(chunk.data, dtype=np.float32))
-                buffer_ms += chunk.end - chunk.start
-
-                if buffer_ms < config.min_duration_ms:
-                    continue
-
-                yield await _transcribe_buffer(model, buffer, config)
-                buffer.clear()
-                buffer_ms = 0
-
-            if buffer:
-                yield await _transcribe_buffer(model, buffer, config)
-
-        return _stream()
+        return buffered_stream(frames, config.min_duration_ms, _transcribe)
 
 
 def _run_transcribe(

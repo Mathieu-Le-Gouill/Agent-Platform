@@ -16,6 +16,7 @@ from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.speech_to_text._base import buffered_stream
 from agent_platform.integrations.speech_to_text.openai.config import OpenAIWhisperConfig
 from agent_platform.integrations.speech_to_text.utils import parse_language
 
@@ -93,38 +94,15 @@ class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
     ) -> AsyncIterator[Transcript]:
         config = config or self._default_config()
 
-        async def _stream() -> AsyncIterator[Transcript]:
-            buffer: list[AudioChunk] = []
-            buffer_ms = 0
+        async def _transcribe(buffer: list[AudioChunk]) -> Transcript:
+            combined = AudioChunk(
+                data=b"".join(c.data for c in buffer),
+                sample_rate=buffer[0].sample_rate,
+                channels=buffer[0].channels,
+                format=buffer[0].format,
+                start=buffer[0].start,
+                end=buffer[-1].end,
+            )
+            return await self.transcribe(combined, config)
 
-            async for chunk in frames:
-                buffer.append(chunk)
-                buffer_ms += chunk.end - chunk.start
-
-                if buffer_ms < config.min_duration_ms:
-                    continue
-
-                combined = AudioChunk(
-                    data=b"".join(c.data for c in buffer),
-                    sample_rate=buffer[0].sample_rate,
-                    channels=buffer[0].channels,
-                    format=buffer[0].format,
-                    start=buffer[0].start,
-                    end=buffer[-1].end,
-                )
-                yield await self.transcribe(combined, config)
-                buffer.clear()
-                buffer_ms = 0
-
-            if buffer:
-                combined = AudioChunk(
-                    data=b"".join(c.data for c in buffer),
-                    sample_rate=buffer[0].sample_rate,
-                    channels=buffer[0].channels,
-                    format=buffer[0].format,
-                    start=buffer[0].start,
-                    end=buffer[-1].end,
-                )
-                yield await self.transcribe(combined, config)
-
-        return _stream()
+        return buffered_stream(frames, config.min_duration_ms, _transcribe)

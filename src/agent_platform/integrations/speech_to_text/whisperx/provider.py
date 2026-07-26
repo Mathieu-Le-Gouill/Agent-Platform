@@ -10,6 +10,7 @@ import whisperx
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
+from agent_platform.integrations.speech_to_text._base import buffered_stream
 from agent_platform.integrations.speech_to_text.utils import parse_language
 from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXConfig
 
@@ -110,27 +111,11 @@ class WhisperXSTT(BaseSpeechToText[WhisperXConfig]):
     ) -> AsyncIterator[Transcript]:
         config = config or self._default_config()
 
-        async def _stream() -> AsyncIterator[Transcript]:
+        async def _transcribe(buffer: list[AudioChunk]) -> Transcript:
             model = await self._load_model(config)
+            return await self._transcribe_buffer(model, buffer, config)
 
-            buffer: list[AudioChunk] = []
-            buffer_ms = 0
-
-            async for chunk in frames:
-                buffer.append(chunk)
-                buffer_ms += chunk.end - chunk.start
-
-                if buffer_ms < config.min_duration_ms:
-                    continue
-
-                yield await self._transcribe_buffer(model, buffer, config)
-                buffer.clear()
-                buffer_ms = 0
-
-            if buffer:
-                yield await self._transcribe_buffer(model, buffer, config)
-
-        return _stream()
+        return buffered_stream(frames, config.min_duration_ms, _transcribe)
 
     async def _postprocess(
         self, audio_np: np.ndarray, result: dict[str, Any], config: WhisperXConfig
