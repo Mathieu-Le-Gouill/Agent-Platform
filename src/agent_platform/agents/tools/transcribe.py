@@ -9,6 +9,7 @@ from pydantic import BaseModel, Field
 from agent_platform.agents.tools._utils import safe_call, safe_stream
 from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.components.speech_to_text import SpeechToText
+from agent_platform.core.interfaces.speech.config import SpeechConfig
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript
 from agent_platform.core.schemas.document import AudioDocument
@@ -31,8 +32,13 @@ class TranscribeTool(Tool):
     output_schema = Transcript
     supports_streaming = True
 
-    def __init__(self, speech_to_text: SpeechToText) -> None:
+    def __init__(
+        self,
+        speech_to_text: SpeechToText,
+        default_config: SpeechConfig | None = None,
+    ) -> None:
         self._speech_to_text = speech_to_text
+        self._default_config = default_config
 
     def _build_chunk(self, validated: TranscribeInput) -> AudioChunk:
         return AudioChunk(
@@ -47,7 +53,9 @@ class TranscribeTool(Tool):
     async def run(self, **kwargs: Any) -> Transcript:
         validated = TranscribeInput(**kwargs)
         result = await safe_call(
-            self._speech_to_text.arun((self._build_chunk(validated), None)),
+            self._speech_to_text.arun(
+                (self._build_chunk(validated), self._default_config)
+            ),
             "Speech-to-text failed",
         )
         if not result.utterances:
@@ -79,7 +87,8 @@ class TranscribeTool(Tool):
             yield self._build_chunk(validated)
 
         async for partial in safe_stream(
-            self._speech_to_text.astream(frames()), "Speech-to-text streaming failed"
+            self._speech_to_text.astream(frames(), config=self._default_config),
+            "Speech-to-text streaming failed",
         ):
             for utterance in partial.utterances:
                 if utterance.text:

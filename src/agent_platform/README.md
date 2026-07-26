@@ -90,13 +90,14 @@ Multi-step operations that chain components together. See `pipelines/README.md`.
 
 ### `config/`: Settings and DI
 
-- `settings.py`, `Settings` (`pydantic-settings`, env prefix `AGENT_PLATFORM_`), `get_settings()` (`lru_cache`'d singleton)
-- `container.py`, `build_provider(domain_module, provider_name)`, a generic factory that instantiates any `integrations.<domain>` provider by its exported class name (`getattr(domain_module, provider_name)()`), raising `ConfigError` if the name isn't found. It reads no separate provider registry, the target domain's own `_PROVIDERS` map (see `integrations/` above) is already the source of truth for valid names, so a `Settings` field for a domain just stores that class name directly (e.g. `llm_provider: str = "OpenAILLM"`)
-- `container.py`, `build_agent(settings)`, the only concrete wiring today: builds a `ConversationAgent` from `settings.llm_provider` via `build_provider`
+- `settings.py`, `Settings` (`pydantic-settings`, env prefix `AGENT_PLATFORM_`), `get_settings()` (`lru_cache`'d singleton). Default provider selection for each of the three wired domains is a single `"<provider>:<model>"` string (`default_llm_model`, `default_image_model`, `default_audio_model`), the convention LangChain's `init_chat_model`/Pydantic AI use, parsed by `core/config.py::parse_model_string`
+- `container.py`, `build_provider(domain_module, provider_name)`, a generic factory that instantiates any `integrations.<domain>` provider. `provider_name` is resolved against that domain module's `PROVIDER_ALIASES` map first (a short slug, e.g. `"openai"` -> `"OpenAILLM"`), falling back to the literal exported class name (`getattr(domain_module, provider_name)()`) so an explicit class name still works; raises `ConfigError` if neither resolves. It reads no separate provider registry, the target domain's own `_PROVIDERS` + `PROVIDER_ALIASES` maps (see `integrations/` above) are already the source of truth for valid names
+- `container.py`, `build_provider_from_model_string(domain_module, model_string)`, combines `parse_model_string` + `build_provider`, returning `(provider_instance, model)`
+- `container.py`, `build_agent(settings)`, builds a `ConversationAgent` whose LLM, `GenerateImageTool`, and `TranscribeTool` (registered on its `ToolRegistry`) are all resolved this way from `settings.default_llm_model`/`default_image_model`/`default_audio_model`
 
 ### `api/`: FastAPI Entrypoint
 
-`app.py` wires one `ConversationAgent` via `config.build_agent()` behind `/chat` and `/health`, using `config.Settings`/`get_settings()` for configuration and `config.setup_logging()` + `core.tracing.configure_tracing()` at startup.
+`app.py` wires one `ConversationAgent` via `config.build_agent()` behind `/chat` and `/health`, using `config.Settings`/`get_settings()` for configuration and `config.setup_logging()` + `core.tracing.configure_tracing()` at startup. That agent already carries image-generation and transcription tools (see `config/` above), not chat only.
 
 ## Extension Patterns
 
@@ -122,21 +123,29 @@ class MyLLM(LangChainLLMProvider):
 ### Wire a new provider domain into `Settings`/DI
 
 Once a domain has real consumers beyond direct constructor injection (the
-pattern `agents/tools/*` use today), expose it through `config/` instead of
-adding a bespoke factory function per domain:
+pattern `agents/tools/*` use today), expose it through `config/` the same way
+`llm`/`image_generation`/`speech_to_text` already are: a `PROVIDER_ALIASES`
+map on the domain module, plus a `"<provider>:<model>"` `Settings` field:
 
 ```python
+# integrations/vector_store/__init__.py
+PROVIDER_ALIASES: dict[str, str] = {"chroma": "ChromaStore", "qdrant": "QdrantStore"}
+
 # config/settings.py
-vector_store_provider: str = "ChromaStore"   # class name from integrations.vector_store
+default_vector_store_model: str = "chroma:default"
 
 # config/container.py
 def build_vector_store(settings: Settings) -> BaseVectorStore:
     import agent_platform.integrations.vector_store as vector_store_module
-    return build_provider(vector_store_module, settings.vector_store_provider)
+    provider, _model = build_provider_from_model_string(
+        vector_store_module, settings.default_vector_store_model
+    )
+    return provider
 ```
 
-`build_provider` already works for any domain module that follows the
-`_PROVIDERS: dict[class_name, module_path]` + lazy `__getattr__` convention,
+`build_provider`/`build_provider_from_model_string` already work for any
+domain module that follows the `_PROVIDERS: dict[class_name, module_path]` +
+`PROVIDER_ALIASES: dict[slug, class_name]` + lazy `__getattr__` convention,
 so this is the only code needed, no new registry, no per-domain dict.
 
 ## Known Issues

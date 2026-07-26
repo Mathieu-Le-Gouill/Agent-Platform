@@ -13,10 +13,12 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # Provider class name as exported by `agent_platform.integrations.llm`
-    # (e.g. "OpenAILLM", "AnthropicLLM") - see config/container.py:build_provider.
-    llm_provider: str = "OpenAILLM"
-    llm_model: str = "gpt-4o-mini"
+    # "<provider>:<model>" strings (see core/config.py::parse_model_string), resolved
+    # by config/container.py::build_provider_from_model_string against each domain's
+    # `PROVIDER_ALIASES` map (e.g. "openai:gpt-4o-mini", "anthropic:claude-sonnet-4-5").
+    default_llm_model: str = "openai:gpt-4o-mini"
+    default_image_model: str = "dalle:dall-e-3"
+    default_audio_model: str = "openai:whisper-1"
     agent_name: str = "assistant"
     agent_system_prompt: str | None = None
     max_iterations: int = 10

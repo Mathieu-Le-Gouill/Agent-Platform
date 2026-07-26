@@ -10,4 +10,14 @@ _PROVIDERS: dict[str, str] = {
     "HuggingFaceLLM": "agent_platform.integrations.llm.huggingface.provider",
 }
 
+# Short slugs for `Settings.default_llm_model`'s "<provider>:<model>" strings
+# (see `core.config.parse_model_string`), resolved by `config.container.build_provider`.
+PROVIDER_ALIASES: dict[str, str] = {
+    "openai": "OpenAILLM",
+    "anthropic": "AnthropicLLM",
+    "mistral": "MistralLLM",
+    "ollama": "OllamaLLM",
+    "huggingface": "HuggingFaceLLM",
+}
+
 __getattr__, __dir__ = make_lazy_provider_accessors(_PROVIDERS, globals())

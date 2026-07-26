@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from agent_platform.agents.tools import ToolError, TranscribeInput, TranscribeTool
 from agent_platform.components.speech_to_text import SpeechToText
+from agent_platform.core.interfaces.speech.config import SpeechConfig
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.core.schemas.enums import AudioFormat, DataType
@@ -113,6 +114,19 @@ class TestTranscribeTool:
     async def test_run_missing_data_raises(self, tool):
         with pytest.raises(ValidationError):
             await tool.run(sample_rate=16000)
+
+    @pytest.mark.asyncio
+    async def test_run_forwards_default_config(self, mock_provider):
+        default_config = SpeechConfig(model="whisper-1")
+        tool = TranscribeTool(
+            speech_to_text=SpeechToText(backend=mock_provider),
+            default_config=default_config,
+        )
+
+        await tool.run(data=b"\x00\x01")
+
+        call_args = mock_provider.transcribe.call_args[0]
+        assert call_args[1] is default_config
 
 
 class TestTranscribeToolToBlocks:

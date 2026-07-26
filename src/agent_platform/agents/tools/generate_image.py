@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 from agent_platform.agents.tools._utils import safe_call
 from agent_platform.agents.tools.base import Tool
 from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
+from agent_platform.core.interfaces.image_generation.config import ImageGenConfig
 from agent_platform.core.schemas.document import ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat
 
@@ -29,14 +30,22 @@ class GenerateImageTool(Tool):
     input_schema = GenerateImageInput
     output_schema = ImageDocument
 
-    def __init__(self, generator: BaseImageGenerator) -> None:
+    def __init__(
+        self,
+        generator: BaseImageGenerator,
+        default_config: ImageGenConfig | None = None,
+    ) -> None:
         self._generator = generator
+        self._default_config = default_config
 
     async def run(self, **kwargs: Any) -> ImageDocument:
         validated = GenerateImageInput(**kwargs)
         return await safe_call(
             self._generator.generate(
-                validated.prompt, size=validated.size, format=validated.format
+                validated.prompt,
+                config=self._default_config,
+                size=validated.size,
+                format=validated.format,
             ),
             "Image generation failed",
         )

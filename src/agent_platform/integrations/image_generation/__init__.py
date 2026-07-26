@@ -8,4 +8,12 @@ _PROVIDERS: dict[str, str] = {
     "StableDiffusionGenerator": "agent_platform.integrations.image_generation.stable_diffusion.provider",
 }
 
+# Short slugs for `Settings.default_image_model`'s "<provider>:<model>" strings
+# (see `core.config.parse_model_string`), resolved by `config.container.build_provider`.
+PROVIDER_ALIASES: dict[str, str] = {
+    "dalle": "DallEImageGenerator",
+    "midjourney": "MidjourneyGenerator",
+    "stable_diffusion": "StableDiffusionGenerator",
+}
+
 __getattr__, __dir__ = make_lazy_provider_accessors(_PROVIDERS, globals())

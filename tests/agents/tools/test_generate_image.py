@@ -4,6 +4,7 @@ import pytest
 from pydantic import ValidationError
 
 from agent_platform.agents.tools import GenerateImageInput, GenerateImageTool, ToolError
+from agent_platform.core.interfaces.image_generation.config import ImageGenConfig
 from agent_platform.core.schemas.document import ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat
 
@@ -43,13 +44,25 @@ class TestGenerateImageTool:
         result = await tool.run(prompt="a cat")
         assert result.format == ImageFormat.PNG
         mock_generator.generate.assert_awaited_once_with(
-            "a cat", size=None, format=ImageFormat.PNG
+            "a cat", config=None, size=None, format=ImageFormat.PNG
         )
 
     async def test_run_with_size_and_format(self, tool, mock_generator):
         await tool.run(prompt="a cat", size="512x512", format=ImageFormat.JPEG)
         mock_generator.generate.assert_awaited_once_with(
-            "a cat", size="512x512", format=ImageFormat.JPEG
+            "a cat", config=None, size="512x512", format=ImageFormat.JPEG
+        )
+
+    async def test_run_forwards_default_config(self, mock_generator):
+        default_config = ImageGenConfig(model="dall-e-2")
+        tool = GenerateImageTool(
+            generator=mock_generator, default_config=default_config
+        )
+
+        await tool.run(prompt="a cat")
+
+        mock_generator.generate.assert_awaited_once_with(
+            "a cat", config=default_config, size=None, format=ImageFormat.PNG
         )
 
     async def test_run_provider_error_wrapped(self, tool, mock_generator):

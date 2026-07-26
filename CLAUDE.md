@@ -8,9 +8,9 @@ Coding-agent guide for this repository. Read this before writing any code. For l
 - **`src/agent_platform/README.md`**, layer map and known issues
 - **`src/agent_platform/<layer>/README.md`**, local patterns for that layer; read before touching it
 
-## Current state (as of 2026-07-25, evals landed)
+## Current state (as of 2026-07-26, default provider selection landed)
 
-The platform is **structurally complete** at the integration, component, pipeline, agent, and evals layers. The remaining gap is `workflows/`, still an empty scaffold; `api/` has a real FastAPI entrypoint (`api/app.py`) wiring one `ConversationAgent` via `config/container.py::build_agent()`, driven by `config/settings.py::Settings`.
+The platform is **structurally complete** at the integration, component, pipeline, agent, and evals layers. The remaining gap is `workflows/`, still an empty scaffold; `api/` has a real FastAPI entrypoint (`api/app.py`) wiring one `ConversationAgent` via `config/container.py::build_agent()`, driven by `config/settings.py::Settings`. That agent already carries `GenerateImageTool`/`TranscribeTool`, not chat only: `Settings.default_llm_model`/`default_image_model`/`default_audio_model` are `"<provider>:<model>"` strings (`core/config.py::parse_model_string`) resolved against each domain's `PROVIDER_ALIASES` map (`integrations/<domain>/__init__.py`) by `build_provider`/`build_provider_from_model_string`.
 
 ### What is solid
 
