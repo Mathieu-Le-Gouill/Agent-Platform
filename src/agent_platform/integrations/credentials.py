@@ -11,6 +11,7 @@ __all__ = [
     "CohereCredentials",
     "DeepgramCredentials",
     "DeepLCredentials",
+    "GoogleCredentials",
     "GoogleTranslateCredentials",
     "GoogleVisionCredentials",
     "HuggingFaceCredentials",
@@ -73,6 +74,12 @@ class DeepgramCredentials(ProviderCredentials, frozen=True):
 class DeepLCredentials(ProviderCredentials, frozen=True):
     auth_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("DEEPL_AUTH_KEY")
+    )
+
+
+class GoogleCredentials(ProviderCredentials, frozen=True):
+    api_key: SecretStr | None = Field(
+        default_factory=lambda: secret_from_env(["GOOGLE_API_KEY", "GEMINI_API_KEY"])
     )
 
 

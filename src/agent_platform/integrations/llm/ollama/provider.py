@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import json
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
@@ -19,6 +20,7 @@ from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     ResponseFormat,
     StreamChunk,
+    ToolCallDelta,
 )
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import (
@@ -130,11 +132,14 @@ class OllamaLLM(
         self,
         prompt: Prompt,
         config: OllamaGenerationConfig | None = None,
+        tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
         client = self._async_client(config)
         messages = _to_native_messages(prompt)
         params = _to_native_params(config)
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
         with self._span(config) as span:
             usage_totals = TokenUsage.zero()
@@ -145,6 +150,22 @@ class OllamaLLM(
                 delta = chunk.message.content if chunk.message else None
                 if delta:
                     yield StreamChunk(delta=delta)
+                # Ollama does not fragment tool-call arguments across chunks
+                # like OpenAI/Anthropic; each call arrives whole in one chunk.
+                message_tool_calls = chunk.message.tool_calls if chunk.message else None
+                if message_tool_calls:
+                    yield StreamChunk(
+                        delta="",
+                        tool_call_deltas=[
+                            ToolCallDelta(
+                                index=idx,
+                                id=uuid4().hex,
+                                name=tc.function.name,
+                                arguments_delta=json.dumps(dict(tc.function.arguments)),
+                            )
+                            for idx, tc in enumerate(message_tool_calls)
+                        ],
+                    )
                 if chunk.done:
                     chunk_usage = TokenUsage(
                         input_tokens=chunk.prompt_eval_count or 0,

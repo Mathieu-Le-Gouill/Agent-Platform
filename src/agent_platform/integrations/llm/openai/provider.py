@@ -9,11 +9,20 @@ from openai import AsyncOpenAI, AsyncStream, OpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.interfaces.llm.batch import (
+    BaseBatchLLMProvider,
+    BatchJob,
+    BatchRequest,
+    BatchResult,
+    BatchStatus,
+)
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
     ResponseFormat,
     StreamChunk,
+    ToolCallDelta,
 )
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import (
@@ -30,7 +39,11 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import record_token_usage
+from agent_platform.core.tracing import (
+    GenAIAttributes,
+    record_token_usage,
+    traced_operation_span,
+)
 from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
@@ -52,8 +65,21 @@ def _is_reasoning_model(model: str) -> bool:
     return model_lower.startswith("gpt-5") and "chat" not in model_lower
 
 
+_BATCH_STATUS_MAP: dict[str, BatchStatus] = {
+    "validating": BatchStatus.PENDING,
+    "in_progress": BatchStatus.IN_PROGRESS,
+    "finalizing": BatchStatus.IN_PROGRESS,
+    "cancelling": BatchStatus.IN_PROGRESS,
+    "completed": BatchStatus.COMPLETED,
+    "failed": BatchStatus.FAILED,
+    "expired": BatchStatus.EXPIRED,
+    "cancelled": BatchStatus.CANCELLED,
+}
+
+
 class OpenAILLM(
-    NativeLLMProvider[OpenAIGenerationConfig, AsyncOpenAI, OpenAI, ChatCompletion]
+    NativeLLMProvider[OpenAIGenerationConfig, AsyncOpenAI, OpenAI, ChatCompletion],
+    BaseBatchLLMProvider,
 ):
     _provider_name = "openai"
     _missing_api_key_message = "OPENAI API key is required but was not provided"
@@ -124,12 +150,15 @@ class OpenAILLM(
         self,
         prompt: Prompt,
         config: OpenAIGenerationConfig | None = None,
+        tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
         client = self._async_client(config)
         messages = _to_native_messages(prompt)
         params = _to_native_params(config)
         params["stream_options"] = {"include_usage": True}
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
         with self._span(config) as span:
             usage_totals = TokenUsage.zero()
@@ -147,6 +176,19 @@ class OpenAILLM(
                     delta = chunk.choices[0].delta.content
                     if delta:
                         yield StreamChunk(delta=delta)
+                    tool_call_deltas = [
+                        ToolCallDelta(
+                            index=tc.index,
+                            id=tc.id,
+                            name=tc.function.name if tc.function else None,
+                            arguments_delta=tc.function.arguments
+                            if tc.function
+                            else None,
+                        )
+                        for tc in (chunk.choices[0].delta.tool_calls or [])
+                    ]
+                    if tool_call_deltas:
+                        yield StreamChunk(delta="", tool_call_deltas=tool_call_deltas)
                 if chunk.usage is not None:
                     chunk_usage = TokenUsage(
                         input_tokens=chunk.usage.prompt_tokens,
@@ -161,6 +203,104 @@ class OpenAILLM(
 
             record_token_usage(span, usage_totals)
             yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
+
+    @error_logged(re_raise=ProviderError, message="Batch submission failed")
+    @with_retry()
+    async def submit_batch(self, requests: list[BatchRequest]) -> BatchJob:
+        config = self._default_config()
+        client = self._async_client(config)
+
+        lines: list[str] = []
+        for req in requests:
+            req_config = cast(OpenAIGenerationConfig, req.config or config)
+            body = {
+                "model": req_config.model,
+                "messages": _to_native_messages(req.prompt),
+                **_to_native_params(req_config),
+            }
+            lines.append(
+                json.dumps(
+                    {
+                        "custom_id": req.custom_id,
+                        "method": "POST",
+                        "url": "/v1/chat/completions",
+                        "body": body,
+                    }
+                )
+            )
+
+        with traced_operation_span(
+            "llm_batch_submit", **{GenAIAttributes.PROVIDER_NAME: self._provider_name}
+        ):
+            uploaded = await client.files.create(
+                file=("batch.jsonl", "\n".join(lines).encode()),
+                purpose="batch",
+            )
+            batch = await client.batches.create(
+                input_file_id=uploaded.id,
+                endpoint="/v1/chat/completions",
+                completion_window="24h",
+            )
+            return _batch_job_from_native(batch)
+
+    @error_logged(re_raise=ProviderError, message="Batch status check failed")
+    @with_retry()
+    async def get_batch_status(self, batch_id: str) -> BatchJob:
+        client = self._async_client(self._default_config())
+        with traced_operation_span(
+            "llm_batch_status",
+            **{
+                GenAIAttributes.PROVIDER_NAME: self._provider_name,
+                GenAIAttributes.BATCH_ID: batch_id,
+            },
+        ):
+            batch = await client.batches.retrieve(batch_id)
+            return _batch_job_from_native(batch)
+
+    @error_logged(re_raise=ProviderError, message="Batch result retrieval failed")
+    @with_retry()
+    async def fetch_batch_results(self, batch_id: str) -> list[BatchResult]:
+        client = self._async_client(self._default_config())
+        with traced_operation_span(
+            "llm_batch_results",
+            **{
+                GenAIAttributes.PROVIDER_NAME: self._provider_name,
+                GenAIAttributes.BATCH_ID: batch_id,
+            },
+        ):
+            batch = await client.batches.retrieve(batch_id)
+            if batch.output_file_id is None:
+                return []
+            content = await client.files.content(batch.output_file_id)
+            results: list[BatchResult] = []
+            for line in content.text.splitlines():
+                if not line.strip():
+                    continue
+                raw = json.loads(line)
+                error = raw.get("error")
+                if error is not None:
+                    results.append(
+                        BatchResult(custom_id=raw["custom_id"], error=str(error))
+                    )
+                    continue
+                completion = ChatCompletion.model_validate(raw["response"]["body"])
+                results.append(
+                    BatchResult(
+                        custom_id=raw["custom_id"],
+                        response=_from_native_response(completion, completion.model),
+                    )
+                )
+            return results
+
+
+def _batch_job_from_native(batch: Any) -> BatchJob:
+    counts = getattr(batch, "request_counts", None)
+    return BatchJob(
+        id=batch.id,
+        status=_BATCH_STATUS_MAP.get(batch.status, BatchStatus.PENDING),
+        request_count=counts.total if counts is not None else None,
+        completed_count=counts.completed if counts is not None else None,
+    )
 
 
 # --- Mappers ---

@@ -14,6 +14,12 @@ class QdrantConfig(VectorStoreConfig):
     # If that changes, Qdrant's Distance enum spells differently than
     # DistanceMetric (`Distance.EUCLID`, not `EUCLIDEAN`) and needs a mapping table.
 
+    # `add_hybrid`/`search_hybrid` additionally assume the collection was
+    # provisioned with two named vectors: a dense one under `"dense"` and a
+    # sparse one under `"sparse"` configured with `models.Modifier.IDF`, so
+    # Qdrant computes IDF weighting server-side from the raw term-frequency
+    # values this provider sends (see `integrations/embeddings/bm25`).
+
 
 """
 sources: https://qdrant.tech/documentation/interfaces

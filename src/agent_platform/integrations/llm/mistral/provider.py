@@ -16,6 +16,7 @@ from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     ResponseFormat,
     StreamChunk,
+    ToolCallDelta,
 )
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import (
@@ -127,11 +128,14 @@ class MistralLLM(
         self,
         prompt: Prompt,
         config: MistralGenerationConfig | None = None,
+        tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
         client = self._async_client(config)
         messages = _to_native_messages(prompt)
         params = _to_native_params(config)
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
         with self._span(config) as span:
             usage_totals = TokenUsage.zero()
@@ -146,6 +150,24 @@ class MistralLLM(
                     delta = chunk.choices[0].delta.content
                     if isinstance(delta, str) and delta:
                         yield StreamChunk(delta=delta)
+                    tool_call_deltas = [
+                        ToolCallDelta(
+                            index=idx,
+                            id=tc.id,
+                            name=tc.function.name if tc.function else None,
+                            arguments_delta=(
+                                tc.function.arguments
+                                if tc.function
+                                and isinstance(tc.function.arguments, str)
+                                else None
+                            ),
+                        )
+                        for idx, tc in enumerate(
+                            chunk.choices[0].delta.tool_calls or []
+                        )
+                    ]
+                    if tool_call_deltas:
+                        yield StreamChunk(delta="", tool_call_deltas=tool_call_deltas)
                 if chunk.usage is not None:
                     chunk_usage = TokenUsage(
                         input_tokens=chunk.usage.prompt_tokens,

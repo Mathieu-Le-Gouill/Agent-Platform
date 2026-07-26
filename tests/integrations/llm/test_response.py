@@ -2,6 +2,7 @@ from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
     StreamChunk,
+    ToolCallDelta,
 )
 from agent_platform.core.schemas.message import AssistantMessage, ToolCall
 from agent_platform.core.schemas.token import TokenUsage
@@ -73,6 +74,12 @@ class TestStreamChunk:
         assert chunk.delta == "Hello"
         assert chunk.finish_reason == FinishReason.STOP
         assert chunk.usage is None
+        assert chunk.tool_call_deltas == []
+
+    def test_with_tool_call_deltas(self):
+        delta = ToolCallDelta(index=0, id="call_1", name="search")
+        chunk = StreamChunk(delta="", tool_call_deltas=[delta])
+        assert chunk.tool_call_deltas == [delta]
 
     def test_with_finish_reason(self):
         chunk = StreamChunk(delta="", finish_reason=FinishReason.STOP)
@@ -91,3 +98,28 @@ class TestStreamChunk:
         chunk = StreamChunk(delta="test")
         with pytest.raises(ValidationError):
             chunk.delta = "changed"
+
+
+class TestToolCallDelta:
+    def test_minimal(self):
+        delta = ToolCallDelta(index=0)
+        assert delta.id is None
+        assert delta.name is None
+        assert delta.arguments_delta is None
+
+    def test_full(self):
+        delta = ToolCallDelta(
+            index=1, id="call_1", name="search", arguments_delta='{"q": 1}'
+        )
+        assert delta.index == 1
+        assert delta.id == "call_1"
+        assert delta.name == "search"
+        assert delta.arguments_delta == '{"q": 1}'
+
+    def test_frozen(self):
+        import pytest
+        from pydantic import ValidationError
+
+        delta = ToolCallDelta(index=0)
+        with pytest.raises(ValidationError):
+            delta.index = 1

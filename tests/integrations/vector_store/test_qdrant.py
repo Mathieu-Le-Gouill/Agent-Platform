@@ -276,3 +276,94 @@ class TestQdrantSearch:
             await provider.search_with_scores(
                 query_vector=[0.1, 0.2], config=QdrantConfig()
             )
+
+
+class TestQdrantAddHybrid:
+    async def test_upserts_named_vectors(self, mocker):
+        from agent_platform.core.schemas.vector import SparseVector
+
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient"
+        )
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.upsert = AsyncMock()
+
+        provider = QdrantVectorStoreProvider(QdrantCredentials(api_key=None))
+        chunk = TextChunk(text="hello", index=0)
+        sparse = SparseVector(indices=[1, 3], values=[2.0, 1.0])
+        await provider.add_hybrid(
+            [chunk], [[0.1, 0.2]], [sparse], config=QdrantConfig()
+        )
+
+        mock_client.upsert.assert_awaited_once()
+        _, kwargs = mock_client.upsert.call_args
+        point = kwargs["points"][0]
+        assert point.vector["dense"] == [0.1, 0.2]
+        assert point.vector["sparse"].indices == [1, 3]
+        assert point.vector["sparse"].values == [2.0, 1.0]
+
+    async def test_add_hybrid_empty_list_skips_upsert(self, mocker):
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient"
+        )
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        mock_client.upsert = AsyncMock()
+
+        provider = QdrantVectorStoreProvider(QdrantCredentials(api_key=None))
+        await provider.add_hybrid([], [], [], config=QdrantConfig())
+
+        mock_client.upsert.assert_not_awaited()
+
+
+class TestQdrantSearchHybrid:
+    async def test_search_hybrid_fuses_prefetch(self, mocker):
+        from agent_platform.core.schemas.vector import SparseVector
+
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient"
+        )
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+        uid = uuid4()
+        point = _scored_point(uid, {"text": "hello"}, score=0.5)
+        mock_client.query_points = AsyncMock(
+            return_value=SimpleNamespace(points=[point])
+        )
+
+        provider = QdrantVectorStoreProvider(QdrantCredentials(api_key=None))
+        sparse = SparseVector(indices=[1], values=[1.0])
+        results = await provider.search_hybrid(
+            query_vector=[0.1, 0.2], sparse_vector=sparse, config=QdrantConfig()
+        )
+
+        assert len(results) == 1
+        assert results[0][0].id == uid
+        _, kwargs = mock_client.query_points.call_args
+        assert len(kwargs["prefetch"]) == 2
+        assert kwargs["prefetch"][0].using == "dense"
+        assert kwargs["prefetch"][1].using == "sparse"
+
+    async def test_search_hybrid_translates_permanent_failure(
+        self, mocker, no_retry_sleep
+    ):
+        from agent_platform.core.schemas.vector import SparseVector
+
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient"
+        )
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+
+        async def always_fails(*args, **kwargs):
+            raise ConnectionError("boom")
+
+        mock_client.query_points = always_fails
+
+        provider = QdrantVectorStoreProvider(QdrantCredentials(api_key=None))
+        sparse = SparseVector(indices=[1], values=[1.0])
+        with pytest.raises(ProviderError, match="Vector store hybrid search failed"):
+            await provider.search_hybrid(
+                query_vector=[0.1, 0.2], sparse_vector=sparse, config=QdrantConfig()
+            )

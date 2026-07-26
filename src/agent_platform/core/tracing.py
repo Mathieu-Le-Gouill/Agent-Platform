@@ -50,6 +50,7 @@ class GenAIAttributes:
     AGENT_NAME = "gen_ai.agent.name"
     TOOL_NAME = "gen_ai.tool.name"
     TOOL_CALL_ID = "gen_ai.tool.call.id"
+    BATCH_ID = "gen_ai.batch.id"
     USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
     USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
     ERROR_TYPE = "error.type"

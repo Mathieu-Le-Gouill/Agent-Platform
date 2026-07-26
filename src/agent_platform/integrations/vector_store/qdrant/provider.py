@@ -11,6 +11,7 @@ from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
 from agent_platform.core.schemas.score import Score
+from agent_platform.core.schemas.vector import SparseVector
 from agent_platform.integrations.credentials import QdrantCredentials
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
 
@@ -97,6 +98,72 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
             query=query_vector,
             limit=k,
             query_filter=self._filter(filter),
+        )
+        return [
+            (
+                _point_to_chunk(point),
+                Score.similarity(min(1.0, max(0.0, point.score))),
+            )
+            for point in response.points
+        ]
+
+    async def add_hybrid(
+        self,
+        documents: list[TextChunk],
+        vectors: list[list[float]],
+        sparse_vectors: list[SparseVector],
+        config: QdrantConfig | None = None,
+    ) -> None:
+        config = config or self._default_config()
+        client = self._client(config)
+        points = [
+            models.PointStruct(
+                id=str(doc.id),
+                vector={
+                    "dense": vector,
+                    "sparse": models.SparseVector(
+                        indices=sparse.indices, values=sparse.values
+                    ),
+                },
+                payload=_chunk_to_payload(doc),
+            )
+            for doc, vector, sparse in zip(documents, vectors, sparse_vectors)
+        ]
+        if points:
+            await client.upsert(collection_name=config.collection_name, points=points)
+
+    @error_logged(re_raise=ProviderError, message="Vector store hybrid search failed")
+    @with_retry()
+    async def search_hybrid(
+        self,
+        query_vector: list[float],
+        sparse_vector: SparseVector,
+        k: int = 5,
+        config: QdrantConfig | None = None,
+        filter: dict[str, Any] | None = None,
+    ) -> list[tuple[TextChunk, Score]]:
+        config = config or self._default_config()
+        client = self._client(config)
+        response = await client.query_points(
+            collection_name=config.collection_name,
+            prefetch=[
+                models.Prefetch(
+                    query=query_vector,
+                    using="dense",
+                    limit=k,
+                    filter=self._filter(filter),
+                ),
+                models.Prefetch(
+                    query=models.SparseVector(
+                        indices=sparse_vector.indices, values=sparse_vector.values
+                    ),
+                    using="sparse",
+                    limit=k,
+                    filter=self._filter(filter),
+                ),
+            ],
+            query=models.FusionQuery(fusion=models.Fusion.RRF),
+            limit=k,
         )
         return [
             (

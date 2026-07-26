@@ -462,13 +462,21 @@ class TestMistralLLMStream:
         events = [
             SimpleNamespace(
                 data=SimpleNamespace(
-                    choices=[SimpleNamespace(delta=SimpleNamespace(content="Hello"))],
+                    choices=[
+                        SimpleNamespace(
+                            delta=SimpleNamespace(content="Hello", tool_calls=None)
+                        )
+                    ],
                     usage=None,
                 )
             ),
             SimpleNamespace(
                 data=SimpleNamespace(
-                    choices=[SimpleNamespace(delta=SimpleNamespace(content=" World"))],
+                    choices=[
+                        SimpleNamespace(
+                            delta=SimpleNamespace(content=" World", tool_calls=None)
+                        )
+                    ],
                     usage=None,
                 )
             ),
@@ -520,3 +528,78 @@ class TestMistralLLMStream:
         assert len(results) == 1
         assert results[0].delta == ""
         assert results[0].finish_reason == FinishReason.STOP
+
+    async def test_stream_with_tools_yields_tool_call_deltas(self, mocker):
+        class _Input(BaseModel):
+            query: str
+
+        class _SchemaTool(Tool):
+            name = "search"
+            description = "search tool"
+            input_schema = _Input
+
+            async def run(self, **kwargs):
+                return "ok"
+
+        mock_mistral = mocker.patch(
+            "agent_platform.integrations.llm.mistral.provider.Mistral"
+        )
+        mock_client = MagicMock()
+        mock_mistral.return_value = mock_client
+
+        events = [
+            SimpleNamespace(
+                data=SimpleNamespace(
+                    choices=[
+                        SimpleNamespace(
+                            delta=SimpleNamespace(
+                                content=None,
+                                tool_calls=[_tool_call("call_1", "search", "")],
+                            )
+                        )
+                    ],
+                    usage=None,
+                )
+            ),
+            SimpleNamespace(
+                data=SimpleNamespace(
+                    choices=[
+                        SimpleNamespace(
+                            delta=SimpleNamespace(
+                                content=None,
+                                tool_calls=[_tool_call(None, None, '{"query": "hi"}')],
+                            )
+                        )
+                    ],
+                    usage=None,
+                )
+            ),
+            SimpleNamespace(
+                data=SimpleNamespace(
+                    choices=[],
+                    usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
+                )
+            ),
+        ]
+
+        async def _gen():
+            for event in events:
+                yield event
+
+        mock_client.chat.stream_async = AsyncMock(return_value=_gen())
+
+        provider = MistralLLM(_creds())
+        prompt = Prompt(messages=[UserMessage(content="Hi")])
+        config = MistralGenerationConfig(model="mistral-medium-latest")
+        results = [
+            c
+            async for c in provider.stream(prompt, config=config, tools=[_SchemaTool()])
+        ]
+
+        _, kwargs = mock_client.chat.stream_async.call_args
+        assert kwargs["tools"][0]["function"]["name"] == "search"
+
+        deltas = [d for c in results for d in c.tool_call_deltas]
+        assert deltas[0].id == "call_1"
+        assert deltas[0].name == "search"
+        assert deltas[1].arguments_delta == '{"query": "hi"}'

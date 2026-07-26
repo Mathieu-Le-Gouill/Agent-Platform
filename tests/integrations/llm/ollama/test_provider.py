@@ -488,8 +488,12 @@ class TestOllamaLLMStream:
         mock_client_cls.return_value = mock_client
 
         chunks = [
-            SimpleNamespace(message=SimpleNamespace(content="Hello"), done=False),
-            SimpleNamespace(message=SimpleNamespace(content=" World"), done=False),
+            SimpleNamespace(
+                message=SimpleNamespace(content="Hello", tool_calls=None), done=False
+            ),
+            SimpleNamespace(
+                message=SimpleNamespace(content=" World", tool_calls=None), done=False
+            ),
             SimpleNamespace(
                 message=None,
                 done=True,
@@ -538,3 +542,58 @@ class TestOllamaLLMStream:
         assert len(results) == 1
         assert results[0].delta == ""
         assert results[0].finish_reason == FinishReason.STOP
+
+    async def test_stream_with_tools_yields_tool_call_deltas(self, mocker):
+        class _Input(BaseModel):
+            query: str
+
+        class _SchemaTool(Tool):
+            name = "search"
+            description = "search tool"
+            input_schema = _Input
+
+            async def run(self, **kwargs):
+                return "ok"
+
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.llm.ollama.provider.AsyncClient"
+        )
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+
+        chunks = [
+            SimpleNamespace(
+                message=SimpleNamespace(
+                    content=None,
+                    tool_calls=[_tool_call("search", {"query": "hi"})],
+                ),
+                done=False,
+            ),
+            SimpleNamespace(
+                message=None,
+                done=True,
+                prompt_eval_count=1,
+                eval_count=1,
+            ),
+        ]
+
+        async def _gen():
+            for chunk in chunks:
+                yield chunk
+
+        mock_client.chat = AsyncMock(return_value=_gen())
+
+        provider = OllamaLLM()
+        prompt = Prompt(messages=[UserMessage(content="Hi")])
+        config = OllamaGenerationConfig(model="llama3.2")
+        results = [
+            c
+            async for c in provider.stream(prompt, config=config, tools=[_SchemaTool()])
+        ]
+
+        _, kwargs = mock_client.chat.call_args
+        assert kwargs["tools"][0]["function"]["name"] == "search"
+
+        deltas = [d for c in results for d in c.tool_call_deltas]
+        assert deltas[0].name == "search"
+        assert deltas[0].arguments_delta == '{"query": "hi"}'

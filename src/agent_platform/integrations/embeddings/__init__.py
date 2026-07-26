@@ -7,6 +7,8 @@ _PROVIDERS: dict[str, str] = {
     "MistralEmbeddingProvider": "agent_platform.integrations.embeddings.mistral.provider",
     "OllamaEmbeddingProvider": "agent_platform.integrations.embeddings.ollama.provider",
     "HuggingFaceEmbeddingProvider": "agent_platform.integrations.embeddings.huggingface.provider",
+    "BM25SparseEmbedder": "agent_platform.integrations.embeddings.bm25.provider",
+    "GoogleEmbeddingProvider": "agent_platform.integrations.embeddings.google.provider",
 }
 
 __getattr__, __dir__ = make_lazy_provider_accessors(_PROVIDERS, globals())

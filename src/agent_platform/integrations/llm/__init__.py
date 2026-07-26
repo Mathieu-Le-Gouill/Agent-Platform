@@ -8,6 +8,7 @@ _PROVIDERS: dict[str, str] = {
     "MistralLLM": "agent_platform.integrations.llm.mistral.provider",
     "OllamaLLM": "agent_platform.integrations.llm.ollama.provider",
     "HuggingFaceLLM": "agent_platform.integrations.llm.huggingface.provider",
+    "GoogleLLM": "agent_platform.integrations.llm.google.provider",
 }
 
 # Short slugs for `Settings.default_llm_model`'s "<provider>:<model>" strings
@@ -18,6 +19,7 @@ PROVIDER_ALIASES: dict[str, str] = {
     "mistral": "MistralLLM",
     "ollama": "OllamaLLM",
     "huggingface": "HuggingFaceLLM",
+    "google": "GoogleLLM",
 }
 
 __getattr__, __dir__ = make_lazy_provider_accessors(_PROVIDERS, globals())

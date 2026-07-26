@@ -6,6 +6,7 @@ from pydantic import BaseModel, SecretStr
 
 from agent_platform.agents.tools.base import Tool
 from agent_platform.core.errors import MissingCredentialError, ProviderError
+from agent_platform.core.interfaces.llm.batch import BatchRequest, BatchStatus
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.core.schemas.document import AudioDocument, ImageDocument
 from agent_platform.core.schemas.enums import AudioFormat, FinishReason, ImageFormat
@@ -589,3 +590,151 @@ class TestAnthropicLLMStream:
         assert len(results) == 1
         assert results[0].delta == ""
         assert results[0].finish_reason == FinishReason.STOP
+
+    async def test_stream_with_tools_yields_tool_call_deltas(self, mocker):
+        class _Input(BaseModel):
+            query: str
+
+        class _SchemaTool(Tool):
+            name = "search"
+            description = "search tool"
+            input_schema = _Input
+
+            async def run(self, **kwargs):
+                return "ok"
+
+        mock_anthropic = mocker.patch(
+            "agent_platform.integrations.llm.anthropic.provider.AsyncAnthropic"
+        )
+        mock_client = MagicMock()
+        mock_anthropic.return_value = mock_client
+
+        events = [
+            SimpleNamespace(
+                type="content_block_start",
+                index=0,
+                content_block=SimpleNamespace(
+                    type="tool_use", id="call_1", name="search"
+                ),
+            ),
+            SimpleNamespace(
+                type="content_block_delta",
+                index=0,
+                delta=SimpleNamespace(
+                    type="input_json_delta", partial_json='{"query": "hi"}'
+                ),
+            ),
+            SimpleNamespace(type="content_block_stop", index=0),
+        ]
+
+        async def _gen():
+            for event in events:
+                yield event
+
+        mock_client.messages.create = AsyncMock(return_value=_gen())
+
+        provider = AnthropicLLM(_creds())
+        prompt = Prompt(messages=[UserMessage(content="Hi")])
+        config = AnthropicGenerationConfig(model="claude-sonnet-4-6")
+        results = [
+            c
+            async for c in provider.stream(prompt, config=config, tools=[_SchemaTool()])
+        ]
+
+        _, kwargs = mock_client.messages.create.call_args
+        assert kwargs["tools"][0]["name"] == "search"
+
+        deltas = [d for c in results for d in c.tool_call_deltas]
+        assert deltas[0].id == "call_1"
+        assert deltas[0].name == "search"
+        assert deltas[1].arguments_delta == '{"query": "hi"}'
+
+
+class TestAnthropicLLMBatch:
+    async def test_submit_batch(self, mocker):
+        mock_anthropic = mocker.patch(
+            "agent_platform.integrations.llm.anthropic.provider.AsyncAnthropic"
+        )
+        mock_client = MagicMock()
+        mock_anthropic.return_value = mock_client
+        mock_client.messages.batches.create = AsyncMock(
+            return_value=SimpleNamespace(
+                id="batch_1",
+                processing_status="in_progress",
+                request_counts=SimpleNamespace(
+                    processing=1, succeeded=0, errored=0, canceled=0, expired=0
+                ),
+            )
+        )
+
+        provider = AnthropicLLM(_creds())
+        requests = [
+            BatchRequest(
+                custom_id="r1", prompt=Prompt(messages=[UserMessage(content="Hi")])
+            )
+        ]
+        job = await provider.submit_batch(requests)
+
+        assert job.id == "batch_1"
+        assert job.status == BatchStatus.IN_PROGRESS
+        assert job.request_count == 1
+        assert job.completed_count == 0
+
+        _, kwargs = mock_client.messages.batches.create.call_args
+        assert kwargs["requests"][0]["custom_id"] == "r1"
+
+    async def test_get_batch_status(self, mocker):
+        mock_anthropic = mocker.patch(
+            "agent_platform.integrations.llm.anthropic.provider.AsyncAnthropic"
+        )
+        mock_client = MagicMock()
+        mock_anthropic.return_value = mock_client
+        mock_client.messages.batches.retrieve = AsyncMock(
+            return_value=SimpleNamespace(
+                id="batch_1", processing_status="ended", request_counts=None
+            )
+        )
+
+        provider = AnthropicLLM(_creds())
+        job = await provider.get_batch_status("batch_1")
+
+        assert job.status == BatchStatus.COMPLETED
+        assert job.request_count is None
+
+    async def test_fetch_batch_results(self, mocker):
+        mock_anthropic = mocker.patch(
+            "agent_platform.integrations.llm.anthropic.provider.AsyncAnthropic"
+        )
+        mock_client = MagicMock()
+        mock_anthropic.return_value = mock_client
+
+        succeeded_message = SimpleNamespace(
+            content=[_text_block("hi")],
+            usage=SimpleNamespace(input_tokens=1, output_tokens=1),
+            model="claude-sonnet-4-6",
+        )
+        entries = [
+            SimpleNamespace(
+                custom_id="r1",
+                result=SimpleNamespace(type="succeeded", message=succeeded_message),
+            ),
+            SimpleNamespace(
+                custom_id="r2",
+                result=SimpleNamespace(type="errored", error="boom"),
+            ),
+        ]
+
+        async def _gen():
+            for entry in entries:
+                yield entry
+
+        mock_client.messages.batches.results = AsyncMock(return_value=_gen())
+
+        provider = AnthropicLLM(_creds())
+        results = await provider.fetch_batch_results("batch_1")
+
+        assert results[0].custom_id == "r1"
+        assert results[0].response is not None
+        assert results[0].response.message.content == "hi"
+        assert results[1].custom_id == "r2"
+        assert results[1].error is not None

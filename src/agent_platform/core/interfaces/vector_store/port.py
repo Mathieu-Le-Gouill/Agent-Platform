@@ -4,6 +4,7 @@ from uuid import UUID
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
+from agent_platform.core.schemas.vector import SparseVector
 
 
 class VectorStore(Protocol):
@@ -30,3 +31,18 @@ class VectorStore(Protocol):
         config: VectorStoreConfig | None = None,
         filter: dict[str, Any] | None = None,
     ) -> list[tuple[TextChunk, Score]]: ...
+    async def search_hybrid(
+        self,
+        query_vector: list[float],
+        sparse_vector: SparseVector,
+        k: int = 5,
+        config: VectorStoreConfig | None = None,
+        filter: dict[str, Any] | None = None,
+    ) -> list[tuple[TextChunk, Score]]: ...
+    async def add_hybrid(
+        self,
+        documents: list[TextChunk],
+        vectors: list[list[float]],
+        sparse_vectors: list[SparseVector],
+        config: VectorStoreConfig | None = None,
+    ) -> None: ...

@@ -36,4 +36,5 @@ class BaseLLMProvider(ABC, Generic[GenerationConfigT]):
         self,
         prompt: Prompt,
         config: GenerationConfigT | None = None,
+        tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]: ...

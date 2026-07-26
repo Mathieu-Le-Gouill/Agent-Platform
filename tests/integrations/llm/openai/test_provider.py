@@ -1,3 +1,4 @@
+import json
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
@@ -6,6 +7,7 @@ from pydantic import BaseModel, SecretStr
 
 from agent_platform.agents.tools.base import Tool
 from agent_platform.core.errors import MissingCredentialError, ProviderError
+from agent_platform.core.interfaces.llm.batch import BatchRequest, BatchStatus
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.core.schemas.document import ImageDocument
 from agent_platform.core.schemas.enums import FinishReason, ImageFormat
@@ -489,11 +491,19 @@ class TestOpenAILLMStream:
 
         chunks = [
             SimpleNamespace(
-                choices=[SimpleNamespace(delta=SimpleNamespace(content="Hello"))],
+                choices=[
+                    SimpleNamespace(
+                        delta=SimpleNamespace(content="Hello", tool_calls=None)
+                    )
+                ],
                 usage=None,
             ),
             SimpleNamespace(
-                choices=[SimpleNamespace(delta=SimpleNamespace(content=" World"))],
+                choices=[
+                    SimpleNamespace(
+                        delta=SimpleNamespace(content=" World", tool_calls=None)
+                    )
+                ],
                 usage=None,
             ),
             SimpleNamespace(
@@ -541,4 +551,188 @@ class TestOpenAILLMStream:
 
         assert len(results) == 1
         assert results[0].delta == ""
+
+    async def test_stream_with_tools_yields_tool_call_deltas(self, mocker):
+        class _Input(BaseModel):
+            query: str
+
+        class _SchemaTool(Tool):
+            name = "search"
+            description = "search tool"
+            input_schema = _Input
+
+            async def run(self, **kwargs):
+                return "ok"
+
+        mock_openai = mocker.patch(
+            "agent_platform.integrations.llm.openai.provider.AsyncOpenAI"
+        )
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+
+        chunks = [
+            SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        delta=SimpleNamespace(
+                            content=None,
+                            tool_calls=[
+                                SimpleNamespace(
+                                    index=0,
+                                    id="call_1",
+                                    function=SimpleNamespace(
+                                        name="search", arguments=""
+                                    ),
+                                )
+                            ],
+                        )
+                    )
+                ],
+                usage=None,
+            ),
+            SimpleNamespace(
+                choices=[
+                    SimpleNamespace(
+                        delta=SimpleNamespace(
+                            content=None,
+                            tool_calls=[
+                                SimpleNamespace(
+                                    index=0,
+                                    id=None,
+                                    function=SimpleNamespace(
+                                        name=None, arguments='{"query": "hi"}'
+                                    ),
+                                )
+                            ],
+                        )
+                    )
+                ],
+                usage=None,
+            ),
+            SimpleNamespace(
+                choices=[],
+                usage=SimpleNamespace(prompt_tokens=1, completion_tokens=1),
+            ),
+        ]
+
+        async def _gen():
+            for chunk in chunks:
+                yield chunk
+
+        mock_client.chat.completions.create = AsyncMock(return_value=_gen())
+
+        provider = OpenAILLM(_creds())
+        prompt = Prompt(messages=[UserMessage(content="Hi")])
+        config = OpenAIGenerationConfig(model="gpt-4.1")
+        results = [
+            c
+            async for c in provider.stream(prompt, config=config, tools=[_SchemaTool()])
+        ]
+
+        _, kwargs = mock_client.chat.completions.create.call_args
+        assert kwargs["tools"][0]["function"]["name"] == "search"
+
+        deltas = [d for c in results for d in c.tool_call_deltas]
+        assert deltas[0].index == 0
+        assert deltas[0].id == "call_1"
+        assert deltas[0].name == "search"
+        assert deltas[1].arguments_delta == '{"query": "hi"}'
         assert results[0].finish_reason == FinishReason.STOP
+
+
+class TestOpenAILLMBatch:
+    async def test_submit_batch(self, mocker):
+        mock_openai = mocker.patch(
+            "agent_platform.integrations.llm.openai.provider.AsyncOpenAI"
+        )
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.files.create = AsyncMock(return_value=SimpleNamespace(id="file_1"))
+        mock_client.batches.create = AsyncMock(
+            return_value=SimpleNamespace(
+                id="batch_1",
+                status="validating",
+                request_counts=SimpleNamespace(total=1, completed=0),
+            )
+        )
+
+        provider = OpenAILLM(_creds())
+        requests = [
+            BatchRequest(
+                custom_id="r1", prompt=Prompt(messages=[UserMessage(content="Hi")])
+            )
+        ]
+        job = await provider.submit_batch(requests)
+
+        assert job.id == "batch_1"
+        assert job.status == BatchStatus.PENDING
+        assert job.request_count == 1
+
+        _, kwargs = mock_client.files.create.call_args
+        assert kwargs["purpose"] == "batch"
+        _, batch_kwargs = mock_client.batches.create.call_args
+        assert batch_kwargs["input_file_id"] == "file_1"
+
+    async def test_get_batch_status(self, mocker):
+        mock_openai = mocker.patch(
+            "agent_platform.integrations.llm.openai.provider.AsyncOpenAI"
+        )
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.batches.retrieve = AsyncMock(
+            return_value=SimpleNamespace(
+                id="batch_1", status="completed", request_counts=None
+            )
+        )
+
+        provider = OpenAILLM(_creds())
+        job = await provider.get_batch_status("batch_1")
+
+        assert job.status == BatchStatus.COMPLETED
+        assert job.request_count is None
+
+    async def test_fetch_batch_results(self, mocker):
+        mock_openai = mocker.patch(
+            "agent_platform.integrations.llm.openai.provider.AsyncOpenAI"
+        )
+        mock_client = MagicMock()
+        mock_openai.return_value = mock_client
+        mock_client.batches.retrieve = AsyncMock(
+            return_value=SimpleNamespace(id="batch_1", output_file_id="out_1")
+        )
+        body = {
+            "id": "chatcmpl-1",
+            "object": "chat.completion",
+            "created": 0,
+            "model": "gpt-4.1",
+            "choices": [
+                {
+                    "index": 0,
+                    "message": {"role": "assistant", "content": "hi"},
+                    "finish_reason": "stop",
+                }
+            ],
+            "usage": {
+                "prompt_tokens": 1,
+                "completion_tokens": 1,
+                "total_tokens": 2,
+            },
+        }
+        result_line = json.dumps(
+            {"custom_id": "r1", "response": {"body": body}, "error": None}
+        )
+        error_line = json.dumps(
+            {"custom_id": "r2", "response": None, "error": {"message": "boom"}}
+        )
+        mock_client.files.content = AsyncMock(
+            return_value=SimpleNamespace(text=f"{result_line}\n{error_line}\n")
+        )
+
+        provider = OpenAILLM(_creds())
+        results = await provider.fetch_batch_results("batch_1")
+
+        assert results[0].custom_id == "r1"
+        assert results[0].response is not None
+        assert results[0].response.message.content == "hi"
+        assert results[1].custom_id == "r2"
+        assert results[1].error is not None

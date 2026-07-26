@@ -14,6 +14,7 @@ from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     ResponseFormat,
     StreamChunk,
+    ToolCallDelta,
 )
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import (
@@ -133,11 +134,14 @@ class HuggingFaceLLM(
         self,
         prompt: Prompt,
         config: HuggingFaceGenerationConfig | None = None,
+        tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
         client = self._async_client(config)
         messages = _to_native_messages(prompt)
         params = _to_native_params(config)
+        if tools:
+            params["tools"] = [self._tool_to_schema(t) for t in tools]
 
         with self._span(config) as span:
             usage_totals = TokenUsage.zero()
@@ -149,6 +153,19 @@ class HuggingFaceLLM(
                     delta = chunk.choices[0].delta.content
                     if delta:
                         yield StreamChunk(delta=delta)
+                    tool_call_deltas = [
+                        ToolCallDelta(
+                            index=tc.index,
+                            id=tc.id,
+                            name=tc.function.name if tc.function else None,
+                            arguments_delta=tc.function.arguments
+                            if tc.function
+                            else None,
+                        )
+                        for tc in (chunk.choices[0].delta.tool_calls or [])
+                    ]
+                    if tool_call_deltas:
+                        yield StreamChunk(delta="", tool_call_deltas=tool_call_deltas)
                 if chunk.usage is not None:
                     chunk_usage = TokenUsage(
                         input_tokens=chunk.usage.prompt_tokens,

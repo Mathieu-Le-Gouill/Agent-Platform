@@ -55,3 +55,14 @@ class BaseVectorStore(ABC, Generic[ConfigT]):
         raise NotImplementedError(
             f"{type(self).__name__} does not support hybrid (dense+sparse) search"
         )
+
+    async def add_hybrid(
+        self,
+        documents: list[TextChunk],
+        vectors: list[list[float]],
+        sparse_vectors: list[SparseVector],
+        config: ConfigT | None = None,
+    ) -> None:
+        raise NotImplementedError(
+            f"{type(self).__name__} does not support hybrid (dense+sparse) add"
+        )
