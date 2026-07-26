@@ -8,7 +8,10 @@ from agent_platform.core.schemas.score import Score
 
 class VectorStore(Protocol):
     async def add(
-        self, documents: list[TextChunk], config: VectorStoreConfig | None = None
+        self,
+        documents: list[TextChunk],
+        vectors: list[list[float]],
+        config: VectorStoreConfig | None = None,
     ) -> None: ...
     async def delete(
         self, document_ids: list[UUID], config: VectorStoreConfig | None = None

@@ -1,25 +1,22 @@
 from __future__ import annotations
 
-import asyncio
-from typing import Any, cast
+from typing import Any
 from uuid import UUID
 
 import weaviate
 import weaviate.auth
-from langchain_core.embeddings import Embeddings
-from langchain_weaviate import WeaviateVectorStore
-from weaviate.classes.query import Filter
+from weaviate.classes.query import Filter, MetadataQuery
+from weaviate.client import WeaviateAsyncClient
+from weaviate.collections.classes.data import DataObject
+from weaviate.collections.classes.filters import _Filters
 
 from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
 from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.enums import Language
 from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import WeaviateCredentials
-from agent_platform.integrations.vector_store.langchain_base import (
-    LangChainVectorStore,
-    _chunk_to_lc,
-    _lc_to_chunk,
-)
 from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
 
 
@@ -35,13 +32,8 @@ def _parse_url(url: str) -> tuple[str, int, bool]:
     return host, port, secure
 
 
-class WeaviateStore(LangChainVectorStore[WeaviateConfig]):
-    def __init__(
-        self,
-        credentials: WeaviateCredentials | None = None,
-        embeddings: Embeddings | None = None,
-    ) -> None:
-        super().__init__(embeddings)
+class WeaviateStore(BaseVectorStore[WeaviateConfig]):
+    def __init__(self, credentials: WeaviateCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, WeaviateCredentials)
 
     def _default_config(self) -> WeaviateConfig:
@@ -55,10 +47,10 @@ class WeaviateStore(LangChainVectorStore[WeaviateConfig]):
             port = config.http_port
         return host, port, secure
 
-    def _connect(self, config: WeaviateConfig) -> weaviate.WeaviateClient:
+    async def _connect(self, config: WeaviateConfig) -> WeaviateAsyncClient:
         host, port, secure = self._connection_target(config)
         if self._credentials.api_key:
-            return weaviate.connect_to_custom(
+            client = weaviate.use_async_with_custom(
                 http_host=host,
                 http_port=port,
                 http_secure=secure,
@@ -69,62 +61,65 @@ class WeaviateStore(LangChainVectorStore[WeaviateConfig]):
                     self._credentials.api_key.get_secret_value()
                 ),
             )
-        return weaviate.connect_to_local(
-            host=host, port=port, grpc_port=config.grpc_port
-        )
-
-    def _build_client(
-        self,
-        config: WeaviateConfig,
-        raw_client: weaviate.WeaviateClient | None = None,
-    ) -> WeaviateVectorStore:
-        raw_client = raw_client if raw_client is not None else self._connect(config)
-        return WeaviateVectorStore(
-            client=raw_client,
-            index_name=config.collection_name,
-            text_key=config.text_key,
-            embedding=self._embeddings,
-            use_multi_tenancy=bool(config.namespace),
-        )
-
-    def _search_kwargs(
-        self, config: WeaviateConfig, filter: dict[str, Any] | None
-    ) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {}
-        if filter:
-            conditions = [
-                Filter.by_property(key).equal(value) for key, value in filter.items()
-            ]
-            kwargs["filters"] = (
-                conditions[0] if len(conditions) == 1 else Filter.all_of(conditions)
+        else:
+            client = weaviate.use_async_with_local(
+                host=host, port=port, grpc_port=config.grpc_port
             )
+        await client.connect()
+        return client
+
+    def _collection(self, client: WeaviateAsyncClient, config: WeaviateConfig) -> Any:
+        collection = client.collections.get(config.collection_name)
         if config.namespace:
-            kwargs["tenant"] = config.namespace
-        return kwargs
+            collection = collection.with_tenant(config.namespace)
+        return collection
+
+    def _filter(self, filter: dict[str, Any] | None) -> _Filters | None:
+        if not filter:
+            return None
+        conditions = [
+            Filter.by_property(key).equal(value) for key, value in filter.items()
+        ]
+        return conditions[0] if len(conditions) == 1 else Filter.all_of(conditions)
 
     async def add(
-        self, documents: list[TextChunk], config: WeaviateConfig | None = None
+        self,
+        documents: list[TextChunk],
+        vectors: list[list[float]],
+        config: WeaviateConfig | None = None,
     ) -> None:
         config = config or self._default_config()
-        raw_client = self._connect(config)
+        client = await self._connect(config)
         try:
-            client = self._build_client(config, raw_client=raw_client)
-            lc_docs = [_chunk_to_lc(doc) for doc in documents]
-            await client.aadd_documents(lc_docs)
+            collection = self._collection(client, config)
+            objects = [
+                DataObject(
+                    properties=_chunk_to_properties(doc, config.text_key),
+                    uuid=doc.id,
+                    vector=vector,
+                )
+                for doc, vector in zip(documents, vectors)
+            ]
+            if objects:
+                await collection.data.insert_many(objects)
         finally:
-            raw_client.close()
+            await client.close()
 
     async def delete(
         self, document_ids: list[UUID], config: WeaviateConfig | None = None
     ) -> None:
         config = config or self._default_config()
-        raw_client = self._connect(config)
+        client = await self._connect(config)
         try:
-            client = self._build_client(config, raw_client=raw_client)
-            ids = [str(doc_id) for doc_id in document_ids]
-            await asyncio.to_thread(client.delete, ids)
+            collection = self._collection(client, config)
+            if document_ids:
+                await collection.data.delete_many(
+                    where=Filter.by_id().contains_any(
+                        [str(doc_id) for doc_id in document_ids]
+                    )
+                )
         finally:
-            raw_client.close()
+            await client.close()
 
     @error_logged(re_raise=ProviderError, message="Vector store search failed")
     @with_retry()
@@ -136,15 +131,17 @@ class WeaviateStore(LangChainVectorStore[WeaviateConfig]):
         filter: dict[str, Any] | None = None,
     ) -> list[TextChunk]:
         config = config or self._default_config()
-        raw_client = self._connect(config)
+        client = await self._connect(config)
         try:
-            client = self._build_client(config, raw_client=raw_client)
-            results = await client.asimilarity_search_by_vector(
-                query_vector, k, **self._search_kwargs(config, filter)
+            collection = self._collection(client, config)
+            result = await collection.query.near_vector(
+                near_vector=query_vector,
+                limit=k,
+                filters=self._filter(filter),
             )
-            return [_lc_to_chunk(c) for c in results]
+            return [_object_to_chunk(obj, config.text_key) for obj in result.objects]
         finally:
-            raw_client.close()
+            await client.close()
 
     @error_logged(re_raise=ProviderError, message="Vector store search failed")
     @with_retry()
@@ -156,25 +153,58 @@ class WeaviateStore(LangChainVectorStore[WeaviateConfig]):
         filter: dict[str, Any] | None = None,
     ) -> list[tuple[TextChunk, Score]]:
         config = config or self._default_config()
-        raw_client = self._connect(config)
+        client = await self._connect(config)
         try:
-            client = self._build_client(config, raw_client=raw_client)
-            # `WeaviateVectorStore` has no public by-vector search that also
-            # returns scores; `return_score` is forwarded to `_perform_asearch`
-            # (undocumented but supported), giving `list[tuple[Document, float]]`
-            # instead of the `list[Document]` the stub declares.
-            results = cast(
-                list[tuple[Any, float]],
-                await client.asimilarity_search_by_vector(
-                    query_vector,
-                    k,
-                    return_score=True,
-                    **self._search_kwargs(config, filter),
-                ),
+            collection = self._collection(client, config)
+            result = await collection.query.near_vector(
+                near_vector=query_vector,
+                limit=k,
+                filters=self._filter(filter),
+                return_metadata=MetadataQuery(distance=True),
             )
             return [
-                (_lc_to_chunk(doc), Score.similarity(float(score)))
-                for doc, score in results
+                (
+                    _object_to_chunk(obj, config.text_key),
+                    Score.similarity(
+                        min(1.0, max(0.0, 1.0 - (obj.metadata.distance or 0.0)))
+                    ),
+                )
+                for obj in result.objects
             ]
         finally:
-            raw_client.close()
+            await client.close()
+
+
+# --- Mappers ---
+
+
+def _chunk_to_properties(chunk: TextChunk, text_key: str) -> dict[str, Any]:
+    metadata = chunk.metadata or {}
+    return {
+        text_key: chunk.text,
+        "document_id": str(chunk.document_id) if chunk.document_id else None,
+        "index": chunk.index,
+        "start_char": chunk.start_char,
+        "end_char": chunk.end_char,
+        "format": chunk.format.value if chunk.format else None,
+        "source": metadata.get("source"),
+        "language": metadata.get("language"),
+        "extra": metadata.get("extra"),
+    }
+
+
+def _object_to_chunk(obj: Any, text_key: str) -> TextChunk:
+    props = obj.properties
+    return TextChunk(
+        id=obj.uuid,
+        document_id=UUID(props["document_id"]) if props.get("document_id") else None,
+        text=props.get(text_key) or "",
+        index=props.get("index") or 0,
+        start_char=props.get("start_char"),
+        end_char=props.get("end_char"),
+        metadata={
+            "source": props.get("source"),
+            "language": Language(props["language"]) if props.get("language") else None,
+            "extra": props.get("extra") or {},
+        },
+    )

@@ -15,7 +15,10 @@ ConfigT = TypeVar("ConfigT", bound=VectorStoreConfig)
 class BaseVectorStore(ABC, Generic[ConfigT]):
     @abstractmethod
     async def add(
-        self, documents: list[TextChunk], config: ConfigT | None = None
+        self,
+        documents: list[TextChunk],
+        vectors: list[list[float]],
+        config: ConfigT | None = None,
     ) -> None: ...
 
     @abstractmethod

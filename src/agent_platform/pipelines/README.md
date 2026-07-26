@@ -28,13 +28,15 @@ Audio → [STT] → Transcript → [Translator] → Translated Transcript
 **Status: Complete**
 
 ```python
-async def ingest(sources, loader: Loader, chunker: Chunker, store: VectorStore, config=None) -> None:
+async def ingest(sources, loader: Loader, chunker: Chunker, embedder: Embedder, store: VectorStore, config=None) -> None:
     documents = await loader.arun(sources)
     chunks = await chunker.arun(documents)
-    await store.add(chunks, config=config)
+    embedding_response = await embedder.arun(chunks)
+    vectors = [embedding.to_list() for embedding in embedding_response.embeddings]
+    await store.add(chunks, vectors, config=config)
 ```
 
-Embedding happens inside `store.add()` via each `VectorStore` provider's own injected LangChain `Embeddings` adapter (see `integrations/vector_store/langchain_base.py`); there is no separate embed step here since `VectorStore.add()` has no vector parameter to feed one into.
+Chunks are embedded via `Embedder` before reaching the store; `VectorStore.add()` takes the precomputed `vectors` directly rather than relying on a vector store's own injected embedding backend.
 
 ### RAG - Query (`rag/query.py`)
 **Status: Complete**

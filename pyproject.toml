@@ -50,11 +50,11 @@ embeddings-huggingface = [
 embeddings = ["agent_platform[embeddings-openai,embeddings-mistral,embeddings-ollama,embeddings-huggingface]"]
 
 # --- Vector Stores ---
-vector-store-chroma = ["langchain-chroma~=1.1"]
-vector-store-faiss = ["faiss-cpu", "langchain-community~=0.4"]
-vector-store-pinecone = ["langchain-pinecone~=0.2"]
-vector-store-qdrant = ["langchain-qdrant~=1.1"]
-vector-store-weaviate = ["langchain-weaviate~=0.0.8"]
+vector-store-chroma = ["chromadb>=1.5"]
+vector-store-faiss = ["faiss-cpu"]
+vector-store-pinecone = ["pinecone>=7.3"]
+vector-store-qdrant = ["qdrant-client>=1.18"]
+vector-store-weaviate = ["weaviate-client>=4.16"]
 vector-store = ["agent_platform[vector-store-chroma,vector-store-faiss,vector-store-pinecone,vector-store-qdrant,vector-store-weaviate]"]
 
 # --- Reranking ---

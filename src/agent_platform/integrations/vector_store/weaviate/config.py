@@ -21,6 +21,5 @@ class WeaviateConfig(VectorStoreConfig):
 
 
 """
-sources: https://python.langchain.com (WeaviateVectorStore)
-         https://docs.weaviate.io/weaviate/client-libraries/python#connection
+sources: https://docs.weaviate.io/weaviate/client-libraries/python#connection
 """

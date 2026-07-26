@@ -45,28 +45,65 @@ class TestIngest:
         store.add = AsyncMock()
         return store
 
+    @pytest.fixture
+    def mock_embedder(self):
+        embedder = AsyncMock()
+        embedder.arun = AsyncMock(
+            return_value=EmbeddingResponse(
+                embeddings=[
+                    Embedding.from_list([0.1, 0.2], model="test-model"),
+                    Embedding.from_list([0.3, 0.4], model="test-model"),
+                ],
+                model="test-model",
+            )
+        )
+        return embedder
+
     async def test_ingest_calls_loader_chunker_store_in_order(
-        self, mock_loader, mock_chunker, mock_store, sample_documents, sample_chunks
+        self,
+        mock_loader,
+        mock_chunker,
+        mock_embedder,
+        mock_store,
+        sample_documents,
+        sample_chunks,
     ):
         sources = ["a.txt", "b.txt"]
-        await ingest(sources, mock_loader, mock_chunker, mock_store)
+        await ingest(sources, mock_loader, mock_chunker, mock_embedder, mock_store)
 
         mock_loader.arun.assert_awaited_once_with(sources)
         mock_chunker.arun.assert_awaited_once_with(sample_documents)
-        mock_store.add.assert_awaited_once_with(sample_chunks, config=None)
+        mock_embedder.arun.assert_awaited_once_with(sample_chunks)
+        mock_store.add.assert_awaited_once_with(
+            sample_chunks, [[0.1, 0.2], [0.3, 0.4]], config=None
+        )
 
     async def test_ingest_passes_config_through(
-        self, mock_loader, mock_chunker, mock_store, sample_chunks
+        self, mock_loader, mock_chunker, mock_embedder, mock_store, sample_chunks
     ):
         config = VectorStoreConfig(collection_name="docs")
-        await ingest(["a.txt"], mock_loader, mock_chunker, mock_store, config=config)
-        mock_store.add.assert_awaited_once_with(sample_chunks, config=config)
+        await ingest(
+            ["a.txt"],
+            mock_loader,
+            mock_chunker,
+            mock_embedder,
+            mock_store,
+            config=config,
+        )
+        mock_store.add.assert_awaited_once_with(
+            sample_chunks, [[0.1, 0.2], [0.3, 0.4]], config=config
+        )
 
-    async def test_ingest_empty_sources(self, mock_loader, mock_chunker, mock_store):
+    async def test_ingest_empty_sources(
+        self, mock_loader, mock_chunker, mock_embedder, mock_store
+    ):
         mock_loader.arun = AsyncMock(return_value=[])
         mock_chunker.arun = AsyncMock(return_value=[])
-        await ingest([], mock_loader, mock_chunker, mock_store)
-        mock_store.add.assert_awaited_once_with([], config=None)
+        mock_embedder.arun = AsyncMock(
+            return_value=EmbeddingResponse(embeddings=[], model="test-model")
+        )
+        await ingest([], mock_loader, mock_chunker, mock_embedder, mock_store)
+        mock_store.add.assert_awaited_once_with([], [], config=None)
 
 
 class TestQuery:

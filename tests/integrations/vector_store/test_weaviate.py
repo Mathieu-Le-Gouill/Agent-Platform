@@ -1,12 +1,17 @@
+from types import SimpleNamespace
+from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
+
 import pytest
 
 pytest.importorskip("weaviate")
-pytest.importorskip("langchain_weaviate")
 
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
 from agent_platform.integrations.vector_store.weaviate.provider import (
     WeaviateStore,
+    _chunk_to_properties,
+    _object_to_chunk,
     _parse_url,
 )
 from tests.helpers import assert_custom_construction_stored
@@ -17,132 +22,105 @@ def provider():
     return WeaviateStore.__new__(WeaviateStore)
 
 
+def _fake_object(uuid, properties, distance=None):
+    return SimpleNamespace(
+        uuid=uuid,
+        properties=properties,
+        metadata=SimpleNamespace(distance=distance),
+    )
+
+
 class TestWeaviateConstruction:
     def test_default_credentials_and_config(self, monkeypatch):
         monkeypatch.delenv("WEAVIATE_URL", raising=False)
         monkeypatch.delenv("WEAVIATE_API_KEY", raising=False)
         store = WeaviateStore()
-        assert store._embeddings is None
         assert store._credentials.url == "http://localhost:8080"
         assert isinstance(store._default_config(), WeaviateConfig)
 
-    def test_custom_credentials_and_embeddings_stored(self):
+    def test_custom_credentials_stored(self):
         import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         creds = mod.WeaviateCredentials(url="http://localhost:8080", api_key=None)
-        assert_custom_construction_stored(WeaviateStore, creds, object())
+        assert_custom_construction_stored(WeaviateStore, creds)
 
 
 class TestWeaviateConnect:
-    def test_connect_to_local_without_api_key(self, provider, monkeypatch):
+    async def test_connect_to_local_without_api_key(self, provider, monkeypatch):
         import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         provider._credentials = mod.WeaviateCredentials(
             url="http://localhost:8080", api_key=None
         )
         captured = {}
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
         monkeypatch.setattr(
             mod.weaviate,
-            "connect_to_local",
-            lambda **kw: captured.update(kw) or "local-client",
+            "use_async_with_local",
+            lambda **kw: captured.update(kw) or mock_client,
         )
-        result = provider._connect(WeaviateConfig())
-        assert result == "local-client"
+        result = await provider._connect(WeaviateConfig())
+        assert result is mock_client
         assert captured["host"] == "localhost"
+        mock_client.connect.assert_awaited_once()
 
-    def test_connect_to_custom_with_api_key(self, provider, monkeypatch):
+    async def test_connect_to_custom_with_api_key(self, provider, monkeypatch):
         import agent_platform.integrations.vector_store.weaviate.provider as mod
 
         provider._credentials = mod.WeaviateCredentials(
             url="https://weaviate.example.com:8443", api_key="secret"
         )
         captured = {}
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
         monkeypatch.setattr(
             mod.weaviate,
-            "connect_to_custom",
-            lambda **kw: captured.update(kw) or "custom-client",
+            "use_async_with_custom",
+            lambda **kw: captured.update(kw) or mock_client,
         )
-        result = provider._connect(WeaviateConfig())
-        assert result == "custom-client"
+        result = await provider._connect(WeaviateConfig())
+        assert result is mock_client
         assert captured["http_host"] == "weaviate.example.com"
         assert captured["http_secure"] is True
 
 
-class TestWeaviateSearchKwargs:
-    def test_no_filter_no_namespace_returns_empty(self, provider):
-        kwargs = provider._search_kwargs(WeaviateConfig(), None)
-        assert kwargs == {}
-
-    def test_filter_uses_filters_kwarg_not_filter(self, provider):
-        kwargs = provider._search_kwargs(WeaviateConfig(), {"source": "doc.txt"})
-        assert "filters" in kwargs
-        assert "filter" not in kwargs
+class TestWeaviateFilter:
+    def test_no_filter_returns_none(self, provider):
+        assert provider._filter(None) is None
 
     def test_single_condition_filter(self, provider):
         from weaviate.collections.classes.filters import _FilterValue
 
-        kwargs = provider._search_kwargs(WeaviateConfig(), {"source": "doc.txt"})
-        assert isinstance(kwargs["filters"], _FilterValue)
+        result = provider._filter({"source": "doc.txt"})
+        assert isinstance(result, _FilterValue)
 
     def test_multi_key_filter_combines_with_all_of(self, provider):
         from weaviate.collections.classes.filters import _Filters
 
-        kwargs = provider._search_kwargs(
-            WeaviateConfig(), {"source": "doc.txt", "language": "en"}
-        )
-        assert isinstance(kwargs["filters"], _Filters)
+        result = provider._filter({"source": "doc.txt", "language": "en"})
+        assert isinstance(result, _Filters)
 
-    def test_namespace_maps_to_tenant_kwarg(self, provider):
-        kwargs = provider._search_kwargs(WeaviateConfig(namespace="tenant-a"), None)
-        assert kwargs == {"tenant": "tenant-a"}
 
-    def test_no_namespace_omits_tenant(self, provider):
-        kwargs = provider._search_kwargs(WeaviateConfig(), None)
-        assert "tenant" not in kwargs
+class TestWeaviateCollection:
+    def test_with_tenant_applied_when_namespace_set(self, provider):
+        mock_client = MagicMock()
+        mock_collection = MagicMock()
+        mock_client.collections.get.return_value = mock_collection
 
-    def test_build_client_enables_multi_tenancy_when_namespace_set(
-        self, provider, monkeypatch, capture_client_kwargs
-    ):
-        import agent_platform.integrations.vector_store.weaviate.provider as mod
+        provider._collection(mock_client, WeaviateConfig(namespace="tenant-a"))
 
-        captured = capture_client_kwargs(mod, "WeaviateVectorStore")
-        provider._credentials = mod.WeaviateCredentials(api_key=None)
+        mock_collection.with_tenant.assert_called_once_with("tenant-a")
 
-        class FakeClient:
-            pass
+    def test_no_tenant_call_without_namespace(self, provider):
+        mock_client = MagicMock()
+        mock_collection = MagicMock()
+        mock_client.collections.get.return_value = mock_collection
 
-        monkeypatch.setattr(
-            mod.weaviate,
-            "connect_to_local",
-            lambda host, port, grpc_port: FakeClient(),
-        )
+        result = provider._collection(mock_client, WeaviateConfig())
 
-        provider._embeddings = None
-        provider._build_client(WeaviateConfig(namespace="tenant-a"))
-
-        assert captured["use_multi_tenancy"] is True
-
-    def test_build_client_disables_multi_tenancy_without_namespace(
-        self, provider, monkeypatch, capture_client_kwargs
-    ):
-        import agent_platform.integrations.vector_store.weaviate.provider as mod
-
-        captured = capture_client_kwargs(mod, "WeaviateVectorStore")
-        provider._credentials = mod.WeaviateCredentials(api_key=None)
-
-        class FakeClient:
-            pass
-
-        monkeypatch.setattr(
-            mod.weaviate,
-            "connect_to_local",
-            lambda host, port, grpc_port: FakeClient(),
-        )
-
-        provider._embeddings = None
-        provider._build_client(WeaviateConfig())
-
-        assert captured["use_multi_tenancy"] is False
+        assert result is mock_collection
+        mock_collection.with_tenant.assert_not_called()
 
 
 class TestWeaviateConfigFields:
@@ -200,158 +178,137 @@ class TestWeaviateConnectionTarget:
         assert (host, port, secure) == ("weaviate.example.com", 8443, True)
 
 
+class TestWeaviateMappers:
+    def test_chunk_to_properties(self):
+        chunk = TextChunk(
+            text="hello",
+            index=0,
+            metadata={"source": "doc.txt", "language": "en", "extra": {"k": "v"}},
+        )
+        props = _chunk_to_properties(chunk, "text")
+        assert props["text"] == "hello"
+        assert props["source"] == "doc.txt"
+        assert props["language"] == "en"
+        assert props["extra"] == {"k": "v"}
+
+    def test_object_to_chunk_round_trip(self):
+        uid = uuid4()
+        obj = _fake_object(
+            uid,
+            {
+                "text": "hello",
+                "index": 2,
+                "source": "doc.txt",
+                "language": "en",
+                "extra": {"k": "v"},
+            },
+        )
+        chunk = _object_to_chunk(obj, "text")
+        assert chunk.id == uid
+        assert chunk.text == "hello"
+        assert chunk.index == 2
+        assert chunk.metadata["source"] == "doc.txt"
+        assert chunk.metadata["extra"] == {"k": "v"}
+
+    def test_object_to_chunk_missing_fields(self):
+        uid = uuid4()
+        obj = _fake_object(uid, {})
+        chunk = _object_to_chunk(obj, "text")
+        assert chunk.text == ""
+        assert chunk.index == 0
+        assert chunk.metadata["extra"] == {}
+
+
 class TestWeaviateConnectionLifecycle:
-    def _patch_store(self, monkeypatch, mod):
-        class FakeVectorStore:
-            def __init__(self, **kwargs):
-                self.kwargs = kwargs
+    def _connected_client(self, monkeypatch, provider):
+        mock_client = MagicMock()
+        mock_client.close = AsyncMock()
+        monkeypatch.setattr(provider, "_connect", AsyncMock(return_value=mock_client))
+        return mock_client
 
-            async def aadd_documents(self, docs):
-                return None
+    async def test_add_closes_client_after_use(self, provider, monkeypatch):
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        mock_collection.data.insert_many = AsyncMock()
+        mock_client.collections.get.return_value = mock_collection
 
-            def delete(self, ids):
-                return None
+        await provider.add(
+            [TextChunk(text="hi", index=0)], [[0.1, 0.2]], config=WeaviateConfig()
+        )
 
-            async def asimilarity_search_by_vector(self, *a, **k):
-                return []
+        mock_collection.data.insert_many.assert_awaited_once()
+        mock_client.close.assert_awaited_once()
 
-            async def asimilarity_search_with_score(self, *a, **k):
-                return []
+    async def test_add_skips_insert_when_empty(self, provider, monkeypatch):
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        mock_collection.data.insert_many = AsyncMock()
+        mock_client.collections.get.return_value = mock_collection
 
-        monkeypatch.setattr(mod, "WeaviateVectorStore", FakeVectorStore)
+        await provider.add([], [], config=WeaviateConfig())
+
+        mock_collection.data.insert_many.assert_not_awaited()
+        mock_client.close.assert_awaited_once()
+
+    async def test_delete_closes_client_after_use(self, provider, monkeypatch):
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        mock_collection.data.delete_many = AsyncMock()
+        mock_client.collections.get.return_value = mock_collection
+
+        doc_id = uuid4()
+        await provider.delete([doc_id], config=WeaviateConfig())
+
+        mock_collection.data.delete_many.assert_awaited_once()
+        mock_client.close.assert_awaited_once()
 
     async def test_search_closes_client_after_use(self, provider, monkeypatch):
-        import agent_platform.integrations.vector_store.weaviate.provider as mod
-
-        self._patch_store(monkeypatch, mod)
-
-        closed = {"called": False}
-
-        class FakeRawClient:
-            def close(self):
-                closed["called"] = True
-
-        provider._credentials = mod.WeaviateCredentials(api_key=None)
-        provider._embeddings = None
-        monkeypatch.setattr(provider, "_connect", lambda config: FakeRawClient())
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        mock_collection.query.near_vector = AsyncMock(
+            return_value=SimpleNamespace(objects=[])
+        )
+        mock_client.collections.get.return_value = mock_collection
 
         await provider.search(query_vector=[0.1, 0.2], config=WeaviateConfig())
 
-        assert closed["called"] is True
-
-    async def test_add_closes_client_after_use(self, provider, monkeypatch):
-        import agent_platform.integrations.vector_store.weaviate.provider as mod
-
-        self._patch_store(monkeypatch, mod)
-
-        closed = {"called": False}
-
-        class FakeRawClient:
-            def close(self):
-                closed["called"] = True
-
-        provider._credentials = mod.WeaviateCredentials(api_key=None)
-        provider._embeddings = None
-        monkeypatch.setattr(provider, "_connect", lambda config: FakeRawClient())
-
-        await provider.add([TextChunk(text="hi", index=0)], config=WeaviateConfig())
-
-        assert closed["called"] is True
+        mock_client.close.assert_awaited_once()
 
     async def test_search_closes_client_even_on_failure(
         self, provider, monkeypatch, no_retry_sleep
     ):
-        import agent_platform.integrations.vector_store.weaviate.provider as mod
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
 
-        class FailingVectorStore:
-            def __init__(self, **kwargs):
-                pass
+        async def always_fails(*args, **kwargs):
+            raise ConnectionError("boom")
 
-            async def asimilarity_search_by_vector(self, *a, **k):
-                raise ConnectionError("boom")
-
-        monkeypatch.setattr(mod, "WeaviateVectorStore", FailingVectorStore)
-
-        closed = {"count": 0}
-
-        class FakeRawClient:
-            def close(self):
-                closed["count"] += 1
-
-        provider._credentials = mod.WeaviateCredentials(api_key=None)
-        provider._embeddings = None
-        monkeypatch.setattr(provider, "_connect", lambda config: FakeRawClient())
+        mock_collection.query.near_vector = always_fails
+        mock_client.collections.get.return_value = mock_collection
 
         with pytest.raises(Exception):
             await provider.search(query_vector=[0.1, 0.2], config=WeaviateConfig())
 
-        assert closed["count"] >= 1
-
-    async def test_delete_closes_client_after_use(self, provider, monkeypatch):
-        import agent_platform.integrations.vector_store.weaviate.provider as mod
-
-        self._patch_store(monkeypatch, mod)
-
-        closed = {"called": False}
-        deleted = {}
-
-        class FakeRawClient:
-            def close(self):
-                closed["called"] = True
-
-        provider._credentials = mod.WeaviateCredentials(api_key=None)
-        provider._embeddings = None
-        monkeypatch.setattr(provider, "_connect", lambda config: FakeRawClient())
-
-        class FakeVectorStoreWithDelete:
-            def __init__(self, **kwargs):
-                pass
-
-            def delete(self, ids):
-                deleted["ids"] = ids
-
-        monkeypatch.setattr(mod, "WeaviateVectorStore", FakeVectorStoreWithDelete)
-
-        doc_id = __import__("uuid").uuid4()
-        await provider.delete([doc_id], config=WeaviateConfig())
-
-        assert closed["called"] is True
-        assert deleted["ids"] == [str(doc_id)]
+        # `@with_retry()` reconnects and closes on each of its attempts.
+        assert mock_client.close.await_count == 3
 
     async def test_search_with_scores_maps_results_and_closes_client(
         self, provider, monkeypatch
     ):
-        import agent_platform.integrations.vector_store.weaviate.provider as mod
-        from agent_platform.integrations.vector_store.langchain_base import (
-            _chunk_to_lc,
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        uid = uuid4()
+        obj = _fake_object(uid, {"text": "hello"}, distance=0.25)
+        mock_collection.query.near_vector = AsyncMock(
+            return_value=SimpleNamespace(objects=[obj])
         )
-
-        closed = {"called": False}
-
-        class FakeRawClient:
-            def close(self):
-                closed["called"] = True
-
-        provider._credentials = mod.WeaviateCredentials(api_key=None)
-        provider._embeddings = None
-        monkeypatch.setattr(provider, "_connect", lambda config: FakeRawClient())
-
-        doc = _chunk_to_lc(TextChunk(text="hello", index=0))
-
-        class FakeVectorStoreWithScores:
-            def __init__(self, **kwargs):
-                pass
-
-            async def asimilarity_search_by_vector(self, *a, **k):
-                assert k.get("return_score") is True
-                return [(doc, 0.75)]
-
-        monkeypatch.setattr(mod, "WeaviateVectorStore", FakeVectorStoreWithScores)
+        mock_client.collections.get.return_value = mock_collection
 
         results = await provider.search_with_scores(
             query_vector=[0.1, 0.2], config=WeaviateConfig()
         )
 
         assert len(results) == 1
+        assert results[0][0].text == "hello"
         assert results[0][1].value == 0.75
-        assert closed["called"] is True
+        mock_client.close.assert_awaited_once()
