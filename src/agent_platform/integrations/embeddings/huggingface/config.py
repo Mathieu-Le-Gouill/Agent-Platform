@@ -11,31 +11,25 @@ class HuggingFaceEmbeddingMode(StrEnum):
 
 
 class HuggingFaceEmbeddingConfig(EmbeddingConfig):
-    # Local mode: `SentenceTransformer` model id/path passed to
-    # `HuggingFaceEmbeddings.model_name`. Hosted mode: model id passed to
-    # `InferenceClient`/`HuggingFaceEndpointEmbeddings`.
+    # Local mode: `sentence_transformers.SentenceTransformer` model id/path.
+    # Hosted mode: model id passed to `InferenceClient`.
     model: str = "sentence-transformers/all-MiniLM-L6-v2"
     # Selects whether embeddings run locally via `sentence-transformers`
-    # or remotely via the Hugging Face Inference API/endpoint.
+    # or remotely via the Hugging Face Inference API.
     mode: HuggingFaceEmbeddingMode = HuggingFaceEmbeddingMode.LOCAL
-    # Local mode: `HuggingFaceEmbeddings.model_kwargs` (Sentence Transformer
-    # constructor kwargs, e.g. `device`). Hosted mode: merged into the
-    # `InferenceClient.feature_extraction(**model_kwargs)` call — the only
-    # pass-through channel `HuggingFaceEndpointEmbeddings` offers.
+    # Local mode: extra `SentenceTransformer(...)` constructor kwargs (e.g.
+    # `device`). Hosted mode: merged into the
+    # `InferenceClient.feature_extraction(...)` call as extra kwargs.
     model_kwargs: dict | None = None
-    # Local mode only: `HuggingFaceEmbeddings.encode_kwargs`, forwarded to
-    # `SentenceTransformer.encode(...)`.
+    # Local mode only: forwarded to `SentenceTransformer.encode(...)`.
     encode_kwargs: dict | None = None
-    # `HuggingFaceEndpointEmbeddings.provider` — hosted-inference provider
-    # name (e.g. "sambanova").
+    # `InferenceClient` hosted-inference provider name (e.g. "sambanova").
     provider: str | None = None
-    # Hosted mode only, routed via `model_kwargs={"truncate": ...}` into
-    # `InferenceClient.feature_extraction(truncate=...)`.
+    # Hosted mode: native `feature_extraction(truncate=...)` top-level param.
     truncate: bool | None = None
-    # Hosted mode only, routed via `model_kwargs={"normalize": ...}` into
-    # `InferenceClient.feature_extraction(normalize=...)`. Only available on
-    # Text-Embeddings-Inference-backed servers.
+    # Hosted mode: native `feature_extraction(normalize=...)` top-level param.
     normalize: bool | None = None
 
 
 # sources: https://huggingface.co/docs/huggingface_hub/package_reference/inference_client
+#          https://sbert.net/docs/package_reference/sentence_transformer/SentenceTransformer.html

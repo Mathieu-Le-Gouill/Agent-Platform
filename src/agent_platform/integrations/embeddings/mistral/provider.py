@@ -1,55 +1,132 @@
+from __future__ import annotations
+
+from collections.abc import Sequence
 from typing import Any
 
-from langchain_mistralai import MistralAIEmbeddings
+from mistralai import Mistral
+from mistralai.models import EmbeddingResponseData
 
-from agent_platform.core.credentials import (
-    resolve_credentials,
-    resolve_max_retries,
-    resolve_timeout,
+from agent_platform.core.credentials import resolve_credentials, resolve_timeout
+from agent_platform.core.errors import (
+    ProviderError,
+    error_logged,
+    require_secret,
+    with_retry,
 )
-from agent_platform.core.errors import require_secret
+from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
+from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
+from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.embedding import Embedding
 from agent_platform.integrations.credentials import MistralCredentials
-from agent_platform.integrations.embeddings.langchain_base import LangChainEmbedder
 from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddingConfig
 
 
-class MistralEmbeddingProvider(LangChainEmbedder[MistralEmbeddingConfig]):
+class MistralEmbeddingProvider(BaseEmbeddingProvider[MistralEmbeddingConfig]):
     def __init__(self, credentials: MistralCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, MistralCredentials)
-
-    def _client(self, config: MistralEmbeddingConfig) -> MistralAIEmbeddings:
-        api_key = require_secret(
-            self._credentials.api_key,
-            "Mistral API key is required but was not provided",
-        )
-
-        return MistralAIEmbeddings(
-            model=config.model,
-            api_key=api_key,
-            **_to_langchain_mistral(config, self._credentials),
-        )
 
     def _default_config(self) -> MistralEmbeddingConfig:
         return MistralEmbeddingConfig()
 
+    def _client(self, config: MistralEmbeddingConfig) -> Mistral:
+        api_key = require_secret(
+            self._credentials.api_key,
+            "Mistral API key is required but was not provided",
+        )
+        kwargs: dict[str, Any] = {"api_key": api_key.get_secret_value()}
+        if config.endpoint:
+            kwargs["server_url"] = config.endpoint
 
-def _to_langchain_mistral(
-    config: MistralEmbeddingConfig,
-    credentials: MistralCredentials,
-) -> dict[str, Any]:
-    params: dict[str, Any] = {"endpoint": config.endpoint}
+        timeout = resolve_timeout(config.timeout, self._credentials)
+        if timeout is not None:
+            kwargs["timeout_ms"] = int(timeout * 1000)
 
-    timeout = resolve_timeout(config.timeout, credentials)
-    if timeout is not None:
-        params["timeout"] = int(timeout)
+        return Mistral(**kwargs)
 
-    params["max_retries"] = resolve_max_retries(config.max_retries, credentials)
+    def _vector(self, data: EmbeddingResponseData) -> list[float]:
+        if data.embedding is None:
+            raise ProviderError("Mistral returned no embedding vector")
+        return data.embedding
 
-    # `dimensions` is intentionally never forwarded: `MistralAIEmbeddings` has
-    # `extra="forbid"` and no such field (see config.py note).
-    if config.wait_time is not None:
-        params["wait_time"] = config.wait_time
-    if config.max_concurrent_requests is not None:
-        params["max_concurrent_requests"] = config.max_concurrent_requests
+    def _params(self, config: MistralEmbeddingConfig) -> dict[str, Any]:
+        params: dict[str, Any] = {}
+        if config.dimensions is not None:
+            params["output_dimension"] = config.dimensions
+        params.update(config.extra_params)
+        return params
 
-    return params
+    def embed_document(
+        self,
+        items: Sequence[TextChunk],
+        config: MistralEmbeddingConfig | None = None,
+    ) -> EmbeddingResponse:
+        config = config or self._default_config()
+        client = self._client(config)
+
+        texts = [item.text for item in items]
+        response = client.embeddings.create(
+            model=config.model, inputs=texts, **self._params(config)
+        )
+
+        embeddings = [
+            Embedding.from_list(self._vector(data), model=config.model, id=item.id)
+            for item, data in zip(items, response.data)
+        ]
+
+        return EmbeddingResponse(embeddings=embeddings, model=config.model)
+
+    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
+    @with_retry()
+    async def aembed_document(
+        self,
+        items: Sequence[TextChunk],
+        config: MistralEmbeddingConfig | None = None,
+    ) -> EmbeddingResponse:
+        config = config or self._default_config()
+        client = self._client(config)
+
+        texts = [item.text for item in items]
+        response = await client.embeddings.create_async(
+            model=config.model, inputs=texts, **self._params(config)
+        )
+
+        embeddings = [
+            Embedding.from_list(self._vector(data), model=config.model, id=item.id)
+            for item, data in zip(items, response.data)
+        ]
+
+        return EmbeddingResponse(embeddings=embeddings, model=config.model)
+
+    def embed_query(
+        self,
+        query: str,
+        config: MistralEmbeddingConfig | None = None,
+    ) -> EmbeddingResponse:
+        config = config or self._default_config()
+        client = self._client(config)
+
+        response = client.embeddings.create(
+            model=config.model, inputs=[query], **self._params(config)
+        )
+
+        embedding = Embedding.from_list(self._vector(response.data[0]))
+
+        return EmbeddingResponse(embeddings=[embedding], model=config.model)
+
+    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
+    @with_retry()
+    async def aembed_query(
+        self,
+        query: str,
+        config: MistralEmbeddingConfig | None = None,
+    ) -> EmbeddingResponse:
+        config = config or self._default_config()
+        client = self._client(config)
+
+        response = await client.embeddings.create_async(
+            model=config.model, inputs=[query], **self._params(config)
+        )
+
+        embedding = Embedding.from_list(self._vector(response.data[0]))
+
+        return EmbeddingResponse(embeddings=[embedding], model=config.model)

@@ -4,25 +4,27 @@ from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
 
 
 class MistralEmbeddingConfig(EmbeddingConfig):
-    # `MistralAIEmbeddings.model` — the Mistral embedding model id passed to
-    # the `/v1/embeddings` endpoint.
+    # Mistral embedding model id passed to the `/v1/embeddings` endpoint.
     model: str = "mistral-embed"
-    # Retry count for `MistralAIEmbeddings.max_retries`.
+    # Retry count. Unused: the native `mistralai` SDK's retry config is a
+    # time-based backoff with no attempt-count knob (same gap as the LLM
+    # domain's Mistral provider); the platform's own `@with_retry()` decorator
+    # on `aembed_document`/`aembed_query` already provides equivalent retry
+    # behavior.
     max_retries: int | None = None
-    # `MistralAIEmbeddings.endpoint` — base URL for the Mistral API.
+    # Base URL for the Mistral API, forwarded as `server_url`.
     endpoint: str = "https://api.mistral.ai/v1/"
-    # `MistralAIEmbeddings.wait_time` — seconds to wait before retrying on a 429 response.
+    # Unused post-migration: was a LangChain-wrapper-level throttle/concurrency
+    # knob for its internal multi-batch dispatch. The provider now issues one
+    # `embeddings.create` call per `embed_document`/`embed_query` invocation
+    # (batching already happens one level up, in `components/embedder.py`),
+    # so there is no per-provider concurrency to throttle.
     wait_time: int | None = None
-    # `MistralAIEmbeddings.max_concurrent_requests` — max in-flight requests.
+    # Unused post-migration, same reason as `wait_time` above.
     max_concurrent_requests: int | None = None
-    # NOTE: base `dimensions` is intentionally never forwarded — installed
-    # `langchain-mistralai` 1.1.6 `MistralAIEmbeddings` has `extra="forbid"`
-    # and no `dimensions` field (verified against installed site-packages).
-    # The Mistral REST API's Matryoshka `output_dimension` truncation isn't
-    # exposed by this client version — a library gap, not fixable via config.
-    # NOTE: base `batch_size` is also never forwarded — `MistralAIEmbeddings`
-    # batches internally by token count (`_get_batches`, 16k-token cap), with
-    # no count-based batch-size knob to map `batch_size` onto.
+    # NOTE: base `dimensions` IS now forwarded (as `output_dimension`) — the
+    # native SDK exposes Matryoshka truncation that `langchain-mistralai`
+    # never surfaced. This is the correctness fix this migration exists for.
 
 
 # sources: https://docs.mistral.ai/api/endpoint/embeddings
