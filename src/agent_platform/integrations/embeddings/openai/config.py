@@ -26,6 +26,6 @@ class OpenAIEmbeddingConfig(EmbeddingConfig):
 
 
 """
-sources: https://platform.openai.com/docs/api-reference/embeddings/create
+sources: https://developers.openai.com/api/reference/resources/embeddings (exact request schema)
          https://python.langchain.com/api_reference/openai/embeddings/langchain_openai.embeddings.base.OpenAIEmbeddings.html
 """

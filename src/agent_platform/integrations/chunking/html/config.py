@@ -20,4 +20,4 @@ class HTMLChunkerConfig(ChunkerConfig):
     return_each_element: bool = False
 
 
-# sources: https://python.langchain.com/api_reference/text_splitters/html/langchain_text_splitters.html.HTMLHeaderTextSplitter.html
+# sources: https://reference.langchain.com/python/langchain-text-splitters/html/HTMLHeaderTextSplitter

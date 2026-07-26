@@ -32,4 +32,4 @@ class DalleConfig(ImageGenConfig):
         return self
 
 
-# sources: https://platform.openai.com/docs/api-reference/images/create
+# sources: https://developers.openai.com/api/reference/resources/images

@@ -22,5 +22,5 @@ class ChromaConfig(VectorStoreConfig):
 
 """
 sources: https://docs.trychroma.com/reference/python/client
-         https://docs.trychroma.com/production/administration/multi-tenancy
+         https://docs.trychroma.com/docs/run-chroma/clients
 """

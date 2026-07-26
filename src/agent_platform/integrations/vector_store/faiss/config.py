@@ -11,4 +11,4 @@ class FAISSConfig(VectorStoreConfig):
     # in faiss.py — see DISTANCE_STRATEGY_MAP there.
 
 
-# sources: https://api.python.langchain.com (langchain_community.vectorstores.faiss.FAISS)
+# sources: https://reference.langchain.com/python/langchain-community/vectorstores/faiss/FAISS

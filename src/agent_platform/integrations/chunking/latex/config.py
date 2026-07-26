@@ -20,6 +20,6 @@ class LatexChunkerConfig(ChunkerConfig):
 
 
 """
-sources: https://python.langchain.com/api_reference/text_splitters/base/langchain_text_splitters.base.TextSplitter.html
-         https://python.langchain.com/api_reference/text_splitters/character/langchain_text_splitters.character.RecursiveCharacterTextSplitter.html
+sources: https://reference.langchain.com/python/langchain-text-splitters/base/TextSplitter
+         https://reference.langchain.com/python/langchain-text-splitters/character/RecursiveCharacterTextSplitter
 """

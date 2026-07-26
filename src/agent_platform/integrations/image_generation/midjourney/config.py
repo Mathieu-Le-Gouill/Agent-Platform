@@ -21,5 +21,5 @@ class MidjourneyConfig(ImageGenConfig):
 
 """
 sources: https://github.com/novicezk/midjourney-proxy
-         https://docs.midjourney.com/hc/en-us/articles/32912179804429-Fast-Relax-and-Turbo-Mode
+         https://docs.midjourney.com/hc/en-us/articles/32859204029709-Parameter-List (Fast/Relax/Turbo Mode)
 """

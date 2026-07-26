@@ -27,4 +27,4 @@ class MarkdownChunkerConfig(ChunkerConfig):
     custom_header_patterns: dict[str, int] | None = None
 
 
-# sources: https://python.langchain.com/api_reference/text_splitters/markdown/langchain_text_splitters.markdown.MarkdownHeaderTextSplitter.html
+# sources: https://reference.langchain.com/python/langchain-text-splitters/markdown/MarkdownHeaderTextSplitter

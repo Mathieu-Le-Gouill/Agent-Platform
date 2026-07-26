@@ -27,4 +27,4 @@ class OpenAIWhisperConfig(SpeechConfig):
     )
 
 
-# sources: https://platform.openai.com/docs/api-reference/audio/createTranscription
+# sources: https://developers.openai.com/api/reference/resources/audio

@@ -19,8 +19,9 @@ class OpenAIGenerationConfig(GenerationConfig):
 
 
 """
-sources: https://platform.openai.com/docs/models
-         https://platform.openai.com/docs/guides/reasoning
-         https://platform.openai.com/docs/guides/function-calling
-         https://platform.openai.com/docs/guides/structured-outputs
+sources: https://developers.openai.com/api/docs/models
+         https://developers.openai.com/api/docs/guides/reasoning
+         https://developers.openai.com/api/docs/guides/function-calling
+         https://developers.openai.com/api/docs/guides/structured-outputs
+         https://developers.openai.com/api/reference/resources/chat (exact request schema; ChatOpenAI uses /v1/chat/completions, not /v1/responses)
 """
