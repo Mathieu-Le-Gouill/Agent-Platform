@@ -5,6 +5,8 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
+from opentelemetry.trace import Span, Status, StatusCode
+
 from agent_platform.agents.tools.base import Tool, ToolStreamChunk
 from agent_platform.agents.tools.errors import ToolNotFoundError, ToolRegistrationError
 from agent_platform.core.schemas.message import (
@@ -46,6 +48,18 @@ class ToolRegistry:
         tool = self.get(call.name)
         return await tool.run(**call.arguments)
 
+    @staticmethod
+    def _record_tool_error(span: Span, exc: Exception) -> None:
+        """Mark `span` as failed the way the GenAI conventions expect.
+
+        Tool errors are caught here rather than left to propagate, so
+        `traced_span`'s own except-block (which does this automatically for
+        propagating exceptions) never runs; set `error.type` and the span
+        status by hand instead.
+        """
+        span.set_attribute(GenAIAttributes.ERROR_TYPE, type(exc).__qualname__)
+        span.set_status(Status(StatusCode.ERROR, str(exc)))
+
     async def call_and_wrap(self, call: ToolCall) -> ToolMessage:
         with traced_operation_span(
             "execute_tool",
@@ -64,8 +78,7 @@ class ToolRegistry:
                 logger.exception("Tool call '%s' failed", call.name)
                 content = str(exc)
                 is_error = True
-
-            span.set_attribute(GenAIAttributes.TOOL_CALL_IS_ERROR, is_error)
+                self._record_tool_error(span, exc)
 
         return ToolMessage(
             result=ToolResult(
@@ -100,12 +113,11 @@ class ToolRegistry:
                 async for delta in tool.astream(**call.arguments):
                     yield ToolStreamChunk(tool_call_id=call.id, delta=delta)
                 yield ToolStreamChunk(tool_call_id=call.id, delta="", is_final=True)
-                span.set_attribute(GenAIAttributes.TOOL_CALL_IS_ERROR, False)
             except asyncio.CancelledError:
                 raise
             except Exception as exc:
                 logger.exception("Tool stream '%s' failed", call.name)
-                span.set_attribute(GenAIAttributes.TOOL_CALL_IS_ERROR, True)
+                self._record_tool_error(span, exc)
                 yield ToolStreamChunk(
                     tool_call_id=call.id, delta=str(exc), is_final=True, is_error=True
                 )

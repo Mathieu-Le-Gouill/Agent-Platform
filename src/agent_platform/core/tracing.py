@@ -35,20 +35,24 @@ _configured = False
 class GenAIAttributes:
     """OTel GenAI semantic-convention attribute keys.
 
-    https://opentelemetry.io/docs/specs/semconv/gen-ai/ - kept as constants
-    so every call site (agent loop, tool calls, LLM calls, and whatever gets
-    instrumented next: embeddings, reranking, ...) spells them identically.
+    https://github.com/open-telemetry/semantic-conventions-genai (the gen-ai
+    conventions moved out of the main semantic-conventions repo; the old
+    opentelemetry.io/docs/specs/semconv/gen-ai/ page just redirects there
+    now) - kept as constants so every call site (agent loop, tool calls, LLM
+    calls, and whatever gets instrumented next: embeddings, reranking, ...)
+    spells them identically. All `gen_ai.*` keys below are still
+    "Development" stability, so upstream can rename them again.
     """
 
     OPERATION_NAME = "gen_ai.operation.name"
-    SYSTEM = "gen_ai.system"
+    PROVIDER_NAME = "gen_ai.provider.name"
     REQUEST_MODEL = "gen_ai.request.model"
     AGENT_NAME = "gen_ai.agent.name"
     TOOL_NAME = "gen_ai.tool.name"
     TOOL_CALL_ID = "gen_ai.tool.call.id"
-    TOOL_CALL_IS_ERROR = "gen_ai.tool.call.is_error"
     USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
     USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
+    ERROR_TYPE = "error.type"
 
 
 class TracingBackend(StrEnum):

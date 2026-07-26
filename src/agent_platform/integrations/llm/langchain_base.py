@@ -70,7 +70,7 @@ class LangChainLLMProvider(
     @abstractmethod
     def _default_config(self) -> GenerationConfigT: ...
 
-    def _gen_ai_system(self) -> str:
+    def _gen_ai_provider(self) -> str:
         name = type(self).__name__
         return (name[: -len("LLM")] if name.endswith("LLM") else name).lower()
 
@@ -85,7 +85,7 @@ class LangChainLLMProvider(
         with traced_operation_span(
             "chat",
             **{
-                GenAIAttributes.SYSTEM: self._gen_ai_system(),
+                GenAIAttributes.PROVIDER_NAME: self._gen_ai_provider(),
                 GenAIAttributes.REQUEST_MODEL: config.model,
             },
         ) as span:
@@ -113,7 +113,7 @@ class LangChainLLMProvider(
         with traced_operation_span(
             "chat",
             **{
-                GenAIAttributes.SYSTEM: self._gen_ai_system(),
+                GenAIAttributes.PROVIDER_NAME: self._gen_ai_provider(),
                 GenAIAttributes.REQUEST_MODEL: config.model,
             },
         ) as span:
@@ -139,7 +139,7 @@ class LangChainLLMProvider(
         with traced_operation_span(
             "chat",
             **{
-                GenAIAttributes.SYSTEM: self._gen_ai_system(),
+                GenAIAttributes.PROVIDER_NAME: self._gen_ai_provider(),
                 GenAIAttributes.REQUEST_MODEL: config.model,
             },
         ) as span:
