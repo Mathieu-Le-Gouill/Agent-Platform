@@ -15,7 +15,7 @@ from agent_platform.integrations.credentials import (
 )
 from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
 from agent_platform.integrations.ocr.google_vision.mappers import from_google_vision
-from agent_platform.integrations.ocr.utils import load_bytes
+from agent_platform.integrations.ocr.sources import load_bytes
 
 
 class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):

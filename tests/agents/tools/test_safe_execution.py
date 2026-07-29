@@ -1,8 +1,8 @@
 import pytest
 from pydantic import BaseModel, Field
 
-from agent_platform.agents.tools._utils import safe_call, safe_stream
 from agent_platform.agents.tools.base import Tool, ToolError
+from agent_platform.agents.tools.safe_execution import safe_call, safe_stream
 from agent_platform.core.schemas import model_schema
 
 # ---------------------------------------------------------------------------

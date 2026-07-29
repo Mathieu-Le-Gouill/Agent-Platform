@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Any
 
 from agent_platform.core.schemas.conversation import Transcript, Utterance
-from agent_platform.integrations.speech_to_text.utils import parse_language
+from agent_platform.integrations.speech_to_text.language import parse_language
 from agent_platform.integrations.speech_to_text.whisperx.config import WhisperXConfig
 
 __all__ = ["map_transcript"]

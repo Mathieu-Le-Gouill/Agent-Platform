@@ -6,8 +6,8 @@ from uuid import uuid4
 
 from pydantic import BaseModel, Field
 
-from agent_platform.agents.tools._utils import safe_call
 from agent_platform.agents.tools.base import Tool, ToolError
+from agent_platform.agents.tools.safe_execution import safe_call
 from agent_platform.components.embedder.component import Embedder
 from agent_platform.components.vector_search.component import VectorSearch
 from agent_platform.core.schemas.chunk import TextChunk

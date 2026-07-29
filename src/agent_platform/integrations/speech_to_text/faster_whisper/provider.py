@@ -17,7 +17,7 @@ from agent_platform.integrations.speech_to_text.faster_whisper.config import (
 from agent_platform.integrations.speech_to_text.faster_whisper.mappers import (
     map_utterances,
 )
-from agent_platform.integrations.speech_to_text.utils import parse_language
+from agent_platform.integrations.speech_to_text.language import parse_language
 
 
 class FasterWhisperSTT(BaseSpeechToText[FasterWhisperConfig]):

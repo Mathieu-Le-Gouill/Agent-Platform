@@ -14,7 +14,7 @@ from agent_platform.integrations.speech_to_text.deepgram.mappers import (
     parse_deepgram_result as _parse_deepgram_result,
 )
 from agent_platform.integrations.speech_to_text.deepgram.provider import DeepgramSTT
-from agent_platform.integrations.speech_to_text.utils import (
+from agent_platform.integrations.speech_to_text.language import (
     parse_language as _parse_language,
 )
 

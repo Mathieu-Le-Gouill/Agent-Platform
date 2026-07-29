@@ -4,8 +4,8 @@ from typing import Any
 
 from pydantic import BaseModel, Field
 
-from agent_platform.agents.tools._utils import safe_call
 from agent_platform.agents.tools.base import Tool, ToolError
+from agent_platform.agents.tools.safe_execution import safe_call
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.schemas.message import Prompt
 

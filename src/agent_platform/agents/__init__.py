@@ -7,11 +7,11 @@ from agent_platform.agents.errors import (
     AgentThinkError,
 )
 from agent_platform.agents.executor import AgentExecutor
-from agent_platform.agents.tools._utils import safe_call
 from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.agents.tools.errors import ToolNotFoundError, ToolRegistrationError
 from agent_platform.agents.tools.ocr.tool import OCRInput, OCRTool
 from agent_platform.agents.tools.registry import ToolRegistry
+from agent_platform.agents.tools.safe_execution import safe_call
 from agent_platform.agents.tools.search.tool import (
     SearchInput,
     SearchResult,

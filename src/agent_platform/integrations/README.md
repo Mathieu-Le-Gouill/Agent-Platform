@@ -41,8 +41,8 @@ orchestration. `mappers.py` holds only pure functions (no `self`, no network/cli
 calls) and imports the same things the provider file would (vendor SDK types for
 annotations, `core/schemas`, `core/interfaces`); it never imports its sibling
 `<provider>.py`, since the provider file imports from it. This mirrors how the domain
-already separates cross-provider shared conversions into `ocr/utils.py`,
-`speech_to_text/utils.py`, and `reranking/scoring.py`, just at per-provider granularity
+already separates cross-provider shared conversions into `ocr/sources.py`,
+`speech_to_text/language.py`, and `reranking/scoring.py`, just at per-provider granularity
 when the conversions are provider-specific rather than shared. Providers with only thin,
 inline dict-literal conversions (a couple of lines, no free functions) don't get a
 `mappers.py`, adding one would be ceremony without removing real duplication.

@@ -14,7 +14,7 @@ from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.credentials import AWSTextractCredentials
 from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
 from agent_platform.integrations.ocr.aws_textract.mappers import from_textract
-from agent_platform.integrations.ocr.utils import load_bytes
+from agent_platform.integrations.ocr.sources import load_bytes
 
 
 class AWSTextractOCR(BaseOCR[AWSTextractConfig]):

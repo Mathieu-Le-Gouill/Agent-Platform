@@ -13,8 +13,8 @@ from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.speech_to_text._base import buffered_stream
+from agent_platform.integrations.speech_to_text.language import parse_language
 from agent_platform.integrations.speech_to_text.openai.config import OpenAIWhisperConfig
-from agent_platform.integrations.speech_to_text.utils import parse_language
 
 
 class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):

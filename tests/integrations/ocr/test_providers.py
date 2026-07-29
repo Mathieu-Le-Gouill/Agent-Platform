@@ -6,15 +6,15 @@ pytest.importorskip("boto3")
 pytest.importorskip("google.cloud")
 pytest.importorskip("pytesseract")
 
+from agent_platform.integrations.ocr.sources import load_bytes
 from agent_platform.integrations.ocr.tesseract.provider import TesseractOCR
-from agent_platform.integrations.ocr.utils import load_bytes
 
 
 class TestOCRLoadBytes:
     def test_url_source(self, mocker):
         source = "https://example.com/image.jpg"
         fake_bytes = b"fake-image-bytes"
-        mock_urlopen = mocker.patch("agent_platform.integrations.ocr.utils.urlopen")
+        mock_urlopen = mocker.patch("agent_platform.integrations.ocr.sources.urlopen")
         mock_response = MagicMock()
         mock_response.read.return_value = fake_bytes
         mock_urlopen.return_value.__enter__.return_value = mock_response
