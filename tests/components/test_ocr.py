@@ -21,7 +21,7 @@ class _FakeOCR(BaseOCR):
 async def test_forwards_source_and_config_to_backend():
     backend = _FakeOCR()
     ocr = OCR(backend)
-    config = OCRConfig(language="fra")
+    config = OCRConfig(min_confidence=0.5)
 
     result = await ocr.arun(("img.png", config))
 

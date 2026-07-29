@@ -38,7 +38,6 @@ class TestOCRInput:
     def test_valid_input(self):
         inp = OCRInput(source="/path/to/image.png")
         assert inp.source == "/path/to/image.png"
-        assert inp.language == "eng"
         assert inp.min_confidence == 0.0
 
     def test_min_confidence_range(self):
@@ -47,17 +46,8 @@ class TestOCRInput:
         with pytest.raises(ValidationError):
             OCRInput(source="img.png", min_confidence=-0.1)
 
-    def test_language_too_short(self):
-        with pytest.raises(ValidationError):
-            OCRInput(source="img.png", language="")
-
-    def test_language_too_long(self):
-        with pytest.raises(ValidationError):
-            OCRInput(source="img.png", language="toolonglang")
-
     def test_defaults(self):
         inp = OCRInput(source="img.png")
-        assert inp.language == "eng"
         assert inp.min_confidence == 0.0
 
 
@@ -76,13 +66,6 @@ class TestOCRTool:
         assert results[0].text == "Hello"
         assert results[1].text == "World"
         mock_provider.extract.assert_awaited_once()
-
-    @pytest.mark.asyncio
-    async def test_run_with_language(self, tool, mock_provider):
-        await tool.run(source="/path/to/image.png", language="fra")
-        call_config = mock_provider.extract.call_args[1].get("config")
-        assert call_config is not None
-        assert call_config.language == "fra"
 
     @pytest.mark.asyncio
     async def test_run_with_min_confidence(self, tool, mock_provider):
@@ -136,7 +119,7 @@ class TestOCRTool:
     @pytest.mark.asyncio
     async def test_run_missing_source_raises(self, tool):
         with pytest.raises(ValidationError):
-            await tool.run(language="eng")
+            await tool.run(min_confidence=0.5)
 
 
 class TestOCRToolToBlocks:

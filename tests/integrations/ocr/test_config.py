@@ -17,9 +17,9 @@ def test_tesseract_config_inherits_base_defaults():
 
 def test_google_vision_config_overrides():
 
-    cfg = GoogleVisionConfig(language="fr", min_confidence=0.6)
+    cfg = GoogleVisionConfig(language_hints=["fr"], min_confidence=0.6)
 
-    assert cfg.language == "fr"
+    assert cfg.language_hints == ["fr"]
     assert cfg.min_confidence == 0.6
     assert cfg.feature_type == "DOCUMENT_TEXT_DETECTION"
 

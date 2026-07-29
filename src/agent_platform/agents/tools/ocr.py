@@ -17,12 +17,6 @@ from agent_platform.utils.score import filter_by_score
 
 class OCRInput(BaseModel):
     source: str = Field(..., description="Image file path or URL")
-    language: str = Field(
-        default="eng",
-        min_length=2,
-        max_length=10,
-        description="Language hint (ISO 639-1 code or Tesseract format)",
-    )
     min_confidence: float = Field(
         default=0.0,
         ge=0.0,
@@ -42,10 +36,7 @@ class OCRTool(Tool):
 
     async def run(self, **kwargs: Any) -> list[TextChunk]:
         validated = OCRInput(**kwargs)
-        config = OCRConfig(
-            language=validated.language,
-            min_confidence=validated.min_confidence,
-        )
+        config = OCRConfig(min_confidence=validated.min_confidence)
         results = await safe_call(
             self._ocr.arun((validated.source, config)),
             "OCR extraction failed",
