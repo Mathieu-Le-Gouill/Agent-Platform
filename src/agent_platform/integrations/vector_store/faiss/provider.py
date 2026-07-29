@@ -10,10 +10,12 @@ import faiss
 import numpy as np
 
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
-from agent_platform.core.interfaces.vector_store.config import DistanceMetric
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
-from agent_platform.integrations.vector_store.faiss.config import FAISSConfig
+from agent_platform.integrations.vector_store.faiss.config import (
+    DistanceMetric,
+    FAISSConfig,
+)
 
 _INDEX_FILENAME = "index.faiss"
 _DOCSTORE_FILENAME = "docstore.pkl"

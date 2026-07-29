@@ -3,9 +3,11 @@ from uuid import uuid4
 import faiss
 import pytest
 
-from agent_platform.core.interfaces.vector_store.config import DistanceMetric
 from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.integrations.vector_store.faiss.config import FAISSConfig
+from agent_platform.integrations.vector_store.faiss.config import (
+    DistanceMetric,
+    FAISSConfig,
+)
 from agent_platform.integrations.vector_store.faiss.provider import FAISSStore
 
 
