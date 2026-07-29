@@ -19,7 +19,7 @@ class TestResponseFormat:
 class TestGenerationConfig:
     def test_defaults(self):
         cfg = GenerationConfig()
-        assert cfg.temperature == 0.7
+        assert cfg.temperature is None
         assert cfg.max_tokens is None
         assert cfg.top_p is None
         assert cfg.top_k is None
@@ -64,7 +64,7 @@ class TestGenerationConfig:
 class TestAnthropicGenerationConfig:
     def test_defaults(self):
         cfg = AnthropicGenerationConfig()
-        assert cfg.temperature == 0.7
+        assert cfg.temperature is None
         assert cfg.thinking is False
         assert cfg.thinking_budget is None
         assert cfg.effort is None
@@ -86,7 +86,7 @@ class TestAnthropicGenerationConfig:
 class TestOpenAIGenerationConfig:
     def test_defaults(self):
         cfg = OpenAIGenerationConfig()
-        assert cfg.temperature == 0.7
+        assert cfg.temperature is None
         assert cfg.reasoning_effort is None
         assert cfg.parallel_tool_calls is True
         assert cfg.strict is True

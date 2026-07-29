@@ -158,7 +158,7 @@ class TestToNativeParams:
     def test_default_config(self):
         cfg = HuggingFaceGenerationConfig()
         result = _to_native_params(cfg)
-        assert result["temperature"] == 0.7
+        assert "temperature" not in result
         assert "extra_body" not in result
 
     def test_temperature_zero_is_sent(self):

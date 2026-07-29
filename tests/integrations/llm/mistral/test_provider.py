@@ -162,7 +162,7 @@ class TestToNativeParams:
     def test_default_config(self):
         cfg = MistralGenerationConfig()
         result = _to_native_params(cfg)
-        assert result == {"temperature": 0.7}
+        assert result == {}
 
     def test_with_fields(self):
         cfg = MistralGenerationConfig(

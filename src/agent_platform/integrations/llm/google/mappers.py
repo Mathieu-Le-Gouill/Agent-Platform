@@ -105,7 +105,9 @@ def to_native_config(
     tools: list[Any] | None,
     tool_to_schema: Any,
 ) -> types.GenerateContentConfig:
-    kwargs: dict[str, Any] = {"temperature": config.temperature}
+    kwargs: dict[str, Any] = {}
+    if config.temperature is not None:
+        kwargs["temperature"] = config.temperature
     if config.max_tokens is not None:
         kwargs["max_output_tokens"] = config.max_tokens
     if config.top_p is not None:

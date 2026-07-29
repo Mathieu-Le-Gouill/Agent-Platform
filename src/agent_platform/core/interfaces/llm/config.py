@@ -6,8 +6,9 @@ from agent_platform.core.interfaces.llm.response import ResponseFormat
 
 class GenerationConfig(ModelConfig):
     # Sampling randomness: 0 is near-deterministic, higher values increase diversity.
+    # None leaves it unset so each provider's own native default applies.
     # https://platform.openai.com/docs/api-reference/chat/create#chat-create-temperature
-    temperature: float = 0.7
+    temperature: float | None = None
     # Upper bound on tokens generated in the completion.
     max_tokens: int | None = None
     # Nucleus sampling: restricts sampling to the smallest token set whose cumulative probability exceeds top_p.

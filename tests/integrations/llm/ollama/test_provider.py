@@ -180,7 +180,7 @@ class TestToNativeParams:
     def test_default_config(self):
         cfg = OllamaGenerationConfig()
         result = _to_native_params(cfg)
-        assert result == {"options": {"temperature": 0.7}}
+        assert result == {"options": {}}
 
     def test_with_fields(self):
         cfg = OllamaGenerationConfig(

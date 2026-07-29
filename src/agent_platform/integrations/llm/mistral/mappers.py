@@ -103,7 +103,9 @@ def to_native_messages(prompt: Prompt) -> list[dict[str, Any]]:
 
 
 def to_native_params(config: MistralGenerationConfig) -> dict[str, Any]:
-    params: dict[str, Any] = {"temperature": config.temperature}
+    params: dict[str, Any] = {}
+    if config.temperature is not None:
+        params["temperature"] = config.temperature
     if config.max_tokens is not None:
         params["max_tokens"] = config.max_tokens
     if config.top_p is not None:

@@ -181,7 +181,7 @@ class TestToNativeParams:
     def test_default_config(self):
         cfg = AnthropicGenerationConfig()
         result = _to_native_params(cfg)
-        assert result == {"max_tokens": 1024, "temperature": 0.7}
+        assert result == {"max_tokens": 1024}
 
     def test_with_max_tokens(self):
         cfg = AnthropicGenerationConfig(max_tokens=500)

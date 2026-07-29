@@ -41,7 +41,6 @@ __all__ = [
 # Reasoning models (o-series, gpt-5 non-chat) reject non-default temperature/top_p
 # and only accept reasoning_effort on this family. https://platform.openai.com/docs/guides/reasoning
 _REASONING_MODEL_PREFIXES = ("o1", "o3", "o4-mini")
-_DEFAULT_TEMPERATURE: float = OpenAIGenerationConfig.model_fields["temperature"].default
 
 _BATCH_STATUS_MAP: dict[str, BatchStatus] = {
     "validating": BatchStatus.PENDING,
@@ -141,7 +140,7 @@ def to_native_params(config: OpenAIGenerationConfig) -> dict[str, Any]:
     reasoning_model = is_reasoning_model(config.model)
 
     params: dict[str, Any] = {}
-    if not reasoning_model and config.temperature != _DEFAULT_TEMPERATURE:
+    if not reasoning_model and config.temperature is not None:
         params["temperature"] = config.temperature
     if config.max_tokens is not None:
         params["max_tokens"] = config.max_tokens

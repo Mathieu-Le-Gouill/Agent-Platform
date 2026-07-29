@@ -167,7 +167,7 @@ class TestToNative:
 
 
 class TestToNativeParams:
-    def test_default_config_omits_default_temperature(self):
+    def test_default_config_omits_unset_temperature(self):
         cfg = OpenAIGenerationConfig()
         result = _to_native_params(cfg)
         assert result == {}
@@ -191,10 +191,10 @@ class TestToNativeParams:
         assert result["frequency_penalty"] == 0.3
         assert result["presence_penalty"] == 0.4
 
-    def test_temperature_at_default_is_omitted(self):
+    def test_explicit_temperature_matching_provider_default_is_sent(self):
         cfg = OpenAIGenerationConfig(temperature=0.7)
         result = _to_native_params(cfg)
-        assert "temperature" not in result
+        assert result["temperature"] == 0.7
 
     def test_temperature_non_default_non_reasoning_model_is_sent(self):
         cfg = OpenAIGenerationConfig(model="gpt-4.1", temperature=0.2)

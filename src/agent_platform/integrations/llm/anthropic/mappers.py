@@ -135,9 +135,9 @@ def to_native_messages(prompt: Prompt) -> tuple[str | None, list[dict[str, Any]]
 
 
 def to_native_params(config: AnthropicGenerationConfig) -> dict[str, Any]:
-    params: dict[str, Any] = {
-        "temperature": config.temperature,
-    }
+    params: dict[str, Any] = {}
+    if config.temperature is not None:
+        params["temperature"] = config.temperature
     if config.top_p is not None:
         params["top_p"] = config.top_p
     if config.top_k is not None:
