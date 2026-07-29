@@ -9,7 +9,7 @@ _PROVIDERS: dict[str, str] = {
 }
 
 # Short slugs for `Settings.default_image_model`'s "<provider>:<model>" strings
-# (see `core.config.parse_model_string`), resolved by `config.container.build_provider`.
+# (see `config.model_string.parse_model_string`), resolved by `config.container.build_provider`.
 PROVIDER_ALIASES: dict[str, str] = {
     "dalle": "DallEImageGenerator",
     "midjourney": "MidjourneyGenerator",

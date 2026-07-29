@@ -8,8 +8,8 @@ from agent_platform.agents.tools.generate_image import GenerateImageTool
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.agents.tools.transcribe import TranscribeTool
 from agent_platform.components.speech_to_text import SpeechToText
+from agent_platform.config.model_string import parse_model_string
 from agent_platform.config.settings import Settings
-from agent_platform.core.config import parse_model_string
 from agent_platform.core.errors import ConfigError
 from agent_platform.core.interfaces.image_generation.config import ImageGenConfig
 from agent_platform.core.interfaces.speech.config import SpeechConfig
@@ -41,7 +41,7 @@ def build_provider_from_model_string(
 ) -> tuple[Any, str]:
     """Resolve a `"<provider>:<model>"` setting into `(provider_instance, model)`.
 
-    See `core.config.parse_model_string` for the string format.
+    See `config.model_string.parse_model_string` for the string format.
     """
     provider_name, model = parse_model_string(model_string)
     return build_provider(domain_module, provider_name), model

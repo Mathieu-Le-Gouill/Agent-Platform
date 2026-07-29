@@ -13,7 +13,7 @@ class Settings(BaseSettings):
         extra="ignore",
     )
 
-    # "<provider>:<model>" strings (see core/config.py::parse_model_string), resolved
+    # "<provider>:<model>" strings (see config/model_string.py::parse_model_string), resolved
     # by config/container.py::build_provider_from_model_string against each domain's
     # `PROVIDER_ALIASES` map (e.g. "openai:gpt-4o-mini", "anthropic:claude-sonnet-4-5").
     default_llm_model: str = "openai:gpt-4o-mini"
