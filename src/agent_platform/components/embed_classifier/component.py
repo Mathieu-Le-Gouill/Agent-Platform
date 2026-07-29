@@ -3,13 +3,13 @@ from __future__ import annotations
 from typing import Generic, TypeVar
 
 from agent_platform.components.base import Component
-from agent_platform.components.chunker import Chunker
+from agent_platform.components.chunker.component import Chunker
 from agent_platform.components.embed_classifier.config import (
     EmbeddingClassifierConfig,
 )
-from agent_platform.components.embedder import Embedder
+from agent_platform.components.embedder.component import Embedder
 from agent_platform.components.llm_classifier.component import LLMClassifier
-from agent_platform.components.similarity_scorer import (
+from agent_platform.components.similarity_scorer.component import (
     SimilarityConfig,
     SimilarityInput,
     SimilarityScorer,

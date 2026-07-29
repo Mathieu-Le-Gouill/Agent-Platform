@@ -4,7 +4,7 @@ import re
 from uuid import uuid4
 
 from agent_platform.components.base import Component
-from agent_platform.components.embedder import Embedder
+from agent_platform.components.embedder.component import Embedder
 from agent_platform.components.semantic_chunker.config import SemanticChunkerConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument

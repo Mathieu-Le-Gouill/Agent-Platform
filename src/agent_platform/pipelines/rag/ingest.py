@@ -1,8 +1,8 @@
 from collections.abc import Sequence
 
-from agent_platform.components.chunker import Chunker
-from agent_platform.components.embedder import Embedder
-from agent_platform.components.loader import Loader
+from agent_platform.components.chunker.component import Chunker
+from agent_platform.components.embedder.component import Embedder
+from agent_platform.components.loader.component import Loader
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.interfaces.vector_store.port import VectorStore
 

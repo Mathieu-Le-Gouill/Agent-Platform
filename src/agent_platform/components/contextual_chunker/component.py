@@ -3,7 +3,7 @@ from __future__ import annotations
 from typing import Generic, TypeVar
 
 from agent_platform.components.base import Component
-from agent_platform.components.chunker import Chunker
+from agent_platform.components.chunker.component import Chunker
 from agent_platform.components.contextual_chunker.config import ContextualChunkerConfig
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig

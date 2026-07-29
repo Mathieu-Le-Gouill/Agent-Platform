@@ -4,10 +4,10 @@ from types import ModuleType
 from typing import Any
 
 from agent_platform.agents.conversation import ConversationAgent
-from agent_platform.agents.tools.generate_image import GenerateImageTool
+from agent_platform.agents.tools.generate_image.tool import GenerateImageTool
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.agents.tools.transcribe import TranscribeTool
-from agent_platform.components.speech_to_text import SpeechToText
+from agent_platform.agents.tools.transcribe.tool import TranscribeTool
+from agent_platform.components.speech_to_text.component import SpeechToText
 from agent_platform.config.model_string import parse_model_string
 from agent_platform.config.settings import Settings
 from agent_platform.core.errors import ConfigError

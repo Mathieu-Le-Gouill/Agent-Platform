@@ -16,13 +16,15 @@ Each agent skill should be:
 
 ### Tool Abstraction (`agents/tools/`)
 
+Each tool lives in its own `tools/<name>/tool.py`, one directory per tool, matching the convention `integrations/<domain>/<provider>/` and `components/<name>/component.py` already use (see `components/README.md`'s "Directory Layout" for the rule). Shared plumbing (`base.py`, `registry.py`, `errors.py`, `_utils.py`) stays at the `tools/` root since it isn't a single tool.
+
 | Component | File | What It Does |
 |---|---|---|
 | `Tool` Protocol | `tools/base.py` | `name`, `description`, `input_schema: type[BaseModel]`, `output_schema`, `async run(**kwargs) -> Any`; validates at subclass definition time |
 | `ToolRegistry` | `tools/registry.py` | Register/get/remove/iterate; `resolve_call()` dispatches a `ToolCall`; `call_and_wrap()` returns a `ToolMessage` (captures errors as `is_error=True`) |
-| `TranscribeTool` | `tools/transcribe.py` | Wraps `BaseSpeechToText`, audio → transcript |
-| `SearchTool` | `tools/search.py` | Embeds query → vector store search → ranked chunks |
-| `OCRTool` | `tools/ocr.py` | Wraps `BaseOCRProvider`, image → extracted text |
+| `TranscribeTool` | `tools/transcribe/tool.py` | Wraps `BaseSpeechToText`, audio → transcript |
+| `SearchTool` | `tools/search/tool.py` | Embeds query → vector store search → ranked chunks |
+| `OCRTool` | `tools/ocr/tool.py` | Wraps `BaseOCRProvider`, image → extracted text |
 | `safe_call()` | `tools/_utils.py` | Error-wrapping helper for provider calls inside tools |
 
 ### Agent Runtime (`agents/`)

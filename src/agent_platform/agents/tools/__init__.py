@@ -1,17 +1,21 @@
 from agent_platform.agents.tools._utils import safe_call
 from agent_platform.agents.tools.base import Tool, ToolError, ToolStreamChunk
-from agent_platform.agents.tools.classify import ClassifyInput, ClassifyTool
+from agent_platform.agents.tools.classify.tool import ClassifyInput, ClassifyTool
 from agent_platform.agents.tools.errors import ToolNotFoundError, ToolRegistrationError
-from agent_platform.agents.tools.generate_image import (
+from agent_platform.agents.tools.generate_image.tool import (
     GenerateImageInput,
     GenerateImageTool,
 )
-from agent_platform.agents.tools.ocr import OCRInput, OCRTool
+from agent_platform.agents.tools.ocr.tool import OCRInput, OCRTool
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.agents.tools.search import SearchInput, SearchResult, SearchTool
-from agent_platform.agents.tools.summarize import SummarizeInput, SummarizeTool
-from agent_platform.agents.tools.transcribe import TranscribeInput, TranscribeTool
-from agent_platform.agents.tools.translate import TranslateInput, TranslateTool
+from agent_platform.agents.tools.search.tool import (
+    SearchInput,
+    SearchResult,
+    SearchTool,
+)
+from agent_platform.agents.tools.summarize.tool import SummarizeInput, SummarizeTool
+from agent_platform.agents.tools.transcribe.tool import TranscribeInput, TranscribeTool
+from agent_platform.agents.tools.translate.tool import TranslateInput, TranslateTool
 
 __all__ = [
     "Tool",

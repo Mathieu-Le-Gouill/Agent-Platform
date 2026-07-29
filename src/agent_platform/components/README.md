@@ -27,27 +27,36 @@ Every component receives typed input and returns typed output. The sync `run()` 
 
 ## Directory Layout
 
+Every component is a directory, one per component, matching the convention `integrations/<domain>/<provider>/` already uses: `component.py` always, `config.py` only if the component owns a config the domain-level `core/interfaces` config doesn't already cover, `strategies/` or other sub-modules only if the component actually needs them. No per-component `__init__.py`, callers import the submodule directly (`from agent_platform.components.embedder.component import Embedder`), same as integration providers.
+
 ```
 components/
 ├── __init__.py
-├── base.py                  # Component[InputT, OutputT] ABC
-├── chunker.py               # TextDocument → TextChunk (wraps BaseChunker)
-├── embedder.py              # TextChunk → EmbeddingResponse (wraps BaseEmbeddingProvider)
-├── reranker.py              # list[T] → list[T] (wraps BaseReranker)
-├── ocr.py                   # (source, config) → list[TextChunk] (wraps BaseOCR)
-├── speech_to_text.py        # (AudioChunk, config) → Transcript, plus astream() (wraps BaseSpeechToText)
-├── vector_search.py         # (vector, k, filter) → list[(TextChunk, Score)] (wraps VectorStore.search_with_scores)
-├── similarity_scorer.py     # Chunks × label vectors → ClassificationResult (pure logic)
-├── semantic_chunker/        # TextDocument → TextChunk, splits on embedding-similarity breakpoints
+├── base.py                       # Component[InputT, OutputT] ABC
+├── chunker/
+│   └── component.py               # TextDocument → TextChunk (wraps BaseChunker)
+├── embedder/
+│   └── component.py               # TextChunk → EmbeddingResponse (wraps BaseEmbeddingProvider)
+├── reranker/
+│   └── component.py               # list[T] → list[T] (wraps BaseReranker)
+├── ocr/
+│   └── component.py               # (source, config) → list[TextChunk] (wraps BaseOCR)
+├── speech_to_text/
+│   └── component.py               # (AudioChunk, config) → Transcript, plus astream() (wraps BaseSpeechToText)
+├── vector_search/
+│   └── component.py               # (vector, k, filter) → list[(TextChunk, Score)] (wraps VectorStore.search_with_scores)
+├── similarity_scorer/
+│   └── component.py               # Chunks × label vectors → ClassificationResult (pure logic)
+├── semantic_chunker/              # TextDocument → TextChunk, splits on embedding-similarity breakpoints
 │   ├── component.py
 │   └── config.py
-├── contextual_chunker/      # TextDocument → TextChunk, prepends an LLM-generated context blurb
+├── contextual_chunker/            # TextDocument → TextChunk, prepends an LLM-generated context blurb
 │   ├── component.py
 │   └── config.py
-├── embed_classifier/        # Embedding-based classifier
+├── embed_classifier/              # Embedding-based classifier
 │   ├── component.py
 │   └── config.py
-└── llm_classifier/          # LLM-based classifier with pluggable strategies
+└── llm_classifier/                # LLM-based classifier with pluggable strategies
     ├── component.py
     ├── config.py
     └── strategies/
@@ -90,28 +99,20 @@ class SimilarityScorer(Component[SimilarityInput, ClassificationResult]):
 
 ## How to Extend
 
-### Add a wrapper component
+### Add a component
 
 ```
-components/<name>.py
+components/<name>/
+└── component.py      # The component class
 ```
 
-1. Create a new file in `components/`
+1. Create `components/<name>/component.py`
 2. Subclass `Component[InputT, OutputT]`
 3. Accept the backend Integration(s) in `__init__`
 4. Implement `arun()`, one async method that orchestrates the backend(s)
-5. Export from `components/__init__.py`
+5. Add `config.py` alongside it only if the component needs its own config beyond the domain-level `core/interfaces` config; add `strategies/` or other sub-modules only if the component actually needs them
 
-### Add a composite component (subdirectory)
-
-```
-components/<complex_component>/
-├── __init__.py
-├── component.py      # The component class
-└── config.py         # Component-specific Pydantic config
-```
-
-Use a subdirectory when the component has its own config, strategies, or sub-modules.
+No `__init__.py`, callers import `components.<name>.component` directly.
 
 ### Component conventions
 
@@ -119,4 +120,4 @@ Use a subdirectory when the component has its own config, strategies, or sub-mod
 - Configs are typed Pydantic models
 - Errors are translated to `core/errors.py` types
 - Components may import from `core/`, `integrations/`, and `components/`, never from `pipelines/` or `agents/`
-- Prefer a flat file for simple wrappers, a subdirectory for complex components with config/strategies
+- Every component is a directory (`components/<name>/component.py`), no flat-file components, matching `integrations/<domain>/<provider>/`'s layout
