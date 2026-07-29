@@ -25,7 +25,7 @@ class TestDalleConfig:
     def test_inherits_defaults(self):
         cfg = DalleConfig()
         assert cfg.model == "dall-e-3"
-        assert cfg.quality == "standard"
+        assert cfg.quality is None
         assert cfg.style is None
 
     def test_custom_quality(self):
@@ -53,6 +53,10 @@ class TestDalleConfig:
     def test_gpt_image_1_invalid_quality_raises(self):
         with pytest.raises(ValidationError):
             DalleConfig(model="gpt-image-1", quality="standard")
+
+    def test_gpt_image_1_default_quality_is_unset(self):
+        cfg = DalleConfig(model="gpt-image-1")
+        assert cfg.quality is None
 
     def test_dalle3_invalid_quality_for_gpt_vocab_raises(self):
         with pytest.raises(ValidationError):

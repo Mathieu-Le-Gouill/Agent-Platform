@@ -55,7 +55,7 @@ def build_request_kwargs(
         "size": size,
         "n": n,
     }
-    if config.model != "dall-e-2":
+    if config.model != "dall-e-2" and config.quality is not None:
         kwargs["quality"] = config.quality
     if config.model in _RESPONSE_FORMAT_MODELS:
         kwargs["response_format"] = "b64_json"

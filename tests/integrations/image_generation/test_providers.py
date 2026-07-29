@@ -53,7 +53,7 @@ class TestDallEImageGenerator:
     def test_constructor_valid_model(self):
         gen = DallEImageGenerator()
         assert gen._default_config().model == "dall-e-3"
-        assert gen._default_config().quality == "standard"
+        assert gen._default_config().quality is None
 
     def test_constructor_valid_model_dalle2(self):
         cfg = DalleConfig(model="dall-e-2", quality="hd")
@@ -316,7 +316,7 @@ class TestDallEGenerate:
         _, kwargs = mock_client.images.generate.call_args
         assert kwargs["style"] == "vivid"
         assert kwargs["response_format"] == "b64_json"
-        assert kwargs["quality"] == "standard"
+        assert "quality" not in kwargs
 
     async def test_generate_gpt_image_1_omits_response_format(self, mocker):
         mock_openai_cls = mocker.patch(
@@ -343,6 +343,26 @@ class TestDallEGenerate:
         assert kwargs["model"] == "gpt-image-1"
         assert "style" not in kwargs
         assert result.content == b"img"
+
+    async def test_generate_gpt_image_1_default_omits_quality(self, mocker):
+        mock_openai_cls = mocker.patch(
+            "agent_platform.integrations.image_generation.dalle.provider.AsyncOpenAI"
+        )
+        mock_client = MagicMock()
+        mock_openai_cls.return_value = mock_client
+
+        mock_data = MagicMock()
+        mock_data.b64_json = base64.b64encode(b"img").decode()
+        mock_data.revised_prompt = None
+        mock_response = MagicMock()
+        mock_response.data = [mock_data]
+        mock_client.images.generate = AsyncMock(return_value=mock_response)
+
+        gen = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("test-key")))
+        await gen.generate("test", config=DalleConfig(model="gpt-image-1"))
+
+        _, kwargs = mock_client.images.generate.call_args
+        assert "quality" not in kwargs
 
     async def test_generate_dalle2_omits_quality(self, mocker):
         mock_openai_cls = mocker.patch(
