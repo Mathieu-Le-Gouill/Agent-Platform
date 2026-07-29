@@ -4,7 +4,9 @@ import pytest
 
 pytest.importorskip("pytesseract")
 
-from agent_platform.integrations.ocr.tesseract.provider import _from_tesseract
+from agent_platform.integrations.ocr.tesseract.mappers import (
+    from_tesseract as _from_tesseract,
+)
 
 
 def test_from_tesseract_missing_block_num():

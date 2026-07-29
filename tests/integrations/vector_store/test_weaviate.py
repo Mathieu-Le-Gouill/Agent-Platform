@@ -8,10 +8,14 @@ pytest.importorskip("weaviate")
 
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
+from agent_platform.integrations.vector_store.weaviate.mappers import (
+    chunk_to_properties as _chunk_to_properties,
+)
+from agent_platform.integrations.vector_store.weaviate.mappers import (
+    object_to_chunk as _object_to_chunk,
+)
 from agent_platform.integrations.vector_store.weaviate.provider import (
     WeaviateStore,
-    _chunk_to_properties,
-    _object_to_chunk,
     _parse_url,
 )
 from tests.helpers import assert_custom_construction_stored

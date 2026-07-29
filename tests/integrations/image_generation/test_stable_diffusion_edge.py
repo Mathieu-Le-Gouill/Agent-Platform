@@ -117,8 +117,8 @@ async def test_generate_success(mocker):
 
 
 def test_pluck_images_tuple():
-    from agent_platform.integrations.image_generation.stable_diffusion.provider import (
-        _pluck_images,
+    from agent_platform.integrations.image_generation.stable_diffusion.mappers import (
+        pluck_images as _pluck_images,
     )
 
     mock_img = MagicMock()

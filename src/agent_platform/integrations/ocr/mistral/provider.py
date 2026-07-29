@@ -4,12 +4,11 @@ import asyncio
 import base64
 from collections.abc import Sequence
 from pathlib import Path
-from typing import TYPE_CHECKING, Any
+from typing import TYPE_CHECKING
 from uuid import UUID, uuid4
 
 if TYPE_CHECKING:
     from mistralai import Mistral
-    from mistralai.models import OCRResponse
 else:
     try:
         from mistralai import Mistral
@@ -25,9 +24,9 @@ from agent_platform.core.errors import (
 )
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.ocr.mistral.config import MistralOCRConfig
+from agent_platform.integrations.ocr.mistral.mappers import from_mistral
 
 _MIME_MAP = {
     "pdf": "application/pdf",
@@ -99,35 +98,4 @@ class MistralOCR(BaseOCR[MistralOCRConfig]):
         except Exception as exc:
             raise ProviderError(f"Mistral OCR failed: {exc}") from exc
 
-        return _from_mistral(response, doc_id, min_confidence=config.min_confidence)
-
-
-def _from_mistral(
-    response: OCRResponse, document_id: UUID, min_confidence: float = 0.0
-) -> list[TextChunk]:
-    chunks: list[TextChunk] = []
-    for page in response.pages:
-        text = (page.markdown or "").strip()
-        if not text:
-            continue
-
-        scores = getattr(page, "confidence_scores", None)
-        avg_conf = (
-            getattr(scores, "average_page_confidence_score", None) if scores else None
-        )
-
-        if avg_conf is not None and avg_conf < min_confidence:
-            continue
-
-        chunk_kwargs: dict[str, Any] = dict(
-            id=uuid4(),
-            document_id=document_id,
-            text=text,
-            index=page.index,
-            metadata={"page": page.index},
-        )
-        if avg_conf is not None:
-            chunk_kwargs["confidence"] = Score.confidence(avg_conf)
-
-        chunks.append(TextChunk(**chunk_kwargs))
-    return chunks
+        return from_mistral(response, doc_id, min_confidence=config.min_confidence)

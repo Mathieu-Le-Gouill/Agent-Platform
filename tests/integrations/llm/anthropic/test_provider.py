@@ -24,13 +24,19 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.integrations.credentials import AnthropicCredentials
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
-from agent_platform.integrations.llm.anthropic.provider import (
-    AnthropicLLM,
-    _block_to_native,
-    _from_native_response,
-    _to_native_messages,
-    _to_native_params,
+from agent_platform.integrations.llm.anthropic.mappers import (
+    block_to_native as _block_to_native,
 )
+from agent_platform.integrations.llm.anthropic.mappers import (
+    from_native_response as _from_native_response,
+)
+from agent_platform.integrations.llm.anthropic.mappers import (
+    to_native_messages as _to_native_messages,
+)
+from agent_platform.integrations.llm.anthropic.mappers import (
+    to_native_params as _to_native_params,
+)
+from agent_platform.integrations.llm.anthropic.provider import AnthropicLLM
 
 
 def _creds(key: str = "sk-ant-test") -> AnthropicCredentials:

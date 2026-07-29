@@ -24,12 +24,16 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.integrations.credentials import GoogleCredentials
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
-from agent_platform.integrations.llm.google.provider import (
-    GoogleLLM,
-    _from_native_response,
-    _to_native_config,
-    _to_native_contents,
+from agent_platform.integrations.llm.google.mappers import (
+    from_native_response as _from_native_response,
 )
+from agent_platform.integrations.llm.google.mappers import (
+    to_native_config as _to_native_config,
+)
+from agent_platform.integrations.llm.google.mappers import (
+    to_native_contents as _to_native_contents,
+)
+from agent_platform.integrations.llm.google.provider import GoogleLLM
 from tests.helpers import assert_custom_construction_stored, assert_default_construction
 
 

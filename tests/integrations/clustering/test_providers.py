@@ -16,10 +16,10 @@ from agent_platform.integrations.clustering.hdbscan.provider import (
     HDBSCANClusterer,
 )
 from agent_platform.integrations.clustering.kmeans.config import KMeansConfig
-from agent_platform.integrations.clustering.kmeans.provider import (
-    KMeansClusterer,
-    _softmax,
+from agent_platform.integrations.clustering.kmeans.mappers import (
+    softmax as _softmax,
 )
+from agent_platform.integrations.clustering.kmeans.provider import KMeansClusterer
 
 # ---------------------------------------------------------------------------
 # Empty items

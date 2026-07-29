@@ -14,26 +14,34 @@ from agent_platform.integrations.credentials import (
     OpenAICredentials,
 )
 from agent_platform.integrations.image_generation.dalle.config import DalleConfig
+from agent_platform.integrations.image_generation.dalle.mappers import (
+    validate_n as _validate_n,
+)
+from agent_platform.integrations.image_generation.dalle.mappers import (
+    validate_size as _validate_size,
+)
 from agent_platform.integrations.image_generation.dalle.provider import (
     DallEImageGenerator,
-    _validate_n,
-    _validate_size,
 )
 from agent_platform.integrations.image_generation.midjourney.config import (
     MidjourneyConfig,
 )
+from agent_platform.integrations.image_generation.midjourney.mappers import (
+    size_to_aspect as _size_to_aspect,
+)
 from agent_platform.integrations.image_generation.midjourney.provider import (
     MidjourneyGenerator,
-    _size_to_aspect,
 )
 from agent_platform.integrations.image_generation.stable_diffusion.config import (
     StableDiffusionConfig,
 )
 
 try:
+    from agent_platform.integrations.image_generation.stable_diffusion.mappers import (
+        parse_size as _parse_size,
+    )
     from agent_platform.integrations.image_generation.stable_diffusion.provider import (
         StableDiffusionGenerator,
-        _parse_size,
     )
 
     _HAS_DIFFUSERS = True

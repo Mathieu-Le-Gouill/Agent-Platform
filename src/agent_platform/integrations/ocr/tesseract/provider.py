@@ -8,50 +8,9 @@ import pytesseract
 from PIL import Image
 
 from agent_platform.core.interfaces.ocr.base import BaseOCR
-from agent_platform.core.schemas.bounding_box import BoundingBox
 from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.score import Score, ScoreKind
 from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
-
-
-def _from_tesseract(
-    data: dict, document_id: UUID, min_confidence: float
-) -> list[TextChunk]:
-    chunks: list[TextChunk] = []
-    n = len(data.get("text", []))
-
-    for i in range(n):
-        text = (data.get("text") or [])[i] or ""
-        conf = float((data.get("conf") or [0])[i] or 0)
-
-        if not text.strip():
-            continue
-        if conf < min_confidence:
-            continue
-
-        chunks.append(
-            TextChunk(
-                id=uuid4(),
-                document_id=document_id,
-                text=text.strip(),
-                confidence=Score(
-                    value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100
-                ),
-                bbox=BoundingBox(
-                    x=float((data.get("left") or [0])[i]),
-                    y=float((data.get("top") or [0])[i]),
-                    width=float((data.get("width") or [0])[i]),
-                    height=float((data.get("height") or [0])[i]),
-                    normalized=False,
-                ),
-                metadata={
-                    "page": (data.get("page_num") or [None] * n)[i],
-                    "block_num": (data.get("block_num") or [None] * n)[i],
-                },
-            )
-        )
-
-    return chunks
+from agent_platform.integrations.ocr.tesseract.mappers import from_tesseract
 
 
 class TesseractOCR(BaseOCR[TesseractConfig]):
@@ -78,7 +37,7 @@ class TesseractOCR(BaseOCR[TesseractConfig]):
             output_type=pytesseract.Output.DICT,
         )
 
-        return _from_tesseract(
+        return from_tesseract(
             data, document_id=doc_id, min_confidence=config.min_confidence
         )
 

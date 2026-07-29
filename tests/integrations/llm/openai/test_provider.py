@@ -25,13 +25,19 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
-from agent_platform.integrations.llm.openai.provider import (
-    OpenAILLM,
-    _block_to_native,
-    _from_native_response,
-    _to_native_messages,
-    _to_native_params,
+from agent_platform.integrations.llm.openai.mappers import (
+    block_to_native as _block_to_native,
 )
+from agent_platform.integrations.llm.openai.mappers import (
+    from_native_response as _from_native_response,
+)
+from agent_platform.integrations.llm.openai.mappers import (
+    to_native_messages as _to_native_messages,
+)
+from agent_platform.integrations.llm.openai.mappers import (
+    to_native_params as _to_native_params,
+)
+from agent_platform.integrations.llm.openai.provider import OpenAILLM
 
 
 def _creds(key: str = "sk-test") -> OpenAICredentials:

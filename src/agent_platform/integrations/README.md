@@ -19,12 +19,33 @@ integrations/
 │   ├── __init__.py
 │   ├── langchain_base.py  # Optional: LangChain intermediate abstract
 │   ├── _base.py           # Optional: native (non-LangChain) shared base, see below
+│   ├── mappers.py         # Optional: domain-level shared conversion functions, when
+│   │                       #   multiple providers (or langchain_base.py) share them
 │   └── <provider>/
 │       ├── __init__.py
 │       ├── config.py      # Provider-specific Pydantic config
+│       ├── mappers.py     # Optional: free functions converting vendor types <-> core
+│       │                   #   schemas, when the provider has more than a couple of them
 │       └── <provider>.py  # Concrete class implementing core/interfaces ABC
 └── …
 ```
+
+### Provider and mapper files
+
+Every provider file contains one class that owns client construction, retry/tracing
+orchestration, and the domain ABC's public methods. When that class also carries
+non-trivial vendor-type ↔ core-schema conversion logic (message/request building,
+response parsing), those conversions live as free functions in a sibling `mappers.py`
+rather than inline in the provider file, so the provider file stays focused on
+orchestration. `mappers.py` holds only pure functions (no `self`, no network/client
+calls) and imports the same things the provider file would (vendor SDK types for
+annotations, `core/schemas`, `core/interfaces`); it never imports its sibling
+`<provider>.py`, since the provider file imports from it. This mirrors how the domain
+already separates cross-provider shared conversions into `ocr/utils.py`,
+`speech_to_text/utils.py`, and `reranking/scoring.py`, just at per-provider granularity
+when the conversions are provider-specific rather than shared. Providers with only thin,
+inline dict-literal conversions (a couple of lines, no free functions) don't get a
+`mappers.py`, adding one would be ceremony without removing real duplication.
 
 **Exception:** `loader/` uses `strategies/` instead of `<provider>/` because each strategy handles a different media type (text, image, audio, video) rather than a different vendor; per-media-type ABCs and configs live in `core/interfaces/loader/{text,image,audio,video}/`, concrete loaders in `loader/strategies/`. `loader/composite/` holds `AutoLoader` (dispatches to the right strategy by file extension) and `MultiLoader` (loads heterogeneous sources via `AutoLoader`), both re-exported through `loader/__init__.py` like any other provider.
 
@@ -89,7 +110,8 @@ Steps:
 2. Create `integrations/<domain>/<new_provider>/`
 3. Define config model (extend domain config or `BaseModel`)
 4. Implement the domain's ABC, all abstract methods
-5. Inline all conversion logic inside the provider file
+5. Put conversion logic in a sibling `mappers.py` if there's more than a couple of
+   one-line conversions, otherwise inline it in the provider file
 6. Use `asyncio.to_thread()` for blocking library calls
 7. Translate all failures to `ProviderError` from `core/errors.py`
 

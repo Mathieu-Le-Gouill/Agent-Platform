@@ -15,6 +15,9 @@ from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.integrations.credentials import DeepgramCredentials
 from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
+from agent_platform.integrations.speech_to_text.deepgram.mappers import (
+    parse_deepgram_result,
+)
 from agent_platform.integrations.speech_to_text.utils import parse_language
 
 
@@ -117,7 +120,7 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
                 async for message in socket:
                     if isinstance(message, bytes):
                         continue
-                    utterances = _parse_deepgram_result(message.model_dump_json())
+                    utterances = parse_deepgram_result(message.model_dump_json())
                     if utterances:
                         yield Transcript(
                             utterances=utterances,
@@ -126,32 +129,3 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
                 await sender
 
         return _stream()
-
-
-def _parse_deepgram_result(raw: str) -> list[Utterance]:
-    import json
-
-    data = json.loads(raw)
-    channel = data.get("channel", {})
-    alternatives = channel.get("alternatives", [])
-    if not alternatives:
-        return []
-
-    alt = alternatives[0]
-    transcript_text = alt.get("transcript", "").strip()
-    if not transcript_text:
-        return []
-
-    words = alt.get("words", [])
-    if words:
-        return [
-            Utterance(
-                text=w["word"],
-                start_ms=int(w["start"] * 1000),
-                end_ms=int(w["end"] * 1000),
-                confidence=w.get("confidence"),
-            )
-            for w in words
-        ]
-
-    return [Utterance(text=transcript_text)]

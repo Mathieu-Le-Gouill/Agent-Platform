@@ -14,10 +14,13 @@ from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
 from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.enums import Language
 from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import WeaviateCredentials
 from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
+from agent_platform.integrations.vector_store.weaviate.mappers import (
+    chunk_to_properties,
+    object_to_chunk,
+)
 
 
 def _parse_url(url: str) -> tuple[str, int, bool]:
@@ -94,7 +97,7 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
             collection = self._collection(client, config)
             objects = [
                 DataObject(
-                    properties=_chunk_to_properties(doc, config.text_key),
+                    properties=chunk_to_properties(doc, config.text_key),
                     uuid=doc.id,
                     vector=vector,
                 )
@@ -139,7 +142,7 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
                 limit=k,
                 filters=self._filter(filter),
             )
-            return [_object_to_chunk(obj, config.text_key) for obj in result.objects]
+            return [object_to_chunk(obj, config.text_key) for obj in result.objects]
         finally:
             await client.close()
 
@@ -164,7 +167,7 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
             )
             return [
                 (
-                    _object_to_chunk(obj, config.text_key),
+                    object_to_chunk(obj, config.text_key),
                     Score.similarity(
                         min(1.0, max(0.0, 1.0 - (obj.metadata.distance or 0.0)))
                     ),
@@ -173,38 +176,3 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
             ]
         finally:
             await client.close()
-
-
-# --- Mappers ---
-
-
-def _chunk_to_properties(chunk: TextChunk, text_key: str) -> dict[str, Any]:
-    metadata = chunk.metadata or {}
-    return {
-        text_key: chunk.text,
-        "document_id": str(chunk.document_id) if chunk.document_id else None,
-        "index": chunk.index,
-        "start_char": chunk.start_char,
-        "end_char": chunk.end_char,
-        "format": chunk.format.value if chunk.format else None,
-        "source": metadata.get("source"),
-        "language": metadata.get("language"),
-        "extra": metadata.get("extra"),
-    }
-
-
-def _object_to_chunk(obj: Any, text_key: str) -> TextChunk:
-    props = obj.properties
-    return TextChunk(
-        id=obj.uuid,
-        document_id=UUID(props["document_id"]) if props.get("document_id") else None,
-        text=props.get(text_key) or "",
-        index=props.get("index") or 0,
-        start_char=props.get("start_char"),
-        end_char=props.get("end_char"),
-        metadata={
-            "source": props.get("source"),
-            "language": Language(props["language"]) if props.get("language") else None,
-            "extra": props.get("extra") or {},
-        },
-    )

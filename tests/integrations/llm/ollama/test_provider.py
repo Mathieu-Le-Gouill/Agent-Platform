@@ -23,13 +23,19 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.integrations.credentials import OllamaCredentials
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
-from agent_platform.integrations.llm.ollama.provider import (
-    OllamaLLM,
-    _from_native_response,
-    _message_content,
-    _to_native_messages,
-    _to_native_params,
+from agent_platform.integrations.llm.ollama.mappers import (
+    from_native_response as _from_native_response,
 )
+from agent_platform.integrations.llm.ollama.mappers import (
+    message_content as _message_content,
+)
+from agent_platform.integrations.llm.ollama.mappers import (
+    to_native_messages as _to_native_messages,
+)
+from agent_platform.integrations.llm.ollama.mappers import (
+    to_native_params as _to_native_params,
+)
+from agent_platform.integrations.llm.ollama.provider import OllamaLLM
 
 
 def _tool_call(name: str, arguments: dict) -> SimpleNamespace:

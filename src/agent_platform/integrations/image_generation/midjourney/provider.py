@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from math import gcd
 from typing import Any
 
 import httpx
@@ -18,6 +17,9 @@ from agent_platform.core.schemas.enums import ImageFormat
 from agent_platform.integrations.credentials import MidjourneyCredentials
 from agent_platform.integrations.image_generation.midjourney.config import (
     MidjourneyConfig,
+)
+from agent_platform.integrations.image_generation.midjourney.mappers import (
+    size_to_aspect,
 )
 
 
@@ -47,7 +49,7 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
 
         payload = {
             "prompt": prompt,
-            "aspect_ratio": _size_to_aspect(size),
+            "aspect_ratio": size_to_aspect(size),
             "process_mode": config.process_mode,
         }
 
@@ -95,7 +97,7 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
 
         payload = {
             "prompt": prompt,
-            "aspect_ratio": _size_to_aspect(size),
+            "aspect_ratio": size_to_aspect(size),
             "process_mode": config.process_mode,
         }
 
@@ -142,20 +144,3 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
         resp = await client.get(url)
         resp.raise_for_status()
         return resp.content
-
-
-# --- Utils ---
-
-
-def _size_to_aspect(size: str | None) -> str:
-    if size is None:
-        return "1:1"
-    parts = size.lower().split("x")
-    if len(parts) != 2:
-        return "1:1"
-    try:
-        w, h = int(parts[0]), int(parts[1])
-        g = gcd(w, h)
-        return f"{w // g}:{h // g}"
-    except (ValueError, ZeroDivisionError):
-        return "1:1"

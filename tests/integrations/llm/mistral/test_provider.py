@@ -23,13 +23,19 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
-from agent_platform.integrations.llm.mistral.provider import (
-    MistralLLM,
-    _block_to_native,
-    _from_native_response,
-    _to_native_messages,
-    _to_native_params,
+from agent_platform.integrations.llm.mistral.mappers import (
+    block_to_native as _block_to_native,
 )
+from agent_platform.integrations.llm.mistral.mappers import (
+    from_native_response as _from_native_response,
+)
+from agent_platform.integrations.llm.mistral.mappers import (
+    to_native_messages as _to_native_messages,
+)
+from agent_platform.integrations.llm.mistral.mappers import (
+    to_native_params as _to_native_params,
+)
+from agent_platform.integrations.llm.mistral.provider import MistralLLM
 
 
 def _creds(key: str = "sk-mist-test") -> MistralCredentials:

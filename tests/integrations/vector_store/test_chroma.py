@@ -9,11 +9,13 @@ from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.credentials import ChromaCredentials
 from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
-from agent_platform.integrations.vector_store.chroma.provider import (
-    ChromaStore,
-    _chunk_to_metadata,
-    _row_to_chunk,
+from agent_platform.integrations.vector_store.chroma.mappers import (
+    chunk_to_metadata as _chunk_to_metadata,
 )
+from agent_platform.integrations.vector_store.chroma.mappers import (
+    row_to_chunk as _row_to_chunk,
+)
+from agent_platform.integrations.vector_store.chroma.provider import ChromaStore
 from tests.helpers import assert_custom_construction_stored, assert_default_construction
 
 

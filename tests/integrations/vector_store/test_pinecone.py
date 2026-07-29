@@ -10,11 +10,13 @@ from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.credentials import PineconeCredentials
 from agent_platform.integrations.vector_store.pinecone.config import PineconeConfig
-from agent_platform.integrations.vector_store.pinecone.provider import (
-    PineconeStore,
-    _chunk_to_metadata,
-    _match_to_chunk,
+from agent_platform.integrations.vector_store.pinecone.mappers import (
+    chunk_to_metadata as _chunk_to_metadata,
 )
+from agent_platform.integrations.vector_store.pinecone.mappers import (
+    match_to_chunk as _match_to_chunk,
+)
+from agent_platform.integrations.vector_store.pinecone.provider import PineconeStore
 from tests.helpers import assert_custom_construction_stored, assert_default_construction
 
 

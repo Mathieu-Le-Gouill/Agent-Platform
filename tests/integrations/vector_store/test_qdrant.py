@@ -10,10 +10,14 @@ from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.credentials import QdrantCredentials
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
+from agent_platform.integrations.vector_store.qdrant.mappers import (
+    chunk_to_payload as _chunk_to_payload,
+)
+from agent_platform.integrations.vector_store.qdrant.mappers import (
+    point_to_chunk as _point_to_chunk,
+)
 from agent_platform.integrations.vector_store.qdrant.provider import (
     QdrantVectorStoreProvider,
-    _chunk_to_payload,
-    _point_to_chunk,
 )
 from tests.helpers import assert_custom_construction_stored, assert_default_construction
 

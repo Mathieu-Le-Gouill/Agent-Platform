@@ -24,13 +24,19 @@ from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
-from agent_platform.integrations.llm.huggingface.provider import (
-    HuggingFaceLLM,
-    _block_to_native,
-    _from_native_response,
-    _to_native_messages,
-    _to_native_params,
+from agent_platform.integrations.llm.huggingface.mappers import (
+    block_to_native as _block_to_native,
 )
+from agent_platform.integrations.llm.huggingface.mappers import (
+    from_native_response as _from_native_response,
+)
+from agent_platform.integrations.llm.huggingface.mappers import (
+    to_native_messages as _to_native_messages,
+)
+from agent_platform.integrations.llm.huggingface.mappers import (
+    to_native_params as _to_native_params,
+)
+from agent_platform.integrations.llm.huggingface.provider import HuggingFaceLLM
 
 
 def _creds(key: str = "hf_test") -> HuggingFaceCredentials:

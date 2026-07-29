@@ -12,10 +12,12 @@ from agent_platform.core.interfaces.chunking.config import ChunkerConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import DocumentMetadata, TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat, Language
-from agent_platform.integrations.chunking.langchain_base import (
-    LangChainChunker,
-    _doc_to_lc,
-    _lc_to_chunks,
+from agent_platform.integrations.chunking.langchain_base import LangChainChunker
+from agent_platform.integrations.chunking.mappers import (
+    doc_to_lc as _doc_to_lc,
+)
+from agent_platform.integrations.chunking.mappers import (
+    lc_to_chunks as _lc_to_chunks,
 )
 
 # ================================================================

@@ -18,6 +18,11 @@ from agent_platform.core.schemas.enums import ImageFormat
 from agent_platform.integrations.image_generation.stable_diffusion.config import (
     StableDiffusionConfig,
 )
+from agent_platform.integrations.image_generation.stable_diffusion.mappers import (
+    build_generator,
+    parse_size,
+    pluck_images,
+)
 
 
 class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
@@ -76,11 +81,11 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
                 code="sd.pipeline_not_loaded",
             )
 
-        height, width = _parse_size(size)
+        height, width = parse_size(size)
         negative_prompt = (
             negative_prompt if negative_prompt is not None else config.negative_prompt
         )
-        generator = _build_generator(config)
+        generator = build_generator(config)
         loop = asyncio.get_event_loop()
 
         def _infer() -> Image.Image:
@@ -98,7 +103,7 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
                 call_kwargs["generator"] = generator
             with torch.no_grad():
                 output = pipeline(**call_kwargs)
-            return _pluck_images(output)[0]
+            return pluck_images(output)[0]
 
         pil_image = await loop.run_in_executor(None, _infer)
 
@@ -138,11 +143,11 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
                 code="sd.pipeline_not_loaded",
             )
 
-        height, width = _parse_size(size)
+        height, width = parse_size(size)
         negative_prompt = (
             negative_prompt if negative_prompt is not None else config.negative_prompt
         )
-        generator = _build_generator(config)
+        generator = build_generator(config)
         loop = asyncio.get_event_loop()
 
         def _infer() -> list[bytes]:
@@ -162,7 +167,7 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
                 output = pipeline(**call_kwargs)
 
             documents: list[bytes] = []
-            for img in _pluck_images(output):
+            for img in pluck_images(output):
                 buf = io.BytesIO()
                 img.save(buf, format=format.value.upper())
                 documents.append(buf.getvalue())
@@ -186,35 +191,3 @@ class StableDiffusionGenerator(BaseImageGenerator[StableDiffusionConfig]):
                 )
             )
         return docs
-
-
-# --- Utils ---
-
-
-def _build_generator(config: StableDiffusionConfig) -> torch.Generator | None:
-    if config.seed is None:
-        return None
-    return torch.Generator(device=config.device).manual_seed(config.seed)
-
-
-def _parse_size(size: str | None) -> tuple[int, int]:
-    if size is None:
-        return 512, 512
-    parts = size.lower().split("x")
-    if len(parts) != 2:
-        raise ValueError(f"Invalid size '{size}'. Expected format 'WIDTHxHEIGHT'.")
-    try:
-        width, height = int(parts[0]), int(parts[1])
-    except ValueError as exc:
-        raise ValueError(
-            f"Invalid size '{size}'. Expected format 'WIDTHxHEIGHT'."
-        ) from exc
-    if width <= 0 or height <= 0:
-        raise ValueError(f"Invalid size '{size}'. Width and height must be positive.")
-    return width, height
-
-
-def _pluck_images(output: Any) -> list[Image.Image]:
-    if isinstance(output, tuple):
-        return list(output[0])
-    return list(output.images)

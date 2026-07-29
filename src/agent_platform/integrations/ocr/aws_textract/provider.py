@@ -9,52 +9,11 @@ from botocore.client import BaseClient
 from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.ocr.base import BaseOCR
-from agent_platform.core.schemas.bounding_box import BoundingBox
 from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.score import Score, ScoreKind
 from agent_platform.integrations.credentials import AWSTextractCredentials
 from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig
+from agent_platform.integrations.ocr.aws_textract.mappers import from_textract
 from agent_platform.integrations.ocr.utils import load_bytes
-
-
-def _from_textract(
-    response: dict[str, Any], document_id: UUID, min_confidence: float
-) -> list[TextChunk]:
-    chunks: list[TextChunk] = []
-
-    for block in response.get("Blocks", []):
-        if block.get("BlockType") != "LINE":
-            continue
-
-        conf = block.get("Confidence", 0) or 0
-        if conf < min_confidence:
-            continue
-
-        text = block.get("Text", "") or ""
-        bbox = block.get("Geometry", {}).get("BoundingBox", {})
-
-        chunks.append(
-            TextChunk(
-                id=uuid4(),
-                document_id=document_id,
-                text=text.strip(),
-                confidence=Score(
-                    value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100
-                ),
-                bbox=BoundingBox(
-                    x=bbox.get("Left", 0.0),
-                    y=bbox.get("Top", 0.0),
-                    width=bbox.get("Width", 0.0),
-                    height=bbox.get("Height", 0.0),
-                    normalized=True,
-                ),
-                metadata={
-                    "page": block.get("Page"),
-                },
-            )
-        )
-
-    return chunks
 
 
 class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
@@ -96,6 +55,6 @@ class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
             Document={"Bytes": document_bytes},
         )
 
-        return _from_textract(
+        return from_textract(
             response, document_id=doc_id, min_confidence=config.min_confidence
         )

@@ -5,10 +5,10 @@ import pytest
 pytest.importorskip("deepgram")
 
 from agent_platform.integrations.credentials import DeepgramCredentials
-from agent_platform.integrations.speech_to_text.deepgram.provider import (
-    DeepgramSTT,
-    _parse_deepgram_result,
+from agent_platform.integrations.speech_to_text.deepgram.mappers import (
+    parse_deepgram_result as _parse_deepgram_result,
 )
+from agent_platform.integrations.speech_to_text.deepgram.provider import DeepgramSTT
 from agent_platform.integrations.speech_to_text.utils import (
     parse_language as _parse_language,
 )

@@ -9,54 +9,12 @@ from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import (
     GoogleVisionCredentials,
 )
 from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
+from agent_platform.integrations.ocr.google_vision.mappers import from_google_vision
 from agent_platform.integrations.ocr.utils import load_bytes
-
-
-def _from_google_vision(
-    response: vision.AnnotateImageResponse, document_id: UUID, min_confidence: float
-) -> list[TextChunk]:
-    chunks: list[TextChunk] = []
-    pages = response.full_text_annotation.pages
-
-    for page_num, page in enumerate(pages):
-        for block in page.blocks:
-            for paragraph in block.paragraphs:
-                words = paragraph.words
-                if not words:
-                    continue
-
-                text = " ".join(
-                    "".join(symbol.text for symbol in word.symbols) for word in words
-                )
-                confs = [
-                    symbol.confidence
-                    for word in words
-                    for symbol in word.symbols
-                    if symbol.confidence
-                ]
-                avg_conf = (sum(confs) / len(confs)) if confs else 0.0
-
-                if avg_conf < min_confidence:
-                    continue
-
-                chunks.append(
-                    TextChunk(
-                        id=uuid4(),
-                        document_id=document_id,
-                        text=text.strip(),
-                        confidence=Score.confidence(avg_conf),
-                        metadata={
-                            "page": page_num,
-                        },
-                    )
-                )
-
-    return chunks
 
 
 class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
@@ -104,6 +62,6 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
         )
         response = await asyncio.to_thread(method, **kwargs)
 
-        return _from_google_vision(
+        return from_google_vision(
             response, document_id=doc_id, min_confidence=config.min_confidence
         )

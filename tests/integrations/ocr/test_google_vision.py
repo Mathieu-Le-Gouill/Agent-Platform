@@ -5,8 +5,8 @@ import pytest
 
 pytest.importorskip("google.cloud")
 
-from agent_platform.integrations.ocr.google_vision.provider import (
-    _from_google_vision,
+from agent_platform.integrations.ocr.google_vision.mappers import (
+    from_google_vision as _from_google_vision,
 )
 
 

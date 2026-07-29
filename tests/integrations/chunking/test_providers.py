@@ -6,10 +6,8 @@ from agent_platform.core.interfaces.chunking.base import BaseChunker
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DocumentFormat
-from agent_platform.integrations.chunking.langchain_base import (
-    LangChainChunker,
-    _doc_to_lc,
-)
+from agent_platform.integrations.chunking.langchain_base import LangChainChunker
+from agent_platform.integrations.chunking.mappers import doc_to_lc as _doc_to_lc
 from agent_platform.integrations.chunking.recursive.config import RecursiveChunkerConfig
 from agent_platform.integrations.chunking.recursive.provider import (
     RecursiveChunkerProvider,

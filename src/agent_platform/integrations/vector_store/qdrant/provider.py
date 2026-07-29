@@ -9,11 +9,14 @@ from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
 from agent_platform.core.schemas.chunk import TextChunk
-from agent_platform.core.schemas.enums import Language
 from agent_platform.core.schemas.score import Score
 from agent_platform.core.schemas.vector import SparseVector
 from agent_platform.integrations.credentials import QdrantCredentials
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
+from agent_platform.integrations.vector_store.qdrant.mappers import (
+    chunk_to_payload,
+    point_to_chunk,
+)
 
 
 class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
@@ -52,7 +55,7 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         client = self._client(config)
         points = [
             models.PointStruct(
-                id=str(doc.id), vector=vector, payload=_chunk_to_payload(doc)
+                id=str(doc.id), vector=vector, payload=chunk_to_payload(doc)
             )
             for doc, vector in zip(documents, vectors)
         ]
@@ -101,7 +104,7 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         )
         return [
             (
-                _point_to_chunk(point),
+                point_to_chunk(point),
                 Score.similarity(min(1.0, max(0.0, point.score))),
             )
             for point in response.points
@@ -125,7 +128,7 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
                         indices=sparse.indices, values=sparse.values
                     ),
                 },
-                payload=_chunk_to_payload(doc),
+                payload=chunk_to_payload(doc),
             )
             for doc, vector, sparse in zip(documents, vectors, sparse_vectors)
         ]
@@ -167,47 +170,8 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         )
         return [
             (
-                _point_to_chunk(point),
+                point_to_chunk(point),
                 Score.similarity(min(1.0, max(0.0, point.score))),
             )
             for point in response.points
         ]
-
-
-# --- Mappers ---
-
-
-def _chunk_to_payload(chunk: TextChunk) -> dict[str, Any]:
-    metadata = chunk.metadata or {}
-    return {
-        "text": chunk.text,
-        "document_id": str(chunk.document_id) if chunk.document_id else None,
-        "index": chunk.index,
-        "start_char": chunk.start_char,
-        "end_char": chunk.end_char,
-        "format": chunk.format.value if chunk.format else None,
-        "source": metadata.get("source"),
-        "language": metadata.get("language"),
-        "extra": metadata.get("extra"),
-    }
-
-
-def _point_to_chunk(point: Any) -> TextChunk:
-    payload = point.payload or {}
-    return TextChunk(
-        id=UUID(str(point.id)),
-        document_id=UUID(payload["document_id"])
-        if payload.get("document_id")
-        else None,
-        text=payload.get("text") or "",
-        index=payload.get("index") or 0,
-        start_char=payload.get("start_char"),
-        end_char=payload.get("end_char"),
-        metadata={
-            "source": payload.get("source"),
-            "language": Language(payload["language"])
-            if payload.get("language")
-            else None,
-            "extra": payload.get("extra") or {},
-        },
-    )
