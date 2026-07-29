@@ -37,7 +37,6 @@ components/
 ├── ocr.py                   # (source, config) → list[TextChunk] (wraps BaseOCR)
 ├── speech_to_text.py        # (AudioChunk, config) → Transcript, plus astream() (wraps BaseSpeechToText)
 ├── vector_search.py         # (vector, k, filter) → list[(TextChunk, Score)] (wraps VectorStore.search_with_scores)
-├── similarity.py            # Vector similarity math helpers (cosine, …), no ABC, used by similarity_scorer.py
 ├── similarity_scorer.py     # Chunks × label vectors → ClassificationResult (pure logic)
 ├── semantic_chunker/        # TextDocument → TextChunk, splits on embedding-similarity breakpoints
 │   ├── component.py

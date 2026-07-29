@@ -3,13 +3,13 @@ from __future__ import annotations
 import re
 from typing import Protocol
 
-from agent_platform.components.similarity import compute_similarity, similarity_bounds
 from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.schemas.enums import SimilarityMetric
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.score import Score
+from agent_platform.core.similarity import compute_similarity, similarity_bounds
 from agent_platform.evals.errors import EvalRunError
 from agent_platform.evals.schemas import EvalCase, EvalOutput
 

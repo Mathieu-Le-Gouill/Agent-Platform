@@ -2,8 +2,8 @@ import math
 
 import pytest
 
-from agent_platform.components.similarity import compute_similarity, similarity_bounds
 from agent_platform.core.schemas.enums import SimilarityMetric
+from agent_platform.core.similarity import compute_similarity, similarity_bounds
 
 
 class TestComputeSimilarity:

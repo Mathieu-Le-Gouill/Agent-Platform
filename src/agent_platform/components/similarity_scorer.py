@@ -3,7 +3,6 @@ from __future__ import annotations
 from collections import defaultdict
 
 from agent_platform.components.base import Component
-from agent_platform.components.similarity import compute_similarity, similarity_bounds
 from agent_platform.core.interfaces.classification.response import (
     ClassificationPrediction,
     ClassificationResult,
@@ -11,6 +10,7 @@ from agent_platform.core.interfaces.classification.response import (
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import SimilarityMetric
 from agent_platform.core.schemas.score import Score
+from agent_platform.core.similarity import compute_similarity, similarity_bounds
 
 
 class SimilarityInput:

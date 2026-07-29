@@ -14,6 +14,7 @@ core/
 ├── credentials.py    # BaseCredentials, ProviderCredentials
 ├── tracing.py        # TracingBackend, TracingConfig, configure_tracing(), traced_span(), mark_span_error()
 ├── genai_tracing.py  # GenAIAttributes, traced_operation_span(), record_token_usage()
+├── similarity.py     # Vector similarity math helpers (compute_similarity, similarity_bounds), used by components/ and evals/
 ├── interfaces/       # ABCs for every capability (the "contract" layer)
 │   ├── llm/
 │   ├── embeddings/

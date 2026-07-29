@@ -51,7 +51,7 @@ Implement the `Scorer` protocol: a `name: str` class attribute plus
 Reuse `core/schemas/score.py::Score` for the result, and if the scorer's
 value range isn't `[0, 1]` (e.g. cosine similarity is `[-1, 1]`), pass
 explicit `low`/`high` bounds, see `EmbeddingSimilarityScorer` for the
-pattern (`components/similarity.py::similarity_bounds`).
+pattern (`core/similarity.py::similarity_bounds`).
 
 ## Adding an Eval Target
 
