@@ -1,56 +1,18 @@
 import opentelemetry.trace as trace_api
 import pytest
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import ConsoleSpanExporter, SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-    InMemorySpanExporter,
-)
+from opentelemetry.sdk.trace.export import ConsoleSpanExporter
 from opentelemetry.trace import StatusCode
-from opentelemetry.util._once import Once
 
 from agent_platform.core import tracing
-from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.tracing import (
-    GenAIAttributes,
     TracingBackend,
     TracingConfig,
     _otlp_endpoint_configured,
     _resolve_exporter,
     configure_tracing,
-    record_token_usage,
-    traced_operation_span,
+    mark_span_error,
     traced_span,
 )
-
-
-@pytest.fixture
-def recorded_spans(monkeypatch):
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = provider.get_tracer("test")
-    monkeypatch.setattr(tracing, "get_tracer", lambda: tracer)
-    return exporter
-
-
-@pytest.fixture
-def isolated_global_provider(monkeypatch):
-    """Reset OpenTelemetry's process-global tracer provider for one test.
-
-    `trace.set_tracer_provider` only ever takes effect once per process, so
-    tests that actually install a provider (rather than monkeypatching
-    `get_tracer` directly) need their own clean slate.
-    """
-    monkeypatch.setattr(trace_api, "_TRACER_PROVIDER", None)
-    monkeypatch.setattr(trace_api, "_TRACER_PROVIDER_SET_ONCE", Once())
-    monkeypatch.setattr(tracing, "_configured", False)
-
-
-@pytest.fixture(autouse=True)
-def clear_otlp_env(monkeypatch):
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_ENDPOINT", raising=False)
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_TRACES_ENDPOINT", raising=False)
-    monkeypatch.delenv("OTEL_EXPORTER_OTLP_PROTOCOL", raising=False)
 
 
 class TestTracingConfigFromEnv:
@@ -171,20 +133,20 @@ class TestConfigureTracing:
 
 class TestTracedSpan:
     def test_records_name_and_attributes(self, recorded_spans):
-        with traced_span("execute_tool", **{GenAIAttributes.TOOL_NAME: "search"}):
+        with traced_span("execute_tool", {"gen_ai.tool.name": "search"}):
             pass
 
         (span,) = recorded_spans.get_finished_spans()
         assert span.name == "execute_tool"
-        assert span.attributes[GenAIAttributes.TOOL_NAME] == "search"
+        assert span.attributes["gen_ai.tool.name"] == "search"
         assert span.status.status_code == StatusCode.UNSET
 
     def test_skips_none_attributes(self, recorded_spans):
-        with traced_span("chat", **{GenAIAttributes.REQUEST_MODEL: None}):
+        with traced_span("chat", {"gen_ai.request.model": None}):
             pass
 
         (span,) = recorded_spans.get_finished_spans()
-        assert GenAIAttributes.REQUEST_MODEL not in span.attributes
+        assert "gen_ai.request.model" not in span.attributes
 
     def test_records_exception_and_reraises(self, recorded_spans):
         with pytest.raises(ValueError):
@@ -196,35 +158,21 @@ class TestTracedSpan:
         assert span.events[0].name == "exception"
 
 
-class TestRecordTokenUsage:
-    def test_sets_usage_attributes(self, recorded_spans):
+class TestMarkSpanError:
+    def test_records_exception_by_default(self, recorded_spans):
         with traced_span("chat") as span:
-            record_token_usage(span, TokenUsage(input_tokens=12, output_tokens=34))
+            mark_span_error(span, ValueError("boom"))
 
         (span,) = recorded_spans.get_finished_spans()
-        assert span.attributes[GenAIAttributes.USAGE_INPUT_TOKENS] == 12
-        assert span.attributes[GenAIAttributes.USAGE_OUTPUT_TOKENS] == 34
+        assert span.attributes["error.type"] == "ValueError"
+        assert span.status.status_code == StatusCode.ERROR
+        assert span.events[0].name == "exception"
 
-
-class TestTracedOperationSpan:
-    def test_names_span_after_operation(self, recorded_spans):
-        with traced_operation_span("chat"):
-            pass
-
-        (span,) = recorded_spans.get_finished_spans()
-        assert span.name == "chat"
-
-    def test_sets_operation_name_attribute(self, recorded_spans):
-        with traced_operation_span("execute_tool"):
-            pass
+    def test_skips_record_exception_when_disabled(self, recorded_spans):
+        with traced_span("execute_tool") as span:
+            mark_span_error(span, ValueError("boom"), record_exception=False)
 
         (span,) = recorded_spans.get_finished_spans()
-        assert span.attributes[GenAIAttributes.OPERATION_NAME] == "execute_tool"
-
-    def test_merges_extra_attributes(self, recorded_spans):
-        with traced_operation_span("chat", **{GenAIAttributes.REQUEST_MODEL: "gpt-4"}):
-            pass
-
-        (span,) = recorded_spans.get_finished_spans()
-        assert span.attributes[GenAIAttributes.OPERATION_NAME] == "chat"
-        assert span.attributes[GenAIAttributes.REQUEST_MODEL] == "gpt-4"
+        assert span.attributes["error.type"] == "ValueError"
+        assert span.status.status_code == StatusCode.ERROR
+        assert len(span.events) == 0

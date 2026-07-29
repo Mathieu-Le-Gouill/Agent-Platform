@@ -5,7 +5,7 @@ import logging
 import time
 from uuid import UUID, uuid4
 
-from agent_platform.core.tracing import traced_operation_span
+from agent_platform.core.genai_tracing import traced_operation_span
 from agent_platform.evals.dataset import EvalDataset
 from agent_platform.evals.schemas import EvalCase, EvalReport, EvalResult
 from agent_platform.evals.scorer import Scorer
@@ -41,7 +41,7 @@ class EvalRunner:
     async def _run_case(self, run_id: UUID, case: EvalCase) -> EvalResult:
         with traced_operation_span(
             "eval_case",
-            **{_EVAL_RUN_ID_ATTR: str(run_id), _EVAL_CASE_ID_ATTR: case.id},
+            {_EVAL_RUN_ID_ATTR: str(run_id), _EVAL_CASE_ID_ATTR: case.id},
         ):
             try:
                 start = time.monotonic()

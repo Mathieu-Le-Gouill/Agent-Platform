@@ -5,8 +5,8 @@ from collections.abc import AsyncIterator
 from agent_platform.agents.agent import Agent
 from agent_platform.agents.errors import AgentMaxIterations
 from agent_platform.agents.tools.base import ToolStreamChunk
+from agent_platform.core.genai_tracing import GenAIAttributes, traced_operation_span
 from agent_platform.core.schemas.message import Message, ToolMessage, UserMessage
-from agent_platform.core.tracing import GenAIAttributes, traced_operation_span
 
 
 class AgentExecutor:
@@ -40,7 +40,7 @@ class AgentExecutor:
 
     async def _execute(self, messages: list[Message]) -> tuple[str, list[Message]]:
         with traced_operation_span(
-            "invoke_agent", **{GenAIAttributes.AGENT_NAME: self._agent.name}
+            "invoke_agent", {GenAIAttributes.AGENT_NAME: self._agent.name}
         ):
             for _ in range(self._max_iterations):
                 assistant_msg = await self._agent.think(messages)
@@ -63,7 +63,7 @@ class AgentExecutor:
         messages: list[Message] = [UserMessage(content=user_input)]
 
         with traced_operation_span(
-            "invoke_agent", **{GenAIAttributes.AGENT_NAME: self._agent.name}
+            "invoke_agent", {GenAIAttributes.AGENT_NAME: self._agent.name}
         ):
             for _ in range(self._max_iterations):
                 assistant_msg = await self._agent.think(messages)

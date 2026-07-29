@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import os
 import threading
-from collections.abc import Iterator
-from contextlib import AbstractContextManager, contextmanager
+from collections.abc import Iterator, Mapping
+from contextlib import contextmanager
 from enum import StrEnum
 from typing import TYPE_CHECKING, Any
 
@@ -11,49 +11,22 @@ from opentelemetry import trace
 from opentelemetry.trace import ProxyTracerProvider, Span, Status, StatusCode
 from pydantic import BaseModel
 
-from agent_platform.core.schemas.token import TokenUsage
-
 if TYPE_CHECKING:
     from opentelemetry.sdk.trace.export import SpanExporter
 
 __all__ = [
-    "GenAIAttributes",
     "TracingBackend",
     "TracingConfig",
     "configure_tracing",
     "get_tracer",
-    "record_token_usage",
-    "traced_operation_span",
+    "mark_span_error",
     "traced_span",
 ]
 
 _TRACER_NAME = "agent_platform"
 _configure_lock = threading.Lock()
 _configured = False
-
-
-class GenAIAttributes:
-    """OTel GenAI semantic-convention attribute keys.
-
-    https://github.com/open-telemetry/semantic-conventions-genai (the gen-ai
-    conventions moved out of the main semantic-conventions repo; the old
-    opentelemetry.io/docs/specs/semconv/gen-ai/ page just redirects there
-    now) - kept as constants so every call site (agent loop, tool calls, LLM
-    calls, and whatever gets instrumented next: embeddings, reranking, ...)
-    spells them identically. All `gen_ai.*` keys below are still
-    "Development" stability, so upstream can rename them again.
-    """
-
-    OPERATION_NAME = "gen_ai.operation.name"
-    PROVIDER_NAME = "gen_ai.provider.name"
-    REQUEST_MODEL = "gen_ai.request.model"
-    AGENT_NAME = "gen_ai.agent.name"
-    TOOL_NAME = "gen_ai.tool.name"
-    TOOL_CALL_ID = "gen_ai.tool.call.id"
-    BATCH_ID = "gen_ai.batch.id"
-    USAGE_INPUT_TOKENS = "gen_ai.usage.input_tokens"
-    USAGE_OUTPUT_TOKENS = "gen_ai.usage.output_tokens"
-    ERROR_TYPE = "error.type"
+_ERROR_TYPE_ATTR = "error.type"
 
 
 class TracingBackend(StrEnum):
@@ -201,7 +174,9 @@ def get_tracer() -> trace.Tracer:
 
 
 @contextmanager
-def traced_span(name: str, /, **attributes: Any) -> Iterator[Span]:
+def traced_span(
+    name: str, /, attributes: Mapping[str, Any] | None = None
+) -> Iterator[Span]:
     """Start a span named `name` with `attributes`, recording latency and errors.
 
     Safe to use unconditionally: when tracing hasn't been configured (or the
@@ -209,31 +184,27 @@ def traced_span(name: str, /, **attributes: Any) -> Iterator[Span]:
     no-op, so this becomes a cheap pass-through.
     """
     with get_tracer().start_as_current_span(name) as span:
-        for key, value in attributes.items():
+        for key, value in (attributes or {}).items():
             if value is not None:
                 span.set_attribute(key, value)
         try:
             yield span
         except Exception as exc:
-            span.record_exception(exc)
-            span.set_status(Status(StatusCode.ERROR, str(exc)))
+            mark_span_error(span, exc)
             raise
 
 
-def record_token_usage(span: Span, usage: TokenUsage) -> None:
-    """Record `usage` on `span` using the GenAI token-usage attribute keys."""
-    span.set_attribute(GenAIAttributes.USAGE_INPUT_TOKENS, usage.input_tokens)
-    span.set_attribute(GenAIAttributes.USAGE_OUTPUT_TOKENS, usage.output_tokens)
+def mark_span_error(
+    span: Span, exc: Exception, *, record_exception: bool = True
+) -> None:
+    """Tag `span` as failed using OTel's error-status conventions.
 
-
-def traced_operation_span(
-    operation: str, /, **attributes: Any
-) -> AbstractContextManager[Span]:
-    """`traced_span` for a GenAI operation: names the span `operation` and sets
-    `gen_ai.operation.name` to match, since every current call site (`chat`,
-    `invoke_agent`, `execute_tool`) needs that pairing and any future one
-    (embeddings, reranking, ...) will too.
+    Shared by `traced_span`'s automatic handling of propagating exceptions
+    and call sites that catch an error without re-raising (e.g. tool calls
+    swallowed into a `ToolResult`), which pass `record_exception=False`
+    since the exception object itself never leaves that call site.
     """
-    return traced_span(
-        operation, **{GenAIAttributes.OPERATION_NAME: operation, **attributes}
-    )
+    span.set_attribute(_ERROR_TYPE_ATTR, type(exc).__qualname__)
+    if record_exception:
+        span.record_exception(exc)
+    span.set_status(Status(StatusCode.ERROR, str(exc)))

@@ -28,7 +28,7 @@
 
 ### `core/`: Foundation
 
-Near-zero external dependencies. Everything here is pure Python, `pydantic`, `abc`, `typing`, `uuid`, `datetime`, with one exception: `core/tracing.py` depends on `opentelemetry-api` (always installed, lightweight; a no-op unless the optional `tracing` extra + an OTLP endpoint are configured).
+Near-zero external dependencies. Everything here is pure Python, `pydantic`, `abc`, `typing`, `uuid`, `datetime`, with one exception: `core/tracing.py`/`core/genai_tracing.py` depend on `opentelemetry-api` (always installed, lightweight; a no-op unless the optional `tracing` extra + an OTLP endpoint are configured).
 
 | Path | Contents |
 |---|---|
@@ -36,7 +36,8 @@ Near-zero external dependencies. Everything here is pure Python, `pydantic`, `ab
 | `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends; `ModelConfig`, a `ProviderConfig` subclass adding `model: str` for model-backed domains (llm, embeddings, reranking, speech, image_generation) |
 | `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
 | `core/credentials.py` | `BaseCredentials`, `ProviderCredentials` |
-| `core/tracing.py` | Vendor-agnostic OpenTelemetry tracing: `TracingBackend`, `TracingConfig`, `configure_tracing()`, `traced_span()`/`traced_operation_span()`, `record_token_usage()`, `GenAIAttributes` |
+| `core/tracing.py` | Vendor-agnostic OpenTelemetry tracing: `TracingBackend`, `TracingConfig`, `configure_tracing()`, `traced_span()`, `mark_span_error()` |
+| `core/genai_tracing.py` | GenAI semantic-convention layer on top of `core/tracing.py`: `traced_operation_span()`, `record_token_usage()`, `GenAIAttributes` |
 | `core/interfaces/<domain>/` | ABCs for every capability (llm, embeddings, vad, ocr, vector_store, reranking, chunking, speech, translation, clustering, classification, loader, image_generation) |
 | `core/schemas/` | Shared Pydantic v2 data models used across all layers |
 

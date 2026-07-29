@@ -8,6 +8,7 @@ from mistralai.models import ChatCompletionResponse
 
 from agent_platform.core.credentials import resolve_credentials, resolve_timeout
 from agent_platform.core.errors import require_secret
+from agent_platform.core.genai_tracing import record_token_usage
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -17,7 +18,6 @@ from agent_platform.core.interfaces.llm.response import (
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import record_token_usage
 from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig

@@ -2,7 +2,7 @@
 
 ## Design
 
-`core/` is the **near-zero-dependency foundation** of the platform. It defines everything that does not depend on an external library, pure Python ABCs, Pydantic schemas, enums, and error types, plus `tracing.py`, whose one exception is depending on the lightweight `opentelemetry-api` (always installed; a no-op unless the optional `tracing` extra and an OTLP endpoint are configured). No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
+`core/` is the **near-zero-dependency foundation** of the platform. It defines everything that does not depend on an external library, pure Python ABCs, Pydantic schemas, enums, and error types, plus `tracing.py`/`genai_tracing.py`, whose one exception is depending on the lightweight `opentelemetry-api` (always installed; a no-op unless the optional `tracing` extra and an OTLP endpoint are configured). No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
 
 ## Directory Layout
 
@@ -12,7 +12,8 @@ core/
 ├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains)
 ├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
 ├── credentials.py    # BaseCredentials, ProviderCredentials
-├── tracing.py        # TracingBackend, TracingConfig, configure_tracing(), traced_span()/traced_operation_span(), record_token_usage(), GenAIAttributes
+├── tracing.py        # TracingBackend, TracingConfig, configure_tracing(), traced_span(), mark_span_error()
+├── genai_tracing.py  # GenAIAttributes, traced_operation_span(), record_token_usage()
 ├── interfaces/       # ABCs for every capability (the "contract" layer)
 │   ├── llm/
 │   ├── embeddings/
@@ -81,11 +82,15 @@ Every error carries `code`, `retryable`, and `context` fields.
 
 ### `tracing.py`: Vendor-Agnostic Observability
 
-Contains zero vendor-specific code: it only knows OpenTelemetry primitives, `TracingBackend` is `AUTO` (default, exports over OTLP whenever `OTEL_EXPORTER_OTLP_ENDPOINT`/`_TRACES_ENDPOINT` is set, otherwise a safe no-op), `NONE` (force-disabled), or `CONSOLE` (stdout, for local debugging). `configure_tracing()` is called once at process startup (`api/app.py`) to install a `TracerProvider`; it defers to any provider already installed by something else (`opentelemetry-instrument`, an APM agent, the host application) instead of overwriting it, and accepts an `exporter=` override for backends with no standard OTLP path.
+Contains zero vendor-specific code and zero GenAI-specific code: it only knows OpenTelemetry primitives, `TracingBackend` is `AUTO` (default, exports over OTLP whenever `OTEL_EXPORTER_OTLP_ENDPOINT`/`_TRACES_ENDPOINT` is set, otherwise a safe no-op), `NONE` (force-disabled), or `CONSOLE` (stdout, for local debugging). `configure_tracing()` is called once at process startup (`api/app.py`) to install a `TracerProvider`; it defers to any provider already installed by something else (`opentelemetry-instrument`, an APM agent, the host application) instead of overwriting it, and accepts an `exporter=` override for backends with no standard OTLP path.
 
-`traced_operation_span(operation, **attributes)` (a thin wrapper over `traced_span()`) is what every instrumented call site uses, it names the span after `operation` and sets `gen_ai.operation.name` to match. `GenAIAttributes` centralizes the `gen_ai.*` semantic-convention attribute keys so every call site (and any future one, embeddings, reranking, ...) spells them identically; `record_token_usage(span, usage)` records token counts the same way everywhere. Latency is captured automatically as span duration, no manual timing anywhere. Currently wired into the agent loop (`agents/executor.py`), tool calls (`agents/tools/registry.py`), and LLM calls (each `integrations/llm/<provider>/provider.py`).
+`traced_span(name, attributes=None)` is the generic context manager every span-producing call site is built on: it records latency as span duration automatically and, on a propagating exception, calls `mark_span_error(span, exc)`. `mark_span_error(span, exc, *, record_exception=True)` sets the OTel error-status attributes by hand; pass `record_exception=False` for call sites that catch and swallow an error (rather than re-raise it) but still need the span tagged as failed, e.g. tool calls in `agents/tools/registry.py`.
 
 Vendor endpoint/auth recipes (LangSmith, Langfuse, ...) live in `integrations/README.md` as env var snippets, not in this module, any OTLP-speaking backend works via the same `AUTO` path.
+
+### `genai_tracing.py`: GenAI Semantic Conventions
+
+Paired with `tracing.py`, this is where GenAI-specific knowledge lives. `traced_operation_span(operation, attributes=None)` (a thin wrapper over `traced_span()`) is what every instrumented call site uses, it names the span after `operation` and sets `gen_ai.operation.name` to match. `GenAIAttributes` centralizes the `gen_ai.*` semantic-convention attribute keys so every call site (and any future one, embeddings, reranking, ...) spells them identically; `record_token_usage(span, usage)` records token counts the same way everywhere. Currently wired into the agent loop (`agents/executor.py`), tool calls (`agents/tools/registry.py`), and LLM calls (each `integrations/llm/<provider>/provider.py`).
 
 ## How to Extend
 
@@ -125,5 +130,5 @@ core/interfaces/<new_domain>/
 ## Constraints
 
 - **No imports from `integrations/`, `components/`, `pipelines/`, or `agents/`**
-- **No external library imports** (no langchain, no openai, no numpy, etc.), only `pydantic`, `abc`, `typing`, `uuid`, `datetime`, and `opentelemetry-api` (used only by `tracing.py`)
+- **No external library imports** (no langchain, no openai, no numpy, etc.), only `pydantic`, `abc`, `typing`, `uuid`, `datetime`, and `opentelemetry-api` (used only by `tracing.py`/`genai_tracing.py`)
 - ABCs use `Generic` TypeVars for type safety where appropriate

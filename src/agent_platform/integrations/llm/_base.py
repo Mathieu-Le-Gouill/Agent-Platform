@@ -18,14 +18,14 @@ from agent_platform.core.errors import (
     require_secret,
     with_retry,
 )
-from agent_platform.core.interfaces.llm.base import BaseLLMProvider, GenerationConfigT
-from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
-from agent_platform.core.schemas.message import Prompt
-from agent_platform.core.tracing import (
+from agent_platform.core.genai_tracing import (
     GenAIAttributes,
     record_token_usage,
     traced_operation_span,
 )
+from agent_platform.core.interfaces.llm.base import BaseLLMProvider, GenerationConfigT
+from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
+from agent_platform.core.schemas.message import Prompt
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
@@ -72,7 +72,7 @@ class NativeLLMProvider(
     def _span(self, config: GenerationConfigT) -> AbstractContextManager[Span]:
         return traced_operation_span(
             "chat",
-            **{
+            {
                 GenAIAttributes.PROVIDER_NAME: self._provider_name,
                 GenAIAttributes.REQUEST_MODEL: self._model_name(config),
             },

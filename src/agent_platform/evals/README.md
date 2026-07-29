@@ -40,7 +40,7 @@ and recorded as a failed `EvalResult` (`error` set, `passed=False`) rather
 than aborting the run, the same pattern `ToolRegistry.call_and_wrap`
 (`agents/tools/registry.py`) already uses for tool calls. Cases run
 concurrently, bounded by `EvalRunner(concurrency=...)`, and each is wrapped
-in a `traced_operation_span("eval_case", ...)` (`core/tracing.py`) tagged
+in a `traced_operation_span("eval_case", ...)` (`core/genai_tracing.py`) tagged
 with `agent_platform.eval.run_id`/`agent_platform.eval.case_id`, so a
 failing case is debuggable through the existing OTel pipeline.
 

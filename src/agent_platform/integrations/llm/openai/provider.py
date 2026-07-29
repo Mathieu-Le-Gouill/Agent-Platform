@@ -9,6 +9,11 @@ from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
 from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.genai_tracing import (
+    GenAIAttributes,
+    record_token_usage,
+    traced_operation_span,
+)
 from agent_platform.core.interfaces.llm.batch import (
     BaseBatchLLMProvider,
     BatchJob,
@@ -24,11 +29,6 @@ from agent_platform.core.interfaces.llm.response import (
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import (
-    GenAIAttributes,
-    record_token_usage,
-    traced_operation_span,
-)
 from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
@@ -196,7 +196,7 @@ class OpenAILLM(
             )
 
         with traced_operation_span(
-            "llm_batch_submit", **{GenAIAttributes.PROVIDER_NAME: self._provider_name}
+            "llm_batch_submit", {GenAIAttributes.PROVIDER_NAME: self._provider_name}
         ):
             uploaded = await client.files.create(
                 file=("batch.jsonl", "\n".join(lines).encode()),
@@ -215,7 +215,7 @@ class OpenAILLM(
         client = self._async_client(self._default_config())
         with traced_operation_span(
             "llm_batch_status",
-            **{
+            {
                 GenAIAttributes.PROVIDER_NAME: self._provider_name,
                 GenAIAttributes.BATCH_ID: batch_id,
             },
@@ -229,7 +229,7 @@ class OpenAILLM(
         client = self._async_client(self._default_config())
         with traced_operation_span(
             "llm_batch_results",
-            **{
+            {
                 GenAIAttributes.PROVIDER_NAME: self._provider_name,
                 GenAIAttributes.BATCH_ID: batch_id,
             },
