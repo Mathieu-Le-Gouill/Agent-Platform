@@ -9,7 +9,6 @@ class TestVADConfig:
     def test_defaults(self):
         cfg = VADConfig()
         assert cfg.sample_rate == 16000
-        assert cfg.max_samples == 80_000
         assert cfg.speech_pad_ms == 30
         assert cfg.min_silence_duration_ms == 100
         assert cfg.min_speech_duration_ms == 250
@@ -17,25 +16,18 @@ class TestVADConfig:
     def test_custom_values(self):
         cfg = VADConfig(
             sample_rate=8000,
-            max_samples=100,
             speech_pad_ms=50,
             min_silence_duration_ms=200,
             min_speech_duration_ms=500,
         )
         assert cfg.sample_rate == 8000
-        assert cfg.max_samples == 100
         assert cfg.speech_pad_ms == 50
         assert cfg.min_silence_duration_ms == 200
         assert cfg.min_speech_duration_ms == 500
 
     def test_accepts_all_positive_values(self):
-        cfg = VADConfig(sample_rate=16000, max_samples=50)
+        cfg = VADConfig(sample_rate=16000)
         assert cfg.sample_rate == 16000
-        assert cfg.max_samples == 50
-
-    def test_max_samples_default_covers_several_seconds_at_16khz(self):
-        cfg = VADConfig()
-        assert cfg.max_samples / cfg.sample_rate >= 1.0
 
 
 class TestSileroVadConfig:
@@ -56,6 +48,15 @@ class TestSileroVadConfig:
     def test_custom_max_speech_duration_s(self):
         cfg = SileroVadConfig(max_speech_duration_s=30.0)
         assert cfg.max_speech_duration_s == 30.0
+
+    def test_max_samples_default_covers_several_seconds_at_16khz(self):
+        cfg = SileroVadConfig()
+        assert cfg.max_samples == 80_000
+        assert cfg.max_samples / cfg.sample_rate >= 1.0
+
+    def test_custom_max_samples(self):
+        cfg = SileroVadConfig(max_samples=50)
+        assert cfg.max_samples == 50
 
 
 class TestWebrtcVadConfig:
