@@ -7,8 +7,12 @@ from typing import TYPE_CHECKING, Any, cast
 from openai import AsyncOpenAI, AsyncStream, OpenAI
 from openai.types.chat import ChatCompletion, ChatCompletionChunk
 
-from agent_platform.core.credentials import resolve_credentials
-from agent_platform.core.errors import ProviderError, error_logged
+from agent_platform.core.credentials import (
+    resolve_credentials,
+    resolve_max_retries,
+    resolve_timeout,
+)
+from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.genai_tracing import (
     GenAIAttributes,
     record_token_usage,
@@ -67,6 +71,20 @@ class OpenAILLM(
 
     def _default_config(self) -> OpenAIGenerationConfig:
         return OpenAIGenerationConfig()
+
+    def _client_kwargs(self, config: OpenAIGenerationConfig) -> dict[str, Any]:
+        api_key = require_secret(
+            self._credentials.api_key, self._missing_api_key_message
+        )
+        kwargs: dict[str, Any] = {
+            "api_key": api_key.get_secret_value(),
+            "base_url": self._credentials.base_url,
+            "max_retries": resolve_max_retries(config.max_retries, self._credentials),
+        }
+        timeout = resolve_timeout(config.timeout, self._credentials)
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return kwargs
 
     def _async_client(self, config: OpenAIGenerationConfig) -> AsyncOpenAI:
         return AsyncOpenAI(**self._client_kwargs(config))

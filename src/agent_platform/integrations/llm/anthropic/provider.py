@@ -6,8 +6,12 @@ from typing import TYPE_CHECKING, Any, cast
 from anthropic import Anthropic, AsyncAnthropic, AsyncStream
 from anthropic.types import Message, RawMessageStreamEvent
 
-from agent_platform.core.credentials import resolve_credentials
-from agent_platform.core.errors import ProviderError, error_logged
+from agent_platform.core.credentials import (
+    resolve_credentials,
+    resolve_max_retries,
+    resolve_timeout,
+)
+from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.genai_tracing import (
     GenAIAttributes,
     record_token_usage,
@@ -62,6 +66,20 @@ class AnthropicLLM(
 
     def _default_config(self) -> AnthropicGenerationConfig:
         return AnthropicGenerationConfig()
+
+    def _client_kwargs(self, config: AnthropicGenerationConfig) -> dict[str, Any]:
+        api_key = require_secret(
+            self._credentials.api_key, self._missing_api_key_message
+        )
+        kwargs: dict[str, Any] = {
+            "api_key": api_key.get_secret_value(),
+            "base_url": self._credentials.base_url,
+            "max_retries": resolve_max_retries(config.max_retries, self._credentials),
+        }
+        timeout = resolve_timeout(config.timeout, self._credentials)
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return kwargs
 
     def _async_client(self, config: AnthropicGenerationConfig) -> AsyncAnthropic:
         return AsyncAnthropic(**self._client_kwargs(config))

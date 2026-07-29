@@ -3,16 +3,12 @@ from __future__ import annotations
 from abc import abstractmethod
 from collections.abc import AsyncIterator
 from contextlib import AbstractContextManager
-from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
+from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar, cast
 
 from opentelemetry.trace import Span
 
-from agent_platform.core.credentials import (
-    ProviderCredentials,
-    resolve_max_retries,
-    resolve_timeout,
-)
-from agent_platform.core.errors import ProviderError, error_logged, require_secret
+from agent_platform.core.credentials import ProviderCredentials
+from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.genai_tracing import (
     GenAIAttributes,
     record_token_usage,
@@ -73,20 +69,6 @@ class NativeLLMProvider(
                 GenAIAttributes.REQUEST_MODEL: self._model_name(config),
             },
         )
-
-    def _client_kwargs(self, config: GenerationConfigT) -> dict[str, Any]:
-        api_key = require_secret(
-            self._credentials.api_key, self._missing_api_key_message
-        )
-        kwargs: dict[str, Any] = {
-            "api_key": api_key.get_secret_value(),
-            "base_url": self._credentials.base_url,
-            "max_retries": resolve_max_retries(config.max_retries, self._credentials),
-        }
-        timeout = resolve_timeout(config.timeout, self._credentials)
-        if timeout is not None:
-            kwargs["timeout"] = timeout
-        return kwargs
 
     @abstractmethod
     def _async_client(self, config: GenerationConfigT) -> AsyncClientT: ...
