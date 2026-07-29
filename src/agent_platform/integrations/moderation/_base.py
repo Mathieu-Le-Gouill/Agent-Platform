@@ -3,10 +3,11 @@ from __future__ import annotations
 from abc import abstractmethod
 from typing import Generic, TypeVar, cast
 
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.interfaces.moderation.base import BaseModerationProvider
 from agent_platform.core.interfaces.moderation.config import ModerationConfig
 from agent_platform.core.interfaces.moderation.response import ModerationResult
+from agent_platform.core.retry import with_retry
 
 ConfigT = TypeVar("ConfigT", bound=ModerationConfig)
 # The async client (e.g. `AsyncOpenAI`), used by `amoderate`/`_invoke_async`.

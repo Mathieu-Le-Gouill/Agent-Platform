@@ -4,8 +4,9 @@ import asyncio
 from abc import abstractmethod
 from typing import Generic, TypeVar
 
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.interfaces.translation.base import BaseTranslator, ConfigT
+from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
 

@@ -4,13 +4,9 @@ import asyncio
 from collections.abc import AsyncIterator
 
 from agent_platform.core.credentials import resolve_credentials
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
+from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
+from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.integrations.credentials import DeepgramCredentials

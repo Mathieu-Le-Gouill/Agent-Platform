@@ -7,8 +7,9 @@ import boto3
 from botocore.client import BaseClient
 
 from agent_platform.core.credentials import resolve_credentials
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.interfaces.ocr.base import BaseOCR
+from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.credentials import AWSTextractCredentials
 from agent_platform.integrations.ocr.aws_textract.config import AWSTextractConfig

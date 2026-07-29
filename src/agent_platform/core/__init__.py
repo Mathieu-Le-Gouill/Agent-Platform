@@ -10,8 +10,8 @@ from agent_platform.core.errors import (
     ValidationError,
     catch_noraise,
     error_logged,
-    with_retry,
 )
+from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas import (
     AssistantMessage,
     AudioBlock,

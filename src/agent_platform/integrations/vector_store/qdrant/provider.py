@@ -6,8 +6,9 @@ from uuid import UUID
 from qdrant_client import AsyncQdrantClient, models
 
 from agent_platform.core.credentials import resolve_credentials
-from agent_platform.core.errors import ProviderError, error_logged, with_retry
+from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
+from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 from agent_platform.core.schemas.vector import SparseVector

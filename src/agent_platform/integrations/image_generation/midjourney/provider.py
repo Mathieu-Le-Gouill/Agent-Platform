@@ -5,13 +5,9 @@ from typing import Any
 import httpx
 
 from agent_platform.core.credentials import resolve_credentials
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
+from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
+from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.document import DocumentMetadata, ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat
 from agent_platform.integrations.credentials import MidjourneyCredentials

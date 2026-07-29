@@ -12,12 +12,7 @@ from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
 )
-from agent_platform.core.errors import (
-    ProviderError,
-    error_logged,
-    require_secret,
-    with_retry,
-)
+from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.genai_tracing import (
     GenAIAttributes,
     record_token_usage,
@@ -25,6 +20,7 @@ from agent_platform.core.genai_tracing import (
 )
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider, GenerationConfigT
 from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
+from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.message import Prompt
 
 if TYPE_CHECKING:
