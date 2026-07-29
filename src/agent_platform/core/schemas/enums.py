@@ -3,6 +3,8 @@ from __future__ import annotations
 from enum import Enum, StrEnum
 from pathlib import Path
 
+# --- Media type ---
+
 
 class MediaType(StrEnum):
     TEXT = "text"
@@ -10,6 +12,9 @@ class MediaType(StrEnum):
     AUDIO = "audio"
     VIDEO = "video"
     UNKNOWN = "unknown"
+
+
+# --- Format enums ---
 
 
 class DocumentFormat(StrEnum):
@@ -55,11 +60,17 @@ class VideoFormat(StrEnum):
     UNKNOWN = "unknown"
 
 
+# --- Data type ---
+
+
 class DataType(StrEnum):
     INT16 = "int16"
     FLOAT32 = "float32"
     INT8 = "int8"
     UINT8 = "uint8"
+
+
+# --- Language ---
 
 
 class Language(StrEnum):
@@ -91,8 +102,11 @@ _MIME_TO_FORMAT: dict[str, FileFormat] = {}
 _FORMAT_BY_EXTENSION: dict[str, FileFormat] = {}
 
 
+# --- File format ---
+
+
 class FileFormat(Enum):
-    # ----- Text -----
+    # Text
     PDF = (DocumentFormat.PDF, MediaType.TEXT)
     MARKDOWN = (DocumentFormat.MARKDOWN, MediaType.TEXT)
     HTML = (DocumentFormat.HTML, MediaType.TEXT)
@@ -104,7 +118,7 @@ class FileFormat(Enum):
     XLSX = (DocumentFormat.XLSX, MediaType.TEXT)
     PPTX = (DocumentFormat.PPTX, MediaType.TEXT)
 
-    # ----- Images -----
+    # Images
     JPEG = (ImageFormat.JPEG, MediaType.IMAGE)
     PNG = (ImageFormat.PNG, MediaType.IMAGE)
     WEBP = (ImageFormat.WEBP, MediaType.IMAGE)
@@ -112,7 +126,7 @@ class FileFormat(Enum):
     BMP = (ImageFormat.BMP, MediaType.IMAGE)
     TIFF = (ImageFormat.TIFF, MediaType.IMAGE)
 
-    # ----- Audio -----
+    # Audio
     MP3 = (AudioFormat.MP3, MediaType.AUDIO)
     WAV = (AudioFormat.WAV, MediaType.AUDIO)
     FLAC = (AudioFormat.FLAC, MediaType.AUDIO)
@@ -120,7 +134,7 @@ class FileFormat(Enum):
     M4A = (AudioFormat.M4A, MediaType.AUDIO)
     OGG = (AudioFormat.OGG, MediaType.AUDIO)
 
-    # ----- Video -----
+    # Video
     MP4 = (VideoFormat.MP4, MediaType.VIDEO)
     MOV = (VideoFormat.MOV, MediaType.VIDEO)
     AVI = (VideoFormat.AVI, MediaType.VIDEO)
@@ -170,6 +184,7 @@ class FileFormat(Enum):
 
 
 # --- Lookup tables ---
+
 
 _MIME_TO_FORMAT.update(
     {
@@ -252,11 +267,17 @@ _FORMAT_BY_EXTENSION.update(
 )
 
 
+# --- Similarity ---
+
+
 class SimilarityMetric(StrEnum):
     COSINE = "cosine"
     DOT = "dot"
     EUCLIDEAN = "euclidean"
     MANHATTAN = "manhattan"
+
+
+# --- LLM ---
 
 
 class FinishReason(StrEnum):

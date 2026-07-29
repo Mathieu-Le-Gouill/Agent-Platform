@@ -17,6 +17,8 @@ from agent_platform.core.schemas.enums import (
     VideoFormat,
 )
 
+# --- Metadata ---
+
 
 class DocumentMetadata(BaseModel, frozen=True):
     title: str | None = None
@@ -27,10 +29,16 @@ class DocumentMetadata(BaseModel, frozen=True):
     extra: dict[str, Any] = Field(default_factory=dict)
 
 
+# --- Base document ---
+
+
 class Document(Entity, frozen=True):
     media_type: MediaType
     source: str = ""
     metadata: DocumentMetadata = Field(default_factory=DocumentMetadata)
+
+
+# --- Text ---
 
 
 class TextDocument(Document, frozen=True):
@@ -43,6 +51,9 @@ class TextDocument(Document, frozen=True):
     word_count: int | None = None
     line_count: int | None = None
     page_count: int | None = None
+
+
+# --- Image ---
 
 
 class ImageDocument(Document, frozen=True):
@@ -94,6 +105,9 @@ class ImageDocument(Document, frozen=True):
                 f.write(self.content)
 
 
+# --- Audio ---
+
+
 class AudioDocument(Document, frozen=True):
     media_type: MediaType = MediaType.AUDIO
     content: bytes = b""
@@ -134,6 +148,9 @@ class AudioDocument(Document, frozen=True):
             arr = arr.reshape(-1, self.channels)
         fmt = _SF_FORMAT_MAP.get(self.format, "WAV")
         sf.write(path, arr, self.sample_rate or 16000, format=fmt)
+
+
+# --- Video ---
 
 
 class VideoDocument(Document, frozen=True):

@@ -10,12 +10,17 @@ from pydantic import BaseModel, Field
 from agent_platform.core.schemas.document import AudioDocument, ImageDocument
 from agent_platform.core.schemas.enums import Language, MediaType
 
+# --- Roles ---
+
 
 class MessageRole(StrEnum):
     SYSTEM = "system"
     USER = "user"
     ASSISTANT = "assistant"
     TOOL = "tool"
+
+
+# --- Tool calls ---
 
 
 class ToolCall(BaseModel, frozen=True):
@@ -29,6 +34,9 @@ class ToolResult(BaseModel, frozen=True):
     name: str
     content: str
     is_error: bool = False
+
+
+# --- Content blocks ---
 
 
 class TextBlock(BaseModel, frozen=True):
@@ -49,6 +57,9 @@ class AudioBlock(BaseModel, frozen=True):
 ContentBlock = Annotated[
     TextBlock | ImageBlock | AudioBlock, Field(discriminator="media_type")
 ]
+
+
+# --- Messages ---
 
 
 class BaseMessage(BaseModel):
@@ -95,6 +106,9 @@ class ToolMessage(BaseMessage):
 
 
 Message = SystemMessage | UserMessage | AssistantMessage | ToolMessage
+
+
+# --- Prompt ---
 
 
 class Prompt(BaseModel):
