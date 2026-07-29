@@ -6,7 +6,6 @@ from agent_platform.core.interfaces.clustering.config import ClusteringConfig
 
 
 class GMMConfig(ClusteringConfig):
-    # Note: the inherited `n_clusters` (base field) is not applicable to GMM — this provider uses `n_components` instead.
     n_components: int = 8  # number of mixture components (clusters) to fit
     covariance_type: Literal["full", "tied", "diag", "spherical"] = (
         "full"  # constraint on the shape of each component's covariance matrix

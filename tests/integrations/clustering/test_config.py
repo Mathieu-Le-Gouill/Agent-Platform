@@ -8,15 +8,11 @@ from agent_platform.integrations.clustering.kmeans.config import KMeansConfig
 
 def test_clustering_config_defaults():
     cfg = ClusteringConfig()
-    assert cfg.n_clusters is None
-    assert cfg.cluster_labels is None
     assert cfg.random_state is None
 
 
 def test_clustering_config_construction():
-    cfg = ClusteringConfig(n_clusters=3, cluster_labels=["a", "b"], random_state=42)
-    assert cfg.n_clusters == 3
-    assert cfg.cluster_labels == ["a", "b"]
+    cfg = ClusteringConfig(random_state=42)
     assert cfg.random_state == 42
 
 
@@ -103,7 +99,7 @@ def test_gmm_config_construction():
 def test_configs_are_frozen():
     cfg = ClusteringConfig()
     try:
-        cfg.n_clusters = 1
+        cfg.random_state = 1
         assert False, "expected ValidationError"
     except ValidationError:
         pass
