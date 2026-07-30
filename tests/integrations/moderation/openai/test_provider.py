@@ -42,6 +42,29 @@ class TestOpenAIModerationClient:
         _, kwargs = mock_openai.call_args
         assert kwargs["api_key"] == "topsecret"
 
+    def test_client_kwargs_default_max_retries(self):
+        provider = OpenAIModeration(_creds())
+        kwargs = provider._client_kwargs(OpenAIModerationConfig(max_retries=None))
+        assert kwargs["max_retries"] == 3
+        assert "timeout" not in kwargs
+
+    def test_client_kwargs_explicit_timeout_and_retries(self):
+        provider = OpenAIModeration(_creds())
+        cfg = OpenAIModerationConfig(timeout=15.0, max_retries=5)
+        kwargs = provider._client_kwargs(cfg)
+        assert kwargs["timeout"] == 15.0
+        assert kwargs["max_retries"] == 5
+
+    def test_client_kwargs_client_options_fallback(self):
+        from agent_platform.core.credentials import ClientOptions
+
+        provider = OpenAIModeration(
+            _creds(), client_options=ClientOptions(timeout=60.0, max_retries=7)
+        )
+        kwargs = provider._client_kwargs(OpenAIModerationConfig())
+        assert kwargs["timeout"] == 60.0
+        assert kwargs["max_retries"] == 7
+
 
 class TestOpenAIModerationSync:
     def test_moderate_maps_categories(self, mocker):

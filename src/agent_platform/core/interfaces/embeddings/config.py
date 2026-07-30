@@ -1,7 +1,7 @@
-from agent_platform.core.config import ModelConfig
+from agent_platform.core.config import ModelConfig, RequestOptions
 
 
-class EmbeddingConfig(ModelConfig):
+class EmbeddingConfig(RequestOptions, ModelConfig):
     # Local input-list batching size used by `components/embedder.py` before
     # calling the provider (see `chunked(input, batch_size)`), independent of
     # any provider-side request-batching knob.
@@ -10,6 +10,3 @@ class EmbeddingConfig(ModelConfig):
     # truncating dimensions (e.g. OpenAI text-embedding-3-*); not all clients
     # accept this field, see each provider's mapper for gating.
     dimensions: int | None = None
-    # Per-request timeout in seconds. Not every client exposes a compatible
-    # top-level field; see each provider's mapper for gating/adaptation.
-    timeout: float | None = None

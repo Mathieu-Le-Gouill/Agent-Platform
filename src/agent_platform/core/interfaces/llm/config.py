@@ -1,10 +1,10 @@
 from __future__ import annotations
 
-from agent_platform.core.config import ModelConfig
+from agent_platform.core.config import ModelConfig, RequestOptions
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 
 
-class GenerationConfig(ModelConfig):
+class GenerationConfig(RequestOptions, ModelConfig):
     # Sampling randomness: 0 is near-deterministic, higher values increase diversity.
     # None leaves it unset so each provider's own native default applies.
     # https://platform.openai.com/docs/api-reference/chat/create#chat-create-temperature
@@ -26,10 +26,6 @@ class GenerationConfig(ModelConfig):
     # Penalizes tokens that have appeared at all so far, encouraging new topics.
     # https://platform.openai.com/docs/api-reference/chat/create#chat-create-presence_penalty
     presence_penalty: float | None = None
-    # Maximum time in seconds to wait for a response before aborting the request.
-    timeout: float | None = None
-    # Maximum number of retry attempts on transient/provider errors.
-    max_retries: int | None = None
     # Desired shape of the model output (e.g. plain text vs. JSON); provider-specific meaning, see each provider's config.
     response_format: ResponseFormat = ResponseFormat.TEXT
     # JSON Schema the output must conform to when response_format requests structured JSON.

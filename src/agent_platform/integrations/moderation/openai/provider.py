@@ -9,6 +9,8 @@ from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
+    resolve_max_retries,
+    resolve_timeout,
 )
 from agent_platform.core.errors import require_secret
 from agent_platform.core.interfaces.moderation.response import (
@@ -37,21 +39,28 @@ class OpenAIModeration(
     def _default_config(self) -> OpenAIModerationConfig:
         return OpenAIModerationConfig()
 
-    def _client_kwargs(self) -> dict[str, Any]:
+    def _client_kwargs(self, config: OpenAIModerationConfig) -> dict[str, Any]:
         api_key = require_secret(
             self._credentials.api_key,
             "OpenAI API key is required but was not provided",
         )
-        return {
+        kwargs: dict[str, Any] = {
             "api_key": api_key.get_secret_value(),
             "base_url": self._client_options.base_url,
+            "max_retries": resolve_max_retries(
+                config.max_retries, self._client_options
+            ),
         }
+        timeout = resolve_timeout(config.timeout, self._client_options)
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return kwargs
 
     def _async_client(self, config: OpenAIModerationConfig) -> AsyncOpenAI:
-        return AsyncOpenAI(**self._client_kwargs())
+        return AsyncOpenAI(**self._client_kwargs(config))
 
     def _sync_client(self, config: OpenAIModerationConfig) -> OpenAI:
-        return OpenAI(**self._client_kwargs())
+        return OpenAI(**self._client_kwargs(config))
 
     def _invoke_sync(
         self, client: OpenAI, text: str, config: OpenAIModerationConfig

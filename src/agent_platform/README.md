@@ -33,7 +33,7 @@ Near-zero external dependencies. Everything here is pure Python, `pydantic`, `ab
 | Path | Contents |
 |---|---|
 | `core/base.py` | `Entity` (UUID mixin), `Timestamped` |
-| `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends; `ModelConfig`, a `ProviderConfig` subclass adding `model: str` for model-backed domains (llm, embeddings, reranking, speech, image_generation) |
+| `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends; `ModelConfig`, a `ProviderConfig` subclass adding `model: str` for model-backed domains (llm, embeddings, reranking, speech, image_generation); `RequestOptions`, a `ProviderConfig` subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs alongside `ModelConfig` (currently `llm`, `embeddings`, `moderation`) |
 | `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
 | `core/credentials.py` | `Credentials` (secrets only, e.g. `api_key`), `ClientOptions` (non-secret construction-time transport settings: `base_url`, `timeout`, `max_retries`) |
 | `core/tracing.py` | Vendor-agnostic OpenTelemetry tracing: `TracingBackend`, `TracingConfig`, `configure_tracing()`, `traced_span()`, `mark_span_error()` |

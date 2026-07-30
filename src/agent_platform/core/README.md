@@ -9,7 +9,7 @@
 ```
 core/
 ├── base.py           # Entity (UUID mixin), Timestamped
-├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains)
+├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains), RequestOptions (ProviderConfig subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs)
 ├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
 ├── credentials.py    # Credentials (secrets only, e.g. api_key), ClientOptions (base_url/timeout/max_retries)
 ├── tracing.py        # TracingBackend, TracingConfig, configure_tracing(), traced_span(), mark_span_error()

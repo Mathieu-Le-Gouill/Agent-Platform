@@ -6,12 +6,12 @@ from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
 class MistralEmbeddingConfig(EmbeddingConfig):
     # Mistral embedding model id passed to the `/v1/embeddings` endpoint.
     model: str = "mistral-embed"
-    # Retry count. Unused: the native `mistralai` SDK's retry config is a
-    # time-based backoff with no attempt-count knob (same gap as the LLM
-    # domain's Mistral provider); the platform's own `@with_retry()` decorator
-    # on `aembed_document`/`aembed_query` already provides equivalent retry
+    # `max_retries` (inherited from `RequestOptions`) is unused: the native
+    # `mistralai` SDK's retry config is a time-based backoff with no
+    # attempt-count knob (same gap as the LLM domain's Mistral provider);
+    # the platform's own `@with_retry()` decorator on
+    # `aembed_document`/`aembed_query` already provides equivalent retry
     # behavior.
-    max_retries: int | None = None
     # Base URL for the Mistral API, forwarded as `server_url`.
     endpoint: str = "https://api.mistral.ai/v1/"
     # Unused post-migration: was a LangChain-wrapper-level throttle/concurrency

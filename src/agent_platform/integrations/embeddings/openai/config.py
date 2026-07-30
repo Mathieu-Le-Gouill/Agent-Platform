@@ -8,8 +8,6 @@ from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
 class OpenAIEmbeddingConfig(EmbeddingConfig):
     # OpenAI embedding model id passed to `embeddings.create(model=...)`.
     model: str = "text-embedding-ada-002"
-    # Max retry attempts on failed requests, forwarded to the client constructor.
-    max_retries: int | None = None
     # Extra kwargs merged into the `embeddings.create` call.
     model_kwargs: dict | None = None
     # Native top-level `encoding_format` param on `embeddings.create`.
