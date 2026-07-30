@@ -92,8 +92,9 @@ of the default `pytest` run. The CLI builds an `Agent` with lightweight
 stub tools (`search`/`ocr`/`translate`-shaped: real `name`/`description`/
 `input_schema`, canned `run()`), since only tool *selection* is graded
 here, not tool execution. It exits non-zero when `EvalReport.pass_rate`
-falls below `--threshold`, this is the regression gate CI wires up (see
-root `AGENTS.md` and `.github/workflows/ci.yml`'s `evals` job).
+falls below `--threshold`. `.github/workflows/ci.yml`'s `evals` job runs
+this, but only on a manual `workflow_dispatch` trigger, never on regular
+push/PR CI, since it costs real provider API usage.
 
 ## Testing
 
