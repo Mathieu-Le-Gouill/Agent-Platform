@@ -4,6 +4,7 @@ import pytest
 
 from agent_platform.core.schemas.score import Score
 from agent_platform.evals import cli
+from agent_platform.evals.errors import EvalDatasetError
 from agent_platform.evals.schemas import EvalReport, EvalResult
 
 
@@ -61,6 +62,30 @@ class TestStubTools:
         )
 
 
+class TestLoadDataset:
+    def test_loads_cases(self, tmp_path):
+        path = tmp_path / "cases.jsonl"
+        path.write_text('{"id": "a", "input": "hi", "tags": ["x"]}\n')
+
+        cases = cli._load_dataset(str(path))
+
+        assert [c.id for c in cases] == ["a"]
+
+    def test_malformed_json_raises(self, tmp_path):
+        path = tmp_path / "cases.jsonl"
+        path.write_text("not json\n")
+
+        with pytest.raises(EvalDatasetError):
+            cli._load_dataset(str(path))
+
+    def test_invalid_schema_raises(self, tmp_path):
+        path = tmp_path / "cases.jsonl"
+        path.write_text('{"input": "missing id"}\n')
+
+        with pytest.raises(EvalDatasetError):
+            cli._load_dataset(str(path))
+
+
 class TestMain:
     def test_main_exits_with_run_result(self, mocker):
         mocker.patch("agent_platform.evals.cli._run", AsyncMock(return_value=0))
@@ -70,6 +95,19 @@ class TestMain:
             cli.main()
 
         assert exc_info.value.code == 0
+
+    def test_main_exits_one_on_invalid_dataset(self, mocker, capsys):
+        mocker.patch(
+            "agent_platform.evals.cli._run",
+            AsyncMock(side_effect=EvalDatasetError("boom")),
+        )
+        mocker.patch("sys.argv", ["agent-platform-eval", "data.jsonl"])
+
+        with pytest.raises(SystemExit) as exc_info:
+            cli.main()
+
+        assert exc_info.value.code == 1
+        assert "boom" in capsys.readouterr().err
 
 
 class TestRun:

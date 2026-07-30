@@ -1,4 +1,3 @@
-from agent_platform.evals.dataset import EvalDataset
 from agent_platform.evals.errors import EvalDatasetError, EvalError, EvalRunError
 from agent_platform.evals.runner import EvalRunner
 from agent_platform.evals.schemas import EvalCase, EvalOutput, EvalReport, EvalResult
@@ -23,7 +22,6 @@ __all__ = [
     "EvalOutput",
     "EvalResult",
     "EvalReport",
-    "EvalDataset",
     "Scorer",
     "ExactMatchScorer",
     "EmbeddingSimilarityScorer",

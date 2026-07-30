@@ -16,20 +16,32 @@ than going through a component wrapper.
 evals/
 ├── errors.py     # EvalError, EvalDatasetError, EvalRunError
 ├── schemas.py    # EvalCase, EvalOutput, EvalResult, EvalReport
-├── dataset.py    # EvalDataset (JSONL-backed)
 ├── scorer.py     # Scorer protocol + ExactMatchScorer, EmbeddingSimilarityScorer,
 │                 # LLMJudgeScorer, ToolSelectionScorer
 ├── targets.py    # EvalTarget adapters over AgentExecutor / ConversationAgent
 ├── runner.py     # EvalRunner: concurrent execution, per-case isolation, tracing
-├── cli.py        # `agent-platform-eval` entrypoint (registered in pyproject.toml)
+├── cli.py        # `agent-platform-eval` entrypoint (registered in pyproject.toml);
+│                 # `_load_dataset()` loads JSONL into `list[EvalCase]` via
+│                 # `integrations/dataset/huggingface`'s `HuggingFaceDatasetProvider`
 └── datasets/
     └── conversation_tool_selection.jsonl   # worked example, see below
 ```
 
+There is no `evals/dataset.py`: `EvalRunner.arun()` takes any `Iterable[EvalCase]`,
+so loading a dataset is just whatever gets you there, `cli.py::_load_dataset()`
+for the CLI, a plain list built by hand in tests, or `integrations/dataset/huggingface`
+directly for anything richer (streaming, native/ratio-based train/test/eval splits,
+non-JSONL sources), see `integrations/README.md`'s `dataset/` row. `_load_dataset()`
+translates the provider's `ProviderError`/pydantic `ValidationError` into
+`EvalDatasetError`, which `cli.py::main()` catches to print a clean CLI error
+instead of a raw traceback.
+
 ## Core Flow
 
-1. Load an `EvalDataset` from JSONL: one `EvalCase` per line
-   (`input`, optional `expected`/`reference`, `tags`, `threshold`).
+1. Load a dataset into `list[EvalCase]` (`input`, optional `expected`/`reference`,
+   `tags`, `threshold`), however the caller prefers, see above. The `evals` extra
+   (`agent_platform[evals]`, pulling in `datasets`) is needed for `cli.py`'s
+   `HuggingFaceDatasetProvider`-backed JSONL loading.
 2. Wrap the system under test as an `EvalTarget`
    (`Callable[[EvalCase], Awaitable[EvalOutput]]`) via `targets.py`.
 3. Pick one or more `Scorer`s.
@@ -69,7 +81,7 @@ for a given input, scored by `ToolSelectionScorer` (exact-set match against
 `case.reference["expected_tools"]`). Run it via the CLI:
 
 ```bash
-uv run --extra llm-openai --extra dev agent-platform-eval \
+uv run --extra llm-openai --extra evals --extra dev agent-platform-eval \
     src/agent_platform/evals/datasets/conversation_tool_selection.jsonl \
     --provider OpenAILLM --scorer tool-selection --threshold 0.7
 ```

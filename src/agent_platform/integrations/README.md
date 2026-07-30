@@ -91,6 +91,7 @@ class OpenAILLMProvider(BaseLLMProvider[OpenAIGenerationConfig]):
 | `image_generation/` | dalle, midjourney, stable_diffusion | `BaseImageGenerator` |
 | `classification/` | transformers (zero-shot) | `BaseClassificationProvider` |
 | `moderation/` | openai (`omni-moderation-latest`, network-bound, shares `_base.py::NativeModerationProvider` with the same dual-client shape as `reranking/_base.py::NativeReranker`), local (offline keyword/regex rule set, no credentials) | `BaseModerationProvider` |
+| `dataset/` | huggingface (wraps the `datasets` library's `load_dataset`; `map`/`filter`/`batch` on the returned splits delegate straight to the underlying `datasets.Dataset`'s own methods, so its Arrow storage, disk-cached `map()` fingerprinting, and streaming/`IterableDataset` support carry through unchanged, see `huggingface/mappers.py::resolve_splits` for native vs. ratio-based train/test/eval split resolution) | `BaseDatasetProvider` |
 
 ## How to Extend
 

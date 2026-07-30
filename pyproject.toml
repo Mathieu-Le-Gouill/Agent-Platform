@@ -141,9 +141,16 @@ chunking = ["agent_platform[chunking-recursive,chunking-html,chunking-latex,chun
 loader-av = ["av"]
 loader-soundfile = ["soundfile"]
 
+# --- Dataset ---
+dataset-huggingface = ["datasets>=3.0"]
+dataset = ["agent_platform[dataset-huggingface]"]
+
+# --- Evals (evals/dataset.py::EvalDataset loads JSONL via dataset/huggingface) ---
+evals = ["agent_platform[dataset-huggingface]"]
+
 # --- Everything (parity with the old monolithic install) ---
 all = [
-    "agent_platform[llm,embeddings,vector-store,reranking,stt,translation,ocr,vad,image,clustering,classification-transformers,moderation,chunking,loader-av,loader-soundfile,api,tracing,tracing-grpc]",
+    "agent_platform[llm,embeddings,vector-store,reranking,stt,translation,ocr,vad,image,clustering,classification-transformers,moderation,chunking,loader-av,loader-soundfile,dataset,evals,api,tracing,tracing-grpc]",
 ]
 
 dev = [

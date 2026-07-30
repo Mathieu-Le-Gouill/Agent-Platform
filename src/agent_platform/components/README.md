@@ -45,6 +45,8 @@ components/
 │   └── component.py               # (AudioChunk, config) → Transcript, plus astream() (wraps BaseSpeechToText)
 ├── vector_search/
 │   └── component.py               # (vector, k, filter) → list[(TextChunk, Score)] (wraps VectorStore.search_with_scores)
+├── dataset/
+│   └── component.py               # DatasetConfig → dict[DatasetSplit, BaseDatasetSplit[T]] (wraps BaseDatasetProvider)
 ├── similarity_scorer/
 │   └── component.py               # Chunks × label vectors → ClassificationResult (pure logic)
 ├── semantic_chunker/              # TextDocument → TextChunk, splits on embedding-similarity breakpoints

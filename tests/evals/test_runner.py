@@ -3,7 +3,6 @@ import asyncio
 import pytest
 
 from agent_platform.core.schemas.score import Score
-from agent_platform.evals.dataset import EvalDataset
 from agent_platform.evals.runner import EvalRunner
 from agent_platform.evals.schemas import EvalCase, EvalOutput
 
@@ -18,8 +17,8 @@ class _StubScorer:
         return Score.confidence(self._value)
 
 
-def _dataset(*cases: EvalCase) -> EvalDataset:
-    return EvalDataset(list(cases))
+def _dataset(*cases: EvalCase) -> list[EvalCase]:
+    return list(cases)
 
 
 class TestEvalRunnerHappyPath:

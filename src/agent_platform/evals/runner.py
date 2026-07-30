@@ -3,10 +3,10 @@ from __future__ import annotations
 import asyncio
 import logging
 import time
+from collections.abc import Iterable
 from uuid import UUID, uuid4
 
 from agent_platform.core.genai_tracing import traced_operation_span
-from agent_platform.evals.dataset import EvalDataset
 from agent_platform.evals.schemas import EvalCase, EvalReport, EvalResult
 from agent_platform.evals.scorer import Scorer
 from agent_platform.evals.targets import EvalTarget
@@ -28,7 +28,7 @@ class EvalRunner:
         self._scorers = scorers
         self._semaphore = asyncio.Semaphore(concurrency)
 
-    async def arun(self, dataset: EvalDataset) -> EvalReport:
+    async def arun(self, dataset: Iterable[EvalCase]) -> EvalReport:
         run_id = uuid4()
 
         async def _bounded(case: EvalCase) -> EvalResult:

@@ -5,16 +5,19 @@ import asyncio
 import sys
 from typing import Any
 
-from pydantic import BaseModel
+from pydantic import BaseModel, ValidationError
 
 from agent_platform.agents.agent import Agent
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.config.container import build_provider
+from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
-from agent_platform.evals.dataset import EvalDataset
+from agent_platform.core.schemas.enums import DatasetSplit
+from agent_platform.evals.errors import EvalDatasetError
 from agent_platform.evals.runner import EvalRunner
+from agent_platform.evals.schemas import EvalCase
 from agent_platform.evals.scorer import (
     ExactMatchScorer,
     LLMJudgeScorer,
@@ -22,6 +25,12 @@ from agent_platform.evals.scorer import (
     ToolSelectionScorer,
 )
 from agent_platform.evals.targets import agent_executor_target
+from agent_platform.integrations.dataset.huggingface.config import (
+    HuggingFaceDatasetConfig,
+)
+from agent_platform.integrations.dataset.huggingface.provider import (
+    HuggingFaceDatasetProvider,
+)
 
 
 class _SearchStubInput(BaseModel):
@@ -84,6 +93,15 @@ def _build_scorer(name: str, llm: BaseLLMProvider, model: str) -> Scorer:
     )
 
 
+def _load_dataset(path: str) -> list[EvalCase]:
+    config = HuggingFaceDatasetConfig(path="json", data_files=path)
+    try:
+        splits = HuggingFaceDatasetProvider[EvalCase]().load(EvalCase, config)
+        return list(splits[DatasetSplit.TRAIN])
+    except (ProviderError, ValidationError) as exc:
+        raise EvalDatasetError(f"{path}: invalid eval dataset: {exc}") from exc
+
+
 def build_arg_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="agent-platform-eval")
     parser.add_argument("dataset", help="Path to a JSONL eval dataset")
@@ -115,7 +133,7 @@ async def _run(args: argparse.Namespace) -> int:
         model=args.model,
     )
     executor = AgentExecutor(agent)
-    dataset = EvalDataset.from_jsonl(args.dataset)
+    dataset = _load_dataset(args.dataset)
     runner = EvalRunner(agent_executor_target(executor), [scorer])
     report = await runner.arun(dataset)
 
@@ -134,7 +152,12 @@ async def _run(args: argparse.Namespace) -> int:
 
 def main() -> None:
     args = build_arg_parser().parse_args()
-    sys.exit(asyncio.run(_run(args)))
+    try:
+        exit_code = asyncio.run(_run(args))
+    except EvalDatasetError as exc:
+        print(f"error: {exc}", file=sys.stderr)
+        sys.exit(1)
+    sys.exit(exit_code)
 
 
 __all__ = ["main", "build_arg_parser"]

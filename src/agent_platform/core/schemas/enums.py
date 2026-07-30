@@ -288,3 +288,12 @@ class FinishReason(StrEnum):
     CONTENT_FILTER = "content_filter"
     ERROR = "error"
     UNKNOWN = "unknown"
+
+
+# --- Dataset ---
+
+
+class DatasetSplit(StrEnum):
+    TRAIN = "train"
+    TEST = "test"
+    EVAL = "eval"
