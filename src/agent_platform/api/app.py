@@ -5,19 +5,11 @@ from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
-from pydantic import BaseModel
 
 from agent_platform.agents.conversation import ConversationAgent
+from agent_platform.api.schemas import ChatRequest, ChatResponse
 from agent_platform.config import Settings, build_agent, get_settings, setup_logging
 from agent_platform.core.tracing import configure_tracing
-
-
-class ChatRequest(BaseModel):
-    message: str
-
-
-class ChatResponse(BaseModel):
-    response: str
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
