@@ -94,9 +94,9 @@ def _build_scorer(name: str, llm: BaseLLMProvider, model: str) -> Scorer:
 
 
 def _load_dataset(path: str) -> list[EvalCase]:
-    config = HuggingFaceDatasetConfig(path="json", data_files=path)
+    config = HuggingFaceDatasetConfig(data_files=path)
     try:
-        splits = HuggingFaceDatasetProvider[EvalCase]().load(EvalCase, config)
+        splits = HuggingFaceDatasetProvider[EvalCase]().load(EvalCase, "json", config)
         return list(splits[DatasetSplit.TRAIN])
     except (ProviderError, ValidationError) as exc:
         raise EvalDatasetError(f"{path}: invalid eval dataset: {exc}") from exc

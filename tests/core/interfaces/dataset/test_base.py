@@ -41,11 +41,11 @@ class _ConcreteSplit(BaseDatasetSplit[dict]):
 
 
 class _ConcreteProvider(BaseDatasetProvider[dict, DatasetConfig]):
-    def load(self, record_type, config=None):
+    def load(self, record_type, path, config=None):
         return {DatasetSplit.TRAIN: _ConcreteSplit([{"a": 1}, {"a": 2}])}
 
-    async def aload(self, record_type, config=None):
-        return self.load(record_type, config)
+    async def aload(self, record_type, path, config=None):
+        return self.load(record_type, path, config)
 
 
 class TestBaseDatasetSplit:
@@ -91,6 +91,6 @@ class TestBaseDatasetProvider:
 
     async def test_aload_delegates_to_load(self):
         provider = _ConcreteProvider()
-        result = await provider.aload(dict)
+        result = await provider.aload(dict, "some/path")
         assert DatasetSplit.TRAIN in result
         assert list(result[DatasetSplit.TRAIN]) == [{"a": 1}, {"a": 2}]

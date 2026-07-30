@@ -15,18 +15,18 @@ DatasetConfigT = TypeVar("DatasetConfigT", bound=DatasetConfig)
 
 
 class Dataset(
-    Component[DatasetConfigT, dict[DatasetSplit, BaseDatasetSplit[RecordT]]],
+    Component[str, dict[DatasetSplit, BaseDatasetSplit[RecordT]]],
     Generic[RecordT, DatasetConfigT],
 ):
     def __init__(
         self,
         backend: BaseDatasetProvider[RecordT, DatasetConfigT],
         record_type: type[RecordT],
+        config: DatasetConfigT | None = None,
     ) -> None:
         self._backend = backend
         self._record_type = record_type
+        self._config = config
 
-    async def arun(
-        self, input: DatasetConfigT
-    ) -> dict[DatasetSplit, BaseDatasetSplit[RecordT]]:
-        return await self._backend.aload(self._record_type, input)
+    async def arun(self, input: str) -> dict[DatasetSplit, BaseDatasetSplit[RecordT]]:
+        return await self._backend.aload(self._record_type, input, self._config)

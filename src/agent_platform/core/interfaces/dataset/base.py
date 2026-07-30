@@ -48,10 +48,10 @@ class BaseDatasetSplit(ABC, Generic[RecordT]):
 class BaseDatasetProvider(ABC, Generic[RecordT, ConfigT]):
     @abstractmethod
     def load(
-        self, record_type: type[RecordT], config: ConfigT | None = None
+        self, record_type: type[RecordT], path: str, config: ConfigT | None = None
     ) -> dict[DatasetSplit, BaseDatasetSplit[RecordT]]: ...
 
     @abstractmethod
     async def aload(
-        self, record_type: type[RecordT], config: ConfigT | None = None
+        self, record_type: type[RecordT], path: str, config: ConfigT | None = None
     ) -> dict[DatasetSplit, BaseDatasetSplit[RecordT]]: ...

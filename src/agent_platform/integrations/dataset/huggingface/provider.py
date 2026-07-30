@@ -6,7 +6,7 @@ from typing import TypeVar
 from datasets import load_dataset
 
 from agent_platform.core.credentials import resolve_credentials
-from agent_platform.core.errors import ConfigError, ProviderError
+from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.dataset.base import (
     BaseDatasetProvider,
     BaseDatasetSplit,
@@ -27,15 +27,16 @@ class HuggingFaceDatasetProvider(
     def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, HuggingFaceCredentials)
 
+    def _default_config(self) -> HuggingFaceDatasetConfig:
+        return HuggingFaceDatasetConfig()
+
     def load(
         self,
         record_type: type[RecordT],
+        path: str,
         config: HuggingFaceDatasetConfig | None = None,
     ) -> dict[DatasetSplit, BaseDatasetSplit[RecordT]]:
-        if config is None:
-            raise ConfigError(
-                "HuggingFaceDatasetProvider requires a config with `path` set"
-            )
+        config = config or self._default_config()
 
         token = (
             self._credentials.api_key.get_secret_value()
@@ -44,7 +45,7 @@ class HuggingFaceDatasetProvider(
         )
         try:
             raw = load_dataset(
-                config.path,
+                path,
                 config.name,
                 data_files=config.data_files,
                 revision=config.revision,
@@ -52,15 +53,14 @@ class HuggingFaceDatasetProvider(
                 token=token,
             )
         except Exception as exc:
-            raise ProviderError(
-                f"failed to load dataset {config.path!r}: {exc}"
-            ) from exc
+            raise ProviderError(f"failed to load dataset {path!r}: {exc}") from exc
 
         return resolve_splits(raw, record_type, config.split_ratios, config.seed)
 
     async def aload(
         self,
         record_type: type[RecordT],
+        path: str,
         config: HuggingFaceDatasetConfig | None = None,
     ) -> dict[DatasetSplit, BaseDatasetSplit[RecordT]]:
-        return await asyncio.to_thread(self.load, record_type, config)
+        return await asyncio.to_thread(self.load, record_type, path, config)
