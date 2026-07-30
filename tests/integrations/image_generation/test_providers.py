@@ -6,6 +6,7 @@ from pydantic import SecretStr
 
 pytest.importorskip("openai")
 
+from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas.document import ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat
@@ -179,12 +180,31 @@ class TestParseSize:
 class TestMidjourneyGenerator:
     def test_constructor_defaults(self):
         gen = MidjourneyGenerator()
-        assert gen._default_config().timeout == 120
+        assert gen._default_config().timeout is None
         assert gen._default_config().process_mode == "fast"
+        assert gen._base_url() == "http://localhost:8080"
 
     def test_constructor_custom_timeout(self):
         cfg = MidjourneyConfig(timeout=60)
         assert cfg.timeout == 60
+
+    def test_base_url_from_client_options(self):
+        gen = MidjourneyGenerator(
+            client_options=ClientOptions(base_url="https://mj.example.com")
+        )
+        assert gen._base_url() == "https://mj.example.com"
+
+    def test_base_url_from_env_fallback(self, monkeypatch):
+        monkeypatch.setenv("MIDJOURNEY_API_URL", "https://env.example.com")
+        gen = MidjourneyGenerator()
+        assert gen._base_url() == "https://env.example.com"
+
+    def test_base_url_client_options_overrides_env(self, monkeypatch):
+        monkeypatch.setenv("MIDJOURNEY_API_URL", "https://env.example.com")
+        gen = MidjourneyGenerator(
+            client_options=ClientOptions(base_url="https://mj.example.com")
+        )
+        assert gen._base_url() == "https://mj.example.com"
 
 
 class TestSizeToAspect:
@@ -530,7 +550,7 @@ class TestMidjourneyGenerate:
         result = await gen.generate(
             "test prompt",
             size="1024x1024",
-            config=MidjourneyConfig(api_url="https://api.example.com"),
+            config=MidjourneyConfig(),
         )
 
         assert isinstance(result, ImageDocument)
@@ -556,7 +576,7 @@ class TestMidjourneyGenerate:
         gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
         result = await gen.generate(
             "test prompt",
-            config=MidjourneyConfig(api_url="https://api.example.com"),
+            config=MidjourneyConfig(),
         )
 
         assert result.metadata.extra["size"] is None
@@ -581,7 +601,7 @@ class TestMidjourneyGenerate:
         results = await gen.generate_many(
             "test",
             n=2,
-            config=MidjourneyConfig(api_url="https://api.example.com"),
+            config=MidjourneyConfig(),
         )
 
         assert len(results) == 2
@@ -599,9 +619,7 @@ class TestMidjourneyGenerate:
         mock_response.content = b"bytes"
 
         gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
-        await gen.generate(
-            "test", config=MidjourneyConfig(api_url="https://api.example.com")
-        )
+        await gen.generate("test", config=MidjourneyConfig())
 
         mock_http_client.__aenter__.assert_awaited_once()
         mock_http_client.__aexit__.assert_awaited_once()
@@ -617,9 +635,7 @@ class TestMidjourneyGenerate:
 
         gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
         with pytest.raises(ProviderError):
-            await gen.generate_many(
-                "test", n=2, config=MidjourneyConfig(api_url="https://api.example.com")
-            )
+            await gen.generate_many("test", n=2, config=MidjourneyConfig())
 
         # with_retry retries on failure; every attempt must still close its client.
         assert (
@@ -642,9 +658,7 @@ class TestMidjourneyGenerate:
         gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
         await gen.generate(
             "test",
-            config=MidjourneyConfig(
-                api_url="https://api.example.com", process_mode="turbo"
-            ),
+            config=MidjourneyConfig(process_mode="turbo"),
         )
 
         _, kwargs = mock_http_client.post.call_args
@@ -661,9 +675,7 @@ class TestMidjourneyGenerate:
 
         gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
         with pytest.raises(ProviderError, match="missing image_url"):
-            await gen.generate(
-                "test", config=MidjourneyConfig(api_url="https://api.example.com")
-            )
+            await gen.generate("test", config=MidjourneyConfig())
 
     async def test_generate_many_missing_image_urls_raises_provider_error(self, mocker):
         mock_httpx_cls = mocker.patch("httpx.AsyncClient")
@@ -676,9 +688,7 @@ class TestMidjourneyGenerate:
 
         gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
         with pytest.raises(ProviderError, match="missing image_url"):
-            await gen.generate_many(
-                "test", n=2, config=MidjourneyConfig(api_url="https://api.example.com")
-            )
+            await gen.generate_many("test", n=2, config=MidjourneyConfig())
 
 
 @pytest.mark.skipif(not _HAS_DIFFUSERS, reason="requires diffusers")

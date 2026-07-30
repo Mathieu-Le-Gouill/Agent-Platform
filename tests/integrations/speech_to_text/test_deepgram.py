@@ -156,8 +156,39 @@ class TestDeepgramApiKey:
 
     def test_build_client_uses_api_key(self):
         stt = DeepgramSTT(DeepgramCredentials(api_key="secret"))
-        client = stt._build_client()
+        client = stt._build_client(DeepgramConfig())
         assert client is not None
+
+
+class TestDeepgramClientOptions:
+    def test_default_max_retries_and_no_timeout(self, mocker):
+        mock_client_cls = mocker.patch("deepgram.AsyncDeepgramClient", autospec=False)
+        stt = DeepgramSTT(DeepgramCredentials(api_key="secret"))
+        stt._build_client(DeepgramConfig(max_retries=None))
+        _, kwargs = mock_client_cls.call_args
+        assert kwargs["max_retries"] == 3
+        assert kwargs["timeout"] is None
+
+    def test_explicit_timeout_and_retries_forwarded(self, mocker):
+        mock_client_cls = mocker.patch("deepgram.AsyncDeepgramClient", autospec=False)
+        stt = DeepgramSTT(DeepgramCredentials(api_key="secret"))
+        stt._build_client(DeepgramConfig(timeout=15.0, max_retries=5))
+        _, kwargs = mock_client_cls.call_args
+        assert kwargs["timeout"] == 15.0
+        assert kwargs["max_retries"] == 5
+
+    def test_client_options_fallback(self, mocker):
+        from agent_platform.core.credentials import ClientOptions
+
+        mock_client_cls = mocker.patch("deepgram.AsyncDeepgramClient", autospec=False)
+        stt = DeepgramSTT(
+            DeepgramCredentials(api_key="secret"),
+            client_options=ClientOptions(timeout=60.0, max_retries=7),
+        )
+        stt._build_client(DeepgramConfig())
+        _, kwargs = mock_client_cls.call_args
+        assert kwargs["timeout"] == 60.0
+        assert kwargs["max_retries"] == 7
 
 
 def _mock_response(channel_json: dict, language: str | None = "en"):

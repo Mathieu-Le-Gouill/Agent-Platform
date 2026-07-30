@@ -1,5 +1,5 @@
-from agent_platform.core.config import ModelConfig
+from agent_platform.core.config import ModelConfig, RequestOptions
 
 
-class SpeechConfig(ModelConfig):
+class SpeechConfig(RequestOptions, ModelConfig):
     pass

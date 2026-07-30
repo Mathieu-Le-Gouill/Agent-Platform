@@ -101,15 +101,10 @@ class TestStableDiffusionConfig:
 
 
 class TestMidjourneyConfig:
-    def test_default_api_url_and_timeout(self):
+    def test_default_timeout_and_process_mode(self):
         cfg = MidjourneyConfig()
-        assert cfg.api_url == "http://localhost:8080"
-        assert cfg.timeout == 120.0
+        assert cfg.timeout is None
         assert cfg.process_mode == "fast"
-
-    def test_custom_api_url_via_alias(self):
-        cfg = MidjourneyConfig(MIDJOURNEY_API_URL="https://mj.example.com")
-        assert cfg.api_url == "https://mj.example.com"
 
     def test_custom_timeout(self):
         cfg = MidjourneyConfig(timeout=60.0)

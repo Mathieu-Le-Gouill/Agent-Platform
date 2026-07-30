@@ -187,12 +187,36 @@ class TestOpenAIWhisperBuildClient:
     def test_raises_without_api_key(self):
         stt = OpenAIWhisperSTT(OpenAICredentials(api_key=None))
         with pytest.raises(MissingCredentialError):
-            stt._build_client()
+            stt._build_client(OpenAIWhisperConfig())
 
     def test_builds_client_with_api_key(self):
         stt = OpenAIWhisperSTT(OpenAICredentials(api_key="secret"))
-        client = stt._build_client()
+        client = stt._build_client(OpenAIWhisperConfig())
         assert client is not None
+
+    def test_client_kwargs_default_max_retries(self):
+        stt = OpenAIWhisperSTT(OpenAICredentials(api_key="secret"))
+        kwargs = stt._client_kwargs(OpenAIWhisperConfig(max_retries=None))
+        assert kwargs["max_retries"] == 3
+        assert "timeout" not in kwargs
+
+    def test_client_kwargs_explicit_timeout_and_retries(self):
+        stt = OpenAIWhisperSTT(OpenAICredentials(api_key="secret"))
+        cfg = OpenAIWhisperConfig(timeout=15.0, max_retries=5)
+        kwargs = stt._client_kwargs(cfg)
+        assert kwargs["timeout"] == 15.0
+        assert kwargs["max_retries"] == 5
+
+    def test_client_kwargs_client_options_fallback(self):
+        from agent_platform.core.credentials import ClientOptions
+
+        stt = OpenAIWhisperSTT(
+            OpenAICredentials(api_key="secret"),
+            client_options=ClientOptions(timeout=60.0, max_retries=7),
+        )
+        kwargs = stt._client_kwargs(OpenAIWhisperConfig())
+        assert kwargs["timeout"] == 60.0
+        assert kwargs["max_retries"] == 7
 
 
 class TestOpenAIWhisperTranscribeResponse:

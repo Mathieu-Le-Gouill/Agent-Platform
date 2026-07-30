@@ -7,7 +7,11 @@ import deepl
 if TYPE_CHECKING:
     from deepl import TextResult
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+)
 from agent_platform.core.errors import ProviderError, require_secret
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
@@ -21,8 +25,16 @@ _DEEPL_TARGETS: dict[Language, str] = {
 
 
 class DeepLTranslator(NativeTranslator[DeepLConfig, deepl.Translator]):
-    def __init__(self, credentials: DeepLCredentials | None = None) -> None:
+    # DeepL's SDK (`deepl.Translator.__init__`) exposes no timeout or retry-count
+    # parameter anywhere in its public API (constructor or per-call), so
+    # `RequestOptions.timeout`/`max_retries` are deliberately not forwarded here.
+    def __init__(
+        self,
+        credentials: DeepLCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, DeepLCredentials)
+        self._client_options = resolve_client_options(client_options)
         self._client_cache: deepl.Translator | None = None
 
     def _default_config(self) -> DeepLConfig:
@@ -34,7 +46,13 @@ class DeepLTranslator(NativeTranslator[DeepLConfig, deepl.Translator]):
                 self._credentials.auth_key, "DeepL auth key is required"
             )
             try:
-                self._client_cache = deepl.Translator(auth_key.get_secret_value())
+                if self._client_options.base_url is not None:
+                    self._client_cache = deepl.Translator(
+                        auth_key.get_secret_value(),
+                        server_url=self._client_options.base_url,
+                    )
+                else:
+                    self._client_cache = deepl.Translator(auth_key.get_secret_value())
             except deepl.DeepLException as exc:
                 raise ProviderError(
                     f"DeepL client initialization failed: {exc}"

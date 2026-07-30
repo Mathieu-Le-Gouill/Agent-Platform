@@ -1,5 +1,5 @@
-from agent_platform.core.config import ProviderConfig
+from agent_platform.core.config import RequestOptions
 
 
-class TranslationConfig(ProviderConfig):
+class TranslationConfig(RequestOptions):
     pass

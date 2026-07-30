@@ -15,7 +15,12 @@ else:
     except ImportError:  # pragma: no cover - depends on installed mistralai version
         from mistralai.client import Mistral
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.retry import with_retry
@@ -35,19 +40,39 @@ _MIME_MAP = {
 
 
 class MistralOCR(BaseOCR[MistralOCRConfig]):
-    def __init__(self, credentials: MistralCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: MistralCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, MistralCredentials)
+        self._client_options = resolve_client_options(client_options)
         self._client: Mistral | None = None
 
     def _default_config(self) -> MistralOCRConfig:
         return MistralOCRConfig()
 
-    def _get_client(self) -> Mistral:
+    def _get_client(self, config: MistralOCRConfig) -> Mistral:
         if self._client is None:
             api_key = require_secret(
                 self._credentials.api_key, "Mistral API key is required"
             )
-            self._client = Mistral(api_key=api_key.get_secret_value())
+            kwargs: dict = {"api_key": api_key.get_secret_value()}
+            if self._client_options.base_url:
+                kwargs["server_url"] = self._client_options.base_url
+
+            timeout = resolve_timeout(config.timeout, self._client_options)
+            if timeout is not None:
+                kwargs["timeout_ms"] = int(timeout * 1000)
+
+            # `config.max_retries`/`client_options.max_retries` are intentionally not
+            # wired into the native SDK's `retry_config`: unlike OpenAI/Anthropic's
+            # simple int attempt count, Mistral's RetryConfig is a time-based backoff
+            # (initial_interval/max_interval/exponent/max_elapsed_time) with no
+            # attempt-count knob, so there's no faithful translation. The platform's
+            # own `@with_retry()` decorator on `extract` already provides equivalent
+            # attempt-count-based retry behavior.
+            self._client = Mistral(**kwargs)
         return self._client
 
     @error_logged(re_raise=ProviderError, message="OCR extraction failed")
@@ -59,7 +84,7 @@ class MistralOCR(BaseOCR[MistralOCRConfig]):
         document_id: UUID | None = None,
     ) -> Sequence[TextChunk]:
         config = config or self._default_config()
-        client = self._get_client()
+        client = self._get_client(config)
 
         doc_id = document_id or uuid4()
 

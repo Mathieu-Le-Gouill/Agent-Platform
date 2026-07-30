@@ -81,6 +81,38 @@ class TestQdrantClient:
         _, kwargs = mock_client_cls.call_args
         assert kwargs["api_key"] is None
 
+    def test_client_default_timeout_is_none(self, mocker):
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient"
+        )
+        provider = QdrantVectorStoreProvider(QdrantCredentials(api_key=None))
+        provider._client(QdrantConfig())
+        _, kwargs = mock_client_cls.call_args
+        assert kwargs["timeout"] is None
+
+    def test_client_config_timeout_cast_to_int(self, mocker):
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient"
+        )
+        provider = QdrantVectorStoreProvider(QdrantCredentials(api_key=None))
+        provider._client(QdrantConfig(timeout=12.7))
+        _, kwargs = mock_client_cls.call_args
+        assert kwargs["timeout"] == 12
+
+    def test_client_options_timeout_fallback(self, mocker):
+        from agent_platform.core.credentials import ClientOptions
+
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient"
+        )
+        provider = QdrantVectorStoreProvider(
+            QdrantCredentials(api_key=None),
+            client_options=ClientOptions(timeout=30.0),
+        )
+        provider._client(QdrantConfig())
+        _, kwargs = mock_client_cls.call_args
+        assert kwargs["timeout"] == 30
+
 
 class TestQdrantFilter:
     def test_no_filter_returns_none(self, provider):

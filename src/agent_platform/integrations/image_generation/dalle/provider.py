@@ -1,10 +1,17 @@
 from __future__ import annotations
 
 import base64
+from typing import Any
 
 from openai import AsyncOpenAI
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_max_retries,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
 from agent_platform.core.retry import with_retry
@@ -27,17 +34,32 @@ _MODEL_MAP: dict[str, str] = {
 
 
 class DallEImageGenerator(BaseImageGenerator[DalleConfig]):
-    def __init__(self, credentials: OpenAICredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: OpenAICredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, OpenAICredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> DalleConfig:
         return DalleConfig()
 
-    def _api_key(self) -> str:
+    def _client_kwargs(self, config: DalleConfig) -> dict[str, Any]:
         api_key = require_secret(
             self._credentials.api_key, "OpenAI API key is required"
         )
-        return api_key.get_secret_value()
+        kwargs: dict[str, Any] = {
+            "api_key": api_key.get_secret_value(),
+            "base_url": self._client_options.base_url,
+            "max_retries": resolve_max_retries(
+                config.max_retries, self._client_options
+            ),
+        }
+        timeout = resolve_timeout(config.timeout, self._client_options)
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return kwargs
 
     @error_logged(re_raise=ProviderError, message="Image generation failed")
     @with_retry()
@@ -53,7 +75,7 @@ class DallEImageGenerator(BaseImageGenerator[DalleConfig]):
             raise ValueError(
                 f"Unsupported model: {config.model}. Use dall-e-2, dall-e-3, or gpt-image-1."
             )
-        client = AsyncOpenAI(api_key=self._api_key())
+        client = AsyncOpenAI(**self._client_kwargs(config))
 
         size = size or default_size(config.model)
         validate_size(config.model, size)
@@ -104,7 +126,7 @@ class DallEImageGenerator(BaseImageGenerator[DalleConfig]):
             raise ValueError(
                 f"Unsupported model: {config.model}. Use dall-e-2, dall-e-3, or gpt-image-1."
             )
-        client = AsyncOpenAI(api_key=self._api_key())
+        client = AsyncOpenAI(**self._client_kwargs(config))
 
         size = size or default_size(config.model)
         validate_size(config.model, size)

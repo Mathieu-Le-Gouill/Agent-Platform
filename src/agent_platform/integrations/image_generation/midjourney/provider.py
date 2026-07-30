@@ -4,7 +4,12 @@ from typing import Any
 
 import httpx
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.interfaces.image_generation.base import BaseImageGenerator
 from agent_platform.core.retry import with_retry
@@ -17,11 +22,20 @@ from agent_platform.integrations.image_generation.midjourney.config import (
 from agent_platform.integrations.image_generation.midjourney.mappers import (
     size_to_aspect,
 )
+from agent_platform.utils.env import from_env
+
+_DEFAULT_BASE_URL = "http://localhost:8080"
+_DEFAULT_TIMEOUT = 120
 
 
 class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
-    def __init__(self, credentials: MidjourneyCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: MidjourneyCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, MidjourneyCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> MidjourneyConfig:
         return MidjourneyConfig()
@@ -31,6 +45,13 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
             self._credentials.api_key, "Midjourney API key is required"
         )
         return api_key.get_secret_value()
+
+    def _base_url(self) -> str:
+        return (
+            self._client_options.base_url
+            or from_env("MIDJOURNEY_API_URL")
+            or _DEFAULT_BASE_URL
+        )
 
     @error_logged(re_raise=ProviderError, message="Image generation failed")
     @with_retry()
@@ -49,9 +70,12 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
             "process_mode": config.process_mode,
         }
 
-        async with httpx.AsyncClient(timeout=config.timeout) as client:
+        timeout = (
+            resolve_timeout(config.timeout, self._client_options) or _DEFAULT_TIMEOUT
+        )
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
-                f"{config.api_url}/imagine",
+                f"{self._base_url()}/imagine",
                 json=payload,
                 headers={"Authorization": f"Bearer {self._api_key()}"},
             )
@@ -98,9 +122,12 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
         }
 
         documents: list[ImageDocument] = []
-        async with httpx.AsyncClient(timeout=config.timeout) as client:
+        timeout = (
+            resolve_timeout(config.timeout, self._client_options) or _DEFAULT_TIMEOUT
+        )
+        async with httpx.AsyncClient(timeout=timeout) as client:
             response = await client.post(
-                f"{config.api_url}/imagine",
+                f"{self._base_url()}/imagine",
                 json=payload,
                 headers={"Authorization": f"Bearer {self._api_key()}"},
             )

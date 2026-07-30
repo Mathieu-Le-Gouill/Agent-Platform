@@ -1,7 +1,7 @@
-from agent_platform.core.config import ProviderConfig
+from agent_platform.core.config import RequestOptions
 
 
-class VectorStoreConfig(ProviderConfig):
+class VectorStoreConfig(RequestOptions):
     collection_name: str = (
         "default"  # index/collection identifier to read and write vectors from
     )

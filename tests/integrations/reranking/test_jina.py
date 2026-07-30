@@ -30,6 +30,34 @@ class TestHeaders:
         assert "Authorization" not in provider._headers()
 
 
+class TestClientKwargs:
+    def test_default_base_url_and_no_timeout(self):
+        provider = _provider()
+        kwargs = provider._client_kwargs(JinaRerankerConfig())
+        assert kwargs["base_url"] == "https://api.jina.ai"
+        assert "timeout" not in kwargs
+        assert "max_retries" not in kwargs
+
+    def test_explicit_timeout(self):
+        provider = _provider()
+        cfg = JinaRerankerConfig(timeout=15.0)
+        kwargs = provider._client_kwargs(cfg)
+        assert kwargs["timeout"] == 15.0
+
+    def test_client_options_fallback(self):
+        from agent_platform.core.credentials import ClientOptions
+
+        provider = JinaRerankerProvider(
+            JinaCredentials(api_key=SecretStr("test-key")),
+            client_options=ClientOptions(
+                base_url="https://custom.jina.example", timeout=60.0
+            ),
+        )
+        kwargs = provider._client_kwargs(JinaRerankerConfig())
+        assert kwargs["base_url"] == "https://custom.jina.example"
+        assert kwargs["timeout"] == 60.0
+
+
 class TestSync:
     def test_forwards_top_k_as_top_n(self, mocker):
         mock_client_cls = mocker.patch(

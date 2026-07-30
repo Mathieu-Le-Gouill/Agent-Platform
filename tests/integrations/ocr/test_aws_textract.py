@@ -79,6 +79,65 @@ async def test_client_is_cached_across_calls_for_same_region(mocker):
 
 
 @pytest.mark.asyncio
+async def test_client_uses_endpoint_url_and_botocore_config(mocker):
+    from agent_platform.core.credentials import ClientOptions
+
+    mock_boto = mocker.patch(
+        "agent_platform.integrations.ocr.aws_textract.provider.boto3.client"
+    )
+    mock_client = MagicMock()
+    mock_client.detect_document_text.return_value = FAKE_TEXTRACT_RESPONSE
+    mock_boto.return_value = mock_client
+
+    ocr = AWSTextractOCR(
+        AWSTextractCredentials(),
+        client_options=ClientOptions(
+            base_url="https://textract.example.com", timeout=5.0, max_retries=9
+        ),
+    )
+
+    mocker.patch(
+        "agent_platform.integrations.ocr.aws_textract.provider.load_bytes",
+        return_value=b"fake-bytes",
+    )
+    await ocr.extract("a.png")
+
+    _, kwargs = mock_boto.call_args
+    assert kwargs["endpoint_url"] == "https://textract.example.com"
+    boto_config = kwargs["config"]
+    assert boto_config.connect_timeout == 5.0
+    assert boto_config.read_timeout == 5.0
+    assert boto_config.retries["max_attempts"] == 9
+
+
+@pytest.mark.asyncio
+async def test_client_default_config_sets_max_retries_only(mocker):
+    mock_boto = mocker.patch(
+        "agent_platform.integrations.ocr.aws_textract.provider.boto3.client"
+    )
+    mock_client = MagicMock()
+    mock_client.detect_document_text.return_value = FAKE_TEXTRACT_RESPONSE
+    mock_boto.return_value = mock_client
+
+    ocr = AWSTextractOCR(AWSTextractCredentials())
+
+    mocker.patch(
+        "agent_platform.integrations.ocr.aws_textract.provider.load_bytes",
+        return_value=b"fake-bytes",
+    )
+    await ocr.extract("a.png")
+
+    _, kwargs = mock_boto.call_args
+    assert "endpoint_url" not in kwargs
+    boto_config = kwargs["config"]
+    # connect_timeout/read_timeout fall back to botocore's own default (60s)
+    # when we don't pass them, since resolve_timeout() returned None.
+    assert boto_config.connect_timeout == 60
+    assert boto_config.read_timeout == 60
+    assert boto_config.retries["max_attempts"] == 3
+
+
+@pytest.mark.asyncio
 async def test_client_is_recreated_for_a_different_region(mocker):
     mock_boto = mocker.patch(
         "agent_platform.integrations.ocr.aws_textract.provider.boto3.client"

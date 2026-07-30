@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 
 import pytest
 
+from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.interfaces.translation.base import BaseTranslator
 from agent_platform.core.schemas.chunk import TextChunk
@@ -184,3 +185,48 @@ class TestAzureTranslator:
         result = await translator.atranslate(content, target=Language.FR)
 
         assert result.text == "Bonjour"
+
+
+class TestAzureTranslatorClient:
+    def test_default_endpoint_and_max_retries(self, mocker):
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
+        )
+        translator = AzureTranslator(_azure_credentials())
+        translator._client(AzureTranslatorConfig())
+
+        _, kwargs = mock_client_cls.call_args
+        assert kwargs["endpoint"] == "https://api.cognitive.microsofttranslator.com"
+        assert kwargs["retry_total"] == 3
+        assert "connection_timeout" not in kwargs
+        assert "read_timeout" not in kwargs
+
+    def test_explicit_timeout_and_retries(self, mocker):
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
+        )
+        translator = AzureTranslator(_azure_credentials())
+        translator._client(AzureTranslatorConfig(timeout=15.0, max_retries=5))
+
+        _, kwargs = mock_client_cls.call_args
+        assert kwargs["retry_total"] == 5
+        assert kwargs["connection_timeout"] == 15.0
+        assert kwargs["read_timeout"] == 15.0
+
+    def test_client_options_fallback(self, mocker):
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
+        )
+        translator = AzureTranslator(
+            _azure_credentials(),
+            client_options=ClientOptions(
+                base_url="https://custom.endpoint", timeout=60.0, max_retries=7
+            ),
+        )
+        translator._client(AzureTranslatorConfig())
+
+        _, kwargs = mock_client_cls.call_args
+        assert kwargs["endpoint"] == "https://custom.endpoint"
+        assert kwargs["retry_total"] == 7
+        assert kwargs["connection_timeout"] == 60.0
+        assert kwargs["read_timeout"] == 60.0

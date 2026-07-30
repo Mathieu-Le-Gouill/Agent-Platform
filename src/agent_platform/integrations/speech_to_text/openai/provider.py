@@ -2,10 +2,17 @@ from __future__ import annotations
 
 import io
 from collections.abc import AsyncIterator
+from typing import Any
 
 from openai import AsyncOpenAI
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_max_retries,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.core.retry import with_retry
@@ -18,17 +25,35 @@ from agent_platform.integrations.speech_to_text.openai.config import OpenAIWhisp
 
 
 class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
-    def __init__(self, credentials: OpenAICredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: OpenAICredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, OpenAICredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> OpenAIWhisperConfig:
         return OpenAIWhisperConfig()
 
-    def _build_client(self) -> AsyncOpenAI:
+    def _client_kwargs(self, config: OpenAIWhisperConfig) -> dict[str, Any]:
         api_key = require_secret(
             self._credentials.api_key, "OpenAI API key is required"
         )
-        return AsyncOpenAI(api_key=api_key.get_secret_value())
+        kwargs: dict[str, Any] = {
+            "api_key": api_key.get_secret_value(),
+            "base_url": self._client_options.base_url,
+            "max_retries": resolve_max_retries(
+                config.max_retries, self._client_options
+            ),
+        }
+        timeout = resolve_timeout(config.timeout, self._client_options)
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        return kwargs
+
+    def _build_client(self, config: OpenAIWhisperConfig) -> AsyncOpenAI:
+        return AsyncOpenAI(**self._client_kwargs(config))
 
     @error_logged(re_raise=ProviderError, message="Speech-to-text failed")
     @with_retry()
@@ -36,7 +61,7 @@ class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
         self, audio: AudioChunk, config: OpenAIWhisperConfig | None = None
     ) -> Transcript:
         config = config or self._default_config()
-        client = self._build_client()
+        client = self._build_client(config)
         fmt = audio.format.value if audio.format else "wav"
         audio_file = io.BytesIO(audio.data)
         audio_file.name = f"audio.{fmt}"

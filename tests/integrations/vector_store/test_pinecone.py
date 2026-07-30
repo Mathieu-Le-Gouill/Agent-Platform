@@ -6,6 +6,7 @@ import pytest
 
 pytest.importorskip("pinecone")
 
+from agent_platform.core.credentials import ClientOptions, resolve_client_options
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.credentials import PineconeCredentials
@@ -66,6 +67,30 @@ class TestPineconeApiKey:
         assert store._api_key() == "secret"
 
 
+class TestPineconeClientKwargs:
+    def test_default_has_no_timeout(self):
+        store = PineconeStore.__new__(PineconeStore)
+        store._credentials = PineconeCredentials(api_key="secret")
+        store._client_options = resolve_client_options(None)
+        kwargs = store._client_kwargs(PineconeConfig())
+        assert kwargs["api_key"] == "secret"
+        assert "timeout" not in kwargs
+
+    def test_explicit_config_timeout(self):
+        store = PineconeStore.__new__(PineconeStore)
+        store._credentials = PineconeCredentials(api_key="secret")
+        store._client_options = resolve_client_options(None)
+        kwargs = store._client_kwargs(PineconeConfig(timeout=15.0))
+        assert kwargs["timeout"] == 15.0
+
+    def test_client_options_timeout_fallback(self):
+        store = PineconeStore.__new__(PineconeStore)
+        store._credentials = PineconeCredentials(api_key="secret")
+        store._client_options = resolve_client_options(ClientOptions(timeout=60.0))
+        kwargs = store._client_kwargs(PineconeConfig())
+        assert kwargs["timeout"] == 60.0
+
+
 class TestPineconeResolveHost:
     async def test_uses_configured_host_without_describe_call(self, mocker):
         mock_pc_cls = mocker.patch(
@@ -73,6 +98,7 @@ class TestPineconeResolveHost:
         )
         store = PineconeStore.__new__(PineconeStore)
         store._credentials = PineconeCredentials(api_key="secret")
+        store._client_options = resolve_client_options(None)
 
         host = await store._resolve_host(PineconeConfig(host="idx.svc.pinecone.io"))
 
@@ -93,6 +119,7 @@ class TestPineconeResolveHost:
 
         store = PineconeStore.__new__(PineconeStore)
         store._credentials = PineconeCredentials(api_key="secret")
+        store._client_options = resolve_client_options(None)
 
         host = await store._resolve_host(PineconeConfig())
 
@@ -111,6 +138,7 @@ class TestPineconeIndex:
 
         store = PineconeStore.__new__(PineconeStore)
         store._credentials = PineconeCredentials(api_key="secret")
+        store._client_options = resolve_client_options(None)
 
         result = await store._index(PineconeConfig(host="idx.svc.pinecone.io"))
 

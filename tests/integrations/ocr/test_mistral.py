@@ -71,6 +71,55 @@ class TestFromMistral:
         assert [c.text for c in chunks] == ["No scores here"]
 
 
+class TestMistralOCRClient:
+    def test_client_uses_base_url_and_timeout(self, mocker):
+        from agent_platform.core.credentials import ClientOptions
+
+        mock_mistral_cls = mocker.patch(
+            "agent_platform.integrations.ocr.mistral.provider.Mistral"
+        )
+        creds = MistralCredentials(api_key="fake-key")
+        ocr = MistralOCR(
+            creds, client_options=ClientOptions(base_url="https://proxy.example.com")
+        )
+        config = MistralOCRConfig(timeout=12.0)
+
+        ocr._get_client(config)
+
+        _, kwargs = mock_mistral_cls.call_args
+        assert kwargs["server_url"] == "https://proxy.example.com"
+        assert kwargs["timeout_ms"] == 12000
+
+    def test_client_omits_timeout_ms_when_unset(self, mocker):
+        mock_mistral_cls = mocker.patch(
+            "agent_platform.integrations.ocr.mistral.provider.Mistral"
+        )
+        creds = MistralCredentials(api_key="fake-key")
+        ocr = MistralOCR(creds)
+        config = MistralOCRConfig()
+
+        ocr._get_client(config)
+
+        _, kwargs = mock_mistral_cls.call_args
+        assert "timeout_ms" not in kwargs
+        assert "server_url" not in kwargs
+
+    def test_client_options_timeout_fallback(self, mocker):
+        from agent_platform.core.credentials import ClientOptions
+
+        mock_mistral_cls = mocker.patch(
+            "agent_platform.integrations.ocr.mistral.provider.Mistral"
+        )
+        creds = MistralCredentials(api_key="fake-key")
+        ocr = MistralOCR(creds, client_options=ClientOptions(timeout=30.0))
+        config = MistralOCRConfig()
+
+        ocr._get_client(config)
+
+        _, kwargs = mock_mistral_cls.call_args
+        assert kwargs["timeout_ms"] == 30000
+
+
 class TestMistralOCRExtract:
     @pytest.mark.asyncio
     async def test_extract_forwards_new_config_fields(self, mocker):
@@ -138,6 +187,30 @@ class TestMistralOCRExtract:
         ocr = MistralOCR(creds)
         with pytest.raises(MissingCredentialError):
             await ocr.extract("https://example.com/doc.pdf")
+
+    @pytest.mark.asyncio
+    async def test_extract_encodes_local_file_as_base64_data_url(
+        self, mocker, tmp_path
+    ):
+        mock_mistral_cls = mocker.patch(
+            "agent_platform.integrations.ocr.mistral.provider.Mistral"
+        )
+        mock_client = MagicMock()
+        mock_client.ocr.process.return_value = SimpleNamespace(pages=[_page(0, "text")])
+        mock_mistral_cls.return_value = mock_client
+
+        creds = MistralCredentials(api_key="fake-key")
+        ocr = MistralOCR(creds)
+
+        local_file = tmp_path / "doc.png"
+        local_file.write_bytes(b"fake-image-bytes")
+
+        await ocr.extract(str(local_file))
+
+        call_kwargs = mock_client.ocr.process.call_args.kwargs
+        document = call_kwargs["document"]
+        assert document["type"] == "document_url"
+        assert document["document_url"].startswith("data:image/png;base64,")
 
     @pytest.mark.asyncio
     async def test_client_error_is_translated_to_provider_error(self, mocker):

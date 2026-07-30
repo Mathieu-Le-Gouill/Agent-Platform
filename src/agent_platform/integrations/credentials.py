@@ -50,7 +50,6 @@ class AzureTranslatorCredentials(Credentials, frozen=True):
     region: str | None = Field(
         default_factory=lambda: from_env("AZURE_TRANSLATOR_REGION")
     )
-    endpoint: str = "https://api.cognitive.microsofttranslator.com"
 
 
 class ChromaCredentials(Credentials, frozen=True):
@@ -157,9 +156,6 @@ class VoyageCredentials(Credentials, frozen=True):
 
 
 class WeaviateCredentials(Credentials, frozen=True):
-    url: str = Field(
-        default_factory=lambda: from_env("WEAVIATE_URL") or "http://localhost:8080"
-    )
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("WEAVIATE_API_KEY")
     )

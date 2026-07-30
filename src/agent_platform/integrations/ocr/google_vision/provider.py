@@ -5,7 +5,11 @@ from uuid import UUID, uuid4
 
 from google.cloud import vision
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+)
 from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.retry import with_retry
@@ -19,8 +23,13 @@ from agent_platform.integrations.ocr.sources import load_bytes
 
 
 class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
-    def __init__(self, credentials: GoogleVisionCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: GoogleVisionCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, GoogleVisionCredentials)
+        self._client_options = resolve_client_options(client_options)
         self._client: vision.ImageAnnotatorClient | None = None
 
     def _default_config(self) -> GoogleVisionConfig:
@@ -28,12 +37,25 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
 
     def _get_client(self) -> vision.ImageAnnotatorClient:
         if self._client is None:
+            # google-cloud-vision only exposes timeout/retry as per-call kwargs on
+            # each RPC method (e.g. text_detection(..., timeout=, retry=)), not at
+            # client construction time, so ClientOptions.timeout/max_retries have no
+            # constructor-level home here; threading them through extract()'s
+            # per-call kwargs is left as a documented non-goal (same caveat as
+            # google-cloud-translate).
+            vendor_client_options: dict = {}
+            if self._client_options.base_url:
+                vendor_client_options["api_endpoint"] = self._client_options.base_url
+
             if self._credentials.credentials_path:
                 self._client = vision.ImageAnnotatorClient.from_service_account_file(
                     self._credentials.credentials_path,
+                    client_options=vendor_client_options or None,
                 )
             else:
-                self._client = vision.ImageAnnotatorClient()
+                self._client = vision.ImageAnnotatorClient(
+                    client_options=vendor_client_options or None,
+                )
         return self._client
 
     @error_logged(re_raise=ProviderError, message="OCR extraction failed")

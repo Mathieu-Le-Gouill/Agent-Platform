@@ -5,7 +5,12 @@ from uuid import UUID
 
 from pinecone import PineconeAsyncio
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
 from agent_platform.core.retry import with_retry
@@ -20,8 +25,13 @@ from agent_platform.integrations.vector_store.pinecone.mappers import (
 
 
 class PineconeStore(BaseVectorStore[PineconeConfig]):
-    def __init__(self, credentials: PineconeCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: PineconeCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, PineconeCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> PineconeConfig:
         return PineconeConfig()
@@ -31,16 +41,32 @@ class PineconeStore(BaseVectorStore[PineconeConfig]):
             self._credentials.api_key, "Pinecone API key is required"
         ).get_secret_value()
 
+    def _client_kwargs(self, config: PineconeConfig) -> dict[str, Any]:
+        # `client_options.base_url` is intentionally not wired here:
+        # `PineconeConfig.host` is a different, more specific concept (the
+        # per-index data-plane host resolved via `describe_index`), not a
+        # generic API base_url.
+        kwargs: dict[str, Any] = {"api_key": self._api_key()}
+        timeout = resolve_timeout(config.timeout, self._client_options)
+        if timeout is not None:
+            kwargs["timeout"] = timeout
+        # `client_options.max_retries` is intentionally not wired here:
+        # `PineconeAsyncio`'s `retry_config` takes a `RetryConfig` object, not
+        # a simple int, so there's no faithful translation from the shared
+        # int-based knob (same honest-exemption style as
+        # `llm/mistral/provider.py::MistralLLM._async_client`).
+        return kwargs
+
     async def _resolve_host(self, config: PineconeConfig) -> str:
         if config.host is not None:
             return config.host
-        async with PineconeAsyncio(api_key=self._api_key()) as pc:
+        async with PineconeAsyncio(**self._client_kwargs(config)) as pc:
             index_model = await pc.describe_index(config.collection_name)
             return index_model.host
 
     async def _index(self, config: PineconeConfig) -> Any:
         host = await self._resolve_host(config)
-        pc = PineconeAsyncio(api_key=self._api_key())
+        pc = PineconeAsyncio(**self._client_kwargs(config))
         return pc.IndexAsyncio(host=host)
 
     async def add(

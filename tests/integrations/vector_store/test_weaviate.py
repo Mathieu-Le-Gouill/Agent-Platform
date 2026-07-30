@@ -39,23 +39,38 @@ class TestWeaviateConstruction:
         monkeypatch.delenv("WEAVIATE_URL", raising=False)
         monkeypatch.delenv("WEAVIATE_API_KEY", raising=False)
         store = WeaviateStore()
-        assert store._credentials.url == "http://localhost:8080"
+        assert store._base_url() == "http://localhost:8080"
         assert isinstance(store._default_config(), WeaviateConfig)
 
     def test_custom_credentials_stored(self):
         import agent_platform.integrations.vector_store.weaviate.provider as mod
 
-        creds = mod.WeaviateCredentials(url="http://localhost:8080", api_key=None)
+        creds = mod.WeaviateCredentials(api_key=None)
         assert_custom_construction_stored(WeaviateStore, creds)
+
+    def test_base_url_from_env_when_client_options_unset(self, monkeypatch):
+        monkeypatch.setenv("WEAVIATE_URL", "http://weaviate-env:8080")
+        store = WeaviateStore()
+        assert store._base_url() == "http://weaviate-env:8080"
+
+    def test_base_url_client_options_takes_precedence_over_env(self, monkeypatch):
+        from agent_platform.core.credentials import ClientOptions
+
+        monkeypatch.setenv("WEAVIATE_URL", "http://weaviate-env:8080")
+        store = WeaviateStore(
+            client_options=ClientOptions(base_url="http://custom:9200")
+        )
+        assert store._base_url() == "http://custom:9200"
 
 
 class TestWeaviateConnect:
     async def test_connect_to_local_without_api_key(self, provider, monkeypatch):
         import agent_platform.integrations.vector_store.weaviate.provider as mod
+        from agent_platform.core.credentials import resolve_client_options
 
-        provider._credentials = mod.WeaviateCredentials(
-            url="http://localhost:8080", api_key=None
-        )
+        provider._credentials = mod.WeaviateCredentials(api_key=None)
+        provider._client_options = resolve_client_options(None)
+        monkeypatch.delenv("WEAVIATE_URL", raising=False)
         captured = {}
         mock_client = MagicMock()
         mock_client.connect = AsyncMock()
@@ -67,13 +82,19 @@ class TestWeaviateConnect:
         result = await provider._connect(WeaviateConfig())
         assert result is mock_client
         assert captured["host"] == "localhost"
+        assert captured["additional_config"] is None
         mock_client.connect.assert_awaited_once()
 
     async def test_connect_to_custom_with_api_key(self, provider, monkeypatch):
         import agent_platform.integrations.vector_store.weaviate.provider as mod
+        from agent_platform.core.credentials import (
+            ClientOptions,
+            resolve_client_options,
+        )
 
-        provider._credentials = mod.WeaviateCredentials(
-            url="https://weaviate.example.com:8443", api_key="secret"
+        provider._credentials = mod.WeaviateCredentials(api_key="secret")
+        provider._client_options = resolve_client_options(
+            ClientOptions(base_url="https://weaviate.example.com:8443")
         )
         captured = {}
         mock_client = MagicMock()
@@ -87,6 +108,29 @@ class TestWeaviateConnect:
         assert result is mock_client
         assert captured["http_host"] == "weaviate.example.com"
         assert captured["http_secure"] is True
+
+    async def test_connect_passes_additional_config_when_timeout_set(
+        self, provider, monkeypatch
+    ):
+        import agent_platform.integrations.vector_store.weaviate.provider as mod
+        from agent_platform.core.credentials import resolve_client_options
+
+        provider._credentials = mod.WeaviateCredentials(api_key=None)
+        provider._client_options = resolve_client_options(None)
+        monkeypatch.delenv("WEAVIATE_URL", raising=False)
+        captured = {}
+        mock_client = MagicMock()
+        mock_client.connect = AsyncMock()
+        monkeypatch.setattr(
+            mod.weaviate,
+            "use_async_with_local",
+            lambda **kw: captured.update(kw) or mock_client,
+        )
+        await provider._connect(WeaviateConfig(timeout=12.5))
+        additional_config = captured["additional_config"]
+        assert additional_config is not None
+        assert additional_config.timeout.query == 12.5
+        assert additional_config.timeout.insert == 12.5
 
 
 class TestWeaviateFilter:
@@ -165,19 +209,25 @@ class TestParseUrl:
 
 
 class TestWeaviateConnectionTarget:
-    def test_prefers_structured_fields_over_url(self, provider):
-        provider._credentials = type(
-            "C", (), {"url": "http://localhost:8080", "api_key": None}
-        )()
+    def test_prefers_structured_fields_over_url(self, provider, monkeypatch):
+        from agent_platform.core.credentials import resolve_client_options
+
+        monkeypatch.delenv("WEAVIATE_URL", raising=False)
+        provider._client_options = resolve_client_options(None)
         host, port, secure = provider._connection_target(
             WeaviateConfig(http_host="custom-host", http_port=9999)
         )
         assert (host, port, secure) == ("custom-host", 9999, False)
 
     def test_falls_back_to_url_parsing_when_unset(self, provider):
-        provider._credentials = type(
-            "C", (), {"url": "https://weaviate.example.com:8443", "api_key": None}
-        )()
+        from agent_platform.core.credentials import (
+            ClientOptions,
+            resolve_client_options,
+        )
+
+        provider._client_options = resolve_client_options(
+            ClientOptions(base_url="https://weaviate.example.com:8443")
+        )
         host, port, secure = provider._connection_target(WeaviateConfig())
         assert (host, port, secure) == ("weaviate.example.com", 8443, True)
 

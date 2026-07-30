@@ -5,7 +5,12 @@ from uuid import UUID
 
 from qdrant_client import AsyncQdrantClient, models
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
 from agent_platform.core.retry import with_retry
@@ -21,19 +26,29 @@ from agent_platform.integrations.vector_store.qdrant.mappers import (
 
 
 class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
-    def __init__(self, credentials: QdrantCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: QdrantCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, QdrantCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> QdrantConfig:
         return QdrantConfig()
 
     def _client(self, config: QdrantConfig) -> AsyncQdrantClient:
+        timeout = resolve_timeout(config.timeout, self._client_options)
+        # No simple max_retries constructor kwarg confirmed for qdrant-client,
+        # so it stays unwired here (same honest-exemption style as
+        # `llm/mistral/provider.py::MistralLLM._async_client`).
         return AsyncQdrantClient(
             url=config.url,
             api_key=self._credentials.api_key.get_secret_value()
             if self._credentials.api_key
             else None,
             prefer_grpc=config.prefer_grpc,
+            timeout=int(timeout) if timeout is not None else None,
         )
 
     def _filter(self, filter: dict[str, Any] | None) -> models.Filter | None:

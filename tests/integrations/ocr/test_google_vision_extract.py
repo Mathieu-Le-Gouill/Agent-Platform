@@ -258,6 +258,60 @@ async def test_client_is_cached_across_calls(mocker):
     mock_vision.ImageAnnotatorClient.assert_called_once()
 
 
+async def test_client_uses_api_endpoint_from_client_options(mocker):
+    from agent_platform.core.credentials import ClientOptions
+
+    mock_vision = mocker.patch(
+        "agent_platform.integrations.ocr.google_vision.provider.vision"
+    )
+    mock_client = MagicMock()
+    mock_vision.ImageAnnotatorClient.return_value = mock_client
+
+    ocr = GoogleVisionOCR(
+        client_options=ClientOptions(base_url="https://vision.example.com")
+    )
+    ocr._get_client()
+
+    _, kwargs = mock_vision.ImageAnnotatorClient.call_args
+    assert kwargs["client_options"] == {"api_endpoint": "https://vision.example.com"}
+
+
+async def test_client_omits_client_options_when_no_base_url(mocker):
+    mock_vision = mocker.patch(
+        "agent_platform.integrations.ocr.google_vision.provider.vision"
+    )
+    mock_client = MagicMock()
+    mock_vision.ImageAnnotatorClient.return_value = mock_client
+
+    ocr = GoogleVisionOCR()
+    ocr._get_client()
+
+    _, kwargs = mock_vision.ImageAnnotatorClient.call_args
+    assert kwargs["client_options"] is None
+
+
+async def test_client_from_service_account_file_uses_api_endpoint(mocker):
+    from agent_platform.core.credentials import ClientOptions
+    from agent_platform.integrations.credentials import GoogleVisionCredentials
+
+    mock_vision = mocker.patch(
+        "agent_platform.integrations.ocr.google_vision.provider.vision"
+    )
+    mock_client = MagicMock()
+    mock_vision.ImageAnnotatorClient.from_service_account_file.return_value = (
+        mock_client
+    )
+
+    ocr = GoogleVisionOCR(
+        GoogleVisionCredentials(credentials_path="/path/to/creds.json"),
+        client_options=ClientOptions(base_url="https://vision.example.com"),
+    )
+    ocr._get_client()
+
+    _, kwargs = mock_vision.ImageAnnotatorClient.from_service_account_file.call_args
+    assert kwargs["client_options"] == {"api_endpoint": "https://vision.example.com"}
+
+
 async def test_extract_handles_missing_confidence(mocker):
     mock_vision = mocker.patch(
         "agent_platform.integrations.ocr.google_vision.provider.vision"

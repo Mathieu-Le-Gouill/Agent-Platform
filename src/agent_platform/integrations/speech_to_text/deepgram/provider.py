@@ -3,7 +3,13 @@ from __future__ import annotations
 import asyncio
 from collections.abc import AsyncIterator
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_max_retries,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.core.retry import with_retry
@@ -18,8 +24,13 @@ from agent_platform.integrations.speech_to_text.language import parse_language
 
 
 class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
-    def __init__(self, credentials: DeepgramCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: DeepgramCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, DeepgramCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> DeepgramConfig:
         return DeepgramConfig()
@@ -30,10 +41,22 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
         )
         return api_key.get_secret_value()
 
-    def _build_client(self):
+    def _build_client(self, config: DeepgramConfig):
         from deepgram import AsyncDeepgramClient
 
-        return AsyncDeepgramClient(api_key=self._api_key())
+        # `AsyncDeepgramClient`'s generated `BaseClient.__init__` (deepgram/base_client.py)
+        # takes plain `timeout: float | None` / `max_retries: int | None` kwargs with the
+        # same semantics as `ClientOptions`, so those two resolve cleanly. `base_url` does
+        # not: the SDK has no single base-URL kwarg, only an `environment:
+        # DeepgramClientEnvironment` object with 4 separate URLs (`base`/`production`/
+        # `agent`/`agent_rest` for REST vs. websocket vs. the voice-agent endpoints), so a
+        # single `ClientOptions.base_url` string has no faithful 1:1 translation. Left
+        # unwired rather than guessing which of the 4 URLs it should populate.
+        return AsyncDeepgramClient(
+            api_key=self._api_key(),
+            timeout=resolve_timeout(config.timeout, self._client_options),
+            max_retries=resolve_max_retries(config.max_retries, self._client_options),
+        )
 
     @error_logged(re_raise=ProviderError, message="Speech-to-text failed")
     @with_retry()
@@ -41,7 +64,7 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
         self, audio: AudioChunk, config: DeepgramConfig | None = None
     ) -> Transcript:
         config = config or self._default_config()
-        client = self._build_client()
+        client = self._build_client(config)
 
         kwargs = dict(
             model=config.model,
@@ -93,7 +116,7 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
         config = config or self._default_config()
 
         async def _stream() -> AsyncIterator[Transcript]:
-            client = self._build_client()
+            client = self._build_client(config)
 
             connect_kwargs = dict(
                 model=config.model,

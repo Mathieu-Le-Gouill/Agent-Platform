@@ -28,6 +28,32 @@ def test_missing_credentials_raises_on_sync_client():
         provider._sync_client(CohereRerankerConfig())
 
 
+class TestClientKwargs:
+    def test_default_max_retries(self):
+        provider = _provider()
+        kwargs = provider._client_kwargs(CohereRerankerConfig(max_retries=None))
+        assert kwargs["max_retries"] == 3
+        assert "timeout" not in kwargs
+
+    def test_explicit_timeout_and_retries(self):
+        provider = _provider()
+        cfg = CohereRerankerConfig(timeout=15.0, max_retries=5)
+        kwargs = provider._client_kwargs(cfg)
+        assert kwargs["timeout"] == 15.0
+        assert kwargs["max_retries"] == 5
+
+    def test_client_options_fallback(self):
+        from agent_platform.core.credentials import ClientOptions
+
+        provider = CohereRerankerProvider(
+            CohereCredentials(api_key=SecretStr("test-key")),
+            client_options=ClientOptions(timeout=60.0, max_retries=7),
+        )
+        kwargs = provider._client_kwargs(CohereRerankerConfig())
+        assert kwargs["timeout"] == 60.0
+        assert kwargs["max_retries"] == 7
+
+
 class TestSync:
     def test_forwards_top_k_as_top_n(self, mocker):
         mock_client_cls = mocker.patch(

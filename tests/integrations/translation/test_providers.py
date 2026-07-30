@@ -3,6 +3,7 @@ from unittest.mock import MagicMock
 import deepl
 import pytest
 
+from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.interfaces.translation.base import BaseTranslator
 from agent_platform.core.schemas.chunk import TextChunk
@@ -159,6 +160,31 @@ class TestDeepLTranslator:
 
         assert result.text == "Hello"
 
+    def test_no_base_url_omits_server_url_kwarg(self, mocker):
+        mock_translator_cls = mocker.patch(
+            "agent_platform.integrations.translation.deepl.provider.deepl.Translator"
+        )
+
+        translator = DeepLTranslator(_deepl_credentials())
+        translator._client(DeepLConfig())
+
+        _, kwargs = mock_translator_cls.call_args
+        assert "server_url" not in kwargs
+
+    def test_base_url_forwarded_as_server_url(self, mocker):
+        mock_translator_cls = mocker.patch(
+            "agent_platform.integrations.translation.deepl.provider.deepl.Translator"
+        )
+
+        translator = DeepLTranslator(
+            _deepl_credentials(),
+            client_options=ClientOptions(base_url="https://custom.deepl.example"),
+        )
+        translator._client(DeepLConfig())
+
+        _, kwargs = mock_translator_cls.call_args
+        assert kwargs["server_url"] == "https://custom.deepl.example"
+
 
 class TestGoogleTranslator:
     def test_constructor_no_args(self):
@@ -244,3 +270,30 @@ class TestGoogleTranslator:
         result = await translator.atranslate(content, target=Language.FR)
 
         assert result.text == "Bonjour"
+
+    def test_no_base_url_omits_client_options_endpoint(self, mocker):
+        mock_module = mocker.patch(
+            "agent_platform.integrations.translation.google_translate.provider.google_translate"
+        )
+
+        translator = GoogleTranslator(GoogleTranslateCredentials())
+        translator._client(GoogleTranslateConfig())
+
+        _, kwargs = mock_module.Client.call_args
+        assert kwargs["client_options"] is None
+
+    def test_base_url_forwarded_as_api_endpoint(self, mocker):
+        mock_module = mocker.patch(
+            "agent_platform.integrations.translation.google_translate.provider.google_translate"
+        )
+
+        translator = GoogleTranslator(
+            GoogleTranslateCredentials(),
+            client_options=ClientOptions(base_url="https://custom.translate.example"),
+        )
+        translator._client(GoogleTranslateConfig())
+
+        _, kwargs = mock_module.Client.call_args
+        assert kwargs["client_options"] == {
+            "api_endpoint": "https://custom.translate.example"
+        }

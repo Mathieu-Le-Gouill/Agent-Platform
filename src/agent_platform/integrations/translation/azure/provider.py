@@ -4,7 +4,13 @@ from azure.ai.translation.text import TextTranslationClient
 from azure.ai.translation.text.models import TranslateInputItem, TranslationTarget
 from azure.core.credentials import AzureKeyCredential
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_max_retries,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, require_secret
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
@@ -12,10 +18,17 @@ from agent_platform.integrations.credentials import AzureTranslatorCredentials
 from agent_platform.integrations.translation._base import NativeTranslator
 from agent_platform.integrations.translation.azure.config import AzureTranslatorConfig
 
+_DEFAULT_ENDPOINT = "https://api.cognitive.microsofttranslator.com"
+
 
 class AzureTranslator(NativeTranslator[AzureTranslatorConfig, TextTranslationClient]):
-    def __init__(self, credentials: AzureTranslatorCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: AzureTranslatorCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, AzureTranslatorCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> AzureTranslatorConfig:
         return AzureTranslatorConfig()
@@ -25,11 +38,21 @@ class AzureTranslator(NativeTranslator[AzureTranslatorConfig, TextTranslationCli
             self._credentials.api_key, "Azure Translator API key is required"
         )
         credential = AzureKeyCredential(api_key.get_secret_value())
+        kwargs: dict[str, int | float] = {
+            "retry_total": resolve_max_retries(
+                config.max_retries, self._client_options
+            ),
+        }
+        timeout = resolve_timeout(config.timeout, self._client_options)
+        if timeout is not None:
+            kwargs["connection_timeout"] = timeout
+            kwargs["read_timeout"] = timeout
         return TextTranslationClient(
-            endpoint=self._credentials.endpoint,
+            endpoint=self._client_options.base_url or _DEFAULT_ENDPOINT,
             credential=credential,
             region=self._credentials.region,
             api_version=config.api_version,
+            **kwargs,  # type: ignore[arg-type]
         )
 
     def _invoke(

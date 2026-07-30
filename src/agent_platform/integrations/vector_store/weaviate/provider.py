@@ -5,12 +5,18 @@ from uuid import UUID
 
 import weaviate
 import weaviate.auth
+import weaviate.config
 from weaviate.classes.query import Filter, MetadataQuery
 from weaviate.client import WeaviateAsyncClient
 from weaviate.collections.classes.data import DataObject
 from weaviate.collections.classes.filters import _Filters
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.interfaces.vector_store.base import BaseVectorStore
 from agent_platform.core.retry import with_retry
@@ -22,6 +28,9 @@ from agent_platform.integrations.vector_store.weaviate.mappers import (
     chunk_to_properties,
     object_to_chunk,
 )
+from agent_platform.utils.env import from_env
+
+_DEFAULT_URL = "http://localhost:8080"
 
 
 def _parse_url(url: str) -> tuple[str, int, bool]:
@@ -37,22 +46,44 @@ def _parse_url(url: str) -> tuple[str, int, bool]:
 
 
 class WeaviateStore(BaseVectorStore[WeaviateConfig]):
-    def __init__(self, credentials: WeaviateCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: WeaviateCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, WeaviateCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> WeaviateConfig:
         return WeaviateConfig()
 
+    def _base_url(self) -> str:
+        return self._client_options.base_url or from_env("WEAVIATE_URL") or _DEFAULT_URL
+
     def _connection_target(self, config: WeaviateConfig) -> tuple[str, int, bool]:
-        host, port, secure = _parse_url(self._credentials.url)
+        host, port, secure = _parse_url(self._base_url())
         if config.http_host is not None:
             host = config.http_host
         if config.http_port is not None:
             port = config.http_port
         return host, port, secure
 
+    def _additional_config(
+        self, config: WeaviateConfig
+    ) -> weaviate.config.AdditionalConfig | None:
+        timeout = resolve_timeout(config.timeout, self._client_options)
+        # No simple max_retries knob exists for weaviate-client's async
+        # connection helpers, so it stays unwired here (same honest-exemption
+        # style as `llm/mistral/provider.py::MistralLLM._async_client`).
+        if timeout is None:
+            return None
+        return weaviate.config.AdditionalConfig(
+            timeout=weaviate.config.Timeout(query=timeout, insert=timeout)
+        )
+
     async def _connect(self, config: WeaviateConfig) -> WeaviateAsyncClient:
         host, port, secure = self._connection_target(config)
+        additional_config = self._additional_config(config)
         if self._credentials.api_key:
             client = weaviate.use_async_with_custom(
                 http_host=host,
@@ -64,10 +95,14 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
                 auth_credentials=weaviate.auth.AuthApiKey(
                     self._credentials.api_key.get_secret_value()
                 ),
+                additional_config=additional_config,
             )
         else:
             client = weaviate.use_async_with_local(
-                host=host, port=port, grpc_port=config.grpc_port
+                host=host,
+                port=port,
+                grpc_port=config.grpc_port,
+                additional_config=additional_config,
             )
         await client.connect()
         return client
