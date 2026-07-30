@@ -26,6 +26,34 @@ repos:
         language: system
         pass_filenames: false
 
+      - id: ruff-check-ci
+        name: ruff check (full repo, CI-equivalent)
+        entry: uv run ruff check .
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: ruff-format-ci
+        name: ruff format --check (full repo, CI-equivalent)
+        entry: uv run ruff format --check .
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: mypy-ci
+        name: mypy (CI-equivalent)
+        entry: uv run mypy src/
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
+      - id: lint-imports-ci
+        name: lint-imports (CI-equivalent)
+        entry: uv run lint-imports
+        language: system
+        pass_filenames: false
+        stages: [pre-push]
+
       - id: pytest-full
         name: pytest (full suite)
         entry: uv run --extra dev pytest -q
