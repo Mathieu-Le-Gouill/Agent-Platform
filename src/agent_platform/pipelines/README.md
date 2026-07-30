@@ -28,12 +28,12 @@ Audio → [STT] → Transcript → [Translator] → Translated Transcript
 **Status: Complete**
 
 ```python
-async def ingest(sources, loader: Loader, chunker: Chunker, embedder: Embedder, store: VectorStore, config=None) -> None:
-    documents = await loader.arun(sources)
-    chunks = await chunker.arun(documents)
-    embedding_response = await embedder.arun(chunks)
+async def ingest(sources, loader: Loader, chunker: Chunker, embedder: Embedder, store: VectorStore, loader_config=None, chunker_config=None, embedding_config=None, store_config=None) -> None:
+    documents = await loader.arun((sources, loader_config))
+    chunks = await chunker.arun((documents, chunker_config))
+    embedding_response = await embedder.arun((chunks, embedding_config))
     vectors = [embedding.to_list() for embedding in embedding_response.embeddings]
-    await store.add(chunks, vectors, config=config)
+    await store.add(chunks, vectors, config=store_config)
 ```
 
 Chunks are embedded via `Embedder` before reaching the store; `VectorStore.add()` takes the precomputed `vectors` directly rather than relying on a vector store's own injected embedding backend.

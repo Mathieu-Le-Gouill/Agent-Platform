@@ -71,9 +71,9 @@ class TestIngest:
         sources = ["a.txt", "b.txt"]
         await ingest(sources, mock_loader, mock_chunker, mock_embedder, mock_store)
 
-        mock_loader.arun.assert_awaited_once_with(sources)
-        mock_chunker.arun.assert_awaited_once_with(sample_documents)
-        mock_embedder.arun.assert_awaited_once_with(sample_chunks)
+        mock_loader.arun.assert_awaited_once_with((sources, None))
+        mock_chunker.arun.assert_awaited_once_with((sample_documents, None))
+        mock_embedder.arun.assert_awaited_once_with((sample_chunks, None))
         mock_store.add.assert_awaited_once_with(
             sample_chunks, [[0.1, 0.2], [0.3, 0.4]], config=None
         )
@@ -88,7 +88,7 @@ class TestIngest:
             mock_chunker,
             mock_embedder,
             mock_store,
-            config=config,
+            store_config=config,
         )
         mock_store.add.assert_awaited_once_with(
             sample_chunks, [[0.1, 0.2], [0.3, 0.4]], config=config
@@ -169,8 +169,12 @@ class TestQuery:
         )
 
         mock_embedder.arun.assert_awaited_once()
-        mock_vector_search.arun.assert_awaited_once_with(([0.1, 0.2, 0.3], 5, None))
-        mock_reranker.arun.assert_awaited_once_with(("what is this?", sample_chunks))
+        mock_vector_search.arun.assert_awaited_once_with(
+            ([0.1, 0.2, 0.3], 5, None, None)
+        )
+        mock_reranker.arun.assert_awaited_once_with(
+            ("what is this?", sample_chunks, None)
+        )
         mock_generator.arun.assert_awaited_once()
         assert result.model == "test-model"
 
@@ -187,7 +191,7 @@ class TestQuery:
             filter={"source": "doc.txt"},
         )
         mock_vector_search.arun.assert_awaited_once_with(
-            ([0.1, 0.2, 0.3], 3, {"source": "doc.txt"})
+            ([0.1, 0.2, 0.3], 3, {"source": "doc.txt"}, None)
         )
 
     async def test_query_builds_prompt_from_reranked_context(
@@ -200,7 +204,7 @@ class TestQuery:
             mock_reranker,
             mock_generator,
         )
-        prompt = mock_generator.arun.await_args.args[0]
+        prompt, _config = mock_generator.arun.await_args.args[0]
         system_text = prompt.system_prompt()
         assert "result 1" in system_text
         assert "result 2" in system_text

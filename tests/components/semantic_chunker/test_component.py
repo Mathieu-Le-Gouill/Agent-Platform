@@ -13,7 +13,8 @@ class _FakeEmbedder(Embedder):
         self._vectors = vectors
 
     async def arun(self, input):
-        vectors = self._vectors[: len(input)]
+        chunks, _config = input
+        vectors = self._vectors[: len(chunks)]
         return EmbeddingResponse(
             embeddings=[Embedding.from_list(v) for v in vectors],
             model="fake",
@@ -26,7 +27,7 @@ async def test_single_sentence_returns_one_chunk():
     chunker = SemanticChunker(embedder)
     doc = TextDocument(text="Only one sentence here.")
 
-    chunks = await chunker.arun([doc])
+    chunks = await chunker.arun(([doc], None))
 
     assert len(chunks) == 1
     assert chunks[0].text == "Only one sentence here."
@@ -39,7 +40,7 @@ async def test_empty_document_returns_no_chunks():
     chunker = SemanticChunker(embedder)
     doc = TextDocument(text="   ")
 
-    chunks = await chunker.arun([doc])
+    chunks = await chunker.arun(([doc], None))
 
     assert chunks == []
 
@@ -55,12 +56,12 @@ async def test_breaks_on_low_similarity():
     ]
     embedder = _FakeEmbedder(vectors)
     config = SemanticChunkerConfig(breakpoint_percentile_threshold=50.0)
-    chunker = SemanticChunker(embedder, config)
+    chunker = SemanticChunker(embedder)
     doc = TextDocument(
         text="First sentence. Second sentence. Third sentence. Fourth sentence."
     )
 
-    chunks = await chunker.arun([doc])
+    chunks = await chunker.arun(([doc], config))
 
     assert len(chunks) >= 2
     assert all(c.metadata["chunking_strategy"] == "semantic" for c in chunks)
@@ -73,7 +74,7 @@ async def test_multiple_documents_are_chunked_independently():
     doc1 = TextDocument(text="One. Two.")
     doc2 = TextDocument(text="Three. Four.")
 
-    chunks = await chunker.arun([doc1, doc2])
+    chunks = await chunker.arun(([doc1, doc2], None))
 
     doc_ids = {c.document_id for c in chunks}
     assert doc1.id in doc_ids

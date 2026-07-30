@@ -44,7 +44,7 @@ components/
 ├── speech_to_text/
 │   └── component.py               # (AudioChunk, config) → Transcript, plus astream() (wraps BaseSpeechToText)
 ├── vector_search/
-│   └── component.py               # (vector, k, filter) → list[(TextChunk, Score)] (wraps VectorStore.search_with_scores)
+│   └── component.py               # (vector, k, filter, config) → list[(TextChunk, Score)] (wraps VectorStore.search_with_scores)
 ├── dataset/
 │   └── component.py               # (path, config) → dict[DatasetSplit, BaseDatasetSplit[T]] (wraps BaseDatasetProvider, same per-call (data, config) input tuple as OCR/SpeechToText)
 ├── similarity_scorer/
@@ -75,40 +75,28 @@ components/
 Wraps one Integration provider. The backend is injected at init, the component exposes a clean input/output contract.
 
 ```python
-class Embedder(Component[list[TextChunk], EmbeddingResponse]):
-    def __init__(self, backend: BaseEmbeddingProvider, config=None): ...
-    async def arun(self, input: list[TextChunk]) -> EmbeddingResponse: ...
+class Embedder(Component[EmbedderInput[EmbedConfigT], EmbeddingResponse]):
+    def __init__(self, backend: BaseEmbeddingProvider) -> None: ...
+    async def arun(self, input: EmbedderInput[EmbedConfigT]) -> EmbeddingResponse: ...
 ```
 
 ### Where config lives: constructor, or `arun()` input?
 
-One question decides it: **will every call to this component use the same config?**
+Components follow the same split `integrations/` uses between what's fixed at construction and what varies per call, just with different names for the fixed part. An Integration provider takes `credentials`/`client_options` (secrets and transport settings) in `__init__` and `config` (behavior for one call) as a per-call method argument, never stored on `self`. A Component takes its backend(s) (constructor injection, the component's equivalent of a fixed client) in `__init__`, and **always** bundles `config` into the `arun()` input alongside the data, as a tuple: `(data, config)`. Never store `config` on `self` in a component's `__init__`, even if every call site happens to pass the same value, that's exactly what the corresponding integration provider itself doesn't do either.
 
-- **Yes, same config every call** → put it in `__init__` as `self._config`, `arun()`'s input is just the data. This is the common case: `Chunker`, `Embedder`, `Loader` all work this way.
-  ```python
-  class Embedder(Component[list[TextChunk], EmbeddingResponse]):
-      def __init__(self, backend: BaseEmbeddingProvider, config=None) -> None:
-          self._config = config
+```python
+class Embedder(Component[EmbedderInput[EmbedConfigT], EmbeddingResponse]):
+    def __init__(self, backend: BaseEmbeddingProvider) -> None:
+        self._backend = backend
 
-      async def arun(self, input: list[TextChunk]) -> EmbeddingResponse:
-          return await self._backend.aembed_document(input, self._config)
-  ```
+    async def arun(self, input: EmbedderInput[EmbedConfigT]) -> EmbeddingResponse:
+        chunks, config = input
+        return await self._backend.aembed_document(chunks, config)
+```
 
-- **No, config can differ per call** → don't put it in `__init__` at all. Bundle it into the `arun()` input alongside the data, as a tuple: `(data, config)`.
-  ```python
-  OCRInput = tuple[str, OCRConfigT | None]
+Every component in this directory follows this shape: `Chunker`, `Embedder`, `Generator`, `Loader`, `Reranker`, `VectorSearch`, `SemanticChunker`, `ContextualChunker`, `LLMClassifier`, `OCR`, `SpeechToText`, `Dataset`. `EmbeddingClassifier` and `SimilarityScorer` already took config per call (they compose other components rather than wrap a single backend) and needed no change.
 
-  class OCR(Component[OCRInput[OCRConfigT], list[TextChunk]]):
-      def __init__(self, backend: BaseOCR[OCRConfigT]) -> None:
-          self._backend = backend
-
-      async def arun(self, input: OCRInput[OCRConfigT]) -> list[TextChunk]:
-          source, config = input
-          return await self._backend.extract(source=source, config=config)
-  ```
-  `components/ocr`, `components/speech_to_text`, and `components/dataset` all use this shape, because their backend methods (`BaseOCR.extract(source, config, ...)`, `BaseSpeechToText.transcribe(audio, config)`, `BaseDatasetProvider.load(record_type, path, config)`) already take config as one argument among several per call, not a fixed setting.
-
-Getting this backwards locks one component instance to one config, when the whole point was to reuse it with a different config each call.
+Locking config into `__init__` ties one component instance to one config, when the whole point of constructor injection is to reuse the same instance with a different config each call, the same reason integration providers never store config on `self` either.
 
 ### Composite component (multiple backends)
 
@@ -150,7 +138,7 @@ No `__init__.py`, callers import `components.<name>.component` directly.
 
 - Backends are injected (constructor injection), never instantiated inside the component
 - Configs are typed Pydantic models
-- Config goes in `__init__` if every call uses the same one, otherwise into the `arun()` input alongside the data, see "Where config lives" above
+- Config always goes into the `arun()` input alongside the data as a `(data, config)` tuple, never into `__init__`, see "Where config lives" above
 - Errors are translated to `core/errors.py` types
 - Components may import from `core/`, `integrations/`, and `components/`, never from `pipelines/` or `agents/`
 - Every component is a directory (`components/<name>/component.py`), no flat-file components, matching `integrations/<domain>/<provider>/`'s layout

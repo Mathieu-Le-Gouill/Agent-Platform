@@ -13,30 +13,34 @@ from agent_platform.core.schemas.message import Prompt
 
 GenConfigT = TypeVar("GenConfigT", bound=GenerationConfig)
 
+ContextualChunkerInput = tuple[
+    list[TextDocument], ContextualChunkerConfig | None, GenConfigT | None
+]
+
 
 class ContextualChunker(
-    Component[list[TextDocument], list[TextChunk]],
+    Component[ContextualChunkerInput[GenConfigT], list[TextChunk]],
     Generic[GenConfigT],
 ):
     def __init__(
         self,
         chunker: Chunker,
         llm: BaseLLMProvider[GenConfigT],
-        config: ContextualChunkerConfig | None = None,
-        generation_config: GenConfigT | None = None,
     ) -> None:
         self._chunker = chunker
         self._llm = llm
-        self._config = config or ContextualChunkerConfig()
-        self._generation_config = generation_config
 
-    async def arun(self, input: list[TextDocument]) -> list[TextChunk]:
+    async def arun(self, input: ContextualChunkerInput[GenConfigT]) -> list[TextChunk]:
+        documents, config, generation_config = input
+        config = config or ContextualChunkerConfig()
         result: list[TextChunk] = []
-        for doc in input:
-            chunks = await self._chunker.arun([doc])
-            document_text = doc.text[: self._config.max_document_chars]
+        for doc in documents:
+            chunks = await self._chunker.arun(([doc], None))
+            document_text = doc.text[: config.max_document_chars]
             for chunk in chunks:
-                context = await self._generate_context(document_text, chunk.text)
+                context = await self._generate_context(
+                    document_text, chunk.text, config, generation_config
+                )
                 result.append(
                     chunk.model_copy(
                         update={
@@ -49,13 +53,19 @@ class ContextualChunker(
                 )
         return result
 
-    async def _generate_context(self, document: str, chunk_text: str) -> str:
+    async def _generate_context(
+        self,
+        document: str,
+        chunk_text: str,
+        config: ContextualChunkerConfig,
+        generation_config: GenConfigT | None,
+    ) -> str:
         prompt = Prompt.build(
-            user=self._config.context_prompt_template.format(
+            user=config.context_prompt_template.format(
                 document=document, chunk=chunk_text
             )
         )
-        response = await self._llm.agenerate(prompt, self._generation_config)
+        response = await self._llm.agenerate(prompt, generation_config)
         if response.message is None:
             return ""
         return response.message.text.strip()

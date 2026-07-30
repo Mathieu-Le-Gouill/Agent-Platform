@@ -24,24 +24,19 @@ logger = logging.getLogger(__name__)
 
 GenConfigT = TypeVar("GenConfigT", bound=GenerationConfig)
 
-_ClassifierInput = tuple[list[TextDocument], list[str], LLMClassifierConfig]
+_ClassifierInput = tuple[list[TextDocument], list[str], LLMClassifierConfig | None]
 
 
 class LLMClassifier(
     Component[_ClassifierInput, ClassificationResponse],
     Generic[GenConfigT],
 ):
-    def __init__(
-        self,
-        llm: BaseLLMProvider[GenConfigT],
-        config: LLMClassifierConfig | None = None,
-    ) -> None:
+    def __init__(self, llm: BaseLLMProvider[GenConfigT]) -> None:
         self._llm = llm
-        self._config = config or LLMClassifierConfig()
 
     async def arun(self, input: _ClassifierInput) -> ClassificationResponse:
         items, candidate_labels, config = input
-        config = config or self._config
+        config = config or LLMClassifierConfig()
         strategy = get_strategy(config.classification_mode)
 
         system_prompt = strategy.build_system_prompt(

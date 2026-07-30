@@ -11,26 +11,27 @@ from agent_platform.utils.batching import chunked
 
 EmbedConfigT = TypeVar("EmbedConfigT", bound=EmbeddingConfig)
 
+EmbedderInput = tuple[list[TextChunk], EmbedConfigT | None]
+
 
 class Embedder(
-    Component[list[TextChunk], EmbeddingResponse],
+    Component[EmbedderInput[EmbedConfigT], EmbeddingResponse],
     Generic[EmbedConfigT],
 ):
     def __init__(
         self,
         backend: BaseEmbeddingProvider[EmbedConfigT],
-        config: EmbedConfigT | None = None,
     ) -> None:
         self._backend = backend
-        self._config = config
 
-    async def arun(self, input: list[TextChunk]) -> EmbeddingResponse:
-        batch_size = (self._config or EmbeddingConfig()).batch_size
+    async def arun(self, input: EmbedderInput[EmbedConfigT]) -> EmbeddingResponse:
+        chunks, config = input
+        batch_size = (config or EmbeddingConfig()).batch_size
 
         embeddings = []
         model = ""
-        for batch in chunked(input, batch_size):
-            response = await self._backend.aembed_document(list(batch), self._config)
+        for batch in chunked(chunks, batch_size):
+            response = await self._backend.aembed_document(list(batch), config)
             embeddings.extend(response.embeddings)
             model = response.model
 

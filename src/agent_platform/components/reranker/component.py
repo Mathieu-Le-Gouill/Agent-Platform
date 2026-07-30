@@ -12,27 +12,26 @@ RerankerConfigT = TypeVar("RerankerConfigT", bound=RerankerConfig)
 
 ChunkT = TypeVar("ChunkT", bound=TextChunk)
 
-RerankerInput = tuple[str, list[ChunkT]]
+RerankerInput = tuple[str, list[ChunkT], RerankerConfigT | None]
 
 
 class Reranker(
-    Component[RerankerInput[ChunkT], list[ChunkT]], Generic[ChunkT, RerankerConfigT]
+    Component[RerankerInput[ChunkT, RerankerConfigT], list[ChunkT]],
+    Generic[ChunkT, RerankerConfigT],
 ):
     def __init__(
         self,
         backend: BaseReranker[ChunkT, RerankerConfigT],
-        config: RerankerConfigT | None = None,
     ) -> None:
         self._backend = backend
-        self._config = config
 
-    async def arun(self, input: RerankerInput[ChunkT]) -> list[ChunkT]:
-        query, items = input
-        batch_size = (self._config or RerankerConfig()).batch_size
+    async def arun(self, input: RerankerInput[ChunkT, RerankerConfigT]) -> list[ChunkT]:
+        query, items, config = input
+        batch_size = (config or RerankerConfig()).batch_size
 
         results: list[ChunkT] = []
         for batch in chunked(items, batch_size):
-            reranked = await self._backend.arerank(query, list(batch), self._config)
+            reranked = await self._backend.arerank(query, list(batch), config)
             results.extend(reranked)
 
         return results

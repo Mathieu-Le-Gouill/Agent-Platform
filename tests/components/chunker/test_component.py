@@ -14,7 +14,7 @@ class TestChunker:
         documents = [TextDocument(text="doc")]
 
         chunker = Chunker(backend=backend)
-        result = await chunker.arun(documents)
+        result = await chunker.arun((documents, None))
 
         assert result == expected
         backend.chunk.assert_called_once_with(documents, None)
@@ -25,8 +25,8 @@ class TestChunker:
         config = ChunkerConfig(chunk_size=100)
         documents = [TextDocument(text="doc")]
 
-        chunker = Chunker(backend=backend, config=config)
-        await chunker.arun(documents)
+        chunker = Chunker(backend=backend)
+        await chunker.arun((documents, config))
 
         backend.chunk.assert_called_once_with(documents, config)
 
@@ -35,6 +35,6 @@ class TestChunker:
         backend.chunk = MagicMock(return_value=[])
 
         chunker = Chunker(backend=backend)
-        result = await chunker.arun([])
+        result = await chunker.arun(([], None))
 
         assert result == []

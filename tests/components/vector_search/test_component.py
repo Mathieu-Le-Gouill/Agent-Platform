@@ -29,9 +29,9 @@ class _FakeVectorStore(VectorStore):
 async def test_forwards_vector_k_and_filter_to_backend():
     backend = _FakeVectorStore()
     config = VectorStoreConfig(collection_name="docs")
-    vector_search = VectorSearch(backend, config)
+    vector_search = VectorSearch(backend)
 
-    result = await vector_search.arun(([0.1, 0.2], 3, {"source": "wiki"}))
+    result = await vector_search.arun(([0.1, 0.2], 3, {"source": "wiki"}, config))
 
     assert result[0][0].text == "match"
     assert backend.calls[0] == ([0.1, 0.2], 3, config, {"source": "wiki"})

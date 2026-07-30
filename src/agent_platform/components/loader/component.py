@@ -10,21 +10,22 @@ from agent_platform.core.schemas.document import TextDocument
 
 LoaderConfigT = TypeVar("LoaderConfigT", bound=LoaderConfig)
 
+LoaderInput = tuple[Sequence[str], LoaderConfigT | None]
+
 
 class Loader(
-    Component[Sequence[str], list[TextDocument]],
+    Component[LoaderInput[LoaderConfigT], list[TextDocument]],
     Generic[LoaderConfigT],
 ):
     def __init__(
         self,
         backend: BaseMediaLoader[TextDocument, LoaderConfigT],
-        config: LoaderConfigT | None = None,
     ) -> None:
         self._backend = backend
-        self._config = config
 
-    async def arun(self, input: Sequence[str]) -> list[TextDocument]:
+    async def arun(self, input: LoaderInput[LoaderConfigT]) -> list[TextDocument]:
+        sources, config = input
         documents: list[TextDocument] = []
-        async for batch in self._backend.load_many(list(input), self._config):
+        async for batch in self._backend.load_many(list(sources), config):
             documents.extend(batch)
         return documents

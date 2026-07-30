@@ -10,26 +10,27 @@ from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.similarity import compute_similarity
 
+SemanticChunkerInput = tuple[list[TextDocument], SemanticChunkerConfig | None]
 
-class SemanticChunker(Component[list[TextDocument], list[TextChunk]]):
-    def __init__(
-        self,
-        embedder: Embedder,
-        config: SemanticChunkerConfig | None = None,
-    ) -> None:
+
+class SemanticChunker(Component[SemanticChunkerInput, list[TextChunk]]):
+    def __init__(self, embedder: Embedder) -> None:
         self._embedder = embedder
-        self._config = config or SemanticChunkerConfig()
 
-    async def arun(self, input: list[TextDocument]) -> list[TextChunk]:
+    async def arun(self, input: SemanticChunkerInput) -> list[TextChunk]:
+        documents, config = input
+        config = config or SemanticChunkerConfig()
         chunks: list[TextChunk] = []
-        for doc in input:
-            chunks.extend(await self._chunk_document(doc))
+        for doc in documents:
+            chunks.extend(await self._chunk_document(doc, config))
         return chunks
 
-    async def _chunk_document(self, doc: TextDocument) -> list[TextChunk]:
+    async def _chunk_document(
+        self, doc: TextDocument, config: SemanticChunkerConfig
+    ) -> list[TextChunk]:
         sentences = [
             s.strip()
-            for s in re.split(self._config.sentence_split_regex, doc.text)
+            for s in re.split(config.sentence_split_regex, doc.text)
             if s.strip()
         ]
         if not sentences:
@@ -38,25 +39,22 @@ class SemanticChunker(Component[list[TextDocument], list[TextChunk]]):
             return [self._make_chunk(doc, sentences[0], 0)]
 
         embed_response = await self._embedder.arun(
-            [TextChunk(text=s) for s in sentences]
+            ([TextChunk(text=s) for s in sentences], None)
         )
         vectors = [list(e.vector) for e in embed_response.embeddings]
 
         distances = [
-            1.0 - compute_similarity(vectors[i], vectors[i + 1], self._config.metric)
+            1.0 - compute_similarity(vectors[i], vectors[i + 1], config.metric)
             for i in range(len(vectors) - 1)
         ]
-        threshold = _percentile(distances, self._config.breakpoint_percentile_threshold)
+        threshold = _percentile(distances, config.breakpoint_percentile_threshold)
         breakpoints = {i for i, d in enumerate(distances) if d > threshold}
 
         groups: list[list[str]] = []
         current: list[str] = []
         for i, sentence in enumerate(sentences):
             current.append(sentence)
-            if (
-                i in breakpoints
-                and len(current) >= self._config.min_sentences_per_chunk
-            ):
+            if i in breakpoints and len(current) >= config.min_sentences_per_chunk:
                 groups.append(current)
                 current = []
         if current:

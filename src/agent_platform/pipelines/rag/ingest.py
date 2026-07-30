@@ -1,22 +1,25 @@
 from collections.abc import Sequence
 
-from agent_platform.components.chunker.component import Chunker
-from agent_platform.components.embedder.component import Embedder
-from agent_platform.components.loader.component import Loader
+from agent_platform.components.chunker.component import Chunker, ChunkerConfigT
+from agent_platform.components.embedder.component import EmbedConfigT, Embedder
+from agent_platform.components.loader.component import Loader, LoaderConfigT
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.interfaces.vector_store.port import VectorStore
 
 
 async def ingest(
     sources: Sequence[str],
-    loader: Loader,
-    chunker: Chunker,
-    embedder: Embedder,
+    loader: Loader[LoaderConfigT],
+    chunker: Chunker[ChunkerConfigT],
+    embedder: Embedder[EmbedConfigT],
     store: VectorStore,
-    config: VectorStoreConfig | None = None,
+    loader_config: LoaderConfigT | None = None,
+    chunker_config: ChunkerConfigT | None = None,
+    embedding_config: EmbedConfigT | None = None,
+    store_config: VectorStoreConfig | None = None,
 ) -> None:
-    documents = await loader.arun(sources)
-    chunks = await chunker.arun(documents)
-    embedding_response = await embedder.arun(chunks)
+    documents = await loader.arun((sources, loader_config))
+    chunks = await chunker.arun((documents, chunker_config))
+    embedding_response = await embedder.arun((chunks, embedding_config))
     vectors = [embedding.to_list() for embedding in embedding_response.embeddings]
-    await store.add(chunks, vectors, config=config)
+    await store.add(chunks, vectors, config=store_config)

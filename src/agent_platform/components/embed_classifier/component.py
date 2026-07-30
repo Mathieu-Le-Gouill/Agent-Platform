@@ -48,19 +48,19 @@ class EmbeddingClassifier(
 
         chunks_per_doc: dict[int, list[TextChunk]] = {}
         for i, doc in enumerate(items):
-            chunks = await self._chunker.arun([doc])
+            chunks = await self._chunker.arun(([doc], None))
             chunks_per_doc[i] = chunks
 
         all_chunks = [c for chunks in chunks_per_doc.values() for c in chunks]
 
-        embed_response = await self._embedder.arun(all_chunks)
+        embed_response = await self._embedder.arun((all_chunks, None))
         chunk_vectors = [
             (chunk, list(emb.vector))
             for chunk, emb in zip(all_chunks, embed_response.embeddings)
         ]
 
         label_chunks = [TextChunk(text=label) for label in candidate_labels]
-        label_embed_response = await self._embedder.arun(label_chunks)
+        label_embed_response = await self._embedder.arun((label_chunks, None))
         label_vectors = {
             label: list(emb.vector)
             for label, emb in zip(candidate_labels, label_embed_response.embeddings)

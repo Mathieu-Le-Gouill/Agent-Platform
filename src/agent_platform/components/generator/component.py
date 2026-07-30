@@ -10,15 +10,19 @@ from agent_platform.core.schemas.message import Prompt
 
 GenerationConfigT = TypeVar("GenerationConfigT", bound=GenerationConfig)
 
+GeneratorInput = tuple[Prompt, GenerationConfigT | None]
 
-class Generator(Component[Prompt, LLMResponse], Generic[GenerationConfigT]):
+
+class Generator(
+    Component[GeneratorInput[GenerationConfigT], LLMResponse],
+    Generic[GenerationConfigT],
+):
     def __init__(
         self,
         backend: BaseLLMProvider[GenerationConfigT],
-        config: GenerationConfigT | None = None,
     ) -> None:
         self._backend = backend
-        self._config = config
 
-    async def arun(self, input: Prompt) -> LLMResponse:
-        return await self._backend.agenerate(input, self._config)
+    async def arun(self, input: GeneratorInput[GenerationConfigT]) -> LLMResponse:
+        prompt, config = input
+        return await self._backend.agenerate(prompt, config)

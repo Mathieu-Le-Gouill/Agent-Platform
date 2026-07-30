@@ -60,7 +60,7 @@ class TestEmbeddingClassifier:
 
         assert isinstance(response, ClassificationResponse)
         assert response.results[0].label == "cat"
-        chunker.arun.assert_awaited_once_with([docs[0]])
+        chunker.arun.assert_awaited_once_with(([docs[0]], None))
         assert embedder.arun.await_count == 2
         similarity_scorer.arun.assert_awaited_once()
 

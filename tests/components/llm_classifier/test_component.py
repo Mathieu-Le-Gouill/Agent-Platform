@@ -145,7 +145,7 @@ class TestLLMClassifier:
 
     async def test_uses_default_config_when_input_config_falsy(self, mock_llm):
         mock_llm.agenerate = AsyncMock(return_value=_llm_response())
-        classifier = LLMClassifier(llm=mock_llm, config=LLMClassifierConfig())
+        classifier = LLMClassifier(llm=mock_llm)
         docs = [TextDocument(text="meow")]
         response = await classifier.arun((docs, ["cat"], None))
 

@@ -10,18 +10,19 @@ from agent_platform.core.schemas.document import TextDocument
 
 ChunkerConfigT = TypeVar("ChunkerConfigT", bound=ChunkerConfig)
 
+ChunkerInput = tuple[list[TextDocument], ChunkerConfigT | None]
+
 
 class Chunker(
-    Component[list[TextDocument], list[TextChunk]],
+    Component[ChunkerInput[ChunkerConfigT], list[TextChunk]],
     Generic[ChunkerConfigT],
 ):
     def __init__(
         self,
         backend: BaseChunker[TextDocument, TextChunk, ChunkerConfigT],
-        config: ChunkerConfigT | None = None,
     ) -> None:
         self._backend = backend
-        self._config = config
 
-    async def arun(self, input: list[TextDocument]) -> list[TextChunk]:
-        return self._backend.chunk(input, self._config)
+    async def arun(self, input: ChunkerInput[ChunkerConfigT]) -> list[TextChunk]:
+        documents, config = input
+        return self._backend.chunk(documents, config)

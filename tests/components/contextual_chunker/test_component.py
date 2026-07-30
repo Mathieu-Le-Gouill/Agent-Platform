@@ -48,7 +48,7 @@ async def test_prepends_generated_context_to_each_chunk():
     llm = _FakeLLM("Context sentence.")
     contextual_chunker = ContextualChunker(chunker, llm)
 
-    result = await contextual_chunker.arun([doc])
+    result = await contextual_chunker.arun(([doc], None, None))
 
     assert len(result) == 1
     assert result[0].text == "Context sentence.\n\nChunk body."
@@ -63,9 +63,9 @@ async def test_truncates_document_to_max_chars_in_prompt():
     chunker = _FakeChunker([chunk])
     llm = _FakeLLM("Context.")
     config = ContextualChunkerConfig(max_document_chars=10)
-    contextual_chunker = ContextualChunker(chunker, llm, config=config)
+    contextual_chunker = ContextualChunker(chunker, llm)
 
-    await contextual_chunker.arun([doc])
+    await contextual_chunker.arun(([doc], config, None))
 
     prompt_text = llm.calls[0].last_user_message().content
     assert "x" * 100 not in prompt_text
@@ -84,7 +84,7 @@ async def test_empty_llm_response_leaves_chunk_text_unchanged():
 
     contextual_chunker = ContextualChunker(chunker, _EmptyLLM())
 
-    result = await contextual_chunker.arun([doc])
+    result = await contextual_chunker.arun(([doc], None, None))
 
     assert result[0].text == "Chunk body."
     assert result[0].metadata["context"] == ""

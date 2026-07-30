@@ -36,9 +36,9 @@ def _chunks(n: int) -> list[TextChunk]:
 @pytest.mark.asyncio
 async def test_single_batch_when_under_limit():
     backend = _FakeEmbeddingProvider()
-    embedder = Embedder(backend, EmbeddingConfig(batch_size=10))
+    embedder = Embedder(backend)
 
-    response = await embedder.arun(_chunks(3))
+    response = await embedder.arun((_chunks(3), EmbeddingConfig(batch_size=10)))
 
     assert len(backend.batches) == 1
     assert len(response.embeddings) == 3
@@ -48,10 +48,10 @@ async def test_single_batch_when_under_limit():
 @pytest.mark.asyncio
 async def test_splits_into_multiple_batches_over_limit():
     backend = _FakeEmbeddingProvider()
-    embedder = Embedder(backend, EmbeddingConfig(batch_size=2))
+    embedder = Embedder(backend)
 
     chunks = _chunks(5)
-    response = await embedder.arun(chunks)
+    response = await embedder.arun((chunks, EmbeddingConfig(batch_size=2)))
 
     assert [len(b) for b in backend.batches] == [2, 2, 1]
     assert len(response.embeddings) == 5
@@ -60,10 +60,10 @@ async def test_splits_into_multiple_batches_over_limit():
 @pytest.mark.asyncio
 async def test_merged_output_preserves_input_order():
     backend = _FakeEmbeddingProvider()
-    embedder = Embedder(backend, EmbeddingConfig(batch_size=2))
+    embedder = Embedder(backend)
 
     chunks = _chunks(5)
-    response = await embedder.arun(chunks)
+    response = await embedder.arun((chunks, EmbeddingConfig(batch_size=2)))
 
     assert [e.vector[0] for e in response.embeddings] == [
         float(len(c.text)) for c in chunks
@@ -73,8 +73,8 @@ async def test_merged_output_preserves_input_order():
 @pytest.mark.asyncio
 async def test_defaults_to_config_batch_size_when_none_given():
     backend = _FakeEmbeddingProvider()
-    embedder = Embedder(backend, config=None)
+    embedder = Embedder(backend)
 
-    await embedder.arun(_chunks(EmbeddingConfig().batch_size + 1))
+    await embedder.arun((_chunks(EmbeddingConfig().batch_size + 1), None))
 
     assert len(backend.batches) == 2

@@ -50,14 +50,14 @@ class SearchTool(Tool):
     async def _search(self, validated: SearchInput) -> list[SearchResult]:
         query_chunk = TextChunk(id=uuid4(), text=validated.query, index=0)
         response = await safe_call(
-            self._embedder.arun([query_chunk]),
+            self._embedder.arun(([query_chunk], None)),
             "Embedding failed",
         )
         if not response.embeddings:
             raise ToolError("Embedding returned no vectors")
         vector = response.embeddings[0].to_list()
         results = await safe_call(
-            self._vector_search.arun((vector, validated.k, None)),
+            self._vector_search.arun((vector, validated.k, None, None)),
             "Vector search failed",
         )
         return [SearchResult(chunk=chunk, score=score) for chunk, score in results]
