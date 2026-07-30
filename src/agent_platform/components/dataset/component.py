@@ -13,20 +13,25 @@ from agent_platform.core.schemas.enums import DatasetSplit
 RecordT = TypeVar("RecordT")
 DatasetConfigT = TypeVar("DatasetConfigT", bound=DatasetConfig)
 
+DatasetInput = tuple[str, DatasetConfigT | None]
+
 
 class Dataset(
-    Component[str, dict[DatasetSplit, BaseDatasetSplit[RecordT]]],
+    Component[
+        DatasetInput[DatasetConfigT], dict[DatasetSplit, BaseDatasetSplit[RecordT]]
+    ],
     Generic[RecordT, DatasetConfigT],
 ):
     def __init__(
         self,
         backend: BaseDatasetProvider[RecordT, DatasetConfigT],
         record_type: type[RecordT],
-        config: DatasetConfigT | None = None,
     ) -> None:
         self._backend = backend
         self._record_type = record_type
-        self._config = config
 
-    async def arun(self, input: str) -> dict[DatasetSplit, BaseDatasetSplit[RecordT]]:
-        return await self._backend.aload(self._record_type, input, self._config)
+    async def arun(
+        self, input: DatasetInput[DatasetConfigT]
+    ) -> dict[DatasetSplit, BaseDatasetSplit[RecordT]]:
+        path, config = input
+        return await self._backend.aload(self._record_type, path, config)

@@ -12,23 +12,23 @@ class Record(BaseModel):
 
 
 class TestDatasetComponent:
-    async def test_arun_delegates_to_backend_aload_with_config(self):
+    async def test_arun_forwards_path_and_config_to_backend(self):
         backend = AsyncMock()
         backend.aload.return_value = {DatasetSplit.TRAIN: "sentinel"}
+        component = Dataset(backend=backend, record_type=Record)
         config = DatasetConfig(data_files="data.jsonl")
-        component = Dataset(backend=backend, record_type=Record, config=config)
 
-        result = await component.arun("json")
+        result = await component.arun(("json", config))
 
         backend.aload.assert_awaited_once_with(Record, "json", config)
         assert result == {DatasetSplit.TRAIN: "sentinel"}
 
-    async def test_arun_defaults_config_to_none(self):
+    async def test_arun_forwards_none_config(self):
         backend = AsyncMock()
         backend.aload.return_value = {DatasetSplit.TRAIN: "sentinel"}
         component = Dataset(backend=backend, record_type=Record)
 
-        result = await component.arun("json")
+        result = await component.arun(("json", None))
 
         backend.aload.assert_awaited_once_with(Record, "json", None)
         assert result == {DatasetSplit.TRAIN: "sentinel"}
@@ -38,6 +38,6 @@ class TestDatasetComponent:
         backend.aload.return_value = {DatasetSplit.TRAIN: "sentinel"}
         component = Dataset(backend=backend, record_type=Record)
 
-        result = component.run("json")
+        result = component.run(("json", None))
 
         assert result == {DatasetSplit.TRAIN: "sentinel"}

@@ -46,7 +46,7 @@ components/
 ├── vector_search/
 │   └── component.py               # (vector, k, filter) → list[(TextChunk, Score)] (wraps VectorStore.search_with_scores)
 ├── dataset/
-│   └── component.py               # path (str) → dict[DatasetSplit, BaseDatasetSplit[T]] (wraps BaseDatasetProvider, config injected at construction like Loader)
+│   └── component.py               # (path, config) → dict[DatasetSplit, BaseDatasetSplit[T]] (wraps BaseDatasetProvider, same per-call (data, config) input tuple as OCR/SpeechToText)
 ├── similarity_scorer/
 │   └── component.py               # Chunks × label vectors → ClassificationResult (pure logic)
 ├── semantic_chunker/              # TextDocument → TextChunk, splits on embedding-similarity breakpoints
