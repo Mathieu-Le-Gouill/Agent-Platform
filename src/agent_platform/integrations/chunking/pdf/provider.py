@@ -26,7 +26,7 @@ class PDFStructureChunkerProvider(
     def chunk(
         self,
         documents: Sequence[TextDocument],
-        config: PDFChunkerConfig | None,
+        config: PDFChunkerConfig | None = None,
     ) -> list[TextChunk]:
         config = config or self._default_config()
 

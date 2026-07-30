@@ -80,6 +80,31 @@ class Embedder(Component[list[TextChunk], EmbeddingResponse]):
     async def arun(self, input: list[TextChunk]) -> EmbeddingResponse: ...
 ```
 
+### Where config lives: constructor vs. `arun()` input
+
+Look at the backend ABC's own method signature to decide, don't default to either shape:
+
+- **Backend method takes `config` as one call among many identical ones** (the component is constructed once and reused across many `arun()` calls with the same settings, e.g. `Chunker`/`Embedder`/`Loader` always chunk/embed/load the same way): store it as `self._config` in `__init__`, `arun()`'s input is just the data.
+  ```python
+  class Embedder(Component[list[TextChunk], EmbeddingResponse]):
+      def __init__(self, backend: BaseEmbeddingProvider, config=None) -> None:
+          self._config = config
+      async def arun(self, input: list[TextChunk]) -> EmbeddingResponse:
+          return await self._backend.aembed_document(input, self._config)
+  ```
+- **Backend method takes `config` as an independent per-call argument alongside the data** (e.g. `BaseOCR.extract(source, config, ...)`, `BaseSpeechToText.transcribe(audio, config)`, `BaseDatasetProvider.load(record_type, path, config)`): don't stash a default in `__init__`, bundle both into the `arun()` input tuple instead, so a single component instance can be called with a different config every time.
+  ```python
+  OCRInput = tuple[str, OCRConfigT | None]
+
+  class OCR(Component[OCRInput[OCRConfigT], list[TextChunk]]):
+      def __init__(self, backend: BaseOCR[OCRConfigT]) -> None:
+          self._backend = backend
+      async def arun(self, input: OCRInput[OCRConfigT]) -> list[TextChunk]:
+          source, config = input
+          return await self._backend.extract(source=source, config=config)
+  ```
+  `components/ocr`, `components/speech_to_text`, and `components/dataset` all follow this shape. Getting this backwards (config in `__init__` for a per-call-config backend) forces one component instance per config variant instead of one instance reused with different configs per call, see `core/README.md`'s "Required parameters never live on config" rule for the symmetric mistake on the `core/interfaces` side.
+
 ### Composite component (multiple backends)
 
 Combines multiple Integration providers to produce a result that requires orchestration.
@@ -120,6 +145,7 @@ No `__init__.py`, callers import `components.<name>.component` directly.
 
 - Backends are injected (constructor injection), never instantiated inside the component
 - Configs are typed Pydantic models
+- Config lives in `__init__` only if the backend treats it as fixed per instance; if the backend's own method takes config as a per-call argument, bundle it into the `arun()` input tuple instead, see "Where config lives" above
 - Errors are translated to `core/errors.py` types
 - Components may import from `core/`, `integrations/`, and `components/`, never from `pipelines/` or `agents/`
 - Every component is a directory (`components/<name>/component.py`), no flat-file components, matching `integrations/<domain>/<provider>/`'s layout

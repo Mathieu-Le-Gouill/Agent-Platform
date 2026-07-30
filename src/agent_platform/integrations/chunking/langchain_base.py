@@ -26,7 +26,7 @@ class LangChainChunker(
     def chunk(
         self,
         documents: Sequence[TextDocument],
-        config: ChunkerConfigT | None,
+        config: ChunkerConfigT | None = None,
     ) -> list[TextChunk]:
         config = config or self._default_config()
 

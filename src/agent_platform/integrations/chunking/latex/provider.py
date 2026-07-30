@@ -20,7 +20,7 @@ class LatexChunkerProvider(LangChainChunker[LatexChunkerConfig]):
     def chunk(
         self,
         documents: Sequence[TextDocument],
-        config: LatexChunkerConfig | None,
+        config: LatexChunkerConfig | None = None,
     ) -> list[TextChunk]:
         for doc in documents:
             if doc.format not in _ACCEPTED_FORMATS:

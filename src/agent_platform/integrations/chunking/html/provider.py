@@ -27,7 +27,7 @@ class HTMLStructureChunkerProvider(
     def chunk(
         self,
         documents: Sequence[TextDocument],
-        config: HTMLChunkerConfig | None,
+        config: HTMLChunkerConfig | None = None,
     ) -> list[TextChunk]:
         config = config or self._default_config()
 

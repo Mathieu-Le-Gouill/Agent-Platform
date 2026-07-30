@@ -28,7 +28,7 @@ class MarkdownStructureChunkerProvider(
     def chunk(
         self,
         documents: Sequence[TextDocument],
-        config: MarkdownChunkerConfig | None,
+        config: MarkdownChunkerConfig | None = None,
     ) -> list[TextChunk]:
         config = config or self._default_config()
 

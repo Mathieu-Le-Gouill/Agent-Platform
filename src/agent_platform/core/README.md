@@ -60,6 +60,8 @@ An interface ABC **never imports from `integrations/`**, **never imports from `c
 
 **Defaults across providers:** don't hardcode one vendor's default onto the shared config, since other vendors often default differently for the same knob. Use `None` for "unset" and forward the field conditionally (`if config.x is not None`), so an untouched field lets each provider's own default apply (see `GenerationConfig.temperature`).
 
+**Required parameters never live on config:** `config` is always optional (`config: ConfigT | None = None`) on every ABC method, so a caller can always omit it and get provider defaults. That means any value a call cannot proceed without (a path, a query string, the text to classify, the items to embed, …) must be its own positional/keyword parameter on the method, never a `Config` field, even a required one, since a required config field would force every caller to construct a config just to make an otherwise-optional-looking argument work (`BaseDatasetProvider.load(self, record_type, path, config=None)` puts `path` directly on the signature rather than inside `DatasetConfig`, for exactly this reason). Concretely: no `<Domain>Config` field is ever declared without a default; every field has a `None` or concrete default so the config stays fully optional as a whole.
+
 ### `schemas/`: Shared Data Structures
 
 All Pydantic v2 models live here. They are the currency passed between layers, a component returns a schema type, a pipeline accepts one, a tool wraps one.

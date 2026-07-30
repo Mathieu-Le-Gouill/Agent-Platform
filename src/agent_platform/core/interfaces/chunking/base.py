@@ -16,5 +16,5 @@ class BaseChunker(ABC, Generic[DocumentT, ChunkT, ChunkerConfigT]):
     def chunk(
         self,
         documents: Sequence[DocumentT],
-        config: ChunkerConfigT | None,
+        config: ChunkerConfigT | None = None,
     ) -> list[ChunkT]: ...
