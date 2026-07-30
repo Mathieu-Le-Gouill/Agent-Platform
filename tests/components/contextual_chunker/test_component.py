@@ -1,7 +1,10 @@
 import pytest
 
 from agent_platform.components.chunker.component import Chunker
-from agent_platform.components.contextual_chunker.component import ContextualChunker
+from agent_platform.components.contextual_chunker.component import (
+    ContextualChunker,
+    ContextualChunkerInput,
+)
 from agent_platform.components.contextual_chunker.config import ContextualChunkerConfig
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.response import LLMResponse
@@ -48,7 +51,7 @@ async def test_prepends_generated_context_to_each_chunk():
     llm = _FakeLLM("Context sentence.")
     contextual_chunker = ContextualChunker(chunker, llm)
 
-    result = await contextual_chunker.arun(([doc], None, None))
+    result = await contextual_chunker.arun(ContextualChunkerInput([doc], None, None))
 
     assert len(result) == 1
     assert result[0].text == "Context sentence.\n\nChunk body."
@@ -65,7 +68,7 @@ async def test_truncates_document_to_max_chars_in_prompt():
     config = ContextualChunkerConfig(max_document_chars=10)
     contextual_chunker = ContextualChunker(chunker, llm)
 
-    await contextual_chunker.arun(([doc], config, None))
+    await contextual_chunker.arun(ContextualChunkerInput([doc], config, None))
 
     prompt_text = llm.calls[0].last_user_message().content
     assert "x" * 100 not in prompt_text
@@ -84,7 +87,7 @@ async def test_empty_llm_response_leaves_chunk_text_unchanged():
 
     contextual_chunker = ContextualChunker(chunker, _EmptyLLM())
 
-    result = await contextual_chunker.arun(([doc], None, None))
+    result = await contextual_chunker.arun(ContextualChunkerInput([doc], None, None))
 
     assert result[0].text == "Chunk body."
     assert result[0].metadata["context"] == ""

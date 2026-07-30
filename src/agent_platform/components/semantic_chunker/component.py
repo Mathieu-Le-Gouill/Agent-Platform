@@ -1,16 +1,20 @@
 from __future__ import annotations
 
 import re
+from typing import NamedTuple
 from uuid import uuid4
 
 from agent_platform.components.base import Component
-from agent_platform.components.embedder.component import Embedder
+from agent_platform.components.embedder.component import Embedder, EmbedderInput
 from agent_platform.components.semantic_chunker.config import SemanticChunkerConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.similarity import compute_similarity
 
-SemanticChunkerInput = tuple[list[TextDocument], SemanticChunkerConfig | None]
+
+class SemanticChunkerInput(NamedTuple):
+    documents: list[TextDocument]
+    config: SemanticChunkerConfig | None
 
 
 class SemanticChunker(Component[SemanticChunkerInput, list[TextChunk]]):
@@ -39,7 +43,7 @@ class SemanticChunker(Component[SemanticChunkerInput, list[TextChunk]]):
             return [self._make_chunk(doc, sentences[0], 0)]
 
         embed_response = await self._embedder.arun(
-            ([TextChunk(text=s) for s in sentences], None)
+            EmbedderInput([TextChunk(text=s) for s in sentences], None)
         )
         vectors = [list(e.vector) for e in embed_response.embeddings]
 

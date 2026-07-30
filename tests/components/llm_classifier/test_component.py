@@ -2,7 +2,10 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from agent_platform.components.llm_classifier.component import LLMClassifier
+from agent_platform.components.llm_classifier.component import (
+    LLMClassifier,
+    LLMClassifierInput,
+)
 from agent_platform.components.llm_classifier.config import LLMClassifierConfig
 from agent_platform.core.interfaces.llm.response import LLMResponse
 from agent_platform.core.schemas.document import TextDocument
@@ -39,7 +42,9 @@ class TestLLMClassifier:
         )
         classifier = LLMClassifier(llm=mock_llm)
         docs = [TextDocument(text="meow")]
-        response = await classifier.arun((docs, ["cat", "dog"], LLMClassifierConfig()))
+        response = await classifier.arun(
+            LLMClassifierInput(docs, ["cat", "dog"], LLMClassifierConfig())
+        )
 
         assert len(response.results) == 1
         assert response.results[0].label == "cat"
@@ -63,7 +68,9 @@ class TestLLMClassifier:
         classifier = LLMClassifier(llm=mock_llm)
         docs = [TextDocument(text="meow")]
         config = LLMClassifierConfig(multi_label=True)
-        response = await classifier.arun((docs, ["cat", "dog"], config))
+        response = await classifier.arun(
+            LLMClassifierInput(docs, ["cat", "dog"], config)
+        )
 
         assert [p.label for p in response.results[0].predictions] == ["cat", "dog"]
 
@@ -75,7 +82,9 @@ class TestLLMClassifier:
         )
         classifier = LLMClassifier(llm=mock_llm)
         docs = [TextDocument(text="meow")]
-        response = await classifier.arun((docs, ["cat"], LLMClassifierConfig()))
+        response = await classifier.arun(
+            LLMClassifierInput(docs, ["cat"], LLMClassifierConfig())
+        )
 
         assert response.results[0].predictions == []
 
@@ -85,7 +94,9 @@ class TestLLMClassifier:
         )
         classifier = LLMClassifier(llm=mock_llm)
         docs = [TextDocument(text="meow")]
-        response = await classifier.arun((docs, ["cat"], LLMClassifierConfig()))
+        response = await classifier.arun(
+            LLMClassifierInput(docs, ["cat"], LLMClassifierConfig())
+        )
 
         assert response.results[0].predictions == []
 
@@ -103,7 +114,9 @@ class TestLLMClassifier:
         )
         classifier = LLMClassifier(llm=mock_llm)
         docs = [TextDocument(text="meow")]
-        response = await classifier.arun((docs, ["cat"], LLMClassifierConfig()))
+        response = await classifier.arun(
+            LLMClassifierInput(docs, ["cat"], LLMClassifierConfig())
+        )
 
         assert response.results[0].predictions == []
 
@@ -122,7 +135,9 @@ class TestLLMClassifier:
         classifier = LLMClassifier(llm=mock_llm)
         docs = [TextDocument(text="meow")]
         with pytest.raises(KeyError):
-            await classifier.arun((docs, ["cat"], LLMClassifierConfig()))
+            await classifier.arun(
+                LLMClassifierInput(docs, ["cat"], LLMClassifierConfig())
+            )
 
     async def test_multiple_documents_produce_multiple_results(self, mock_llm):
         mock_llm.agenerate = AsyncMock(
@@ -138,7 +153,9 @@ class TestLLMClassifier:
         )
         classifier = LLMClassifier(llm=mock_llm)
         docs = [TextDocument(text="meow"), TextDocument(text="woof")]
-        response = await classifier.arun((docs, ["cat", "dog"], LLMClassifierConfig()))
+        response = await classifier.arun(
+            LLMClassifierInput(docs, ["cat", "dog"], LLMClassifierConfig())
+        )
 
         assert len(response.results) == 2
         assert mock_llm.agenerate.await_count == 2
@@ -147,6 +164,6 @@ class TestLLMClassifier:
         mock_llm.agenerate = AsyncMock(return_value=_llm_response())
         classifier = LLMClassifier(llm=mock_llm)
         docs = [TextDocument(text="meow")]
-        response = await classifier.arun((docs, ["cat"], None))
+        response = await classifier.arun(LLMClassifierInput(docs, ["cat"], None))
 
         assert len(response.results) == 1

@@ -3,6 +3,10 @@ from uuid import uuid4
 
 import pytest
 
+from agent_platform.components.chunker.component import ChunkerInput
+from agent_platform.components.embedder.component import EmbedderInput
+from agent_platform.components.reranker.component import RerankerInput
+from agent_platform.components.vector_search.component import VectorSearchInput
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.interfaces.llm.response import LLMResponse
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
@@ -72,8 +76,8 @@ class TestIngest:
         await ingest(sources, mock_loader, mock_chunker, mock_embedder, mock_store)
 
         mock_loader.arun.assert_awaited_once_with((sources, None))
-        mock_chunker.arun.assert_awaited_once_with((sample_documents, None))
-        mock_embedder.arun.assert_awaited_once_with((sample_chunks, None))
+        mock_chunker.arun.assert_awaited_once_with(ChunkerInput(sample_documents, None))
+        mock_embedder.arun.assert_awaited_once_with(EmbedderInput(sample_chunks, None))
         mock_store.add.assert_awaited_once_with(
             sample_chunks, [[0.1, 0.2], [0.3, 0.4]], config=None
         )
@@ -170,10 +174,10 @@ class TestQuery:
 
         mock_embedder.arun.assert_awaited_once()
         mock_vector_search.arun.assert_awaited_once_with(
-            ([0.1, 0.2, 0.3], 5, None, None)
+            VectorSearchInput([0.1, 0.2, 0.3], 5, None, None)
         )
         mock_reranker.arun.assert_awaited_once_with(
-            ("what is this?", sample_chunks, None)
+            RerankerInput("what is this?", sample_chunks, None)
         )
         mock_generator.arun.assert_awaited_once()
         assert result.model == "test-model"
@@ -191,7 +195,7 @@ class TestQuery:
             filter={"source": "doc.txt"},
         )
         mock_vector_search.arun.assert_awaited_once_with(
-            ([0.1, 0.2, 0.3], 3, {"source": "doc.txt"}, None)
+            VectorSearchInput([0.1, 0.2, 0.3], 3, {"source": "doc.txt"}, None)
         )
 
     async def test_query_builds_prompt_from_reranked_context(

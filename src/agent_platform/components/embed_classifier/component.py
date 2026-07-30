@@ -1,14 +1,17 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 from agent_platform.components.base import Component
-from agent_platform.components.chunker.component import Chunker
+from agent_platform.components.chunker.component import Chunker, ChunkerInput
 from agent_platform.components.embed_classifier.config import (
     EmbeddingClassifierConfig,
 )
-from agent_platform.components.embedder.component import Embedder
-from agent_platform.components.llm_classifier.component import LLMClassifier
+from agent_platform.components.embedder.component import Embedder, EmbedderInput
+from agent_platform.components.llm_classifier.component import (
+    LLMClassifier,
+    LLMClassifierInput,
+)
 from agent_platform.components.similarity_scorer.component import (
     SimilarityConfig,
     SimilarityInput,
@@ -24,11 +27,15 @@ from agent_platform.core.schemas.document import TextDocument
 
 EmbedConfigT = TypeVar("EmbedConfigT", bound=EmbeddingConfig)
 
-_EmbedClassifierInput = tuple[list[TextDocument], list[str], EmbeddingClassifierConfig]
+
+class EmbedClassifierInput(NamedTuple):
+    items: list[TextDocument]
+    candidate_labels: list[str]
+    config: EmbeddingClassifierConfig
 
 
 class EmbeddingClassifier(
-    Component[_EmbedClassifierInput, ClassificationResponse],
+    Component[EmbedClassifierInput, ClassificationResponse],
     Generic[EmbedConfigT],
 ):
     def __init__(
@@ -43,24 +50,26 @@ class EmbeddingClassifier(
         self._similarity_scorer = similarity_scorer
         self._llm_classifier = llm_classifier
 
-    async def arun(self, input: _EmbedClassifierInput) -> ClassificationResponse:
+    async def arun(self, input: EmbedClassifierInput) -> ClassificationResponse:
         items, candidate_labels, config = input
 
         chunks_per_doc: dict[int, list[TextChunk]] = {}
         for i, doc in enumerate(items):
-            chunks = await self._chunker.arun(([doc], None))
+            chunks = await self._chunker.arun(ChunkerInput([doc], None))
             chunks_per_doc[i] = chunks
 
         all_chunks = [c for chunks in chunks_per_doc.values() for c in chunks]
 
-        embed_response = await self._embedder.arun((all_chunks, None))
+        embed_response = await self._embedder.arun(EmbedderInput(all_chunks, None))
         chunk_vectors = [
             (chunk, list(emb.vector))
             for chunk, emb in zip(all_chunks, embed_response.embeddings)
         ]
 
         label_chunks = [TextChunk(text=label) for label in candidate_labels]
-        label_embed_response = await self._embedder.arun((label_chunks, None))
+        label_embed_response = await self._embedder.arun(
+            EmbedderInput(label_chunks, None)
+        )
         label_vectors = {
             label: list(emb.vector)
             for label, emb in zip(candidate_labels, label_embed_response.embeddings)
@@ -84,7 +93,9 @@ class EmbeddingClassifier(
             if config.llm_rerank and self._llm_classifier is not None:
                 llm_cfg = config.llm_classifier_config
                 if llm_cfg is not None:
-                    rerank_input = ([items[doc_idx]], candidate_labels, llm_cfg)
+                    rerank_input = LLMClassifierInput(
+                        [items[doc_idx]], candidate_labels, llm_cfg
+                    )
                     rerank_response = await self._llm_classifier.arun(rerank_input)
                     if rerank_response.results:
                         result = rerank_response.results[0]

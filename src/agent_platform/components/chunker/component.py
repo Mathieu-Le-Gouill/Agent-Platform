@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 from agent_platform.components.base import Component
 from agent_platform.core.interfaces.chunking.base import BaseChunker
@@ -10,7 +10,10 @@ from agent_platform.core.schemas.document import TextDocument
 
 ChunkerConfigT = TypeVar("ChunkerConfigT", bound=ChunkerConfig)
 
-ChunkerInput = tuple[list[TextDocument], ChunkerConfigT | None]
+
+class ChunkerInput(NamedTuple, Generic[ChunkerConfigT]):
+    documents: list[TextDocument]
+    config: ChunkerConfigT | None
 
 
 class Chunker(

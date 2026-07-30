@@ -8,8 +8,11 @@ from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.agents.tools.safe_execution import safe_call
-from agent_platform.components.embedder.component import Embedder
-from agent_platform.components.vector_search.component import VectorSearch
+from agent_platform.components.embedder.component import Embedder, EmbedderInput
+from agent_platform.components.vector_search.component import (
+    VectorSearch,
+    VectorSearchInput,
+)
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 
@@ -50,14 +53,16 @@ class SearchTool(Tool):
     async def _search(self, validated: SearchInput) -> list[SearchResult]:
         query_chunk = TextChunk(id=uuid4(), text=validated.query, index=0)
         response = await safe_call(
-            self._embedder.arun(([query_chunk], None)),
+            self._embedder.arun(EmbedderInput([query_chunk], None)),
             "Embedding failed",
         )
         if not response.embeddings:
             raise ToolError("Embedding returned no vectors")
         vector = response.embeddings[0].to_list()
         results = await safe_call(
-            self._vector_search.arun((vector, validated.k, None, None)),
+            self._vector_search.arun(
+                VectorSearchInput(vector, validated.k, None, None)
+            ),
             "Vector search failed",
         )
         return [SearchResult(chunk=chunk, score=score) for chunk, score in results]

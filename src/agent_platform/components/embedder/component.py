@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 from agent_platform.components.base import Component
 from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
@@ -11,7 +11,10 @@ from agent_platform.utils.batching import chunked
 
 EmbedConfigT = TypeVar("EmbedConfigT", bound=EmbeddingConfig)
 
-EmbedderInput = tuple[list[TextChunk], EmbedConfigT | None]
+
+class EmbedderInput(NamedTuple, Generic[EmbedConfigT]):
+    chunks: list[TextChunk]
+    config: EmbedConfigT | None
 
 
 class Embedder(

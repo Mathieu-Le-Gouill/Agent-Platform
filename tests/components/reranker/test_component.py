@@ -1,6 +1,6 @@
 import pytest
 
-from agent_platform.components.reranker.component import Reranker
+from agent_platform.components.reranker.component import Reranker, RerankerInput
 from agent_platform.core.interfaces.reranking.base import BaseReranker
 from agent_platform.core.interfaces.reranking.config import RerankerConfig
 from agent_platform.core.schemas.chunk import TextChunk
@@ -27,7 +27,9 @@ async def test_single_batch_when_under_limit():
     backend = _FakeReranker()
     reranker = Reranker(backend)
 
-    result = await reranker.arun(("query", _chunks(3), RerankerConfig(batch_size=10)))
+    result = await reranker.arun(
+        RerankerInput("query", _chunks(3), RerankerConfig(batch_size=10))
+    )
 
     assert len(backend.calls) == 1
     assert backend.calls[0][0] == "query"
@@ -40,7 +42,9 @@ async def test_splits_into_multiple_batches_over_limit():
     reranker = Reranker(backend)
 
     chunks = _chunks(5)
-    result = await reranker.arun(("query", chunks, RerankerConfig(batch_size=2)))
+    result = await reranker.arun(
+        RerankerInput("query", chunks, RerankerConfig(batch_size=2))
+    )
 
     assert [len(call[1]) for call in backend.calls] == [2, 2, 1]
     assert len(result) == 5
@@ -52,7 +56,9 @@ async def test_results_concatenated_in_batch_order():
     reranker = Reranker(backend)
 
     chunks = _chunks(4)
-    result = await reranker.arun(("query", chunks, RerankerConfig(batch_size=2)))
+    result = await reranker.arun(
+        RerankerInput("query", chunks, RerankerConfig(batch_size=2))
+    )
 
     # each batch of 2 is reversed by the fake backend, batches stay in order
     assert [c.text for c in result] == ["doc1", "doc0", "doc3", "doc2"]
@@ -63,6 +69,8 @@ async def test_defaults_to_config_batch_size_when_none_given():
     backend = _FakeReranker()
     reranker = Reranker(backend)
 
-    await reranker.arun(("query", _chunks(RerankerConfig().batch_size + 1), None))
+    await reranker.arun(
+        RerankerInput("query", _chunks(RerankerConfig().batch_size + 1), None)
+    )
 
     assert len(backend.calls) == 2

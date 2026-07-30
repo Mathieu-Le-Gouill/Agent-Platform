@@ -1,6 +1,9 @@
 import pytest
 
-from agent_platform.components.vector_search.component import VectorSearch
+from agent_platform.components.vector_search.component import (
+    VectorSearch,
+    VectorSearchInput,
+)
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.interfaces.vector_store.port import VectorStore
 from agent_platform.core.schemas.chunk import TextChunk
@@ -31,7 +34,9 @@ async def test_forwards_vector_k_and_filter_to_backend():
     config = VectorStoreConfig(collection_name="docs")
     vector_search = VectorSearch(backend)
 
-    result = await vector_search.arun(([0.1, 0.2], 3, {"source": "wiki"}, config))
+    result = await vector_search.arun(
+        VectorSearchInput([0.1, 0.2], 3, {"source": "wiki"}, config)
+    )
 
     assert result[0][0].text == "match"
     assert backend.calls[0] == ([0.1, 0.2], 3, config, {"source": "wiki"})

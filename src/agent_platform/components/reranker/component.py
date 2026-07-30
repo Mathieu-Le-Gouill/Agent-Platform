@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 from agent_platform.components.base import Component
 from agent_platform.core.interfaces.reranking.base import BaseReranker
@@ -12,7 +12,11 @@ RerankerConfigT = TypeVar("RerankerConfigT", bound=RerankerConfig)
 
 ChunkT = TypeVar("ChunkT", bound=TextChunk)
 
-RerankerInput = tuple[str, list[ChunkT], RerankerConfigT | None]
+
+class RerankerInput(NamedTuple, Generic[ChunkT, RerankerConfigT]):
+    query: str
+    items: list[ChunkT]
+    config: RerankerConfigT | None
 
 
 class Reranker(

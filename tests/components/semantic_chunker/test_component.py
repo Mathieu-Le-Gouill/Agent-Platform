@@ -1,7 +1,10 @@
 import pytest
 
 from agent_platform.components.embedder.component import Embedder
-from agent_platform.components.semantic_chunker.component import SemanticChunker
+from agent_platform.components.semantic_chunker.component import (
+    SemanticChunker,
+    SemanticChunkerInput,
+)
 from agent_platform.components.semantic_chunker.config import SemanticChunkerConfig
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.schemas.document import TextDocument
@@ -27,7 +30,7 @@ async def test_single_sentence_returns_one_chunk():
     chunker = SemanticChunker(embedder)
     doc = TextDocument(text="Only one sentence here.")
 
-    chunks = await chunker.arun(([doc], None))
+    chunks = await chunker.arun(SemanticChunkerInput([doc], None))
 
     assert len(chunks) == 1
     assert chunks[0].text == "Only one sentence here."
@@ -40,7 +43,7 @@ async def test_empty_document_returns_no_chunks():
     chunker = SemanticChunker(embedder)
     doc = TextDocument(text="   ")
 
-    chunks = await chunker.arun(([doc], None))
+    chunks = await chunker.arun(SemanticChunkerInput([doc], None))
 
     assert chunks == []
 
@@ -61,7 +64,7 @@ async def test_breaks_on_low_similarity():
         text="First sentence. Second sentence. Third sentence. Fourth sentence."
     )
 
-    chunks = await chunker.arun(([doc], config))
+    chunks = await chunker.arun(SemanticChunkerInput([doc], config))
 
     assert len(chunks) >= 2
     assert all(c.metadata["chunking_strategy"] == "semantic" for c in chunks)
@@ -74,7 +77,7 @@ async def test_multiple_documents_are_chunked_independently():
     doc1 = TextDocument(text="One. Two.")
     doc2 = TextDocument(text="Three. Four.")
 
-    chunks = await chunker.arun(([doc1, doc2], None))
+    chunks = await chunker.arun(SemanticChunkerInput([doc1, doc2], None))
 
     doc_ids = {c.document_id for c in chunks}
     assert doc1.id in doc_ids

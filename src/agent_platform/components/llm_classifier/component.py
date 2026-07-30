@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import logging
-from typing import Generic, TypeVar, cast
+from typing import Generic, NamedTuple, TypeVar, cast
 
 from pydantic import ValidationError as PydanticValidationError
 
@@ -24,17 +24,21 @@ logger = logging.getLogger(__name__)
 
 GenConfigT = TypeVar("GenConfigT", bound=GenerationConfig)
 
-_ClassifierInput = tuple[list[TextDocument], list[str], LLMClassifierConfig | None]
+
+class LLMClassifierInput(NamedTuple):
+    items: list[TextDocument]
+    candidate_labels: list[str]
+    config: LLMClassifierConfig | None
 
 
 class LLMClassifier(
-    Component[_ClassifierInput, ClassificationResponse],
+    Component[LLMClassifierInput, ClassificationResponse],
     Generic[GenConfigT],
 ):
     def __init__(self, llm: BaseLLMProvider[GenConfigT]) -> None:
         self._llm = llm
 
-    async def arun(self, input: _ClassifierInput) -> ClassificationResponse:
+    async def arun(self, input: LLMClassifierInput) -> ClassificationResponse:
         items, candidate_labels, config = input
         config = config or LLMClassifierConfig()
         strategy = get_strategy(config.classification_mode)

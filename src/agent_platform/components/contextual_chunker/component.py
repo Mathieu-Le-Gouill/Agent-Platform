@@ -1,9 +1,9 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 from agent_platform.components.base import Component
-from agent_platform.components.chunker.component import Chunker
+from agent_platform.components.chunker.component import Chunker, ChunkerInput
 from agent_platform.components.contextual_chunker.config import ContextualChunkerConfig
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
@@ -13,9 +13,11 @@ from agent_platform.core.schemas.message import Prompt
 
 GenConfigT = TypeVar("GenConfigT", bound=GenerationConfig)
 
-ContextualChunkerInput = tuple[
-    list[TextDocument], ContextualChunkerConfig | None, GenConfigT | None
-]
+
+class ContextualChunkerInput(NamedTuple, Generic[GenConfigT]):
+    documents: list[TextDocument]
+    config: ContextualChunkerConfig | None
+    generation_config: GenConfigT | None
 
 
 class ContextualChunker(
@@ -35,7 +37,7 @@ class ContextualChunker(
         config = config or ContextualChunkerConfig()
         result: list[TextChunk] = []
         for doc in documents:
-            chunks = await self._chunker.arun(([doc], None))
+            chunks = await self._chunker.arun(ChunkerInput([doc], None))
             document_text = doc.text[: config.max_document_chars]
             for chunk in chunks:
                 context = await self._generate_context(

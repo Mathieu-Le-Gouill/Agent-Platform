@@ -1,6 +1,9 @@
 from unittest.mock import AsyncMock
 
-from agent_platform.components.embed_classifier.component import EmbeddingClassifier
+from agent_platform.components.embed_classifier.component import (
+    EmbedClassifierInput,
+    EmbeddingClassifier,
+)
 from agent_platform.components.embed_classifier.config import EmbeddingClassifierConfig
 from agent_platform.components.llm_classifier.config import LLMClassifierConfig
 from agent_platform.core.interfaces.classification.response import (
@@ -56,7 +59,7 @@ class TestEmbeddingClassifier:
         docs = [TextDocument(text="meow")]
         config = EmbeddingClassifierConfig()
 
-        response = await component.arun((docs, ["cat"], config))
+        response = await component.arun(EmbedClassifierInput(docs, ["cat"], config))
 
         assert isinstance(response, ClassificationResponse)
         assert response.results[0].label == "cat"
@@ -85,7 +88,9 @@ class TestEmbeddingClassifier:
             llm_rerank=True, llm_classifier_config=LLMClassifierConfig()
         )
 
-        response = await component.arun((docs, ["cat", "dog"], config))
+        response = await component.arun(
+            EmbedClassifierInput(docs, ["cat", "dog"], config)
+        )
 
         assert response.results[0].label == "dog"
         llm_classifier.arun.assert_awaited_once()
@@ -96,7 +101,7 @@ class TestEmbeddingClassifier:
         docs = [TextDocument(text="meow")]
         config = EmbeddingClassifierConfig(llm_rerank=True, llm_classifier_config=None)
 
-        response = await component.arun((docs, ["cat"], config))
+        response = await component.arun(EmbedClassifierInput(docs, ["cat"], config))
 
         assert response.results[0].label == "cat"
         llm_classifier.arun.assert_not_awaited()
@@ -108,7 +113,7 @@ class TestEmbeddingClassifier:
             llm_rerank=True, llm_classifier_config=LLMClassifierConfig()
         )
 
-        response = await component.arun((docs, ["cat"], config))
+        response = await component.arun(EmbedClassifierInput(docs, ["cat"], config))
 
         assert response.results[0].label == "cat"
 
@@ -148,7 +153,9 @@ class TestEmbeddingClassifier:
             chunker=chunker, embedder=embedder, similarity_scorer=similarity_scorer
         )
         docs = [TextDocument(text="a"), TextDocument(text="b")]
-        response = await component.arun((docs, ["cat"], EmbeddingClassifierConfig()))
+        response = await component.arun(
+            EmbedClassifierInput(docs, ["cat"], EmbeddingClassifierConfig())
+        )
 
         assert len(response.results) == 2
         assert chunker.arun.await_count == 2

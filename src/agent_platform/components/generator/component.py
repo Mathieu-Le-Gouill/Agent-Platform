@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 from agent_platform.components.base import Component
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
@@ -10,7 +10,10 @@ from agent_platform.core.schemas.message import Prompt
 
 GenerationConfigT = TypeVar("GenerationConfigT", bound=GenerationConfig)
 
-GeneratorInput = tuple[Prompt, GenerationConfigT | None]
+
+class GeneratorInput(NamedTuple, Generic[GenerationConfigT]):
+    prompt: Prompt
+    config: GenerationConfigT | None
 
 
 class Generator(
