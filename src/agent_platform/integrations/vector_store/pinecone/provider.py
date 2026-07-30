@@ -62,6 +62,10 @@ class PineconeStore(BaseVectorStore[PineconeConfig]):
             return config.host
         async with PineconeAsyncio(**self._client_kwargs(config)) as pc:
             index_model = await pc.describe_index(config.collection_name)
+            if index_model.host is None:
+                raise RuntimeError(
+                    f"Pinecone index '{config.collection_name}' has no host"
+                )
             return index_model.host
 
     async def _index(self, config: PineconeConfig) -> Any:
