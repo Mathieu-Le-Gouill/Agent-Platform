@@ -18,9 +18,11 @@ class SimilarityInput:
         self,
         chunk_vectors: list[tuple[TextChunk, list[float]]],
         label_vectors: dict[str, list[float]],
+        config: SimilarityConfig | None = None,
     ) -> None:
         self.chunk_vectors = chunk_vectors
         self.label_vectors = label_vectors
+        self.config = config
 
 
 class SimilarityConfig:
@@ -40,24 +42,22 @@ class SimilarityConfig:
 
 
 class SimilarityScorer(Component[SimilarityInput, ClassificationResult]):
-    def __init__(self, config: SimilarityConfig | None = None) -> None:
-        self._config = config or SimilarityConfig()
-
     async def arun(self, input: SimilarityInput) -> ClassificationResult:
+        config = input.config or SimilarityConfig()
         label_scores: dict[str, list[float]] = defaultdict(list)
-        low, high = similarity_bounds(self._config.metric)
+        low, high = similarity_bounds(config.metric)
 
         for chunk, chunk_vec in input.chunk_vectors:
             for label, label_vec in input.label_vectors.items():
-                sim = compute_similarity(chunk_vec, label_vec, self._config.metric)
-                if self._config.threshold is None or sim >= self._config.threshold:
+                sim = compute_similarity(chunk_vec, label_vec, config.metric)
+                if config.threshold is None or sim >= config.threshold:
                     label_scores[label].append(sim)
 
         if not label_scores:
             return ClassificationResult(
                 predictions=[
                     ClassificationPrediction(
-                        label=self._config.unknown_label,
+                        label=config.unknown_label,
                         score=Score.confidence(0.0),
                     )
                 ],
@@ -66,24 +66,22 @@ class SimilarityScorer(Component[SimilarityInput, ClassificationResult]):
         result: dict[str, float] = {}
         for label, scores in label_scores.items():
             scores.sort(reverse=True)
-            result[label] = sum(scores[: self._config.top_k]) / min(
-                len(scores), self._config.top_k
-            )
+            result[label] = sum(scores[: config.top_k]) / min(len(scores), config.top_k)
 
         sorted_labels = sorted(result.items(), key=lambda x: x[1], reverse=True)
 
-        if self._config.multi_label:
+        if config.multi_label:
             predictions = [
                 ClassificationPrediction(
                     label=label, score=Score.similarity(score, low=low, high=high)
                 )
                 for label, score in sorted_labels
-                if self._config.threshold is None or score >= self._config.threshold
+                if config.threshold is None or score >= config.threshold
             ]
             if not predictions:
                 predictions.append(
                     ClassificationPrediction(
-                        label=self._config.unknown_label,
+                        label=config.unknown_label,
                         score=Score.similarity(0.0, low=low, high=high),
                     )
                 )

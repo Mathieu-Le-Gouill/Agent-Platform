@@ -71,7 +71,6 @@ class EmbeddingClassifier(
             doc_chunks = chunks_per_doc[doc_idx]
             doc_chunk_vecs = [(c, v) for c, v in chunk_vectors if c in doc_chunks]
 
-            sim_input = SimilarityInput(doc_chunk_vecs, label_vectors)
             sim_config = SimilarityConfig(
                 top_k=config.top_k,
                 threshold=config.similarity_threshold,
@@ -79,7 +78,7 @@ class EmbeddingClassifier(
                 unknown_label=config.unknown_label,
                 metric=config.similarity_metric,
             )
-            self._similarity_scorer._config = sim_config
+            sim_input = SimilarityInput(doc_chunk_vecs, label_vectors, sim_config)
             result = await self._similarity_scorer.arun(sim_input)
 
             if config.llm_rerank and self._llm_classifier is not None:
