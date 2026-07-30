@@ -7,7 +7,12 @@ from typing import Any
 from huggingface_hub import AsyncInferenceClient, InferenceClient
 from sentence_transformers import SentenceTransformer
 
-from agent_platform.core.credentials import resolve_credentials, resolve_timeout
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.core.errors import require_secret
 from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.integrations.embeddings._base import NativeEmbeddingProvider
@@ -18,8 +23,13 @@ from agent_platform.integrations.embeddings.huggingface.config import (
 
 
 class HuggingFaceEmbeddingProvider(NativeEmbeddingProvider[HuggingFaceEmbeddingConfig]):
-    def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: HuggingFaceCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, HuggingFaceCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> HuggingFaceEmbeddingConfig:
         return HuggingFaceEmbeddingConfig()
@@ -61,7 +71,7 @@ class HuggingFaceEmbeddingProvider(NativeEmbeddingProvider[HuggingFaceEmbeddingC
         }
         if config.provider is not None:
             kwargs["provider"] = config.provider
-        timeout = resolve_timeout(config.timeout, self._credentials)
+        timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout"] = timeout
         return kwargs

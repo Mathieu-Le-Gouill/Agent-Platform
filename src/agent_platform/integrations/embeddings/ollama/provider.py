@@ -5,22 +5,40 @@ from typing import Any
 
 from ollama import AsyncClient, Client
 
-from agent_platform.core.credentials import resolve_credentials, resolve_timeout
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.integrations.credentials import OllamaCredentials
 from agent_platform.integrations.embeddings._base import NativeEmbeddingProvider
 from agent_platform.integrations.embeddings.ollama.config import OllamaEmbeddingConfig
+from agent_platform.utils.env import from_env
+
+# Ollama has no auth concept, only a server location; when no client_options.base_url
+# is given, fall back to the env var / the SDK's own local-daemon default.
+_DEFAULT_BASE_URL = "http://localhost:11434"
 
 
 class OllamaEmbeddingProvider(NativeEmbeddingProvider[OllamaEmbeddingConfig]):
-    def __init__(self, credentials: OllamaCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: OllamaCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, OllamaCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> OllamaEmbeddingConfig:
         return OllamaEmbeddingConfig()
 
     def _client_kwargs(self, config: OllamaEmbeddingConfig) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {"host": self._credentials.base_url}
-        timeout = resolve_timeout(config.timeout, self._credentials)
+        base_url = self._client_options.base_url or from_env(
+            "OLLAMA_BASE_URL", _DEFAULT_BASE_URL
+        )
+        kwargs: dict[str, Any] = {"host": base_url}
+        timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout"] = timeout
         return kwargs

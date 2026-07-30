@@ -6,7 +6,12 @@ from typing import TYPE_CHECKING, Any
 from mistralai import Mistral
 from mistralai.models import ChatCompletionResponse
 
-from agent_platform.core.credentials import resolve_credentials, resolve_timeout
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.core.errors import require_secret
 from agent_platform.core.genai_tracing import record_token_usage
 from agent_platform.core.interfaces.llm.response import (
@@ -36,8 +41,13 @@ class MistralLLM(
 ):
     _provider_name = "mistral"
 
-    def __init__(self, credentials: MistralCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: MistralCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, MistralCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         return {
@@ -58,14 +68,14 @@ class MistralLLM(
             "Mistral API key is required but was not provided",
         )
         kwargs: dict[str, Any] = {"api_key": api_key.get_secret_value()}
-        if self._credentials.base_url:
-            kwargs["server_url"] = self._credentials.base_url
+        if self._client_options.base_url:
+            kwargs["server_url"] = self._client_options.base_url
 
-        timeout = resolve_timeout(config.timeout, self._credentials)
+        timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout_ms"] = int(timeout * 1000)
 
-        # `config.max_retries`/`credentials.max_retries` are intentionally not wired
+        # `config.max_retries`/`client_options.max_retries` are intentionally not wired
         # into the native SDK's `retry_config`: unlike OpenAI/Anthropic's simple
         # int attempt count, Mistral's RetryConfig is a time-based backoff
         # (initial_interval/max_interval/exponent/max_elapsed_time) with no

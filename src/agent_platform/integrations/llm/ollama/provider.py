@@ -9,6 +9,8 @@ import httpx
 from ollama import AsyncClient, ChatResponse, Client
 
 from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
     resolve_credentials,
     resolve_max_retries,
     resolve_timeout,
@@ -31,9 +33,14 @@ from agent_platform.integrations.llm.ollama.mappers import (
     to_native_messages,
     to_native_params,
 )
+from agent_platform.utils.env import from_env
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
+
+# Ollama has no auth concept, only a server location; when no client_options.base_url
+# is given, fall back to the env var / the SDK's own local-daemon default.
+_DEFAULT_BASE_URL = "http://localhost:11434"
 
 
 class OllamaLLM(
@@ -41,8 +48,13 @@ class OllamaLLM(
 ):
     _provider_name = "ollama"
 
-    def __init__(self, credentials: OllamaCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: OllamaCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, OllamaCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         return {
@@ -59,14 +71,17 @@ class OllamaLLM(
         return OllamaGenerationConfig()
 
     def _client_kwargs(self, config: OllamaGenerationConfig) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {"host": self._credentials.base_url}
-        timeout = resolve_timeout(config.timeout, self._credentials)
+        base_url = self._client_options.base_url or from_env(
+            "OLLAMA_BASE_URL", _DEFAULT_BASE_URL
+        )
+        kwargs: dict[str, Any] = {"host": base_url}
+        timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout"] = timeout
         return kwargs
 
     def _max_retries(self, config: OllamaGenerationConfig) -> int:
-        return resolve_max_retries(config.max_retries, self._credentials)
+        return resolve_max_retries(config.max_retries, self._client_options)
 
     def _async_client(self, config: OllamaGenerationConfig) -> AsyncClient:
         # `Client`/`AsyncClient` forward unrecognized kwargs straight to the

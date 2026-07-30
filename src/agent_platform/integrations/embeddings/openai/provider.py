@@ -6,6 +6,8 @@ from typing import Any
 from openai import AsyncOpenAI, OpenAI
 
 from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
     resolve_credentials,
     resolve_max_retries,
     resolve_timeout,
@@ -17,8 +19,13 @@ from agent_platform.integrations.embeddings.openai.config import OpenAIEmbedding
 
 
 class OpenAIEmbeddingProvider(NativeEmbeddingProvider[OpenAIEmbeddingConfig]):
-    def __init__(self, credentials: OpenAICredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: OpenAICredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, OpenAICredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> OpenAIEmbeddingConfig:
         return OpenAIEmbeddingConfig()
@@ -30,12 +37,14 @@ class OpenAIEmbeddingProvider(NativeEmbeddingProvider[OpenAIEmbeddingConfig]):
         )
         kwargs: dict[str, Any] = {
             "api_key": api_key.get_secret_value(),
-            "max_retries": resolve_max_retries(config.max_retries, self._credentials),
+            "max_retries": resolve_max_retries(
+                config.max_retries, self._client_options
+            ),
         }
         if self._credentials.organization is not None:
             kwargs["organization"] = self._credentials.organization
 
-        timeout = resolve_timeout(config.timeout, self._credentials)
+        timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout"] = timeout
         return kwargs

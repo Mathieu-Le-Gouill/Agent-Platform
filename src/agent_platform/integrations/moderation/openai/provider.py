@@ -5,7 +5,11 @@ from typing import Any
 from openai import AsyncOpenAI, OpenAI
 from openai.types.moderation_create_response import ModerationCreateResponse
 
-from agent_platform.core.credentials import resolve_credentials
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+)
 from agent_platform.core.errors import require_secret
 from agent_platform.core.interfaces.moderation.response import (
     ModerationCategory,
@@ -22,8 +26,13 @@ class OpenAIModeration(
         OpenAIModerationConfig, AsyncOpenAI, OpenAI, ModerationCreateResponse
     ]
 ):
-    def __init__(self, credentials: OpenAICredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: OpenAICredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, OpenAICredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> OpenAIModerationConfig:
         return OpenAIModerationConfig()
@@ -35,7 +44,7 @@ class OpenAIModeration(
         )
         return {
             "api_key": api_key.get_secret_value(),
-            "base_url": self._credentials.base_url,
+            "base_url": self._client_options.base_url,
         }
 
     def _async_client(self, config: OpenAIModerationConfig) -> AsyncOpenAI:

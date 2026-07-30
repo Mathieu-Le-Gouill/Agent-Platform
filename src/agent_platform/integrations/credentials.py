@@ -1,6 +1,6 @@
 from pydantic import Field, SecretStr
 
-from agent_platform.core.credentials import ProviderCredentials
+from agent_platform.core.credentials import Credentials
 from agent_platform.utils.env import from_env, secret_from_env
 
 __all__ = [
@@ -28,13 +28,13 @@ __all__ = [
 ]
 
 
-class AnthropicCredentials(ProviderCredentials, frozen=True):
+class AnthropicCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("ANTHROPIC_API_KEY")
     )
 
 
-class AWSTextractCredentials(ProviderCredentials, frozen=True):
+class AWSTextractCredentials(Credentials, frozen=True):
     aws_access_key_id: str | None = Field(
         default_factory=lambda: from_env("AWS_ACCESS_KEY_ID")
     )
@@ -43,7 +43,7 @@ class AWSTextractCredentials(ProviderCredentials, frozen=True):
     )
 
 
-class AzureTranslatorCredentials(ProviderCredentials, frozen=True):
+class AzureTranslatorCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("AZURE_TRANSLATOR_KEY")
     )
@@ -53,79 +53,77 @@ class AzureTranslatorCredentials(ProviderCredentials, frozen=True):
     endpoint: str = "https://api.cognitive.microsofttranslator.com"
 
 
-class ChromaCredentials(ProviderCredentials, frozen=True):
+class ChromaCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("CHROMA_API_KEY")
     )
 
 
-class CohereCredentials(ProviderCredentials, frozen=True):
+class CohereCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("COHERE_API_KEY")
     )
 
 
-class DeepgramCredentials(ProviderCredentials, frozen=True):
+class DeepgramCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("DEEPGRAM_API_KEY")
     )
 
 
-class DeepLCredentials(ProviderCredentials, frozen=True):
+class DeepLCredentials(Credentials, frozen=True):
     auth_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("DEEPL_AUTH_KEY")
     )
 
 
-class GoogleCredentials(ProviderCredentials, frozen=True):
+class GoogleCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env(["GOOGLE_API_KEY", "GEMINI_API_KEY"])
     )
 
 
-class GoogleTranslateCredentials(ProviderCredentials, frozen=True):
+class GoogleTranslateCredentials(Credentials, frozen=True):
     credentials_path: str | None = Field(
         default_factory=lambda: from_env("GOOGLE_APPLICATION_CREDENTIALS")
     )
 
 
-class GoogleVisionCredentials(ProviderCredentials, frozen=True):
+class GoogleVisionCredentials(Credentials, frozen=True):
     credentials_path: str | None = Field(
         default_factory=lambda: from_env("GOOGLE_APPLICATION_CREDENTIALS")
     )
 
 
-class HuggingFaceCredentials(ProviderCredentials, frozen=True):
+class HuggingFaceCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("HF_TOKEN")
     )
 
 
-class JinaCredentials(ProviderCredentials, frozen=True):
+class JinaCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("JINA_API_KEY")
     )
 
 
-class MidjourneyCredentials(ProviderCredentials, frozen=True):
+class MidjourneyCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("MIDJOURNEY_API_KEY")
     )
 
 
-class MistralCredentials(ProviderCredentials, frozen=True):
+class MistralCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("MISTRAL_API_KEY")
     )
 
 
-class OllamaCredentials(ProviderCredentials, frozen=True):
-    base_url: str | None = Field(
-        default_factory=lambda: from_env("OLLAMA_BASE_URL", "http://localhost:11434")
-    )
+class OllamaCredentials(Credentials, frozen=True):
+    pass
 
 
-class OpenAICredentials(ProviderCredentials, frozen=True):
+class OpenAICredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("OPENAI_API_KEY")
     )
@@ -134,31 +132,31 @@ class OpenAICredentials(ProviderCredentials, frozen=True):
     )
 
 
-class PicoVoiceCredentials(ProviderCredentials, frozen=True):
+class PicoVoiceCredentials(Credentials, frozen=True):
     access_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("PICOVOICE_ACCESS_KEY")
     )
 
 
-class PineconeCredentials(ProviderCredentials, frozen=True):
+class PineconeCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("PINECONE_API_KEY")
     )
 
 
-class QdrantCredentials(ProviderCredentials, frozen=True):
+class QdrantCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("QDRANT_API_KEY")
     )
 
 
-class VoyageCredentials(ProviderCredentials, frozen=True):
+class VoyageCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("VOYAGE_API_KEY")
     )
 
 
-class WeaviateCredentials(ProviderCredentials, frozen=True):
+class WeaviateCredentials(Credentials, frozen=True):
     url: str = Field(
         default_factory=lambda: from_env("WEAVIATE_URL") or "http://localhost:8080"
     )

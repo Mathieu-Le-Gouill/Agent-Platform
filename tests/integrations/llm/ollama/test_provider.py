@@ -5,6 +5,7 @@ import pytest
 from pydantic import BaseModel
 
 from agent_platform.agents.tools.base import Tool
+from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.core.schemas.document import AudioDocument, ImageDocument
@@ -325,6 +326,18 @@ class TestOllamaLLMConstruction:
         provider = OllamaLLM()
         kwargs = provider._client_kwargs(OllamaGenerationConfig())
         assert "timeout" not in kwargs
+
+    def test_client_kwargs_default_host_falls_back_to_localhost(self):
+        provider = OllamaLLM()
+        kwargs = provider._client_kwargs(OllamaGenerationConfig())
+        assert kwargs["host"] == "http://localhost:11434"
+
+    def test_client_kwargs_explicit_host(self):
+        provider = OllamaLLM(
+            client_options=ClientOptions(base_url="http://custom-ollama:1234")
+        )
+        kwargs = provider._client_kwargs(OllamaGenerationConfig())
+        assert kwargs["host"] == "http://custom-ollama:1234"
 
     def test_client_kwargs_explicit_timeout(self):
         provider = OllamaLLM()

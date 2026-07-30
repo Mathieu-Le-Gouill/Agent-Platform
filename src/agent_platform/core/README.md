@@ -11,7 +11,7 @@ core/
 ├── base.py           # Entity (UUID mixin), Timestamped
 ├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains)
 ├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
-├── credentials.py    # BaseCredentials, ProviderCredentials
+├── credentials.py    # Credentials (secrets only, e.g. api_key), ClientOptions (base_url/timeout/max_retries)
 ├── tracing.py        # TracingBackend, TracingConfig, configure_tracing(), traced_span(), mark_span_error()
 ├── genai_tracing.py  # GenAIAttributes, traced_operation_span(), record_token_usage()
 ├── similarity.py     # Vector similarity math helpers (compute_similarity, similarity_bounds), used by components/ and evals/

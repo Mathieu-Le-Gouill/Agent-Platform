@@ -7,7 +7,7 @@ from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar, cast
 
 from opentelemetry.trace import Span
 
-from agent_platform.core.credentials import ProviderCredentials
+from agent_platform.core.credentials import ClientOptions, Credentials
 from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.genai_tracing import (
     GenAIAttributes,
@@ -53,7 +53,8 @@ class NativeLLMProvider(
     _provider_name: ClassVar[str]
     _missing_api_key_message: ClassVar[str] = "API key is required but was not provided"
 
-    _credentials: ProviderCredentials
+    _credentials: Credentials
+    _client_options: ClientOptions
 
     @abstractmethod
     def _default_config(self) -> GenerationConfigT: ...

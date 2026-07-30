@@ -6,7 +6,12 @@ from typing import Any
 from mistralai import Mistral
 from mistralai.models import EmbeddingResponseData
 
-from agent_platform.core.credentials import resolve_credentials, resolve_timeout
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.core.errors import ProviderError, require_secret
 from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.embeddings._base import NativeEmbeddingProvider
@@ -14,8 +19,13 @@ from agent_platform.integrations.embeddings.mistral.config import MistralEmbeddi
 
 
 class MistralEmbeddingProvider(NativeEmbeddingProvider[MistralEmbeddingConfig]):
-    def __init__(self, credentials: MistralCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: MistralCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, MistralCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _default_config(self) -> MistralEmbeddingConfig:
         return MistralEmbeddingConfig()
@@ -29,7 +39,7 @@ class MistralEmbeddingProvider(NativeEmbeddingProvider[MistralEmbeddingConfig]):
         if config.endpoint:
             kwargs["server_url"] = config.endpoint
 
-        timeout = resolve_timeout(config.timeout, self._credentials)
+        timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout_ms"] = int(timeout * 1000)
 

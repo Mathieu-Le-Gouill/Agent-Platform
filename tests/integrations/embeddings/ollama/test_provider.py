@@ -4,6 +4,7 @@ from uuid import uuid4
 
 import pytest
 
+from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.schemas.chunk import TextChunk
@@ -34,6 +35,18 @@ class TestOllamaEmbeddingProviderClient:
         provider = OllamaEmbeddingProvider()
         kwargs = provider._client_kwargs(OllamaEmbeddingConfig())
         assert "timeout" not in kwargs
+
+    def test_client_kwargs_default_host_falls_back_to_localhost(self):
+        provider = OllamaEmbeddingProvider()
+        kwargs = provider._client_kwargs(OllamaEmbeddingConfig())
+        assert kwargs["host"] == "http://localhost:11434"
+
+    def test_client_kwargs_explicit_host(self):
+        provider = OllamaEmbeddingProvider(
+            client_options=ClientOptions(base_url="http://custom-ollama:1234")
+        )
+        kwargs = provider._client_kwargs(OllamaEmbeddingConfig())
+        assert kwargs["host"] == "http://custom-ollama:1234"
 
     def test_client_kwargs_explicit_timeout(self):
         provider = OllamaEmbeddingProvider()

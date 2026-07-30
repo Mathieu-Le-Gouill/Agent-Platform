@@ -7,6 +7,8 @@ from anthropic import Anthropic, AsyncAnthropic, AsyncStream
 from anthropic.types import Message, RawMessageStreamEvent
 
 from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
     resolve_credentials,
     resolve_max_retries,
     resolve_timeout,
@@ -54,8 +56,13 @@ class AnthropicLLM(
     _provider_name = "anthropic"
     _missing_api_key_message = "Anthropic API key is required but was not provided"
 
-    def __init__(self, credentials: AnthropicCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: AnthropicCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, AnthropicCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         return {
@@ -73,10 +80,12 @@ class AnthropicLLM(
         )
         kwargs: dict[str, Any] = {
             "api_key": api_key.get_secret_value(),
-            "base_url": self._credentials.base_url,
-            "max_retries": resolve_max_retries(config.max_retries, self._credentials),
+            "base_url": self._client_options.base_url,
+            "max_retries": resolve_max_retries(
+                config.max_retries, self._client_options
+            ),
         }
-        timeout = resolve_timeout(config.timeout, self._credentials)
+        timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout"] = timeout
         return kwargs

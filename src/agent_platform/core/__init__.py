@@ -1,6 +1,6 @@
 from agent_platform.core.base import Entity, Timestamped
 from agent_platform.core.config import ModelConfig, ProviderConfig
-from agent_platform.core.credentials import BaseCredentials, ProviderCredentials
+from agent_platform.core.credentials import ClientOptions, Credentials
 from agent_platform.core.errors import (
     ConfigError,
     MissingCredentialError,
@@ -78,8 +78,8 @@ __all__ = [
     "error_logged",
     "with_retry",
     "catch_noraise",
-    "BaseCredentials",
-    "ProviderCredentials",
+    "ClientOptions",
+    "Credentials",
     "Document",
     "TextDocument",
     "ImageDocument",

@@ -5,7 +5,12 @@ from typing import TYPE_CHECKING, Any
 
 from huggingface_hub import AsyncInferenceClient, ChatCompletionOutput, InferenceClient
 
-from agent_platform.core.credentials import resolve_credentials, resolve_timeout
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+    resolve_timeout,
+)
 from agent_platform.core.errors import require_secret
 from agent_platform.core.genai_tracing import record_token_usage
 from agent_platform.core.interfaces.llm.response import (
@@ -42,8 +47,13 @@ class HuggingFaceLLM(
 ):
     _provider_name = "huggingface"
 
-    def __init__(self, credentials: HuggingFaceCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: HuggingFaceCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, HuggingFaceCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _model_name(self, config: HuggingFaceGenerationConfig) -> str:
         return config.repo_id
@@ -71,11 +81,11 @@ class HuggingFaceLLM(
             "provider": config.provider,
             "token": api_key.get_secret_value(),
         }
-        timeout = resolve_timeout(config.timeout, self._credentials)
+        timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout"] = timeout
 
-        # `config.max_retries`/`credentials.max_retries` are intentionally not wired
+        # `config.max_retries`/`client_options.max_retries` are intentionally not wired
         # in: `InferenceClient`/`AsyncInferenceClient` have no built-in retry-count
         # knob. The platform's own `@with_retry()` decorator on `agenerate` already
         # provides equivalent attempt-count-based retry behavior.

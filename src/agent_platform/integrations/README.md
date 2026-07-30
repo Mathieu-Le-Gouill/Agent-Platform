@@ -49,25 +49,32 @@ inline dict-literal conversions (a couple of lines, no free functions) don't get
 
 **Exception:** `loader/` uses `strategies/` instead of `<provider>/` because each strategy handles a different media type (text, image, audio, video) rather than a different vendor; per-media-type ABCs and configs live in `core/interfaces/loader/{text,image,audio,video}/`, concrete loaders in `loader/strategies/`. `loader/composite/` holds `AutoLoader` (dispatches to the right strategy by file extension) and `MultiLoader` (loads heterogeneous sources via `AutoLoader`), both re-exported through `loader/__init__.py` like any other provider.
 
-## Credentials
+## Credentials and client options
 
-Provider credentials all live in the single file `integrations/credentials.py`. Each is a frozen Pydantic model extending `ProviderCredentials` from `core/credentials.py`. Providers that don't need real credentials (local loaders, local chunkers, FAISS/Chroma, local rerankers/VAD/STT, …) simply don't take a `credentials` constructor argument at all, there is no placeholder credentials type for them.
+Provider credentials all live in the single file `integrations/credentials.py`. Each is a frozen Pydantic model extending `Credentials` from `core/credentials.py` and holds secrets only (`api_key` and friends). Providers that don't need real secrets (local loaders, local chunkers, FAISS/Chroma, local rerankers/VAD/STT, …) simply don't take a `credentials` constructor argument at all, there is no placeholder credentials type for them.
 
 ```python
 # integrations/credentials.py
-class OpenAICredentials(ProviderCredentials, frozen=True):
+class OpenAICredentials(Credentials, frozen=True):
     api_key: SecretStr
     organization: str | None = None
 ```
 
+Non-secret, construction-time transport settings (`base_url`, `timeout`, `max_retries`) are a separate, single `ClientOptions` type (`core/credentials.py`), not subclassed per provider since these fields mean the same thing for every vendor. Only providers that are actually network-bound and read these fields (currently `llm`, `embeddings`, `moderation`) accept a `client_options` constructor argument; `timeout`/`max_retries` can still be overridden per call via the domain's own config (`resolve_timeout`/`resolve_max_retries` prefer the per-call value, falling back to `client_options`).
+
 ## The Provider File
 
-Every provider file contains one class that subclasses the domain's ABC from `core/interfaces/`. The ABC itself does not take credentials, a provider that needs them accepts and stores `self._credentials` directly in its own `__init__`. Example:
+Every provider file contains one class that subclasses the domain's ABC from `core/interfaces/`. The ABC itself does not take credentials, a provider that needs them accepts and stores `self._credentials` (and, for network-bound providers, `self._client_options`) directly in its own `__init__`. Example:
 
 ```python
 class OpenAILLMProvider(BaseLLMProvider[OpenAIGenerationConfig]):
-    def __init__(self, credentials: OpenAICredentials | None = None) -> None:
-        self._credentials = credentials if credentials is not None else OpenAICredentials()
+    def __init__(
+        self,
+        credentials: OpenAICredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
+        self._credentials = resolve_credentials(credentials, OpenAICredentials)
+        self._client_options = resolve_client_options(client_options)
     async def agenerate(self, prompt, model, config, tools) -> LLMResponse: ...
     def generate(self, prompt, model, config, tools) -> LLMResponse: ...
     async def stream(self, prompt, model, config) -> AsyncIterator[StreamChunk]: ...

@@ -35,7 +35,7 @@ Near-zero external dependencies. Everything here is pure Python, `pydantic`, `ab
 | `core/base.py` | `Entity` (UUID mixin), `Timestamped` |
 | `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends; `ModelConfig`, a `ProviderConfig` subclass adding `model: str` for model-backed domains (llm, embeddings, reranking, speech, image_generation) |
 | `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
-| `core/credentials.py` | `BaseCredentials`, `ProviderCredentials` |
+| `core/credentials.py` | `Credentials` (secrets only, e.g. `api_key`), `ClientOptions` (non-secret construction-time transport settings: `base_url`, `timeout`, `max_retries`) |
 | `core/tracing.py` | Vendor-agnostic OpenTelemetry tracing: `TracingBackend`, `TracingConfig`, `configure_tracing()`, `traced_span()`, `mark_span_error()` |
 | `core/genai_tracing.py` | GenAI semantic-convention layer on top of `core/tracing.py`: `traced_operation_span()`, `record_token_usage()`, `GenAIAttributes` |
 | `core/interfaces/<domain>/` | ABCs for every capability (llm, embeddings, vad, ocr, vector_store, reranking, chunking, speech, translation, clustering, classification, loader, image_generation, dataset) |

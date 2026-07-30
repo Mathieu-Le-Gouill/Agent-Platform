@@ -5,6 +5,7 @@ import pytest
 from pydantic import BaseModel, SecretStr
 
 from agent_platform.agents.tools.base import Tool
+from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.core.schemas.document import AudioDocument, ImageDocument
@@ -314,10 +315,9 @@ class TestMistralLLMClient:
         mock_mistral = mocker.patch(
             "agent_platform.integrations.llm.mistral.provider.Mistral"
         )
-        creds = MistralCredentials(
-            api_key=SecretStr("key"), base_url="https://custom.mistral"
+        provider = MistralLLM(
+            _creds(), client_options=ClientOptions(base_url="https://custom.mistral")
         )
-        provider = MistralLLM(creds)
         provider._async_client(MistralGenerationConfig())
         _, kwargs = mock_mistral.call_args
         assert kwargs["server_url"] == "https://custom.mistral"
