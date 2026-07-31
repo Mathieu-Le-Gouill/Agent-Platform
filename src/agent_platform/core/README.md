@@ -12,6 +12,10 @@ core/
 ├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains), RequestOptions (ProviderConfig subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs)
 ├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
 ├── retry.py          # with_retry() decorator: exponential backoff, honors PlatformError.retryable
+├── resilience.py     # CircuitBreaker (open/half-open/closed state machine), RateLimiter (token bucket)
+├── middleware.py     # Middleware protocol + MiddlewarePipeline: generic pre/post hooks around a typed operation
+├── persistence.py    # Checkpointer[StateT] protocol + InMemoryCheckpointer
+├── token_usage.py    # TokenUsageAggregator: accumulates TokenUsage per string key
 ├── credentials.py    # Credentials (secrets only, e.g. api_key), ClientOptions (base_url/timeout/max_retries)
 ├── tracing.py        # TracingBackend, TracingConfig, configure_tracing(), traced_span(), mark_span_error()
 ├── genai_tracing.py  # GenAIAttributes, traced_operation_span(), record_token_usage()
@@ -99,7 +103,23 @@ Vendor endpoint/auth recipes (LangSmith, Langfuse, ...) live in `integrations/RE
 
 ### `genai_tracing.py`: GenAI Semantic Conventions
 
-Paired with `tracing.py`, this is where GenAI-specific knowledge lives. `traced_operation_span(operation, attributes=None)` (a thin wrapper over `traced_span()`) is what every instrumented call site uses, it names the span after `operation` and sets `gen_ai.operation.name` to match. `GenAIAttributes` centralizes the `gen_ai.*` semantic-convention attribute keys so every call site (and any future one, embeddings, reranking, ...) spells them identically; `record_token_usage(span, usage)` records token counts the same way everywhere. Currently wired into the agent loop (`agents/executor.py`), tool calls (`agents/tools/registry.py`), and LLM calls (each `integrations/llm/<provider>/provider.py`).
+Paired with `tracing.py`, this is where GenAI-specific knowledge lives. `traced_operation_span(operation, attributes=None)` (a thin wrapper over `traced_span()`) is what every instrumented call site uses, it names the span after `operation` and sets `gen_ai.operation.name` to match. `GenAIAttributes` centralizes the `gen_ai.*` semantic-convention attribute keys so every call site (and any future one, embeddings, reranking, ...) spells them identically; `record_token_usage(span, usage)` records token counts the same way everywhere. Currently wired into the agent loop (`agents/executor.py`), tool calls (`agents/tools/registry.py`), and LLM calls (each `integrations/llm/<provider>/provider.py`). `GenAIAttributes.CONVERSATION_ID` is defined but not yet set at any span-creation site, that wiring is a later phase.
+
+### `resilience.py`: Circuit Breaker & Rate Limiter
+
+Sits alongside `retry.py` rather than replacing it: `with_retry()` retries a single failing call, `CircuitBreaker` and `RateLimiter` guard a call site's overall traffic. `CircuitBreaker(failure_threshold, reset_timeout)` wraps an async callable via `call(func, *args, **kwargs)`; it tracks consecutive failures, opens (raising `ProviderError(retryable=True)` without invoking `func`) once `failure_threshold` is hit, and moves to half-open after `reset_timeout` seconds elapse, a single success there closes it again, a failure reopens it. `RateLimiter(rate, burst=None)` is a token-bucket limiter (`burst` defaults to `rate`, i.e. one second of headroom); `await acquire(tokens=1.0)` blocks until enough tokens have replenished. Both are generic over any async callable, no `agents/tools/` concept involved.
+
+### `middleware.py`: Generic Pre/Post Hooks
+
+`Middleware[CtxT]` is a `Protocol` with `async before(ctx) -> CtxT | None` and `async after(ctx, result) -> Any`; a non-`None` return from `before` short-circuits the pipeline (the operation and every `after` are skipped, that value becomes the result). `MiddlewarePipeline[CtxT]` composes a list of them: `run(ctx, operation)` calls each `before` in order, runs `operation(ctx)` if none short-circuited, then calls each `after` in *reverse* order so the first middleware wraps outermost, matching the usual decorator/onion model. Generic over `CtxT`, no `Agent`/`Tool` concept, reused later for agent guardrails and tool-call approval hooks.
+
+### `persistence.py`: Checkpointing
+
+`Checkpointer[StateT]` is a `Protocol` with `async save(key, state) -> None` and `async load(key) -> StateT | None`. `InMemoryCheckpointer[StateT]` is the default implementation, a plain dict keyed by `key`. Generic over `StateT`, so it works for a `ConversationAgent` session or a future `workflows/` run state alike; a real backend (Redis, a DB table) implements the same protocol.
+
+### `token_usage.py`: Token Accounting
+
+`TokenUsageAggregator` accumulates `TokenUsage` (see `schemas/token.py`) under an arbitrary string key via `record(key, usage)`, using `TokenUsage.__add__`. `total_for(key)` returns that key's running total (`TokenUsage.zero()` if unseen), `grand_total()` sums across every key, `keys()` lists recorded keys. No opinion on what the key means, a conversation id, a session id, a workflow-run id all work the same way.
 
 ## How to Extend
 
