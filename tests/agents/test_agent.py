@@ -9,9 +9,11 @@ from agent_platform.agents.errors import AgentGuardrailError, AgentThinkError
 from agent_platform.agents.guardrails import OutputNotEmptyGuardrail
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry, is_tool_validation_error
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
+    ResponseFormat,
     StreamChunk,
 )
 from agent_platform.core.schemas.message import (
@@ -577,6 +579,33 @@ class TestAgentResponseSchema:
         msgs = [UserMessage(content="Hi")]
         await agent.think(msgs)
         assert len(msgs) == 1
+
+    @pytest.mark.asyncio
+    async def test_sets_json_schema_response_format_on_generation_config(
+        self, mock_llm
+    ):
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content='{"value": 42}'
+        )
+        agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
+        await agent.think([UserMessage(content="Hi")])
+        config = mock_llm.agenerate.call_args[1]["config"]
+        assert config.response_format is ResponseFormat.JSON_SCHEMA
+        assert config.json_schema == _Answer.model_json_schema()
+
+    @pytest.mark.asyncio
+    async def test_does_not_override_explicit_response_format(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="not json")
+        agent = Agent(
+            name="structured",
+            llm=mock_llm,
+            response_schema=_Answer,
+            generation_config=GenerationConfig(response_format=ResponseFormat.JSON),
+        )
+        await agent.think([UserMessage(content="Hi")])
+        config = mock_llm.agenerate.call_args[1]["config"]
+        assert config.response_format is ResponseFormat.JSON
+        assert config.json_schema is None
 
 
 class TestAgentThinkStream:

@@ -17,7 +17,7 @@ from agent_platform.agents.tools.registry import (
 from agent_platform.agents.validation import retry_once_on_invalid
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
-from agent_platform.core.interfaces.llm.response import StreamChunk
+from agent_platform.core.interfaces.llm.response import ResponseFormat, StreamChunk
 from agent_platform.core.middleware import MiddlewarePipeline
 from agent_platform.core.schemas.message import (
     AssistantMessage,
@@ -98,6 +98,16 @@ class Agent:
         config = self._generation_config or GenerationConfig()
         if not config.model:
             config = config.model_copy(update={"model": self._model})
+        if (
+            self._response_schema is not None
+            and config.response_format is ResponseFormat.TEXT
+        ):
+            config = config.model_copy(
+                update={
+                    "response_format": ResponseFormat.JSON_SCHEMA,
+                    "json_schema": self._response_schema.model_json_schema(),
+                }
+            )
         return config
 
     def _build_call_args(
