@@ -8,6 +8,7 @@ from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
+from agent_platform.core.persistence import Checkpointer
 from agent_platform.core.schemas.message import (
     Message,
     UserMessage,
@@ -27,6 +28,7 @@ class ConversationAgent(Agent):
         max_iterations: int = 10,
         max_history_turns: int | None = None,
         context_strategy: ContextStrategy | None = None,
+        checkpointer: Checkpointer[list[Message]] | None = None,
         conversation_id: UUID | None = None,
     ) -> None:
         if context_strategy is not None and max_history_turns is not None:
@@ -48,6 +50,7 @@ class ConversationAgent(Agent):
             if max_history_turns is not None
             else None
         )
+        self._checkpointer = checkpointer
         self._conversation_id = conversation_id or uuid4()
 
     @property
@@ -73,9 +76,48 @@ class ConversationAgent(Agent):
         self._history = accumulated
         self._truncate_history()
 
+        if self._checkpointer is not None:
+            await self._checkpointer.save(
+                str(self._conversation_id), list(self._history)
+            )
+
         return result
 
     def _truncate_history(self) -> None:
         if self._context_strategy is None:
             return
         self._history = self._context_strategy.trim(self._history)
+
+    @classmethod
+    async def resume(
+        cls,
+        *,
+        conversation_id: UUID,
+        checkpointer: Checkpointer[list[Message]],
+        name: str,
+        llm: BaseLLMProvider,
+        tool_registry: ToolRegistry | None = None,
+        system_prompt: str | None = None,
+        model: str = "default",
+        generation_config: GenerationConfig | None = None,
+        max_iterations: int = 10,
+        max_history_turns: int | None = None,
+        context_strategy: ContextStrategy | None = None,
+    ) -> ConversationAgent:
+        agent = cls(
+            name=name,
+            llm=llm,
+            tool_registry=tool_registry,
+            system_prompt=system_prompt,
+            model=model,
+            generation_config=generation_config,
+            max_iterations=max_iterations,
+            max_history_turns=max_history_turns,
+            context_strategy=context_strategy,
+            checkpointer=checkpointer,
+            conversation_id=conversation_id,
+        )
+        saved = await checkpointer.load(str(conversation_id))
+        if saved is not None:
+            agent._history = list(saved)
+        return agent

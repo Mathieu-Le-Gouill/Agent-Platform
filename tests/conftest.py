@@ -80,6 +80,7 @@ def mock_langchain_response() -> MagicMock:
 def mock_llm():
     llm = MagicMock()
     llm.agenerate = AsyncMock()
+    llm.stream = MagicMock()
     return llm
 
 

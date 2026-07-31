@@ -24,6 +24,15 @@ from agent_platform.core.tracing import mark_span_error
 
 logger = logging.getLogger(__name__)
 
+TOOL_CALL_VALIDATION_ERROR_KEY = "tool_call_validation_error"
+
+
+def is_tool_validation_error(message: ToolMessage) -> bool:
+    return (
+        message.result.is_error
+        and message.metadata.get(TOOL_CALL_VALIDATION_ERROR_KEY) is True
+    )
+
 
 class ToolRegistry:
     _tools: dict[str, Tool]
@@ -73,12 +82,19 @@ class ToolRegistry:
                 GenAIAttributes.TOOL_CALL_ID: call.id,
             },
         ) as span:
+            metadata: dict[str, Any] = {}
             try:
                 raw = await self.resolve_call(call)
                 content = str(raw) if raw is not None else ""
                 is_error = False
             except asyncio.CancelledError:
                 raise
+            except ToolCallValidationError as exc:
+                logger.info("Tool call '%s' failed argument validation", call.name)
+                content = str(exc)
+                is_error = True
+                metadata = {TOOL_CALL_VALIDATION_ERROR_KEY: True}
+                mark_span_error(span, exc, record_exception=False)
             except Exception as exc:
                 logger.exception("Tool call '%s' failed", call.name)
                 content = str(exc)
@@ -91,7 +107,8 @@ class ToolRegistry:
                 name=call.name,
                 content=content,
                 is_error=is_error,
-            )
+            ),
+            metadata=metadata,
         )
 
     async def call_and_stream(self, call: ToolCall) -> AsyncIterator[ToolStreamChunk]:
@@ -104,6 +121,7 @@ class ToolRegistry:
                 delta=message.result.content,
                 is_final=True,
                 is_error=message.result.is_error,
+                is_validation_error=is_tool_validation_error(message),
             )
             return
 

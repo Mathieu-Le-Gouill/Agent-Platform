@@ -31,18 +31,22 @@ Each tool lives in its own `tools/<name>/tool.py`, one directory per tool, match
 
 | Component | File | What It Does |
 |---|---|---|
-| `Agent` | `agent.py` | Holds `system_prompt`, `tool_registry`, `llm`; `think()` → `AssistantMessage`; `act()` → `list[ToolMessage]` (runs tool calls concurrently via `asyncio.gather`, order-preserving); `step()` = think + act |
-| `AgentExecutor` | `executor.py` | think-act loop with `max_iterations` guard; `run(user_input)` and `run_with_messages(messages)` |
-| `ConversationAgent` | `conversation.py` | Extends `Agent` with persistent `_history`, `chat()`, pluggable `context_strategy: ContextStrategy | None` for history trimming |
-| `ContextStrategy` | `context.py` | Protocol: `trim(history) -> history`; `TurnCountStrategy(max_turns)` is the built-in implementation, `ConversationAgent(max_history_turns=N)` is sugar for `context_strategy=TurnCountStrategy(N)` (passing both raises `ValueError`) |
+| `Agent` | `agent.py` | Holds `system_prompt`, `tool_registry`, `llm`, optional `guardrails: list[Guardrail]` and `response_schema: type[BaseModel]`; `think()` → `AssistantMessage` (runs guardrails around generation, then validates `response_schema` with one corrective retry via `validation.retry_once_on_invalid` when there are no tool calls); `think_stream()` → `AsyncIterator[StreamChunk]` (same tool-list/config setup as `think()`, no guardrail/schema wrapping); `act()` → `list[ToolMessage]` (runs tool calls concurrently via `asyncio.gather`, order-preserving); `act_stream()` propagates a tool call's validation-error tag onto the `ToolMessage` it reconstructs from stream chunks; `step()` = think + act |
+| `AgentExecutor` | `executor.py` | think-act loop with `max_iterations` guard; `run(user_input)` and `run_with_messages(messages)`; each round is wrapped in `validation.retry_once_on_invalid` so a `ToolCallValidationError` (tagged via `tools.registry.is_tool_validation_error`) triggers one corrective retry before giving up; `run_streaming(user_input)` streams `Agent.think_stream()` text chunks interleaved with `act_stream()` tool events, reassembling fragmented `ToolCallDelta`s into `ToolCall`s via the internal `_assemble_tool_calls()` |
+| `ConversationAgent` | `conversation.py` | Extends `Agent` with persistent `_history`, `chat()`, pluggable `context_strategy: ContextStrategy | None` for history trimming, optional `checkpointer: Checkpointer[list[Message]] | None` (saves history after every `chat()` turn); `ConversationAgent.resume(conversation_id, checkpointer, ...)` classmethod reconstructs an agent's history from a checkpointer |
+| `ContextStrategy` | `context.py` | Protocol: `trim(history) -> history`. `TurnCountStrategy(max_turns)` is the original built-in implementation, `ConversationAgent(max_history_turns=N)` is sugar for `context_strategy=TurnCountStrategy(N)` (passing both raises `ValueError`). `TokenBudgetStrategy(max_tokens, count_tokens)` drops oldest whole turns until under budget, given an injected token-counting callable (always keeps at least the most recent turn). `SummarizingStrategy(llm, max_turns=...)` behaves like `TurnCountStrategy` but folds dropped turns into a `SystemMessage` summary via the injected `BaseLLMProvider`'s synchronous `generate()` (not `agenerate()`), so `trim()` stays synchronous and the `ContextStrategy` protocol/`ConversationAgent` need no changes. |
+| `Guardrail` | `guardrails.py` | `Guardrail = Middleware[GuardrailContext]` (Phase 1's `core/middleware.py` primitive, parameterized over `GuardrailContext(messages)`); `Agent(guardrails=[...])` runs them through a `MiddlewarePipeline` wrapping generation (`before` can short-circuit with a canned `AssistantMessage`, `after` can inspect/reject the real one). `OutputNotEmptyGuardrail` is the shipped example: raises `AgentGuardrailError` if the final answer has no text and no tool calls. Policy is opt-in, not baked in. |
+| `retry_once_on_invalid` | `validation.py` | Shared "run, check, corrective-retry-once, else give up" helper (`attempt`/`check`/`correct` callables) used by both malformed tool-call recovery (`AgentExecutor`) and `response_schema` validation (`Agent.think()`); raises `AgentRecoveryExhausted` (carrying the failing `last_result`) if the retried attempt is still invalid. |
 
 ### Error Types (`agents/errors.py`)
 
 ```
 AgentError
-├── AgentThinkError    (LLM generation failed)
-├── AgentActError      (tool execution failed at agent level)
-└── AgentMaxIterations (loop exceeded max_iterations)
+├── AgentThinkError        (LLM generation failed)
+├── AgentActError          (tool execution failed at agent level)
+├── AgentMaxIterations     (loop exceeded max_iterations)
+├── AgentRecoveryExhausted (one corrective retry still failed; carries `last_result`)
+└── AgentGuardrailError    (raised by a concrete Guardrail, e.g. OutputNotEmptyGuardrail)
 ```
 
 Tool-level errors live in `tools/errors.py`:
@@ -50,7 +54,9 @@ Tool-level errors live in `tools/errors.py`:
 ToolError
 ├── ToolNotFoundError
 ├── ToolRegistrationError
-└── ToolCallValidationError  (raised by ToolRegistry.resolve_call on schema mismatch)
+└── ToolCallValidationError  (raised by ToolRegistry.resolve_call on schema mismatch;
+                              tagged onto the resulting ToolMessage's metadata, see
+                              tools.registry.is_tool_validation_error())
 ```
 
 ## What's Left to Build
@@ -96,7 +102,7 @@ branching exists; `pipelines/` only gives fixed hand-written linear flows.
   workflow run can be interrupted and resumed, this also covers part of the
   Phase 3 "no persistence" gap.
 
-### Phase 3 — Harness engineering hardening
+### Phase 3 — Harness engineering hardening (done)
 
 Makes the existing single-agent loop production-grade; independent of Phase 2
 and can proceed in parallel.
@@ -112,23 +118,29 @@ and can proceed in parallel.
   only ever sees the raw pre-translation SDK exception there; it activates
   wherever a future call site wraps something that raises `PlatformError`
   directly (a tool, the agent loop).
-- Context management: `ConversationAgent` only truncates by turn count
-  (`max_history_turns`). ~~Add token-aware trimming/summarization behind a
-  pluggable strategy~~ **partially done**: the pluggable seam now exists
-  (`ContextStrategy` protocol in `context.py`, `TurnCountStrategy` is the only
-  built-in implementation so far). Still to add: a token-budget-aware
-  strategy and a summarizing strategy (token counting is model-specific, so
-  this can't be one fixed algorithm).
-- Streaming LLM text generation: `Agent.think()` has no streaming variant
-  today (only tool-call streaming via `act_stream()` exists); add one and wire
-  it into `/chat` as SSE.
-- ~~Malformed tool-call recovery~~ **prerequisite done**: `ToolRegistry.resolve_call`
-  now validates `call.arguments` against `tool.input_schema` before invoking
-  `run()`, raising `ToolCallValidationError` (a `ToolError` subclass) on
-  mismatch instead of failing deep inside the tool. Still to add: have
-  `AgentExecutor` catch that error and feed it back to the model as a
-  corrective turn once, instead of surfacing it straight as a failed
-  `ToolMessage`.
+- ~~Context management: `ConversationAgent` only truncates by turn count~~
+  **done**: `TokenBudgetStrategy` (token-budget-aware trimming, injected
+  token counter) and `SummarizingStrategy` (folds dropped turns into an
+  LLM-generated summary via `BaseLLMProvider.generate()`) join
+  `TurnCountStrategy` in `context.py`, all implementing `ContextStrategy`.
+- ~~Streaming LLM text generation: `Agent.think()` has no streaming variant~~
+  **done**: `Agent.think_stream()` wraps `BaseLLMProvider.stream()` the same
+  way `think()` wraps `agenerate()`; `AgentExecutor.run_streaming()` uses it
+  so the assistant's own text streams token-by-token (not just tool-call
+  deltas), and `api/app.py` exposes it as SSE via `POST /chat/stream`.
+- ~~Malformed tool-call recovery~~ **done**: `AgentExecutor` catches a
+  `ToolCallValidationError`-tagged `ToolMessage` (via
+  `tools.registry.is_tool_validation_error`) and retries `think()`+`act()`
+  once with corrective feedback appended to the conversation, via the shared
+  `validation.retry_once_on_invalid` helper, before giving up and returning
+  the error like any other failed tool call. `run_streaming()` applies the
+  same recovery.
+- New this phase, not originally scoped but built on the same primitives:
+  `response_schema` on `Agent` (structured final-answer validation, reusing
+  `retry_once_on_invalid`), `Guardrail`s (`guardrails.py`, built on Phase 1's
+  `MiddlewarePipeline`), and `ConversationAgent` checkpointing/`resume()`
+  (built on Phase 1's `Checkpointer[StateT]`). These pull forward two Phase 4
+  items below (guardrails, part of persistence); Phase 4 is updated to match.
 
 ### Phase 4 — Production hygiene / observability polish
 
@@ -138,19 +150,25 @@ above land.
 - Attach `conversation_id`/`session_id` as a span attribute in
   `core/tracing.py` so a multi-turn session's spans correlate without an
   external join.
-- Rate limiter and circuit breaker utilities alongside `with_retry` in
-  `core/errors.py`, opt-in per provider (today only retry+backoff exists, no
-  fallback/failover chain across providers).
-- Cost/token attribution rollup: aggregate `TokenUsage` per conversation,
-  exposed via a hook or in `/chat` response metadata.
-- Guardrails as an extension point (pre/post-generation validators for input
-  moderation, output schema/PII checks) on `Agent`, not a baked-in policy.
+- Rate limiter and circuit breaker utilities alongside `with_retry`: `core/resilience.py`'s
+  `CircuitBreaker`/`RateLimiter` exist (Phase 1) but are not yet wired into
+  any LLM provider call site, opt-in per provider (today only retry+backoff
+  is wired, no fallback/failover chain across providers).
+- Cost/token attribution rollup: `core/token_usage.py`'s `TokenUsageAggregator`
+  exists (Phase 1) but nothing yet calls `record()` per conversation or
+  exposes totals via a hook or in `/chat` response metadata.
+- ~~Guardrails as an extension point~~ **done**: see Phase 3 above
+  (`agents/guardrails.py`).
+- ~~`ConversationAgent` session persistence~~ **done**: see Phase 3 above
+  (`checkpointer` param, `ConversationAgent.resume()`).
 
 ## Infrastructure notes
 
-- **Streaming**, `Agent.think()` does not yet support streaming responses
-  (tool-call streaming via `act_stream()` already exists) — tracked as part
-  of Phase 3 above.
+- **Streaming**, `Agent.think_stream()` and `AgentExecutor.run_streaming()`
+  now stream the assistant's own text, not just tool-call deltas; `/chat/stream`
+  exposes this over SSE. Note `/chat/stream` is single-turn (built directly on
+  `AgentExecutor`, not `ConversationAgent`): it does not read from or append
+  to a `ConversationAgent`'s persistent history the way `/chat` does.
 
 ## Adding a New Tool
 

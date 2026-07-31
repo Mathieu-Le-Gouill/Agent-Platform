@@ -5,9 +5,10 @@ import pytest
 from pydantic import BaseModel
 
 from agent_platform.agents.agent import Agent
-from agent_platform.agents.errors import AgentThinkError
+from agent_platform.agents.errors import AgentGuardrailError, AgentThinkError
+from agent_platform.agents.guardrails import OutputNotEmptyGuardrail
 from agent_platform.agents.tools.base import Tool
-from agent_platform.agents.tools.registry import ToolRegistry
+from agent_platform.agents.tools.registry import ToolRegistry, is_tool_validation_error
 from agent_platform.core.interfaces.llm.response import LLMResponse
 from agent_platform.core.schemas.message import (
     AssistantMessage,
@@ -16,7 +17,11 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
-from tests.helpers import make_fake_llm_response
+from tests.helpers import (
+    make_fake_llm_response,
+    make_fake_stream,
+    make_text_stream_chunks,
+)
 
 
 class _WeatherInput(BaseModel):
@@ -113,6 +118,9 @@ class TestAgentConstruction:
 
     def test_no_system_prompt(self, agent):
         assert agent.system_prompt is None
+
+    def test_no_response_schema_by_default(self, agent):
+        assert agent.response_schema is None
 
 
 class TestAgentThink:
@@ -324,6 +332,31 @@ class _FailingStreamingTool(Tool):
 
 class TestAgentActStream:
     @pytest.mark.asyncio
+    async def test_validation_error_tagged_on_reconstructed_message(self, mock_llm):
+        class _StrictInput(BaseModel):
+            location: str
+
+        class _StrictTool(Tool):
+            name = "strict_weather"
+            description = "Requires a location"
+            input_schema = _StrictInput
+
+            async def run(self, **kwargs):
+                return kwargs["location"]
+
+        r = ToolRegistry()
+        r.register(_StrictTool())
+        agent = Agent(name="strict-agent", llm=mock_llm, tool_registry=r)
+        msg = AssistantMessage(
+            content="",
+            tool_calls=[ToolCall(id="call_1", name="strict_weather", arguments={})],
+        )
+        events = [e async for e in agent.act_stream(msg)]
+        tool_messages = [e for e in events if isinstance(e, ToolMessage)]
+        assert len(tool_messages) == 1
+        assert is_tool_validation_error(tool_messages[0]) is True
+
+    @pytest.mark.asyncio
     async def test_non_streaming_tool_call(self, agent):
         msg = AssistantMessage(
             content="",
@@ -413,3 +446,164 @@ class TestAgentStep:
         assistant_msg, tool_msgs = await agent.step(msgs)
         assert len(msgs) == 1
         assert msgs[0].content == "Weather?"
+
+
+class TestAgentGuardrails:
+    @pytest.mark.asyncio
+    async def test_no_guardrails_by_default(self, mock_llm):
+        agent = Agent(name="plain", llm=mock_llm)
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi")
+        result = await agent.think([UserMessage(content="Hi")])
+        assert result.content == "Hi"
+
+    @pytest.mark.asyncio
+    async def test_guardrail_rejects_empty_response(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="")
+        agent = Agent(
+            name="guarded", llm=mock_llm, guardrails=[OutputNotEmptyGuardrail()]
+        )
+        with pytest.raises(AgentGuardrailError, match="empty"):
+            await agent.think([UserMessage(content="Hi")])
+
+    @pytest.mark.asyncio
+    async def test_guardrail_allows_non_empty_response(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Fine")
+        agent = Agent(
+            name="guarded", llm=mock_llm, guardrails=[OutputNotEmptyGuardrail()]
+        )
+        result = await agent.think([UserMessage(content="Hi")])
+        assert result.content == "Fine"
+
+    @pytest.mark.asyncio
+    async def test_before_short_circuit_skips_generation(self, mock_llm):
+        class _ShortCircuit:
+            async def before(self, ctx):
+                return AssistantMessage(content="canned")
+
+            async def after(self, ctx, result):
+                return result
+
+        agent = Agent(name="guarded", llm=mock_llm, guardrails=[_ShortCircuit()])
+        result = await agent.think([UserMessage(content="Hi")])
+        assert result.content == "canned"
+        mock_llm.agenerate.assert_not_awaited()
+
+
+class _Answer(BaseModel):
+    value: int
+
+
+class TestAgentResponseSchema:
+    @pytest.mark.asyncio
+    async def test_no_schema_returns_text_unvalidated(self, mock_llm):
+        agent = Agent(name="plain", llm=mock_llm)
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="not json")
+        result = await agent.think([UserMessage(content="Hi")])
+        assert result.text == "not json"
+
+    @pytest.mark.asyncio
+    async def test_valid_json_passes_on_first_try(self, mock_llm):
+        agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content='{"value": 42}'
+        )
+        result = await agent.think([UserMessage(content="Hi")])
+        assert result.text == '{"value": 42}'
+        assert mock_llm.agenerate.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_invalid_json_recovers_on_retry(self, mock_llm):
+        call_count = 0
+
+        async def gen(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return make_fake_llm_response(content="not json")
+            return make_fake_llm_response(content='{"value": 7}')
+
+        mock_llm.agenerate.side_effect = gen
+        agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
+        result = await agent.think([UserMessage(content="Hi")])
+        assert result.text == '{"value": 7}'
+        assert call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_invalid_json_twice_gives_up_with_last_result(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content="still not json"
+        )
+        agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
+        result = await agent.think([UserMessage(content="Hi")])
+        assert result.text == "still not json"
+        assert mock_llm.agenerate.await_count == 2
+
+    @pytest.mark.asyncio
+    async def test_tool_calls_skip_schema_validation(self, mock_llm, registry):
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content="",
+            tool_calls=[
+                {"id": "c1", "name": "get_weather", "args": {"location": "Paris"}}
+            ],
+        )
+        agent = Agent(
+            name="structured",
+            llm=mock_llm,
+            tool_registry=registry,
+            response_schema=_Answer,
+        )
+        result = await agent.think([UserMessage(content="Weather?")])
+        assert len(result.tool_calls) == 1
+        assert mock_llm.agenerate.await_count == 1
+
+    @pytest.mark.asyncio
+    async def test_does_not_mutate_input_messages(self, mock_llm):
+        call_count = 0
+
+        async def gen(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return make_fake_llm_response(content="not json")
+            return make_fake_llm_response(content='{"value": 1}')
+
+        mock_llm.agenerate.side_effect = gen
+        agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
+        msgs = [UserMessage(content="Hi")]
+        await agent.think(msgs)
+        assert len(msgs) == 1
+
+
+class TestAgentThinkStream:
+    @pytest.mark.asyncio
+    async def test_think_stream_yields_chunks(self, mock_llm):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["Hel", "lo"])
+        )
+        agent = Agent(name="streamer", llm=mock_llm)
+        chunks = [c async for c in agent.think_stream([UserMessage(content="Hi")])]
+        deltas = [c.delta for c in chunks if c.delta]
+        assert deltas == ["Hel", "lo"]
+
+    @pytest.mark.asyncio
+    async def test_think_stream_wraps_errors(self, mock_llm):
+        def boom(**kwargs):
+            raise RuntimeError("stream crashed")
+
+        mock_llm.stream.side_effect = boom
+        agent = Agent(name="streamer", llm=mock_llm)
+        with pytest.raises(AgentThinkError, match="LLM streaming failed"):
+            async for _ in agent.think_stream([UserMessage(content="Hi")]):
+                pass
+
+    @pytest.mark.asyncio
+    async def test_think_stream_cancelled_error_propagates(self, mock_llm):
+        async def cancelling_gen(**kwargs):
+            raise asyncio.CancelledError()
+            yield  # pragma: no cover
+
+        mock_llm.stream.side_effect = cancelling_gen
+        agent = Agent(name="streamer", llm=mock_llm)
+        with pytest.raises(asyncio.CancelledError):
+            async for _ in agent.think_stream([UserMessage(content="Hi")]):
+                pass

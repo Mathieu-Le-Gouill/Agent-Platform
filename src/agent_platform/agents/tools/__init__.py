@@ -10,7 +10,7 @@ from agent_platform.agents.tools.generate_image.tool import (
     GenerateImageTool,
 )
 from agent_platform.agents.tools.ocr.tool import OCRInput, OCRTool
-from agent_platform.agents.tools.registry import ToolRegistry
+from agent_platform.agents.tools.registry import ToolRegistry, is_tool_validation_error
 from agent_platform.agents.tools.safe_execution import safe_call
 from agent_platform.agents.tools.search.tool import (
     SearchInput,
@@ -29,6 +29,7 @@ __all__ = [
     "ToolRegistrationError",
     "ToolCallValidationError",
     "ToolRegistry",
+    "is_tool_validation_error",
     "TranscribeInput",
     "TranscribeTool",
     "OCRInput",

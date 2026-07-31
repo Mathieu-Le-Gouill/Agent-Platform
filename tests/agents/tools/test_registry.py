@@ -9,6 +9,7 @@ from agent_platform.agents.tools import (
     ToolCallValidationError,
     ToolError,
     ToolRegistry,
+    is_tool_validation_error,
 )
 from agent_platform.core.schemas.message import ToolCall
 
@@ -199,6 +200,30 @@ class TestToolRegistry:
         message = await registry.call_and_wrap(call)
         assert message.result.is_error is True
         assert "Invalid arguments" in message.result.content
+
+    @pytest.mark.asyncio
+    async def test_call_and_wrap_tags_validation_error(self, registry):
+        registry.register(_StrictTool())
+        call = ToolCall(id="call_6", name="strict", arguments={})
+        message = await registry.call_and_wrap(call)
+        assert is_tool_validation_error(message) is True
+
+    @pytest.mark.asyncio
+    async def test_call_and_wrap_does_not_tag_other_errors(self, registry):
+        tool = _DummyTool()
+        tool.run = AsyncMock(side_effect=RuntimeError("boom"))  # type: ignore[method-assign]
+        registry.register(tool)
+        call = ToolCall(id="call_7", name="dummy", arguments={})
+        message = await registry.call_and_wrap(call)
+        assert message.result.is_error is True
+        assert is_tool_validation_error(message) is False
+
+    @pytest.mark.asyncio
+    async def test_call_and_wrap_does_not_tag_success(self, registry):
+        registry.register(_DummyTool())
+        call = ToolCall(id="call_8", name="dummy", arguments={})
+        message = await registry.call_and_wrap(call)
+        assert is_tool_validation_error(message) is False
 
 
 class TestCallAndWrap:

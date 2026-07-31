@@ -7,6 +7,7 @@ from agent_platform.agents.context import TurnCountStrategy
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
+from agent_platform.core.persistence import InMemoryCheckpointer
 from agent_platform.core.schemas.message import (
     UserMessage,
 )
@@ -362,3 +363,58 @@ async def test_transcribe_search_summarize_integration():
     assert stt.transcribe.await_count == 1
     assert embedder.aembed_document.await_count == 1
     assert store.search_with_scores.await_count == 1
+
+
+class TestConversationCheckpointing:
+    @pytest.mark.asyncio
+    async def test_chat_saves_history_when_checkpointer_set(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi back")
+        checkpointer: InMemoryCheckpointer[list] = InMemoryCheckpointer()
+        agent = ConversationAgent(name="conv", llm=mock_llm, checkpointer=checkpointer)
+
+        await agent.chat("Hi")
+
+        saved = await checkpointer.load(str(agent.conversation_id))
+        assert saved is not None
+        assert len(saved) == 2
+
+    @pytest.mark.asyncio
+    async def test_no_checkpointer_by_default(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi back")
+        agent = ConversationAgent(name="conv", llm=mock_llm)
+        await agent.chat("Hi")
+        assert agent._checkpointer is None
+
+    @pytest.mark.asyncio
+    async def test_resume_reconstructs_history(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi back")
+        checkpointer: InMemoryCheckpointer[list] = InMemoryCheckpointer()
+        original = ConversationAgent(
+            name="conv", llm=mock_llm, checkpointer=checkpointer
+        )
+        await original.chat("Hi")
+        cid = original.conversation_id
+
+        resumed = await ConversationAgent.resume(
+            conversation_id=cid,
+            checkpointer=checkpointer,
+            name="conv",
+            llm=mock_llm,
+        )
+
+        assert resumed.conversation_id == cid
+        assert len(resumed.history) == 2
+        assert resumed.history[0].content == "Hi"
+
+    @pytest.mark.asyncio
+    async def test_resume_with_no_saved_state_starts_empty(self, mock_llm):
+        from uuid import uuid4
+
+        checkpointer: InMemoryCheckpointer[list] = InMemoryCheckpointer()
+        resumed = await ConversationAgent.resume(
+            conversation_id=uuid4(),
+            checkpointer=checkpointer,
+            name="conv",
+            llm=mock_llm,
+        )
+        assert resumed.history == []

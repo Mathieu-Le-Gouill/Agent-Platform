@@ -13,6 +13,7 @@ class ToolStreamChunk(BaseModel, frozen=True):
     delta: str
     is_final: bool = False
     is_error: bool = False
+    is_validation_error: bool = False
 
 
 class Tool(Protocol):
