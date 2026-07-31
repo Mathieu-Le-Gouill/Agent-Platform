@@ -11,6 +11,7 @@ from agent_platform.agents.tools import (
     ToolRegistry,
     is_tool_validation_error,
 )
+from agent_platform.agents.tools.errors import ToolTimeoutError
 from agent_platform.core.schemas.message import ToolCall
 
 
@@ -315,3 +316,145 @@ class TestCallAndStream:
         with pytest.raises(asyncio.CancelledError):
             async for _ in registry.call_and_stream(call):
                 pass
+
+
+class _SlowTool(Tool):
+    name = "slow"
+    description = "A tool that takes a while"
+    input_schema = BaseModel
+
+    def __init__(self, delay: float) -> None:
+        self._delay = delay
+
+    async def run(self, **kwargs):
+        await asyncio.sleep(self._delay)
+        return "done"
+
+
+class _ConcurrencyTrackingTool(Tool):
+    name = "tracked"
+    description = "Tracks how many calls are in flight at once"
+    input_schema = BaseModel
+
+    def __init__(self) -> None:
+        self.in_flight = 0
+        self.max_in_flight = 0
+
+    async def run(self, **kwargs):
+        self.in_flight += 1
+        self.max_in_flight = max(self.max_in_flight, self.in_flight)
+        await asyncio.sleep(0.01)
+        self.in_flight -= 1
+        return "done"
+
+
+class TestPerToolTimeout:
+    @pytest.mark.asyncio
+    async def test_resolve_call_within_timeout_succeeds(self, registry):
+        registry.register(_SlowTool(delay=0.001), timeout=1.0)
+        call = ToolCall(id="c1", name="slow", arguments={})
+        assert await registry.resolve_call(call) == "done"
+
+    @pytest.mark.asyncio
+    async def test_resolve_call_exceeding_timeout_raises(self, registry):
+        registry.register(_SlowTool(delay=1.0), timeout=0.01)
+        call = ToolCall(id="c1", name="slow", arguments={})
+        with pytest.raises(ToolTimeoutError, match="timed out"):
+            await registry.resolve_call(call)
+
+    @pytest.mark.asyncio
+    async def test_call_and_wrap_surfaces_timeout_as_error(self, registry):
+        registry.register(_SlowTool(delay=1.0), timeout=0.01)
+        call = ToolCall(id="c1", name="slow", arguments={})
+        message = await registry.call_and_wrap(call)
+        assert message.result.is_error is True
+        assert is_tool_validation_error(message) is False
+
+    @pytest.mark.asyncio
+    async def test_no_timeout_means_unbounded(self, registry):
+        registry.register(_SlowTool(delay=0.01))
+        call = ToolCall(id="c1", name="slow", arguments={})
+        assert await registry.resolve_call(call) == "done"
+
+    def test_remove_clears_timeout(self, registry):
+        registry.register(_SlowTool(delay=0.01), timeout=1.0)
+        registry.remove("slow")
+        registry.register(_SlowTool(delay=0.01))
+        assert "slow" not in registry._timeouts
+
+
+class TestPerToolConcurrency:
+    @pytest.mark.asyncio
+    async def test_max_concurrency_limits_in_flight_calls(self, registry):
+        tool = _ConcurrencyTrackingTool()
+        registry.register(tool, max_concurrency=2)
+        calls = [ToolCall(id=str(i), name="tracked", arguments={}) for i in range(5)]
+
+        await asyncio.gather(*(registry.call_and_wrap(c) for c in calls))
+
+        assert tool.max_in_flight <= 2
+
+    @pytest.mark.asyncio
+    async def test_no_max_concurrency_means_unbounded(self, registry):
+        tool = _ConcurrencyTrackingTool()
+        registry.register(tool)
+        calls = [ToolCall(id=str(i), name="tracked", arguments={}) for i in range(5)]
+
+        await asyncio.gather(*(registry.call_and_wrap(c) for c in calls))
+
+        assert tool.max_in_flight == 5
+
+    @pytest.mark.asyncio
+    async def test_max_concurrency_applies_to_streaming(self, registry):
+        registry.register(_StreamingTool(), max_concurrency=1)
+        call = ToolCall(id="c1", name="streamer", arguments={})
+        chunks = [c async for c in registry.call_and_stream(call)]
+        assert [c.delta for c in chunks] == ["hello ", "world", ""]
+
+    def test_remove_clears_semaphore(self, registry):
+        registry.register(_DummyTool(), max_concurrency=1)
+        registry.remove("dummy")
+        assert "dummy" not in registry._semaphores
+
+
+class TestDiscoverEntryPoints:
+    def test_discovers_and_registers_tools(self, registry, monkeypatch):
+        class _FakeEntryPoint:
+            def __init__(self, factory):
+                self._factory = factory
+
+            def load(self):
+                return self._factory
+
+        fake_entry_points = [_FakeEntryPoint(_DummyTool), _FakeEntryPoint(_OtherTool)]
+        monkeypatch.setattr(
+            "agent_platform.agents.tools.registry.entry_points",
+            lambda group: fake_entry_points if group == "agent_platform.tools" else [],
+        )
+
+        discovered = registry.discover_entry_points()
+
+        assert {t.name for t in discovered} == {"dummy", "other"}
+        assert "dummy" in registry
+        assert "other" in registry
+
+    def test_uses_custom_group(self, registry, monkeypatch):
+        calls = []
+
+        def fake_entry_points(group):
+            calls.append(group)
+            return []
+
+        monkeypatch.setattr(
+            "agent_platform.agents.tools.registry.entry_points", fake_entry_points
+        )
+
+        registry.discover_entry_points(group="custom.group")
+
+        assert calls == ["custom.group"]
+
+    def test_no_entry_points_returns_empty(self, registry, monkeypatch):
+        monkeypatch.setattr(
+            "agent_platform.agents.tools.registry.entry_points", lambda group: []
+        )
+        assert registry.discover_entry_points() == []

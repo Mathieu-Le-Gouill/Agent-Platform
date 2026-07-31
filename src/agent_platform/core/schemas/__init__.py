@@ -42,6 +42,7 @@ from agent_platform.core.schemas.enums import (
     SimilarityMetric,
     VideoFormat,
 )
+from agent_platform.core.schemas.mcp import MCPToolSpec
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     AudioBlock,
@@ -122,5 +123,6 @@ __all__ = [
     "ClassificationResult",
     "ClassificationResponse",
     "SparseVector",
+    "MCPToolSpec",
     "model_schema",
 ]

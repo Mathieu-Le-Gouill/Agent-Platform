@@ -21,10 +21,11 @@ Each tool lives in its own `tools/<name>/tool.py`, one directory per tool, match
 | Component | File | What It Does |
 |---|---|---|
 | `Tool` Protocol | `tools/base.py` | `name`, `description`, `input_schema: type[BaseModel]`, `output_schema`, `async run(**kwargs) -> Any`; validates at subclass definition time |
-| `ToolRegistry` | `tools/registry.py` | Register/get/remove/iterate; `resolve_call()` validates `call.arguments` against the tool's `input_schema` (raising `ToolCallValidationError`) before dispatching, then calls `tool.run(**call.arguments)` with the original arguments unchanged; a tool that leaves `input_schema` at its `Tool` protocol default (bare `BaseModel`, uninstantiable) opts out of this pre-validation; `call_and_wrap()` returns a `ToolMessage` (captures errors as `is_error=True`) |
+| `ToolRegistry` | `tools/registry.py` | Register/get/remove/iterate; `register(tool, *, timeout=None, max_concurrency=None)` optionally guards a tool with a per-call timeout (`run()` only, raises `ToolTimeoutError`) and/or a concurrency cap (`asyncio.Semaphore`, enforced on both `run()` and `astream()`), both opt-in and independent; `discover_entry_points(group="agent_platform.tools")` registers every `Tool` an installed package exposes via `importlib.metadata` entry points (a zero-arg factory per entry point); `resolve_call()` validates `call.arguments` against the tool's `input_schema` (raising `ToolCallValidationError`) before dispatching, then calls `tool.run(**call.arguments)` with the original arguments unchanged; a tool that leaves `input_schema` at its `Tool` protocol default (bare `BaseModel`, uninstantiable) opts out of this pre-validation; `call_and_wrap()` returns a `ToolMessage` (captures errors as `is_error=True`) |
 | `TranscribeTool` | `tools/transcribe/tool.py` | Wraps `BaseSpeechToText`, audio → transcript |
 | `SearchTool` | `tools/search/tool.py` | Embeds query → vector store search → ranked chunks |
 | `OCRTool` | `tools/ocr/tool.py` | Wraps `BaseOCRProvider`, image → extracted text |
+| `MCPToolAdapter` / `discover_mcp_tools()` | `tools/mcp/adapter.py`, `tools/mcp/discovery.py` | Wraps one MCP server tool (`core/interfaces/mcp/base.py`'s `BaseMCPClient`) as a `Tool`, building `input_schema` dynamically from the tool's raw JSON Schema; `discover_mcp_tools(client)` lists every tool a connected client's server exposes and returns one adapter per tool, ready for `ToolRegistry.register()`. No MCP-transport code lives here, see `integrations/mcp/` |
 | `safe_call()` | `tools/safe_execution.py` | Error-wrapping helper for provider calls inside tools |
 
 ### Agent Runtime (`agents/`)
@@ -54,9 +55,11 @@ Tool-level errors live in `tools/errors.py`:
 ToolError
 ├── ToolNotFoundError
 ├── ToolRegistrationError
-└── ToolCallValidationError  (raised by ToolRegistry.resolve_call on schema mismatch;
-                              tagged onto the resulting ToolMessage's metadata, see
-                              tools.registry.is_tool_validation_error())
+├── ToolCallValidationError  (raised by ToolRegistry.resolve_call on schema mismatch;
+│                             tagged onto the resulting ToolMessage's metadata, see
+│                             tools.registry.is_tool_validation_error())
+└── ToolTimeoutError         (raised by ToolRegistry.resolve_call when a tool's
+                              per-call timeout, set via register(timeout=...), elapses)
 ```
 
 ## What's Left to Build
@@ -141,6 +144,40 @@ and can proceed in parallel.
   `MiddlewarePipeline`), and `ConversationAgent` checkpointing/`resume()`
   (built on Phase 1's `Checkpointer[StateT]`). These pull forward two Phase 4
   items below (guardrails, part of persistence); Phase 4 is updated to match.
+
+### Phase 3b - Tooling ecosystem (done)
+
+Independent of Phases 2/4: closes the "every tool is hand-registered Python"
+gap without changing the `Tool` protocol itself, so anything already
+implementing `Tool` (including a future `workflows/` node) keeps working
+unmodified.
+
+- Per-tool resilience: `ToolRegistry.register(tool, *, timeout=None,
+  max_concurrency=None)`, enforced in `call_and_wrap`/`call_and_stream`
+  (`asyncio.wait_for` for `timeout`, an `asyncio.Semaphore` for
+  `max_concurrency`), both opt-in, reusing `core/resilience.py`'s spirit
+  (guarding a call site's traffic) without pulling `CircuitBreaker`/
+  `RateLimiter` themselves in, a single slow/runaway tool is a simpler
+  failure mode than the sustained-traffic one those guard against.
+- Generic plugin discovery: `ToolRegistry.discover_entry_points(group=
+  "agent_platform.tools")` loads `Tool` factories any installed package
+  exposes via `importlib.metadata` entry points, no registry code change
+  needed to pick up a new third-party tool package.
+- MCP interop, following the existing provider-inversion pattern (a tool
+  wraps a `core/interfaces/<domain>` ABC, never a concrete `integrations/`
+  class directly, see `TranscribeTool`/`BaseSpeechToText`):
+  - `core/schemas/mcp.py::MCPToolSpec` (name/description/raw JSON Schema)
+    and `core/interfaces/mcp/base.py::BaseMCPClient` (the only domain ABC
+    that owns connection lifecycle, `connect()`/`aclose()`, since an MCP
+    server is a stateful session, not a stateless per-call provider).
+  - `integrations/mcp/stdio/provider.py::StdioMCPClient` is the only file
+    that imports the third-party `mcp` SDK (optional `tools-mcp` extra),
+    per `integrations/README.md`'s "only integrations/ imports third-party
+    packages" rule.
+  - `agents/tools/mcp/adapter.py::MCPToolAdapter` and
+    `agents/tools/mcp/discovery.py::discover_mcp_tools()` depend only on
+    `BaseMCPClient`, so they import fine even without the `mcp` SDK
+    installed; only constructing a concrete `StdioMCPClient` needs the extra.
 
 ### Phase 4 — Production hygiene / observability polish
 

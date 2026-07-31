@@ -99,6 +99,7 @@ class OpenAILLMProvider(BaseLLMProvider[OpenAIGenerationConfig]):
 | `classification/` | transformers (zero-shot) | `BaseClassificationProvider` |
 | `moderation/` | openai (`omni-moderation-latest`, network-bound, shares `_base.py::NativeModerationProvider` with the same dual-client shape as `reranking/_base.py::NativeReranker`), local (offline keyword/regex rule set, no credentials) | `BaseModerationProvider` |
 | `dataset/` | huggingface (wraps the `datasets` library's `load_dataset`; `map`/`filter`/`batch` on the returned splits delegate straight to the underlying `datasets.Dataset`'s own methods, so its Arrow storage, disk-cached `map()` fingerprinting, and streaming/`IterableDataset` support carry through unchanged, see `huggingface/mappers.py::resolve_splits` for native vs. ratio-based train/test/eval split resolution) | `BaseDatasetProvider` |
+| `mcp/` | stdio (`StdioMCPClient`, wraps the official `mcp` SDK's `stdio_client`/`ClientSession` to talk to a server launched as a local subprocess). The odd one out among all domains above: `BaseMCPClient` owns connection lifecycle (`connect()`/`aclose()`, also usable as `async with client:`) since an MCP server is a stateful session, not a stateless per-call provider; `agents/tools/mcp/` (not `integrations/`) is where a connected client's tools become `Tool`s | `BaseMCPClient` |
 
 ## How to Extend
 

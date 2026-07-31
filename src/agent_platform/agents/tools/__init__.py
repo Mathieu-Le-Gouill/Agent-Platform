@@ -9,6 +9,7 @@ from agent_platform.agents.tools.generate_image.tool import (
     GenerateImageInput,
     GenerateImageTool,
 )
+from agent_platform.agents.tools.mcp import MCPToolAdapter, discover_mcp_tools
 from agent_platform.agents.tools.ocr.tool import OCRInput, OCRTool
 from agent_platform.agents.tools.registry import ToolRegistry, is_tool_validation_error
 from agent_platform.agents.tools.safe_execution import safe_call
@@ -46,4 +47,6 @@ __all__ = [
     "SummarizeInput",
     "SummarizeTool",
     "safe_call",
+    "MCPToolAdapter",
+    "discover_mcp_tools",
 ]

@@ -34,7 +34,10 @@ core/
 │   ├── classification/
 │   ├── loader/
 │   ├── image_generation/
-│   └── dataset/
+│   ├── dataset/
+│   └── mcp/          # BaseMCPClient: connect()/aclose() + list_tools()/call_tool(),
+│                       #   the one domain ABC that owns connection lifecycle (an MCP
+│                       #   server is a stateful session, not a stateless per-call provider)
 └── schemas/          # Pydantic v2 data structures (shared across all layers)
     ├── document.py
     ├── chunk.py
@@ -45,6 +48,7 @@ core/
     ├── cluster.py
     ├── message.py
     ├── conversation.py
+    ├── mcp.py        # MCPToolSpec: one MCP server tool's name/description/raw JSON Schema
     └── enums.py
 ```
 
