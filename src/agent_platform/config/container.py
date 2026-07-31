@@ -17,6 +17,7 @@ from agent_platform.core.interfaces.llm.fallback import (
     FallbackLLMProvider,
 )
 from agent_platform.core.interfaces.speech.config import SpeechConfig
+from agent_platform.core.resilience import RateLimiter
 from agent_platform.core.token_usage import TokenUsageAggregator
 
 
@@ -74,7 +75,13 @@ def build_llm_with_fallback(settings: Settings) -> tuple[Any, str]:
     for model_string in settings.fallback_llm_models:
         provider, model = build_provider_from_model_string(llm_module, model_string)
         entries.append(FallbackEntry(provider=provider, model=model))
-    return FallbackLLMProvider(entries), primary_model
+
+    rate_limiter = (
+        RateLimiter(rate=settings.llm_rate_limit, burst=settings.llm_rate_limit_burst)
+        if settings.llm_rate_limit is not None
+        else None
+    )
+    return FallbackLLMProvider(entries, rate_limiter=rate_limiter), primary_model
 
 
 def build_agent(settings: Settings) -> ConversationAgent:

@@ -98,6 +98,31 @@ class TestBuildLlmWithFallback:
         assert isinstance(llm._entries[1].provider, AnthropicLLM)
         assert llm._entries[1].model == "claude-sonnet-4-5"
 
+    def test_no_rate_limiter_when_llm_rate_limit_unset(self):
+        settings = Settings(
+            _env_file=None,
+            default_llm_model="openai:gpt-4o-mini",
+            fallback_llm_models=["anthropic:claude-sonnet-4-5"],
+        )
+
+        llm, _ = build_llm_with_fallback(settings)
+
+        assert llm._rate_limiter is None
+
+    def test_wires_rate_limiter_when_configured(self):
+        settings = Settings(
+            _env_file=None,
+            default_llm_model="openai:gpt-4o-mini",
+            fallback_llm_models=["anthropic:claude-sonnet-4-5"],
+            llm_rate_limit=5.0,
+            llm_rate_limit_burst=10.0,
+        )
+
+        llm, _ = build_llm_with_fallback(settings)
+
+        assert isinstance(llm, FallbackLLMProvider)
+        assert llm._rate_limiter is not None
+
 
 class TestBuildProvider:
     def test_instantiates_provider_by_alias(self):

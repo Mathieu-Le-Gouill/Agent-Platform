@@ -7,7 +7,7 @@ from agent_platform.core.interfaces.llm.fallback import (
     FallbackEntry,
     FallbackLLMProvider,
 )
-from agent_platform.core.resilience import CircuitState
+from agent_platform.core.resilience import CircuitState, RateLimiter
 from agent_platform.core.schemas.message import Prompt
 from tests.helpers import (
     make_fake_llm_response,
@@ -127,6 +127,53 @@ class TestAgenerate:
 
         assert result.message.text == "secondary"
         primary.agenerate.assert_not_called()
+
+
+class TestRateLimiter:
+    @pytest.mark.asyncio
+    async def test_agenerate_acquires_from_rate_limiter(self, prompt):
+        primary = _mock_provider()
+        primary.agenerate.return_value = make_fake_llm_response("primary")
+        rate_limiter = RateLimiter(rate=100.0)
+        rate_limiter.acquire = AsyncMock(wraps=rate_limiter.acquire)
+
+        chain = FallbackLLMProvider(
+            [FallbackEntry(provider=primary, model="model-a")],
+            rate_limiter=rate_limiter,
+        )
+
+        await chain.agenerate(prompt)
+
+        rate_limiter.acquire.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_stream_acquires_from_rate_limiter(self, prompt):
+        primary = _mock_provider()
+        primary.stream.side_effect = lambda *a, **kw: make_fake_stream(
+            make_text_stream_chunks(["ok"])
+        )
+        rate_limiter = RateLimiter(rate=100.0)
+        rate_limiter.acquire = AsyncMock(wraps=rate_limiter.acquire)
+
+        chain = FallbackLLMProvider(
+            [FallbackEntry(provider=primary, model="model-a")],
+            rate_limiter=rate_limiter,
+        )
+
+        _ = [c async for c in chain.stream(prompt)]
+
+        rate_limiter.acquire.assert_awaited_once()
+
+    @pytest.mark.asyncio
+    async def test_no_rate_limiter_by_default(self, prompt):
+        primary = _mock_provider()
+        primary.agenerate.return_value = make_fake_llm_response("primary")
+
+        chain = FallbackLLMProvider([FallbackEntry(provider=primary, model="model-a")])
+
+        result = await chain.agenerate(prompt)
+
+        assert result.message.text == "primary"
 
 
 class TestStream:

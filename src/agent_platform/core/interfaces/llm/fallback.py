@@ -8,7 +8,7 @@ from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
-from agent_platform.core.resilience import CircuitBreaker, CircuitState
+from agent_platform.core.resilience import CircuitBreaker, CircuitState, RateLimiter
 from agent_platform.core.schemas.message import Prompt
 
 if TYPE_CHECKING:
@@ -45,11 +45,13 @@ class FallbackLLMProvider(BaseLLMProvider):
         entries: Sequence[FallbackEntry],
         *,
         circuit_breaker_factory: type[CircuitBreaker] = CircuitBreaker,
+        rate_limiter: RateLimiter | None = None,
     ) -> None:
         if not entries:
             raise ValueError("FallbackLLMProvider requires at least one entry")
         self._entries = list(entries)
         self._circuits = [circuit_breaker_factory() for _ in entries]
+        self._rate_limiter = rate_limiter
 
     def _config_for(
         self, config: GenerationConfig | None, model: str
@@ -86,6 +88,8 @@ class FallbackLLMProvider(BaseLLMProvider):
         config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> LLMResponse:
+        if self._rate_limiter is not None:
+            await self._rate_limiter.acquire()
         last_exc: Exception | None = None
         for entry, circuit in zip(self._entries, self._circuits, strict=True):
             if circuit.state is CircuitState.OPEN:
@@ -115,6 +119,8 @@ class FallbackLLMProvider(BaseLLMProvider):
         switching providers mid-stream would mix output from two different
         completions, so a failure past that point is raised as-is instead of
         silently retried."""
+        if self._rate_limiter is not None:
+            await self._rate_limiter.acquire()
         last_exc: Exception | None = None
         for entry, circuit in zip(self._entries, self._circuits, strict=True):
             if circuit.state is CircuitState.OPEN:

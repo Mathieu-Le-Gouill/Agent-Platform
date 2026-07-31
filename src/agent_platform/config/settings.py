@@ -23,6 +23,12 @@ class Settings(BaseSettings):
     # core/interfaces/llm/fallback.py::FallbackLLMProvider). Empty by default: no
     # fallback chain, the single configured provider is used directly.
     fallback_llm_models: list[str] = Field(default_factory=list)
+    # Token-bucket limit applied to the fallback chain as a whole (core/resilience.py::
+    # RateLimiter), shared across all entries since the budget being protected is the
+    # caller's total downstream traffic, not any one vendor's. None disables limiting.
+    # Only takes effect when fallback_llm_models is non-empty (see build_llm_with_fallback).
+    llm_rate_limit: float | None = None
+    llm_rate_limit_burst: float | None = None
     default_image_model: str = "dalle:dall-e-3"
     default_audio_model: str = "openai:whisper-1"
     agent_name: str = "assistant"
