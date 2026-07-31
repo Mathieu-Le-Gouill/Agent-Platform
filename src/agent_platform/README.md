@@ -9,9 +9,10 @@
 ├──────────────────────────────────────────────────┤
 │  agents/         ← composition (Agent, Executor,  │
 │                     ConversationAgent, Tool ABC,  │
-│                     ToolRegistry, 3 tools)        │
+│                     ToolRegistry, 7 tools + MCP)   │
 │  api/        ← FastAPI entrypoint (build_agent)   │
-│  workflows/  ← stub                                │
+│  workflows/  ← orchestration (WorkflowGraph, DAG,  │
+│                agent/tool/handoff nodes)          │
 ├──────────────────────────────────────────────────┤
 │  pipelines/         ← orchestration               │
 │  (ingestion, speech_translation, rag)             │
@@ -159,4 +160,4 @@ so this is the only code needed, no new registry, no per-domain dict.
 
 | Issue | Location | Status |
 |---|---|---|
-| Empty stub | `workflows/` | By design |
+| No parallel fan-out/fan-in (a strict DAG walked one node at a time) | `workflows/graph.py` | Tracked in `workflows/README.md` |

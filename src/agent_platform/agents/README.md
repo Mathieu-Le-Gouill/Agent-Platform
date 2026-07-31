@@ -84,26 +84,27 @@ and a golden `ConversationAgent`/`AgentExecutor` tool-selection dataset,
 wired into CI as an optional `evals` job. See `evals/README.md` for the
 package's design and how to add scorers/targets/datasets.
 
-### Phase 2 — Orchestration (`workflows/`, currently an empty stub)
+### Phase 2 — Orchestration (`workflows/`) (done)
 
-The only agent shape today is one `ConversationAgent` per process. No
-supervisor/sub-agent delegation, handoffs, fan-out/fan-in, or conditional
-branching exists; `pipelines/` only gives fixed hand-written linear flows.
+The only agent shape before this phase was one `ConversationAgent` per
+process; `pipelines/` only gave fixed hand-written linear flows. `workflows/`
+now provides a typed-state DAG: `WorkflowGraph`/`CompiledWorkflow`
+(`graph.py`), `WorkflowState`/`MessagesState`/`HandoffState`/
+`WorkflowCheckpoint` (`state.py`), and `agent_node`/`tool_node`/
+`binary_router`/`handoff_node` (`nodes/`). See `workflows/README.md` for the
+full design.
 
-- Decide the engine before writing code: LangGraph (already implied by the
-  stub's name) trades a new heavy dependency for speed-to-market; a lightweight
-  in-house DAG executor (typed state schema, async node callables, conditional
-  edges) stays consistent with this repo's "no monolithic dependency, inject
-  everything" style but is more to build and maintain. This is a call for the
-  user to make before Phase 2 starts.
-- `workflows/state.py` (typed state base), `workflows/graph.py`
-  (`WorkflowGraph`, node/edge registration, `arun()`), `workflows/nodes/`
-  (`agent_node` wrapping an `Agent`, `tool_node`, conditional router).
-- Multi-agent handoff: a node type that hands control to a different
-  `Agent`/`ConversationAgent`, passing shared typed state.
-- Pluggable checkpointing (in-memory default, injectable backend) so a
-  workflow run can be interrupted and resumed, this also covers part of the
-  Phase 3 "no persistence" gap.
+- Engine decision: an in-house DAG executor, not LangGraph, consistent with
+  every other layer's "dependency-free ABCs, vendor SDKs isolated to
+  `integrations/`" pattern (the unused `langgraph`/`langchain` base
+  dependencies this decision left dangling have been removed from
+  `pyproject.toml`).
+- Multi-agent handoff: `nodes/handoff.py::handoff_node` hands control to a
+  different `Agent`, sharing `state.messages`, and stamps `state.active_agent`.
+- Pluggable checkpointing: `CompiledWorkflow.arun(checkpointer=..., run_id=...)`
+  saves a `WorkflowCheckpoint` (state + next node) after every step;
+  `resume(run_id, checkpointer)` continues an interrupted run. Built on Phase
+  1's `Checkpointer[StateT]`, the same primitive `ConversationAgent` uses.
 
 ### Phase 3 — Harness engineering hardening (done)
 

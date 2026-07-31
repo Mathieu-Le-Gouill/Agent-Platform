@@ -31,7 +31,7 @@ generation, calling native vendor SDKs/REST endpoints directly (LangChain is
 only used inside `chunking`, wrapping `langchain-text-splitters`). Everything
 is `pydantic` v2 typed
 and layered strictly bottom-up: `core` → `integrations` → `components` →
-`pipelines` → `agents`.
+`pipelines` → `agents` → `workflows` → `evals`.
 
 ## 2. Directory map
 
@@ -43,13 +43,13 @@ Purpose only, enough to know which README to open next.
 | `src/agent_platform/integrations/` | Provider adapters per domain (llm, embeddings, vector_store, reranking, ocr, speech_to_text, translation, vad, chunking, clustering, loader, image_generation, classification), 13 domains | yes |
 | `src/agent_platform/components/` | Reusable processing units wrapping one or more integrations (`Chunker`, `Embedder`, `Reranker`, classifiers) | yes |
 | `src/agent_platform/pipelines/` | Multi-step orchestration flows composing components (ingestion, RAG, speech translation) | yes |
-| `src/agent_platform/agents/` | Top-level composition: `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, tools | yes |
+| `src/agent_platform/agents/` | Top-level composition: `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, tools (incl. MCP), guardrails | yes |
+| `src/agent_platform/workflows/` | Multi-agent orchestration: in-house typed-state DAG (`WorkflowGraph`/`CompiledWorkflow`), `agent_node`/`tool_node`/`handoff_node`, pluggable checkpointing | yes |
 | `src/agent_platform/evals/` | Regression testing for agents/pipelines: `EvalCase`/`EvalDataset`/`EvalRunner`/`Scorer`/`EvalReport`, `agent-platform-eval` CLI | yes |
 | `src/agent_platform/audio/` | DSP utilities, resampling, waveform chunking, tensor/numpy/base64 conversion | no |
 | `src/agent_platform/utils/` | Shared helpers: async batching, env var parsing, score utilities | no |
 | `src/agent_platform/config/` | Logging setup, `Settings` (pydantic-settings), `build_agent()` DI factory, generic `build_provider(domain_module, provider_name)` factory reused by any future domain wiring | no |
 | `src/agent_platform/api/` | FastAPI app wiring `build_agent()` behind `/chat` and `/health` | no |
-| `src/agent_platform/workflows/` | Scaffold stub (LangGraph state machine), not yet implemented | no |
 | `tests/` | Test suite, one file per source module; provider domains (`integrations/<domain>/<provider>/`) are flattened to `tests/integrations/<domain>/test_<provider>.py` with shared `test_base.py`/`test_config.py`/`test_providers.py` per domain rather than a strict 1:1 path mirror | no |
 
 Read `src/agent_platform/README.md` first for the full layer diagram before

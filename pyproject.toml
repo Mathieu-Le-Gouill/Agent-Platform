@@ -22,8 +22,6 @@ classifiers = [
 
 dependencies = [
     # --- Core framework (always installed) ---
-    "langchain~=1.3",
-    "langgraph~=1.2",
     "opentelemetry-api~=1.29",
     "numpy",
     "pillow",
@@ -244,6 +242,7 @@ name = "Layered architecture"
 type = "layers"
 layers = [
     "agent_platform.evals",
+    "agent_platform.workflows",
     "agent_platform.agents",
     "agent_platform.pipelines",
     "agent_platform.components",
@@ -260,4 +259,5 @@ forbidden_modules = [
     "agent_platform.components",
     "agent_platform.pipelines",
     "agent_platform.agents",
+    "agent_platform.workflows",
 ]
