@@ -133,11 +133,22 @@ class ToolRegistry:
             },
         ) as span:
             try:
+                self._validate_arguments(tool, call)
                 async for delta in tool.astream(**call.arguments):
                     yield ToolStreamChunk(tool_call_id=call.id, delta=delta)
                 yield ToolStreamChunk(tool_call_id=call.id, delta="", is_final=True)
             except asyncio.CancelledError:
                 raise
+            except ToolCallValidationError as exc:
+                logger.info("Tool call '%s' failed argument validation", call.name)
+                mark_span_error(span, exc, record_exception=False)
+                yield ToolStreamChunk(
+                    tool_call_id=call.id,
+                    delta=str(exc),
+                    is_final=True,
+                    is_error=True,
+                    is_validation_error=True,
+                )
             except Exception as exc:
                 logger.exception("Tool stream '%s' failed", call.name)
                 mark_span_error(span, exc, record_exception=False)

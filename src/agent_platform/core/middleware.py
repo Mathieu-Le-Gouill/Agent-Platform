@@ -1,24 +1,27 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
-from typing import Any, Generic, Protocol, TypeVar
+from typing import Generic, Protocol, TypeVar
 
-CtxT = TypeVar("CtxT")
+CtxT = TypeVar("CtxT", contravariant=True)
+ResultT = TypeVar("ResultT")
 
 __all__ = ["Middleware", "MiddlewarePipeline"]
 
 
-class Middleware(Protocol[CtxT]):
-    async def before(self, ctx: CtxT) -> CtxT | None: ...
+class Middleware(Protocol[CtxT, ResultT]):
+    async def before(self, ctx: CtxT) -> ResultT | None: ...
 
-    async def after(self, ctx: CtxT, result: Any) -> Any: ...
+    async def after(self, ctx: CtxT, result: ResultT) -> ResultT: ...
 
 
-class MiddlewarePipeline(Generic[CtxT]):
-    def __init__(self, middlewares: list[Middleware[CtxT]]) -> None:
+class MiddlewarePipeline(Generic[CtxT, ResultT]):
+    def __init__(self, middlewares: list[Middleware[CtxT, ResultT]]) -> None:
         self._middlewares = middlewares
 
-    async def run(self, ctx: CtxT, operation: Callable[[CtxT], Awaitable[Any]]) -> Any:
+    async def run(
+        self, ctx: CtxT, operation: Callable[[CtxT], Awaitable[ResultT]]
+    ) -> ResultT:
         for middleware in self._middlewares:
             short_circuit = await middleware.before(ctx)
             if short_circuit is not None:

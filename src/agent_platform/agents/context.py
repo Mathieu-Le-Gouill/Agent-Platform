@@ -14,7 +14,7 @@ from agent_platform.core.schemas.message import (
 
 
 class ContextStrategy(Protocol):
-    def trim(self, history: list[Message]) -> list[Message]: ...
+    async def trim(self, history: list[Message]) -> list[Message]: ...
 
 
 class TurnCountStrategy:
@@ -23,7 +23,7 @@ class TurnCountStrategy:
             raise ValueError("max_turns must be >= 1")
         self._max_turns = max_turns
 
-    def trim(self, history: list[Message]) -> list[Message]:
+    async def trim(self, history: list[Message]) -> list[Message]:
         user_indices = [i for i, m in enumerate(history) if isinstance(m, UserMessage)]
         if len(user_indices) <= self._max_turns:
             return history
@@ -56,7 +56,7 @@ class TokenBudgetStrategy:
         self._max_tokens = max_tokens
         self._count_tokens = count_tokens
 
-    def trim(self, history: list[Message]) -> list[Message]:
+    async def trim(self, history: list[Message]) -> list[Message]:
         user_indices, bounds = _turn_bounds(history)
         if not user_indices:
             return history
@@ -78,10 +78,12 @@ class TokenBudgetStrategy:
 
 class SummarizingStrategy:
     """Like `TurnCountStrategy`, but collapses dropped turns into a summary
-    instead of discarding them outright, via a synchronous `BaseLLMProvider`
-    call (`generate()`, not `agenerate()`) so `trim()` can stay synchronous
-    and satisfy `ContextStrategy` without changing that protocol or
-    `ConversationAgent`.
+    instead of discarding them outright, via `BaseLLMProvider.agenerate()`.
+    `ContextStrategy.trim()` is async precisely so this can await the LLM
+    call instead of blocking the event loop with the provider's synchronous
+    `generate()` (`_truncate_history()` is only ever called from
+    `ConversationAgent.chat()`, already a coroutine, so awaiting here costs
+    nothing at the call site).
     """
 
     def __init__(
@@ -100,7 +102,7 @@ class SummarizingStrategy:
         self._max_turns = max_turns
         self._summary_prompt = summary_prompt
 
-    def trim(self, history: list[Message]) -> list[Message]:
+    async def trim(self, history: list[Message]) -> list[Message]:
         user_indices = [i for i, m in enumerate(history) if isinstance(m, UserMessage)]
         if len(user_indices) <= self._max_turns:
             return history
@@ -109,11 +111,11 @@ class SummarizingStrategy:
         dropped = history[:first_to_keep]
         kept = history[first_to_keep:]
 
-        return [SystemMessage(content=self._summarize(dropped)), *kept]
+        return [SystemMessage(content=await self._summarize(dropped)), *kept]
 
-    def _summarize(self, dropped: list[Message]) -> str:
+    async def _summarize(self, dropped: list[Message]) -> str:
         transcript = "\n".join(f"{m.role.value}: {_message_text(m)}" for m in dropped)
-        response = self._llm.generate(
+        response = await self._llm.agenerate(
             prompt=Prompt.build(system=self._summary_prompt, user=transcript)
         )
         if response.message is None:

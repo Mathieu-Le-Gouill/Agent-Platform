@@ -231,7 +231,7 @@ class TestConversationTruncation:
     @pytest.mark.asyncio
     async def test_custom_context_strategy_is_used(self, mock_llm):
         class _KeepLastTwo:
-            def trim(self, history):
+            async def trim(self, history):
                 return history[-2:]
 
         mock_llm.agenerate.return_value = make_fake_llm_response(content="Response")

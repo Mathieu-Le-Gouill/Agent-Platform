@@ -78,6 +78,22 @@ class _CancelledStreamingTool(Tool):
         yield  # pragma: no cover
 
 
+class _StrictStreamingInput(BaseModel):
+    location: str
+
+
+class _StrictStreamingTool(Tool):
+    name = "strict_streamer"
+    description = "A streaming tool requiring a specific schema"
+    input_schema = _StrictStreamingInput
+    supports_streaming = True
+
+    async def astream(self, **kwargs):
+        yield kwargs[
+            "location"
+        ]  # pragma: no cover - should never run when args are bad
+
+
 @pytest.fixture
 def registry():
     return ToolRegistry()
@@ -238,6 +254,23 @@ class TestCallAndWrap:
 
 
 class TestCallAndStream:
+    @pytest.mark.asyncio
+    async def test_streaming_tool_invalid_arguments_tagged_before_astream(
+        self, registry
+    ):
+        tool = _StrictStreamingTool()
+        tool.astream = AsyncMock()  # type: ignore[method-assign]
+        registry.register(tool)
+        call = ToolCall(id="c1", name="strict_streamer", arguments={})
+
+        chunks = [c async for c in registry.call_and_stream(call)]
+
+        assert len(chunks) == 1
+        assert chunks[0].is_error is True
+        assert chunks[0].is_validation_error is True
+        assert "Invalid arguments" in chunks[0].delta
+        tool.astream.assert_not_called()
+
     @pytest.mark.asyncio
     async def test_non_streaming_tool_yields_single_final_chunk(self, registry):
         registry.register(_DummyTool())

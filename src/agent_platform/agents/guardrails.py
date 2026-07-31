@@ -12,7 +12,7 @@ class GuardrailContext:
         self.messages = messages
 
 
-Guardrail = Middleware[GuardrailContext]
+Guardrail = Middleware[GuardrailContext, AssistantMessage]
 
 
 class OutputNotEmptyGuardrail:

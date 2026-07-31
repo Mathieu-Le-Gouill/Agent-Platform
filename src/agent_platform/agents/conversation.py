@@ -74,7 +74,7 @@ class ConversationAgent(Agent):
             list(self._history)
         )
         self._history = accumulated
-        self._truncate_history()
+        await self._truncate_history()
 
         if self._checkpointer is not None:
             await self._checkpointer.save(
@@ -83,10 +83,10 @@ class ConversationAgent(Agent):
 
         return result
 
-    def _truncate_history(self) -> None:
+    async def _truncate_history(self) -> None:
         if self._context_strategy is None:
             return
-        self._history = self._context_strategy.trim(self._history)
+        self._history = await self._context_strategy.trim(self._history)
 
     @classmethod
     async def resume(
