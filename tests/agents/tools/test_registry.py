@@ -4,7 +4,12 @@ from unittest.mock import AsyncMock
 import pytest
 from pydantic import BaseModel
 
-from agent_platform.agents.tools import Tool, ToolError, ToolRegistry
+from agent_platform.agents.tools import (
+    Tool,
+    ToolCallValidationError,
+    ToolError,
+    ToolRegistry,
+)
 from agent_platform.core.schemas.message import ToolCall
 
 
@@ -15,6 +20,19 @@ class _DummyTool(Tool):
 
     async def run(self, **kwargs):
         return {"handled": True}
+
+
+class _StrictInput(BaseModel):
+    location: str
+
+
+class _StrictTool(Tool):
+    name = "strict"
+    description = "A tool requiring a specific schema"
+    input_schema = _StrictInput
+
+    async def run(self, **kwargs):
+        return f"weather for {kwargs['location']}"
 
 
 class _OtherTool(Tool):
@@ -155,6 +173,32 @@ class TestToolRegistry:
         call = ToolCall(id="call_2", name="dummy", arguments={"key": "val"})
         await registry.resolve_call(call)
         tool.run.assert_awaited_once_with(key="val")  # type: ignore[attr-defined]
+
+    @pytest.mark.asyncio
+    async def test_resolve_call_validates_arguments(self, registry):
+        tool = _StrictTool()
+        registry.register(tool)
+        call = ToolCall(id="call_3", name="strict", arguments={"location": "Paris"})
+        result = await registry.resolve_call(call)
+        assert result == "weather for Paris"
+
+    @pytest.mark.asyncio
+    async def test_resolve_call_invalid_arguments_raises_before_run(self, registry):
+        tool = _StrictTool()
+        tool.run = AsyncMock()  # type: ignore[method-assign]
+        registry.register(tool)
+        call = ToolCall(id="call_4", name="strict", arguments={})
+        with pytest.raises(ToolCallValidationError, match="Invalid arguments"):
+            await registry.resolve_call(call)
+        tool.run.assert_not_awaited()  # type: ignore[attr-defined]
+
+    @pytest.mark.asyncio
+    async def test_call_and_wrap_surfaces_validation_error(self, registry):
+        registry.register(_StrictTool())
+        call = ToolCall(id="call_5", name="strict", arguments={})
+        message = await registry.call_and_wrap(call)
+        assert message.result.is_error is True
+        assert "Invalid arguments" in message.result.content
 
 
 class TestCallAndWrap:

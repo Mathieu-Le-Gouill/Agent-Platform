@@ -5,8 +5,15 @@ import logging
 from collections.abc import AsyncIterator
 from typing import Any
 
+from pydantic import BaseModel
+from pydantic import ValidationError as PydanticValidationError
+
 from agent_platform.agents.tools.base import Tool, ToolStreamChunk
-from agent_platform.agents.tools.errors import ToolNotFoundError, ToolRegistrationError
+from agent_platform.agents.tools.errors import (
+    ToolCallValidationError,
+    ToolNotFoundError,
+    ToolRegistrationError,
+)
 from agent_platform.core.genai_tracing import GenAIAttributes, traced_operation_span
 from agent_platform.core.schemas.message import (
     ToolCall,
@@ -45,7 +52,18 @@ class ToolRegistry:
 
     async def resolve_call(self, call: ToolCall) -> Any:
         tool = self.get(call.name)
+        self._validate_arguments(tool, call)
         return await tool.run(**call.arguments)
+
+    def _validate_arguments(self, tool: Tool, call: ToolCall) -> None:
+        if tool.input_schema is BaseModel:
+            return
+        try:
+            tool.input_schema(**call.arguments)
+        except PydanticValidationError as exc:
+            raise ToolCallValidationError(
+                f"Invalid arguments for tool '{call.name}': {exc}"
+            ) from exc
 
     async def call_and_wrap(self, call: ToolCall) -> ToolMessage:
         with traced_operation_span(

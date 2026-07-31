@@ -1,6 +1,10 @@
 from agent_platform.agents.tools.base import Tool, ToolError, ToolStreamChunk
 from agent_platform.agents.tools.classify.tool import ClassifyInput, ClassifyTool
-from agent_platform.agents.tools.errors import ToolNotFoundError, ToolRegistrationError
+from agent_platform.agents.tools.errors import (
+    ToolCallValidationError,
+    ToolNotFoundError,
+    ToolRegistrationError,
+)
 from agent_platform.agents.tools.generate_image.tool import (
     GenerateImageInput,
     GenerateImageTool,
@@ -23,6 +27,7 @@ __all__ = [
     "ToolStreamChunk",
     "ToolNotFoundError",
     "ToolRegistrationError",
+    "ToolCallValidationError",
     "ToolRegistry",
     "TranscribeInput",
     "TranscribeTool",

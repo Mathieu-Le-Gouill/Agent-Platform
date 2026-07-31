@@ -3,6 +3,7 @@ from __future__ import annotations
 from uuid import UUID, uuid4
 
 from agent_platform.agents.agent import Agent
+from agent_platform.agents.context import ContextStrategy, TurnCountStrategy
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
@@ -25,8 +26,13 @@ class ConversationAgent(Agent):
         generation_config: GenerationConfig | None = None,
         max_iterations: int = 10,
         max_history_turns: int | None = None,
+        context_strategy: ContextStrategy | None = None,
         conversation_id: UUID | None = None,
     ) -> None:
+        if context_strategy is not None and max_history_turns is not None:
+            raise ValueError(
+                "pass either max_history_turns or context_strategy, not both"
+            )
         super().__init__(
             name=name,
             llm=llm,
@@ -37,7 +43,11 @@ class ConversationAgent(Agent):
         )
         self._history: list[Message] = []
         self._executor = AgentExecutor(self, max_iterations=max_iterations)
-        self._max_history_turns = max_history_turns
+        self._context_strategy = context_strategy or (
+            TurnCountStrategy(max_history_turns)
+            if max_history_turns is not None
+            else None
+        )
         self._conversation_id = conversation_id or uuid4()
 
     @property
@@ -66,14 +76,6 @@ class ConversationAgent(Agent):
         return result
 
     def _truncate_history(self) -> None:
-        if self._max_history_turns is None:
+        if self._context_strategy is None:
             return
-
-        user_indices = [
-            i for i, m in enumerate(self._history) if isinstance(m, UserMessage)
-        ]
-        if len(user_indices) <= self._max_history_turns:
-            return
-
-        first_to_keep = user_indices[-self._max_history_turns]
-        self._history = self._history[first_to_keep:]
+        self._history = self._context_strategy.trim(self._history)

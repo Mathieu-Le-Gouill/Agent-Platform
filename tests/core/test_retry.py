@@ -52,3 +52,30 @@ class TestWithRetry:
             return "done"
 
         assert await succeeds() == "done"
+
+    @pytest.mark.asyncio
+    async def test_non_retryable_platform_error_raises_immediately(self):
+        calls = {"n": 0}
+
+        @with_retry(max_attempts=3, base_delay=0.001)
+        async def fails():
+            calls["n"] += 1
+            raise ProviderError("permanent", retryable=False)
+
+        with pytest.raises(ProviderError, match="permanent"):
+            await fails()
+        assert calls["n"] == 1
+
+    @pytest.mark.asyncio
+    async def test_retryable_platform_error_retries(self):
+        calls = {"n": 0}
+
+        @with_retry(max_attempts=3, base_delay=0.001, max_delay=0.001)
+        async def flaky():
+            calls["n"] += 1
+            if calls["n"] < 3:
+                raise ProviderError("transient", retryable=True)
+            return "ok"
+
+        assert await flaky() == "ok"
+        assert calls["n"] == 3

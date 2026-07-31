@@ -11,6 +11,7 @@ core/
 ├── base.py           # Entity (UUID mixin), Timestamped
 ├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains), RequestOptions (ProviderConfig subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs)
 ├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
+├── retry.py          # with_retry() decorator: exponential backoff, honors PlatformError.retryable
 ├── credentials.py    # Credentials (secrets only, e.g. api_key), ClientOptions (base_url/timeout/max_retries)
 ├── tracing.py        # TracingBackend, TracingConfig, configure_tracing(), traced_span(), mark_span_error()
 ├── genai_tracing.py  # GenAIAttributes, traced_operation_span(), record_token_usage()
@@ -86,7 +87,7 @@ PlatformError
 └── ToolError
 ```
 
-Every error carries `code`, `retryable`, and `context` fields.
+Every error carries `code`, `retryable`, and `context` fields. `retry.py`'s `with_retry()` decorator (exponential backoff with jitter, `max_attempts`/`retry_on` configurable) checks this flag: if a caught exception is a `PlatformError` with `retryable=False`, it re-raises immediately instead of burning through retry attempts. Since every current `@with_retry()` call site in `integrations/` sits *inside* an outer `@error_logged(re_raise=ProviderError)` (decorator order: `error_logged` above `with_retry`), `with_retry` there only ever sees the raw underlying SDK exception, never the translated `PlatformError`, so this flag-check is a no-op for those call sites today; it takes effect wherever `with_retry` wraps a call that itself raises `PlatformError` directly (e.g. a tool or agent-loop retry).
 
 ### `tracing.py`: Vendor-Agnostic Observability
 

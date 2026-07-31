@@ -82,10 +82,14 @@ class Agent:
         return response.message
 
     async def act(self, assistant_message: AssistantMessage) -> list[ToolMessage]:
-        return [
-            await self._tool_registry.call_and_wrap(tc)
-            for tc in assistant_message.tool_calls
-        ]
+        return list(
+            await asyncio.gather(
+                *(
+                    self._tool_registry.call_and_wrap(tc)
+                    for tc in assistant_message.tool_calls
+                )
+            )
+        )
 
     async def act_stream(
         self, assistant_message: AssistantMessage

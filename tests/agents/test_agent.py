@@ -247,6 +247,46 @@ class TestAgentAct:
         assert "internal failure" in results[0].result.content
 
     @pytest.mark.asyncio
+    async def test_act_runs_tool_calls_concurrently(self, mock_llm):
+        started = asyncio.Event()
+        release = asyncio.Event()
+
+        class _BlockingTool(Tool):
+            name = "blocking"
+            description = "Waits for a sibling call before completing"
+            input_schema = BaseModel
+
+            async def run(self, **kwargs):
+                started.set()
+                await asyncio.wait_for(release.wait(), timeout=1)
+                return "done"
+
+        class _UnblockingTool(Tool):
+            name = "unblocking"
+            description = "Waits for the sibling to start, then releases it"
+            input_schema = BaseModel
+
+            async def run(self, **kwargs):
+                await asyncio.wait_for(started.wait(), timeout=1)
+                release.set()
+                return "released"
+
+        r = ToolRegistry()
+        r.register(_BlockingTool())
+        r.register(_UnblockingTool())
+        agent = Agent(name="concurrent", llm=mock_llm, tool_registry=r)
+        msg = AssistantMessage(
+            content="",
+            tool_calls=[
+                ToolCall(id="c1", name="blocking", arguments={}),
+                ToolCall(id="c2", name="unblocking", arguments={}),
+            ],
+        )
+        results = await asyncio.wait_for(agent.act(msg), timeout=1)
+        assert results[0].result.content == "done"
+        assert results[1].result.content == "released"
+
+    @pytest.mark.asyncio
     async def test_act_tool_returns_none(self, registry_with_empty, mock_llm):
         agent = Agent(name="empty", llm=mock_llm, tool_registry=registry_with_empty)
         msg = AssistantMessage(

@@ -6,6 +6,7 @@ __all__ = [
     "ToolError",
     "ToolNotFoundError",
     "ToolRegistrationError",
+    "ToolCallValidationError",
 ]
 
 
@@ -18,4 +19,8 @@ class ToolNotFoundError(ToolError):
 
 
 class ToolRegistrationError(ToolError):
+    pass
+
+
+class ToolCallValidationError(ToolError):
     pass

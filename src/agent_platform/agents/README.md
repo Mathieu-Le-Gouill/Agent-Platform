@@ -21,7 +21,7 @@ Each tool lives in its own `tools/<name>/tool.py`, one directory per tool, match
 | Component | File | What It Does |
 |---|---|---|
 | `Tool` Protocol | `tools/base.py` | `name`, `description`, `input_schema: type[BaseModel]`, `output_schema`, `async run(**kwargs) -> Any`; validates at subclass definition time |
-| `ToolRegistry` | `tools/registry.py` | Register/get/remove/iterate; `resolve_call()` dispatches a `ToolCall`; `call_and_wrap()` returns a `ToolMessage` (captures errors as `is_error=True`) |
+| `ToolRegistry` | `tools/registry.py` | Register/get/remove/iterate; `resolve_call()` validates `call.arguments` against the tool's `input_schema` (raising `ToolCallValidationError`) before dispatching, then calls `tool.run(**call.arguments)` with the original arguments unchanged; a tool that leaves `input_schema` at its `Tool` protocol default (bare `BaseModel`, uninstantiable) opts out of this pre-validation; `call_and_wrap()` returns a `ToolMessage` (captures errors as `is_error=True`) |
 | `TranscribeTool` | `tools/transcribe/tool.py` | Wraps `BaseSpeechToText`, audio → transcript |
 | `SearchTool` | `tools/search/tool.py` | Embeds query → vector store search → ranked chunks |
 | `OCRTool` | `tools/ocr/tool.py` | Wraps `BaseOCRProvider`, image → extracted text |
@@ -31,9 +31,10 @@ Each tool lives in its own `tools/<name>/tool.py`, one directory per tool, match
 
 | Component | File | What It Does |
 |---|---|---|
-| `Agent` | `agent.py` | Holds `system_prompt`, `tool_registry`, `llm`; `think()` → `AssistantMessage`; `act()` → `list[ToolMessage]`; `step()` = think + act |
+| `Agent` | `agent.py` | Holds `system_prompt`, `tool_registry`, `llm`; `think()` → `AssistantMessage`; `act()` → `list[ToolMessage]` (runs tool calls concurrently via `asyncio.gather`, order-preserving); `step()` = think + act |
 | `AgentExecutor` | `executor.py` | think-act loop with `max_iterations` guard; `run(user_input)` and `run_with_messages(messages)` |
-| `ConversationAgent` | `conversation.py` | Extends `Agent` with persistent `_history`, `chat()`, optional history truncation by turn count |
+| `ConversationAgent` | `conversation.py` | Extends `Agent` with persistent `_history`, `chat()`, pluggable `context_strategy: ContextStrategy | None` for history trimming |
+| `ContextStrategy` | `context.py` | Protocol: `trim(history) -> history`; `TurnCountStrategy(max_turns)` is the built-in implementation, `ConversationAgent(max_history_turns=N)` is sugar for `context_strategy=TurnCountStrategy(N)` (passing both raises `ValueError`) |
 
 ### Error Types (`agents/errors.py`)
 
@@ -48,7 +49,8 @@ Tool-level errors live in `tools/errors.py`:
 ```
 ToolError
 ├── ToolNotFoundError
-└── ToolRegistrationError
+├── ToolRegistrationError
+└── ToolCallValidationError  (raised by ToolRegistry.resolve_call on schema mismatch)
 ```
 
 ## What's Left to Build
@@ -99,21 +101,34 @@ branching exists; `pipelines/` only gives fixed hand-written linear flows.
 Makes the existing single-agent loop production-grade; independent of Phase 2
 and can proceed in parallel.
 
-- `Agent.act()` currently awaits tool calls sequentially inside a list
-  comprehension; parallelize independent tool calls with `asyncio.gather`.
-- `with_retry` (`core/errors.py`) retries any exception in `retry_on`
-  regardless of `PlatformError.retryable`; make it consult that flag /
-  a predicate instead of blanket exception-type retry.
+- ~~`Agent.act()` currently awaits tool calls sequentially~~ **done**: `act()`
+  now runs independent tool calls concurrently via `asyncio.gather`
+  (order-preserving).
+- ~~`with_retry` retries any exception regardless of `PlatformError.retryable`~~
+  **done**: `core/retry.py`'s `with_retry()` now re-raises immediately on a
+  `PlatformError` with `retryable=False`. Note this is currently a no-op for
+  every existing `integrations/` call site, since they all wrap `with_retry()`
+  *inside* an outer `@error_logged(re_raise=ProviderError)`, so `with_retry`
+  only ever sees the raw pre-translation SDK exception there; it activates
+  wherever a future call site wraps something that raises `PlatformError`
+  directly (a tool, the agent loop).
 - Context management: `ConversationAgent` only truncates by turn count
-  (`max_history_turns`). Add token-aware trimming/summarization behind a
-  pluggable strategy (token counting is model-specific, so this can't be one
-  fixed algorithm).
+  (`max_history_turns`). ~~Add token-aware trimming/summarization behind a
+  pluggable strategy~~ **partially done**: the pluggable seam now exists
+  (`ContextStrategy` protocol in `context.py`, `TurnCountStrategy` is the only
+  built-in implementation so far). Still to add: a token-budget-aware
+  strategy and a summarizing strategy (token counting is model-specific, so
+  this can't be one fixed algorithm).
 - Streaming LLM text generation: `Agent.think()` has no streaming variant
   today (only tool-call streaming via `act_stream()` exists); add one and wire
   it into `/chat` as SSE.
-- Malformed tool-call recovery: when a tool call's arguments fail
-  `input_schema` validation, feed the validation error back to the model once
-  before failing, instead of surfacing it straight to `ToolError`.
+- ~~Malformed tool-call recovery~~ **prerequisite done**: `ToolRegistry.resolve_call`
+  now validates `call.arguments` against `tool.input_schema` before invoking
+  `run()`, raising `ToolCallValidationError` (a `ToolError` subclass) on
+  mismatch instead of failing deep inside the tool. Still to add: have
+  `AgentExecutor` catch that error and feed it back to the model as a
+  corrective turn once, instead of surfacing it straight as a failed
+  `ToolMessage`.
 
 ### Phase 4 — Production hygiene / observability polish
 

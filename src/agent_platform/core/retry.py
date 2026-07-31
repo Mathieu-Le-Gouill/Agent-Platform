@@ -7,6 +7,8 @@ import random
 from collections.abc import Callable, Coroutine
 from typing import Any, TypeVar
 
+from agent_platform.core.errors import PlatformError
+
 _AsyncFunc = TypeVar("_AsyncFunc", bound=Callable[..., Coroutine[Any, Any, Any]])
 
 __all__ = ["with_retry"]
@@ -27,7 +29,9 @@ def with_retry(
             for attempt in range(1, max_attempts + 1):
                 try:
                     return await func(*args, **kwargs)
-                except retry_on:
+                except retry_on as exc:
+                    if isinstance(exc, PlatformError) and not exc.retryable:
+                        raise
                     if attempt == max_attempts:
                         raise
                     delay = min(max_delay, base_delay * 2 ** (attempt - 1))

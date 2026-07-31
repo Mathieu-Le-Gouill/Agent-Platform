@@ -3,6 +3,7 @@ from unittest.mock import AsyncMock, MagicMock
 import pytest
 from pydantic import BaseModel
 
+from agent_platform.agents.context import TurnCountStrategy
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
@@ -43,7 +44,20 @@ class TestConversationConstruction:
 
     def test_max_history_turns_default(self, mock_llm):
         agent = ConversationAgent(name="conv", llm=mock_llm)
-        assert agent._max_history_turns is None
+        assert agent._context_strategy is None
+
+    def test_max_history_turns_builds_turn_count_strategy(self, mock_llm):
+        agent = ConversationAgent(name="conv", llm=mock_llm, max_history_turns=2)
+        assert isinstance(agent._context_strategy, TurnCountStrategy)
+
+    def test_context_strategy_and_max_history_turns_conflict_raises(self, mock_llm):
+        with pytest.raises(ValueError, match="not both"):
+            ConversationAgent(
+                name="conv",
+                llm=mock_llm,
+                max_history_turns=2,
+                context_strategy=TurnCountStrategy(2),
+            )
 
     def test_conversation_id_default(self, mock_llm):
         agent = ConversationAgent(name="conv", llm=mock_llm)
@@ -207,6 +221,24 @@ class TestConversationTruncation:
             max_history_turns=1,
         )
 
+        await agent.chat("Turn 1")
+        await agent.chat("Turn 2")
+        assert len(agent.history) == 2
+        assert agent.history[0].content == "Turn 2"
+        assert agent.history[1].content == "Response"
+
+    @pytest.mark.asyncio
+    async def test_custom_context_strategy_is_used(self, mock_llm):
+        class _KeepLastTwo:
+            def trim(self, history):
+                return history[-2:]
+
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Response")
+        agent = ConversationAgent(
+            name="custom-strategy",
+            llm=mock_llm,
+            context_strategy=_KeepLastTwo(),
+        )
         await agent.chat("Turn 1")
         await agent.chat("Turn 2")
         assert len(agent.history) == 2
