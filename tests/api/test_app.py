@@ -84,6 +84,28 @@ class TestChatStream:
         ]
         assert [e["delta"] for e in events if e["type"] == "text"] == ["Hel", "lo"]
 
+    def test_streams_usage_event_after_completion(self):
+        mock_llm = MagicMock()
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["hi"])
+        )
+        agent = Agent(name="streamer", llm=mock_llm)
+
+        app = create_app()
+        with TestClient(app) as client:
+            app.state.agent = agent
+            response = client.post("/chat/stream", json={"message": "hi"})
+
+        events = [
+            json.loads(line[len("data: ") :])
+            for line in response.text.splitlines()
+            if line.startswith("data: ")
+        ]
+        usage_events = [e for e in events if e["type"] == "usage"]
+        assert len(usage_events) == 1
+        assert usage_events[0]["input_tokens"] == agent.token_usage.input_tokens
+        assert events[-1]["type"] == "usage"
+
     def test_streams_tool_events(self):
         call_count = 0
 

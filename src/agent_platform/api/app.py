@@ -67,6 +67,9 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     payload = {"type": "text", "delta": event}
                 yield f"data: {json.dumps(payload)}\n\n"
 
+            usage_payload = {"type": "usage", **agent.token_usage.model_dump()}
+            yield f"data: {json.dumps(usage_payload)}\n\n"
+
         return StreamingResponse(events(), media_type="text/event-stream")
 
     return app
