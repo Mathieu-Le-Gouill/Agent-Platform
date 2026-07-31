@@ -12,3 +12,4 @@ class ChatRequest(BaseModel):
 class ChatResponse(BaseModel):
     response: str
     usage: TokenUsage
+    estimated_cost: float | None = None

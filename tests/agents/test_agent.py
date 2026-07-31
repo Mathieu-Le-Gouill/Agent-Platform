@@ -9,6 +9,7 @@ from agent_platform.agents.errors import AgentGuardrailError, AgentThinkError
 from agent_platform.agents.guardrails import OutputNotEmptyGuardrail
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry, is_tool_validation_error
+from agent_platform.core.cost import ModelPricing, StaticPricingTable
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
@@ -128,6 +129,49 @@ class TestAgentConstruction:
 
     def test_no_response_schema_by_default(self, agent):
         assert agent.response_schema is None
+
+    def test_no_cost_estimator_by_default(self, agent):
+        assert agent.estimated_cost is None
+
+
+class TestAgentEstimatedCost:
+    @pytest.mark.asyncio
+    async def test_computes_cost_from_recorded_usage(self, mock_llm, registry):
+        pricing = StaticPricingTable(
+            {"test-model": ModelPricing(input_per_1k=1.0, output_per_1k=2.0)}
+        )
+        aggregator = TokenUsageAggregator()
+        agent = Agent(
+            name="priced-agent",
+            llm=mock_llm,
+            tool_registry=registry,
+            model="test-model",
+            token_usage_aggregator=aggregator,
+            cost_estimator=pricing,
+        )
+        mock_llm.agenerate.return_value = LLMResponse(
+            message=AssistantMessage(content="hi"),
+            usage=TokenUsage(input_tokens=1000, output_tokens=500),
+            model="test-model",
+            finish_reason=FinishReason.STOP,
+        )
+
+        await agent.think([UserMessage(content="hi")])
+
+        assert agent.estimated_cost == pytest.approx(1.0 + 1.0)
+
+    def test_unpriced_model_returns_zero(self, mock_llm, registry):
+        pricing = StaticPricingTable({})
+        agent = Agent(
+            name="priced-agent",
+            llm=mock_llm,
+            tool_registry=registry,
+            model="unknown-model",
+            token_usage_aggregator=TokenUsageAggregator(),
+            cost_estimator=pricing,
+        )
+
+        assert agent.estimated_cost == 0.0
 
 
 class TestAgentThink:

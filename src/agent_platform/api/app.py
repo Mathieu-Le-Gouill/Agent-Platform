@@ -36,7 +36,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def chat(request: ChatRequest) -> ChatResponse:
         agent: ConversationAgent = app.state.agent
         response = await agent.chat(request.message)
-        return ChatResponse(response=response, usage=agent.token_usage)
+        return ChatResponse(
+            response=response,
+            usage=agent.token_usage,
+            estimated_cost=agent.estimated_cost,
+        )
 
     @app.post("/chat/stream")
     async def chat_stream(request: ChatRequest) -> StreamingResponse:
@@ -67,7 +71,11 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     payload = {"type": "text", "delta": event}
                 yield f"data: {json.dumps(payload)}\n\n"
 
-            usage_payload = {"type": "usage", **agent.token_usage.model_dump()}
+            usage_payload = {
+                "type": "usage",
+                **agent.token_usage.model_dump(),
+                "estimated_cost": agent.estimated_cost,
+            }
             yield f"data: {json.dumps(usage_payload)}\n\n"
 
         return StreamingResponse(events(), media_type="text/event-stream")

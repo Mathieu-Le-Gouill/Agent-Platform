@@ -6,6 +6,7 @@ from agent_platform.agents.agent import Agent
 from agent_platform.agents.context import ContextStrategy, TurnCountStrategy
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.registry import ToolRegistry
+from agent_platform.core.cost import CostEstimator
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.persistence import Checkpointer
@@ -32,6 +33,7 @@ class ConversationAgent(Agent):
         checkpointer: Checkpointer[list[Message]] | None = None,
         conversation_id: UUID | None = None,
         token_usage_aggregator: TokenUsageAggregator | None = None,
+        cost_estimator: CostEstimator | None = None,
     ) -> None:
         if context_strategy is not None and max_history_turns is not None:
             raise ValueError(
@@ -47,6 +49,7 @@ class ConversationAgent(Agent):
             generation_config=generation_config,
             token_usage_aggregator=token_usage_aggregator,
             usage_key=str(conversation_id),
+            cost_estimator=cost_estimator,
         )
         self._history: list[Message] = []
         self._executor = AgentExecutor(self, max_iterations=max_iterations)
@@ -109,6 +112,7 @@ class ConversationAgent(Agent):
         max_history_turns: int | None = None,
         context_strategy: ContextStrategy | None = None,
         token_usage_aggregator: TokenUsageAggregator | None = None,
+        cost_estimator: CostEstimator | None = None,
     ) -> ConversationAgent:
         agent = cls(
             name=name,
@@ -123,6 +127,7 @@ class ConversationAgent(Agent):
             checkpointer=checkpointer,
             conversation_id=conversation_id,
             token_usage_aggregator=token_usage_aggregator,
+            cost_estimator=cost_estimator,
         )
         saved = await checkpointer.load(str(conversation_id))
         if saved is not None:

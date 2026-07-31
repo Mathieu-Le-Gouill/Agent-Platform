@@ -27,6 +27,7 @@ class _EchoTool(Tool):
 
 class FakeAgent:
     token_usage = TokenUsage(input_tokens=3, output_tokens=7)
+    estimated_cost = None
 
     async def chat(self, user_input: str) -> str:
         return f"echo: {user_input}"
@@ -52,6 +53,7 @@ class TestChat:
         assert response.json() == {
             "response": "echo: hi",
             "usage": {"input_tokens": 3, "output_tokens": 7, "reasoning_tokens": 0},
+            "estimated_cost": None,
         }
 
     def test_requires_message_field(self):

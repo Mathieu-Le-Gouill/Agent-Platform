@@ -15,6 +15,7 @@ from agent_platform.agents.tools.registry import (
     ToolRegistry,
 )
 from agent_platform.agents.validation import retry_once_on_invalid
+from agent_platform.core.cost import CostEstimator
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import ResponseFormat, StreamChunk
@@ -47,6 +48,7 @@ class Agent:
         response_schema: type[BaseModel] | None = None,
         token_usage_aggregator: TokenUsageAggregator | None = None,
         usage_key: str | None = None,
+        cost_estimator: CostEstimator | None = None,
     ) -> None:
         if not name:
             raise ValueError("Agent name must not be empty")
@@ -62,6 +64,7 @@ class Agent:
         self._response_schema = response_schema
         self._usage_aggregator = token_usage_aggregator
         self._usage_key = usage_key or name
+        self._cost_estimator = cost_estimator
 
     @property
     def name(self) -> str:
@@ -78,6 +81,15 @@ class Agent:
         if self._usage_aggregator is None:
             return TokenUsage.zero()
         return self._usage_aggregator.total_for(self._usage_key)
+
+    @property
+    def estimated_cost(self) -> float | None:
+        """Estimated dollar cost of `token_usage` so far, or `None` when no
+        `cost_estimator` was injected (as opposed to `0.0`, a priced-but-free
+        result, which a missing estimator can't produce)."""
+        if self._cost_estimator is None:
+            return None
+        return self._cost_estimator.cost_for(self._model, self.token_usage)
 
     @property
     def tool_registry(self) -> ToolRegistry:
