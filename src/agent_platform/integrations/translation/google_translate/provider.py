@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from google.cloud import translate_v2 as google_translate  # type: ignore[attr-defined]
+from google.cloud import translate_v2 as google_translate
 
 from agent_platform.core.credentials import (
     ClientOptions,
