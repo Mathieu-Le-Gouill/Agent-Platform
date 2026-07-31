@@ -27,6 +27,8 @@ from agent_platform.core.schemas.message import (
     ToolResult,
     UserMessage,
 )
+from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.core.token_usage import TokenUsageAggregator
 
 logger = logging.getLogger(__name__)
 
@@ -43,6 +45,8 @@ class Agent:
         generation_config: GenerationConfig | None = None,
         guardrails: list[Guardrail] | None = None,
         response_schema: type[BaseModel] | None = None,
+        token_usage_aggregator: TokenUsageAggregator | None = None,
+        usage_key: str | None = None,
     ) -> None:
         if not name:
             raise ValueError("Agent name must not be empty")
@@ -56,10 +60,24 @@ class Agent:
             MiddlewarePipeline(list(guardrails)) if guardrails else None
         )
         self._response_schema = response_schema
+        self._usage_aggregator = token_usage_aggregator
+        self._usage_key = usage_key or name
 
     @property
     def name(self) -> str:
         return self._name
+
+    @property
+    def token_usage(self) -> TokenUsage:
+        """Total `TokenUsage` recorded under this agent's `usage_key` so far.
+
+        `TokenUsage.zero()` when no `token_usage_aggregator` was injected, so
+        callers can read this unconditionally instead of checking for `None`
+        first.
+        """
+        if self._usage_aggregator is None:
+            return TokenUsage.zero()
+        return self._usage_aggregator.total_for(self._usage_key)
 
     @property
     def tool_registry(self) -> ToolRegistry:
@@ -107,6 +125,9 @@ class Agent:
 
         if response.message is None:
             raise AgentThinkError("LLM returned empty response")
+
+        if self._usage_aggregator is not None:
+            self._usage_aggregator.record(self._usage_key, response.usage)
 
         return response.message
 
@@ -174,6 +195,8 @@ class Agent:
             async for chunk in self._llm.stream(
                 prompt=prompt, config=config, tools=tools
             ):
+                if chunk.usage is not None and self._usage_aggregator is not None:
+                    self._usage_aggregator.record(self._usage_key, chunk.usage)
                 yield chunk
         except asyncio.CancelledError:
             raise

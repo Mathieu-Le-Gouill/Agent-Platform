@@ -2,7 +2,13 @@ from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
 import pytest
+from opentelemetry.sdk.trace import TracerProvider
+from opentelemetry.sdk.trace.export import SimpleSpanProcessor
+from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
+    InMemorySpanExporter,
+)
 
+from agent_platform.core import tracing
 from agent_platform.core.schemas.chunk import AudioChunk, TextChunk
 from agent_platform.core.schemas.document import TextDocument
 from agent_platform.core.schemas.enums import DataType, DocumentFormat
@@ -90,6 +96,20 @@ def no_retry_sleep(monkeypatch) -> None:
     import agent_platform.core.retry as retry_mod
 
     monkeypatch.setattr(retry_mod.asyncio, "sleep", AsyncMock())
+
+
+@pytest.fixture
+def recorded_spans(monkeypatch):
+    """Redirect `traced_span`'s tracer to an in-memory exporter so a test can
+    assert on the spans a call produced. Root-level (not `tests/core/`
+    only) since span attributes - `gen_ai.conversation.id` in particular -
+    are asserted on from `agents/`, not just `core/`."""
+    exporter = InMemorySpanExporter()
+    provider = TracerProvider()
+    provider.add_span_processor(SimpleSpanProcessor(exporter))
+    tracer = provider.get_tracer("test")
+    monkeypatch.setattr(tracing, "get_tracer", lambda: tracer)
+    return exporter
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

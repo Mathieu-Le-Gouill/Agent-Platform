@@ -7,10 +7,13 @@ from agent_platform.agents.context import TurnCountStrategy
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
+from agent_platform.core.genai_tracing import GenAIAttributes
 from agent_platform.core.persistence import InMemoryCheckpointer
 from agent_platform.core.schemas.message import (
     UserMessage,
 )
+from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.core.token_usage import TokenUsageAggregator
 from tests.helpers import make_fake_llm_response
 
 
@@ -418,3 +421,73 @@ class TestConversationCheckpointing:
             llm=mock_llm,
         )
         assert resumed.history == []
+
+
+class TestConversationTokenUsage:
+    @pytest.mark.asyncio
+    async def test_zero_usage_without_aggregator(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi back")
+        agent = ConversationAgent(name="conv", llm=mock_llm)
+
+        await agent.chat("Hi")
+
+        assert agent.token_usage == TokenUsage.zero()
+
+    @pytest.mark.asyncio
+    async def test_records_usage_under_conversation_id(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi back")
+        aggregator = TokenUsageAggregator()
+        agent = ConversationAgent(
+            name="conv", llm=mock_llm, token_usage_aggregator=aggregator
+        )
+
+        await agent.chat("Hi")
+
+        assert agent.token_usage == TokenUsage(input_tokens=10, output_tokens=5)
+        assert aggregator.total_for(str(agent.conversation_id)) == TokenUsage(
+            input_tokens=10, output_tokens=5
+        )
+
+    @pytest.mark.asyncio
+    async def test_accumulates_across_turns(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi back")
+        agent = ConversationAgent(
+            name="conv", llm=mock_llm, token_usage_aggregator=TokenUsageAggregator()
+        )
+
+        await agent.chat("Hi")
+        await agent.chat("Again")
+
+        assert agent.token_usage == TokenUsage(input_tokens=20, output_tokens=10)
+
+    @pytest.mark.asyncio
+    async def test_two_conversations_do_not_share_usage(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi back")
+        shared = TokenUsageAggregator()
+        first = ConversationAgent(
+            name="conv", llm=mock_llm, token_usage_aggregator=shared
+        )
+        second = ConversationAgent(
+            name="conv", llm=mock_llm, token_usage_aggregator=shared
+        )
+
+        await first.chat("Hi")
+
+        assert first.token_usage == TokenUsage(input_tokens=10, output_tokens=5)
+        assert second.token_usage == TokenUsage.zero()
+
+
+class TestConversationTracing:
+    @pytest.mark.asyncio
+    async def test_chat_sets_conversation_id_span_attribute(
+        self, mock_llm, recorded_spans
+    ):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi back")
+        agent = ConversationAgent(name="conv", llm=mock_llm)
+
+        await agent.chat("Hi")
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes[GenAIAttributes.CONVERSATION_ID] == str(
+            agent.conversation_id
+        )

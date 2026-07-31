@@ -8,6 +8,7 @@ from agent_platform.agents.agent import Agent
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.api.app import create_app, main
+from agent_platform.core.schemas.token import TokenUsage
 from tests.helpers import (
     make_fake_stream,
     make_text_stream_chunks,
@@ -25,6 +26,8 @@ class _EchoTool(Tool):
 
 
 class FakeAgent:
+    token_usage = TokenUsage(input_tokens=3, output_tokens=7)
+
     async def chat(self, user_input: str) -> str:
         return f"echo: {user_input}"
 
@@ -46,7 +49,10 @@ class TestChat:
             response = client.post("/chat", json={"message": "hi"})
 
         assert response.status_code == 200
-        assert response.json() == {"response": "echo: hi"}
+        assert response.json() == {
+            "response": "echo: hi",
+            "usage": {"input_tokens": 3, "output_tokens": 7, "reasoning_tokens": 0},
+        }
 
     def test_requires_message_field(self):
         with TestClient(create_app()) as client:

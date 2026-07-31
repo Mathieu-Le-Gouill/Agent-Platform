@@ -1,23 +1,8 @@
 import opentelemetry.trace as trace_api
 import pytest
-from opentelemetry.sdk.trace import TracerProvider
-from opentelemetry.sdk.trace.export import SimpleSpanProcessor
-from opentelemetry.sdk.trace.export.in_memory_span_exporter import (
-    InMemorySpanExporter,
-)
 from opentelemetry.util._once import Once
 
 from agent_platform.core import tracing
-
-
-@pytest.fixture
-def recorded_spans(monkeypatch):
-    exporter = InMemorySpanExporter()
-    provider = TracerProvider()
-    provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = provider.get_tracer("test")
-    monkeypatch.setattr(tracing, "get_tracer", lambda: tracer)
-    return exporter
 
 
 @pytest.fixture

@@ -12,7 +12,12 @@ from agent_platform.config.model_string import parse_model_string
 from agent_platform.config.settings import Settings
 from agent_platform.core.errors import ConfigError
 from agent_platform.core.interfaces.image_generation.config import ImageGenConfig
+from agent_platform.core.interfaces.llm.fallback import (
+    FallbackEntry,
+    FallbackLLMProvider,
+)
 from agent_platform.core.interfaces.speech.config import SpeechConfig
+from agent_platform.core.token_usage import TokenUsageAggregator
 
 
 def build_provider(domain_module: ModuleType, provider_name: str) -> Any:
@@ -47,14 +52,36 @@ def build_provider_from_model_string(
     return build_provider(domain_module, provider_name), model
 
 
-def build_agent(settings: Settings) -> ConversationAgent:
-    import agent_platform.integrations.image_generation as image_module
-    import agent_platform.integrations.llm as llm_module
-    import agent_platform.integrations.speech_to_text as speech_module
+def build_llm_with_fallback(settings: Settings) -> tuple[Any, str]:
+    """Resolve `settings.default_llm_model` (+ `fallback_llm_models`) into a
+    single `BaseLLMProvider`.
 
-    llm, llm_model = build_provider_from_model_string(
+    With no fallbacks configured, returns the primary provider directly (the
+    common case stays a plain single-provider call, no wrapper overhead).
+    Otherwise wraps the chain in a `FallbackLLMProvider`, which owns retrying
+    the next entry when an earlier one's circuit breaker trips - callers see
+    one `BaseLLMProvider`, not the chain behind it.
+    """
+    import agent_platform.integrations.llm as llm_module
+
+    primary, primary_model = build_provider_from_model_string(
         llm_module, settings.default_llm_model
     )
+    if not settings.fallback_llm_models:
+        return primary, primary_model
+
+    entries = [FallbackEntry(provider=primary, model=primary_model)]
+    for model_string in settings.fallback_llm_models:
+        provider, model = build_provider_from_model_string(llm_module, model_string)
+        entries.append(FallbackEntry(provider=provider, model=model))
+    return FallbackLLMProvider(entries), primary_model
+
+
+def build_agent(settings: Settings) -> ConversationAgent:
+    import agent_platform.integrations.image_generation as image_module
+    import agent_platform.integrations.speech_to_text as speech_module
+
+    llm, llm_model = build_llm_with_fallback(settings)
     image_generator, image_model = build_provider_from_model_string(
         image_module, settings.default_image_model
     )
@@ -83,7 +110,13 @@ def build_agent(settings: Settings) -> ConversationAgent:
         system_prompt=settings.agent_system_prompt,
         model=llm_model,
         max_iterations=settings.max_iterations,
+        token_usage_aggregator=TokenUsageAggregator(),
     )
 
 
-__all__ = ["build_agent", "build_provider", "build_provider_from_model_string"]
+__all__ = [
+    "build_agent",
+    "build_llm_with_fallback",
+    "build_provider",
+    "build_provider_from_model_string",
+]

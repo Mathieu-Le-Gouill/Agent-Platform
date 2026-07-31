@@ -180,21 +180,34 @@ unmodified.
     `BaseMCPClient`, so they import fine even without the `mcp` SDK
     installed; only constructing a concrete `StdioMCPClient` needs the extra.
 
-### Phase 4 — Production hygiene / observability polish
+### Phase 4 — Production hygiene / observability polish (done)
 
 Lower urgency than Phases 1-3; these round out tracing and resilience once the
-above land.
+above landed.
 
-- Attach `conversation_id`/`session_id` as a span attribute in
-  `core/tracing.py` so a multi-turn session's spans correlate without an
+- ~~Attach `conversation_id`/`session_id` as a span attribute~~ **done**:
+  `AgentExecutor.run`/`run_with_messages`/`run_streaming` take an optional
+  `conversation_id` keyword and set `GenAIAttributes.CONVERSATION_ID` on the
+  `invoke_agent` span when given (omitted, not set to `None`, otherwise);
+  `ConversationAgent.chat()` and `api/app.py`'s `/chat`, `/chat/stream` routes
+  always pass theirs, so a multi-turn session's spans correlate without an
   external join.
-- Rate limiter and circuit breaker utilities alongside `with_retry`: `core/resilience.py`'s
-  `CircuitBreaker`/`RateLimiter` exist (Phase 1) but are not yet wired into
-  any LLM provider call site, opt-in per provider (today only retry+backoff
-  is wired, no fallback/failover chain across providers).
-- Cost/token attribution rollup: `core/token_usage.py`'s `TokenUsageAggregator`
-  exists (Phase 1) but nothing yet calls `record()` per conversation or
-  exposes totals via a hook or in `/chat` response metadata.
+- ~~Rate limiter and circuit breaker utilities wired into an LLM call site~~
+  **done, for `CircuitBreaker`**: `core/interfaces/llm/fallback.py`'s
+  `FallbackLLMProvider` tries an ordered list of `BaseLLMProvider`s, each
+  behind its own `CircuitBreaker`, falling through to the next on failure - a
+  `BaseLLMProvider` itself, so `Agent(llm=...)` doesn't need to know it's
+  talking to more than one vendor. `config/container.py::build_agent` wires
+  it in when `Settings.fallback_llm_models` is non-empty; empty (the default)
+  skips the wrapper entirely. `RateLimiter` remains unwired, no call site
+  needed it yet.
+- ~~Cost/token attribution rollup~~ **done**: `Agent` takes an optional
+  `token_usage_aggregator`/`usage_key`, records `TokenUsage` after every
+  `_generate()` call and every `think_stream()` chunk that carries one, and
+  exposes the running total via `Agent.token_usage`. `ConversationAgent` uses
+  its own `conversation_id` as the key; `config/container.py::build_agent`
+  wires one in by default, and `api/app.py`'s `/chat` route returns it as
+  `ChatResponse.usage`.
 - ~~Guardrails as an extension point~~ **done**: see Phase 3 above
   (`agents/guardrails.py`).
 - ~~`ConversationAgent` session persistence~~ **done**: see Phase 3 above

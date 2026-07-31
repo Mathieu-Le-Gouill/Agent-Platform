@@ -6,6 +6,7 @@ from agent_platform.agents.errors import AgentMaxIterations, AgentThinkError
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
+from agent_platform.core.genai_tracing import GenAIAttributes
 from agent_platform.core.schemas.message import (
     UserMessage,
 )
@@ -301,6 +302,48 @@ class TestExecutorRunWithMessages:
         assert result == "Prebuilt answer"
         assert len(accumulated) == 2
         assert accumulated[0] is messages[0]
+
+
+class TestExecutorTracing:
+    @pytest.mark.asyncio
+    async def test_run_sets_conversation_id_when_given(self, mock_llm, recorded_spans):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi")
+        agent = Agent(name="test", llm=mock_llm)
+        ex = AgentExecutor(agent)
+
+        await ex.run("Hi", conversation_id="conv-123")
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes[GenAIAttributes.CONVERSATION_ID] == "conv-123"
+
+    @pytest.mark.asyncio
+    async def test_run_omits_conversation_id_when_not_given(
+        self, mock_llm, recorded_spans
+    ):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi")
+        agent = Agent(name="test", llm=mock_llm)
+        ex = AgentExecutor(agent)
+
+        await ex.run("Hi")
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert GenAIAttributes.CONVERSATION_ID not in span.attributes
+
+    @pytest.mark.asyncio
+    async def test_run_streaming_sets_conversation_id_when_given(
+        self, mock_llm, recorded_spans
+    ):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["Hi"])
+        )
+        agent = Agent(name="test", llm=mock_llm)
+        ex = AgentExecutor(agent)
+
+        async for _ in ex.run_streaming("Hi", conversation_id="conv-456"):
+            pass
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes[GenAIAttributes.CONVERSATION_ID] == "conv-456"
 
 
 class _StrictWeatherInput(BaseModel):

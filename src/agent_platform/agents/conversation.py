@@ -13,6 +13,7 @@ from agent_platform.core.schemas.message import (
     Message,
     UserMessage,
 )
+from agent_platform.core.token_usage import TokenUsageAggregator
 
 
 class ConversationAgent(Agent):
@@ -30,11 +31,13 @@ class ConversationAgent(Agent):
         context_strategy: ContextStrategy | None = None,
         checkpointer: Checkpointer[list[Message]] | None = None,
         conversation_id: UUID | None = None,
+        token_usage_aggregator: TokenUsageAggregator | None = None,
     ) -> None:
         if context_strategy is not None and max_history_turns is not None:
             raise ValueError(
                 "pass either max_history_turns or context_strategy, not both"
             )
+        conversation_id = conversation_id or uuid4()
         super().__init__(
             name=name,
             llm=llm,
@@ -42,6 +45,8 @@ class ConversationAgent(Agent):
             system_prompt=system_prompt,
             model=model,
             generation_config=generation_config,
+            token_usage_aggregator=token_usage_aggregator,
+            usage_key=str(conversation_id),
         )
         self._history: list[Message] = []
         self._executor = AgentExecutor(self, max_iterations=max_iterations)
@@ -51,7 +56,7 @@ class ConversationAgent(Agent):
             else None
         )
         self._checkpointer = checkpointer
-        self._conversation_id = conversation_id or uuid4()
+        self._conversation_id = conversation_id
 
     @property
     def history(self) -> list[Message]:
@@ -71,7 +76,7 @@ class ConversationAgent(Agent):
         self.add_user_message(user_input)
 
         result, accumulated = await self._executor.run_with_messages(
-            list(self._history)
+            list(self._history), conversation_id=str(self._conversation_id)
         )
         self._history = accumulated
         await self._truncate_history()
@@ -103,6 +108,7 @@ class ConversationAgent(Agent):
         max_iterations: int = 10,
         max_history_turns: int | None = None,
         context_strategy: ContextStrategy | None = None,
+        token_usage_aggregator: TokenUsageAggregator | None = None,
     ) -> ConversationAgent:
         agent = cls(
             name=name,
@@ -116,6 +122,7 @@ class ConversationAgent(Agent):
             context_strategy=context_strategy,
             checkpointer=checkpointer,
             conversation_id=conversation_id,
+            token_usage_aggregator=token_usage_aggregator,
         )
         saved = await checkpointer.load(str(conversation_id))
         if saved is not None:

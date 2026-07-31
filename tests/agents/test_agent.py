@@ -9,7 +9,11 @@ from agent_platform.agents.errors import AgentGuardrailError, AgentThinkError
 from agent_platform.agents.guardrails import OutputNotEmptyGuardrail
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry, is_tool_validation_error
-from agent_platform.core.interfaces.llm.response import LLMResponse
+from agent_platform.core.interfaces.llm.response import (
+    FinishReason,
+    LLMResponse,
+    StreamChunk,
+)
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     ToolCall,
@@ -17,6 +21,7 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.core.token_usage import TokenUsageAggregator
 from tests.helpers import (
     make_fake_llm_response,
     make_fake_stream,
@@ -607,3 +612,79 @@ class TestAgentThinkStream:
         with pytest.raises(asyncio.CancelledError):
             async for _ in agent.think_stream([UserMessage(content="Hi")]):
                 pass
+
+
+class TestAgentTokenUsage:
+    def test_zero_usage_without_aggregator(self, agent):
+        assert agent.token_usage == TokenUsage.zero()
+
+    @pytest.mark.asyncio
+    async def test_think_records_usage_under_usage_key(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response("hi")
+        aggregator = TokenUsageAggregator()
+        agent = Agent(
+            name="metered",
+            llm=mock_llm,
+            token_usage_aggregator=aggregator,
+        )
+
+        await agent.think([UserMessage(content="hi")])
+
+        assert agent.token_usage == TokenUsage(input_tokens=10, output_tokens=5)
+        assert aggregator.total_for("metered") == TokenUsage(
+            input_tokens=10, output_tokens=5
+        )
+
+    @pytest.mark.asyncio
+    async def test_think_accumulates_across_calls(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response("hi")
+        agent = Agent(
+            name="metered",
+            llm=mock_llm,
+            token_usage_aggregator=TokenUsageAggregator(),
+        )
+
+        await agent.think([UserMessage(content="hi")])
+        await agent.think([UserMessage(content="hi again")])
+
+        assert agent.token_usage == TokenUsage(input_tokens=20, output_tokens=10)
+
+    @pytest.mark.asyncio
+    async def test_think_uses_explicit_usage_key(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response("hi")
+        aggregator = TokenUsageAggregator()
+        agent = Agent(
+            name="metered",
+            llm=mock_llm,
+            token_usage_aggregator=aggregator,
+            usage_key="conversation-42",
+        )
+
+        await agent.think([UserMessage(content="hi")])
+
+        assert aggregator.total_for("conversation-42") == TokenUsage(
+            input_tokens=10, output_tokens=5
+        )
+        assert aggregator.total_for("metered") == TokenUsage.zero()
+
+    @pytest.mark.asyncio
+    async def test_think_stream_records_usage_from_final_chunk(self, mock_llm):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            [
+                StreamChunk(delta="Hi"),
+                StreamChunk(
+                    delta="",
+                    finish_reason=FinishReason.STOP,
+                    usage=TokenUsage(input_tokens=4, output_tokens=1),
+                ),
+            ]
+        )
+        aggregator = TokenUsageAggregator()
+        agent = Agent(name="streamer", llm=mock_llm, token_usage_aggregator=aggregator)
+
+        async for _ in agent.think_stream([UserMessage(content="Hi")]):
+            pass
+
+        assert aggregator.total_for("streamer") == TokenUsage(
+            input_tokens=4, output_tokens=1
+        )

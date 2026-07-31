@@ -53,18 +53,21 @@ class CircuitBreaker:
         try:
             result = await func(*args, **kwargs)
         except Exception:
-            self._on_failure()
+            self.record_failure()
             raise
         else:
-            self._on_success()
+            self.record_success()
             return result
 
-    def _on_success(self) -> None:
+    def record_success(self) -> None:
+        """Reset the breaker to closed. Public so callers that can't route a
+        call through `call()` (a sync call site, or one step of a streaming
+        response) can still report the outcome, e.g. `FallbackLLMProvider`."""
         self._failure_count = 0
         self._state = CircuitState.CLOSED
         self._opened_at = None
 
-    def _on_failure(self) -> None:
+    def record_failure(self) -> None:
         self._failure_count += 1
         if self._failure_count >= self._failure_threshold:
             if self._state is not CircuitState.OPEN:

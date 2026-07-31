@@ -17,7 +17,7 @@ All layers: core, integrations (15 domains, incl. MCP), components, pipelines (R
 
 ## Near-term build priorities
 
-Detailed phased roadmap lives in `src/agent_platform/agents/README.md` ("Roadmap: closing the gap with modern agent platforms"). Phases 1-3 (evals, harness hardening, tooling ecosystem) and Phase 2 (`workflows/` orchestration) are done. Phase 4 (production hygiene / observability polish: session-id span attribute, provider circuit breaker, token-usage rollup) is next.
+Detailed phased roadmap lives in `src/agent_platform/agents/README.md` ("Roadmap: closing the gap with modern agent platforms"). All phases (1-4: evals, harness hardening, tooling ecosystem, `workflows/` orchestration, production hygiene/observability) are done. No open roadmap items remain there; new work starts from a fresh gap analysis rather than this roadmap.
 
 ## Keeping this file current
 

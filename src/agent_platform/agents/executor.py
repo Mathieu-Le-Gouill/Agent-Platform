@@ -76,15 +76,15 @@ class AgentExecutor:
     def max_iterations(self) -> int:
         return self._max_iterations
 
-    async def run(self, user_input: str) -> str:
+    async def run(self, user_input: str, *, conversation_id: str | None = None) -> str:
         messages: list[Message] = [UserMessage(content=user_input)]
-        result, _ = await self._execute(messages)
+        result, _ = await self._execute(messages, conversation_id=conversation_id)
         return result
 
     async def run_with_messages(
-        self, messages: list[Message]
+        self, messages: list[Message], *, conversation_id: str | None = None
     ) -> tuple[str, list[Message]]:
-        return await self._execute(list(messages))
+        return await self._execute(list(messages), conversation_id=conversation_id)
 
     async def _think_and_act(self, messages: list[Message]) -> _ThinkActResult:
         assistant_msg = await self._agent.think(messages)
@@ -105,9 +105,15 @@ class AgentExecutor:
             )
         )
 
-    async def _execute(self, messages: list[Message]) -> tuple[str, list[Message]]:
+    async def _execute(
+        self, messages: list[Message], *, conversation_id: str | None = None
+    ) -> tuple[str, list[Message]]:
         with traced_operation_span(
-            "invoke_agent", {GenAIAttributes.AGENT_NAME: self._agent.name}
+            "invoke_agent",
+            {
+                GenAIAttributes.AGENT_NAME: self._agent.name,
+                GenAIAttributes.CONVERSATION_ID: conversation_id,
+            },
         ):
             for _ in range(self._max_iterations):
                 try:
@@ -159,12 +165,16 @@ class AgentExecutor:
         return assistant_msg, tool_messages
 
     async def run_streaming(
-        self, user_input: str
+        self, user_input: str, *, conversation_id: str | None = None
     ) -> AsyncIterator[ToolStreamChunk | str]:
         messages: list[Message] = [UserMessage(content=user_input)]
 
         with traced_operation_span(
-            "invoke_agent", {GenAIAttributes.AGENT_NAME: self._agent.name}
+            "invoke_agent",
+            {
+                GenAIAttributes.AGENT_NAME: self._agent.name,
+                GenAIAttributes.CONVERSATION_ID: conversation_id,
+            },
         ):
             for _ in range(self._max_iterations):
                 sink: list[ToolStreamChunk | str] = []

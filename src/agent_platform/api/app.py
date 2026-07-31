@@ -36,7 +36,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
     async def chat(request: ChatRequest) -> ChatResponse:
         agent: ConversationAgent = app.state.agent
         response = await agent.chat(request.message)
-        return ChatResponse(response=response)
+        return ChatResponse(response=response, usage=agent.token_usage)
 
     @app.post("/chat/stream")
     async def chat_stream(request: ChatRequest) -> StreamingResponse:
@@ -48,9 +48,13 @@ def create_app(settings: Settings | None = None) -> FastAPI:
         """
         agent: ConversationAgent = app.state.agent
         executor = AgentExecutor(agent, max_iterations=settings.max_iterations)
+        conversation_id = getattr(agent, "conversation_id", None)
 
         async def events() -> AsyncIterator[str]:
-            async for event in executor.run_streaming(request.message):
+            async for event in executor.run_streaming(
+                request.message,
+                conversation_id=str(conversation_id) if conversation_id else None,
+            ):
                 if isinstance(event, ToolStreamChunk):
                     payload = {
                         "type": "tool",

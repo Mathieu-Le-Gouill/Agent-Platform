@@ -3,12 +3,16 @@ import pytest
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.config.container import (
     build_agent,
+    build_llm_with_fallback,
     build_provider,
     build_provider_from_model_string,
 )
 from agent_platform.config.settings import Settings
 from agent_platform.core.errors import ConfigError
+from agent_platform.core.interfaces.llm.fallback import FallbackLLMProvider
+from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations import llm as llm_module
+from agent_platform.integrations.llm.anthropic.provider import AnthropicLLM
 from agent_platform.integrations.llm.openai.provider import OpenAILLM
 
 
@@ -43,6 +47,56 @@ class TestBuildAgent:
 
         with pytest.raises(ConfigError):
             build_agent(settings)
+
+    def test_has_a_token_usage_aggregator_wired_in(self):
+        settings = Settings(_env_file=None)
+
+        agent = build_agent(settings)
+
+        assert agent.token_usage == TokenUsage.zero()
+
+    def test_uses_plain_provider_without_fallback_models(self):
+        settings = Settings(_env_file=None)
+
+        agent = build_agent(settings)
+
+        assert isinstance(agent._llm, OpenAILLM)
+
+    def test_wraps_in_fallback_provider_when_configured(self):
+        settings = Settings(
+            _env_file=None,
+            default_llm_model="openai:gpt-4o-mini",
+            fallback_llm_models=["anthropic:claude-sonnet-4-5"],
+        )
+
+        agent = build_agent(settings)
+
+        assert isinstance(agent._llm, FallbackLLMProvider)
+
+
+class TestBuildLlmWithFallback:
+    def test_no_fallback_models_returns_primary_directly(self):
+        settings = Settings(_env_file=None, default_llm_model="openai:gpt-4o-mini")
+
+        llm, model = build_llm_with_fallback(settings)
+
+        assert isinstance(llm, OpenAILLM)
+        assert model == "gpt-4o-mini"
+
+    def test_fallback_models_build_a_chain(self):
+        settings = Settings(
+            _env_file=None,
+            default_llm_model="openai:gpt-4o-mini",
+            fallback_llm_models=["anthropic:claude-sonnet-4-5"],
+        )
+
+        llm, model = build_llm_with_fallback(settings)
+
+        assert isinstance(llm, FallbackLLMProvider)
+        assert model == "gpt-4o-mini"
+        assert isinstance(llm._entries[0].provider, OpenAILLM)
+        assert isinstance(llm._entries[1].provider, AnthropicLLM)
+        assert llm._entries[1].model == "claude-sonnet-4-5"
 
 
 class TestBuildProvider:
