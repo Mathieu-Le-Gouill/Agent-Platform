@@ -73,8 +73,7 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
     ) -> weaviate.config.AdditionalConfig | None:
         timeout = resolve_timeout(config.timeout, self._client_options)
         # No simple max_retries knob exists for weaviate-client's async
-        # connection helpers, so it stays unwired here (same honest-exemption
-        # style as `llm/mistral/provider.py::MistralLLM._async_client`).
+        # connection helpers, so it stays unwired here.
         if timeout is None:
             return None
         return weaviate.config.AdditionalConfig(

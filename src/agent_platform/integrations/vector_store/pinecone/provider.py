@@ -53,8 +53,7 @@ class PineconeStore(BaseVectorStore[PineconeConfig]):
         # `client_options.max_retries` is intentionally not wired here:
         # `PineconeAsyncio`'s `retry_config` takes a `RetryConfig` object, not
         # a simple int, so there's no faithful translation from the shared
-        # int-based knob (same honest-exemption style as
-        # `llm/mistral/provider.py::MistralLLM._async_client`).
+        # int-based knob.
         return kwargs
 
     async def _resolve_host(self, config: PineconeConfig) -> str:

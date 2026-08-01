@@ -27,8 +27,7 @@ class ChromaStore(BaseVectorStore[ChromaConfig]):
     # `PersistentClient` have no timeout/max_retries constructor kwarg, and
     # `ChromaConfig` already models the connection target as separate
     # `host`/`port` fields rather than a single base_url string, so there's
-    # no clean, honest way to wire `ClientOptions`/`RequestOptions` here
-    # (matches the local-only exemption `vector_store/faiss` also documents).
+    # no clean, honest way to wire `ClientOptions`/`RequestOptions` here.
     def __init__(self, credentials: ChromaCredentials | None = None) -> None:
         self._credentials = resolve_credentials(credentials, ChromaCredentials)
 

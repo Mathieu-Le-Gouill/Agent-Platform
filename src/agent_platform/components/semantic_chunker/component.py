@@ -47,6 +47,7 @@ class SemanticChunker(Component[SemanticChunkerInput, list[TextChunk]]):
         )
         vectors = [list(e.vector) for e in embed_response.embeddings]
 
+        # distance (1 - similarity) between consecutive sentences: a spike means a topic shift
         distances = [
             1.0 - compute_similarity(vectors[i], vectors[i + 1], config.metric)
             for i in range(len(vectors) - 1)
@@ -58,6 +59,7 @@ class SemanticChunker(Component[SemanticChunkerInput, list[TextChunk]]):
         current: list[str] = []
         for i, sentence in enumerate(sentences):
             current.append(sentence)
+            # ignore a breakpoint until the group meets the minimum size, merging it forward
             if i in breakpoints and len(current) >= config.min_sentences_per_chunk:
                 groups.append(current)
                 current = []
@@ -84,6 +86,7 @@ def _percentile(values: list[float], pct: float) -> float:
     if not values:
         return 0.0
     ordered = sorted(values)
+    # linear interpolation between the two nearest ranks (numpy's default method)
     k = (len(ordered) - 1) * (pct / 100.0)
     f = int(k)
     c = min(f + 1, len(ordered) - 1)

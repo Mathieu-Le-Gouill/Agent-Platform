@@ -35,11 +35,10 @@ class HTMLStructureChunkerProvider(
             headers_to_split_on=config.headers_to_split_on,
             return_each_element=config.return_each_element,
         )
-        # NOTE: unlike `recursive`/`latex`, this provider splits at the string
-        # level (split_text) rather than going through LangChainChunker's
-        # split_documents path, so start_char/end_char are never populated on
-        # the resulting TextChunks. Left as-is per architecture review — see
-        # `markdown.py` for the same tradeoff.
+        # NOTE: this provider splits at the string level (split_text) rather
+        # than going through LangChainChunker's split_documents path, so
+        # start_char/end_char are never populated on the resulting
+        # TextChunks.
         size_splitter = RecursiveCharacterTextSplitter(
             chunk_size=config.chunk_size,
             chunk_overlap=config.chunk_overlap,

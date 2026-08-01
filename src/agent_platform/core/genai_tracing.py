@@ -19,13 +19,9 @@ __all__ = [
 class GenAIAttributes:
     """OTel GenAI semantic-convention attribute keys.
 
-    https://github.com/open-telemetry/semantic-conventions-genai (the gen-ai
-    conventions moved out of the main semantic-conventions repo; the old
-    opentelemetry.io/docs/specs/semconv/gen-ai/ page just redirects there
-    now) - kept as constants so every call site (agent loop, tool calls, LLM
-    calls, and whatever gets instrumented next: embeddings, reranking, ...)
-    spells them identically. All `gen_ai.*` keys below are still
-    "Development" stability, so upstream can rename them again.
+    https://github.com/open-telemetry/semantic-conventions-genai. Kept as
+    constants so every call site spells them identically. These `gen_ai.*`
+    keys are still "Development" stability, so upstream may rename them.
     """
 
     OPERATION_NAME = "gen_ai.operation.name"
@@ -50,9 +46,7 @@ def traced_operation_span(
     operation: str, /, attributes: Mapping[str, Any] | None = None
 ) -> AbstractContextManager[Span]:
     """`traced_span` for a GenAI operation: names the span `operation` and sets
-    `gen_ai.operation.name` to match, since every current call site (`chat`,
-    `invoke_agent`, `execute_tool`) needs that pairing and any future one
-    (embeddings, reranking, ...) will too.
+    `gen_ai.operation.name` to match.
     """
     return traced_span(
         operation, {GenAIAttributes.OPERATION_NAME: operation, **(attributes or {})}

@@ -9,6 +9,7 @@ class Dimensions(BaseModel, frozen=True):
     depth: int | None = None
 
 
+# keyed by Pillow Image.mode strings (https://pillow.readthedocs.io/en/stable/handbook/concepts.html#modes)
 _MODE_BIT_DEPTH: dict[str, int] = {
     "1": 1,
     "L": 8,

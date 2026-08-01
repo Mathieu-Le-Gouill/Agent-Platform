@@ -44,6 +44,7 @@ class BaseVectorStore(ABC, Generic[ConfigT]):
         filter: dict[str, Any] | None = None,
     ) -> list[tuple[TextChunk, Score]]: ...
 
+    # not @abstractmethod: opt-in for stores with native dense+sparse support, not forced on every backend
     async def search_hybrid(
         self,
         query_vector: list[float],

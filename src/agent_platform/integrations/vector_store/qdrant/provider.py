@@ -40,8 +40,7 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
     def _client(self, config: QdrantConfig) -> AsyncQdrantClient:
         timeout = resolve_timeout(config.timeout, self._client_options)
         # No simple max_retries constructor kwarg confirmed for qdrant-client,
-        # so it stays unwired here (same honest-exemption style as
-        # `llm/mistral/provider.py::MistralLLM._async_client`).
+        # so it stays unwired here.
         return AsyncQdrantClient(
             url=config.url,
             api_key=self._credentials.api_key.get_secret_value()

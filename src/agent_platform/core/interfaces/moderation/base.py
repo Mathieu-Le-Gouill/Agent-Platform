@@ -10,13 +10,7 @@ ConfigT = TypeVar("ConfigT", bound=ModerationConfig)
 
 
 class BaseModerationProvider(ABC, Generic[ConfigT]):
-    """Flags text against a set of safety/policy categories.
-
-    Follows the network-bound sync/async pairing convention (like `llm`/
-    `embeddings`/`reranking`/`translation`), not `classification`'s
-    async-only exemption, since the primary provider (OpenAI) is a real
-    network call.
-    """
+    """Flags text against a set of safety/policy categories."""
 
     @abstractmethod
     def moderate(

@@ -12,9 +12,8 @@ class OllamaEmbeddingConfig(EmbeddingConfig):
     top_k: int | None = None
     # Part of the `options` dict on `/api/embed`.
     temperature: float | None = None
-    # Seconds (or, since the native `ollama` SDK migration, a duration string
-    # like "5m") the model stays loaded in memory after the request (Ollama
-    # server default: 5 minutes).
+    # Seconds (or a duration string like "5m") the model stays loaded in
+    # memory after the request (Ollama server default: 5 minutes).
     keep_alive: int | str | None = None
     # NOTE: base `batch_size` is never forwarded — the native `ollama` SDK's
     # `embed()` has no request-batching-count field; it sends the full input

@@ -26,6 +26,7 @@ def _dot(a: list[float], b: list[float]) -> float:
 
 
 def _euclidean(a: list[float], b: list[float]) -> float:
+    # inverted so a distance metric becomes a bounded (0, 1] similarity score
     distance = math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
     return 1.0 / (1.0 + distance)
 

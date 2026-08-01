@@ -25,9 +25,7 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
     """Local, in-process vector store backed directly by `faiss-cpu`.
 
     Since this is offline/local compute with no network calls, it
-    intentionally carries no `@error_logged`/`@with_retry` decorators
-    (matching the exemption already established for
-    `classification/transformers`).
+    intentionally carries no `@error_logged`/`@with_retry` decorators.
     """
 
     def __init__(self) -> None:
@@ -206,6 +204,8 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
 
         distance = self._distance or config.distance
         query = self._prepare([query_vector], distance)
+        # FAISS has no server-side filter, so over-fetch when filtering post-hoc
+        # to reduce the chance of ending up with fewer than k matches.
         fetch_k = k if not filter else min(index.ntotal, max(k * 4, k))
         distances, ids = await asyncio.to_thread(index.search, query, fetch_k)
 

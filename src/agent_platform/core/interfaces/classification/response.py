@@ -13,6 +13,7 @@ class ClassificationResult(BaseModel):
 
     @property
     def top(self) -> ClassificationPrediction | None:
+        # assumes providers return predictions pre-sorted by descending score
         return self.predictions[0] if self.predictions else None
 
     @property

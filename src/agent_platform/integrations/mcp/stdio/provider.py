@@ -74,6 +74,8 @@ class StdioMCPClient(BaseMCPClient[MCPClientConfig]):
     ) -> Any:
         session = self._require_session()
         result = await session.call_tool(name, arguments)
+        # Content blocks can be text, image, or resource types; only text ones
+        # contribute to the joined result.
         text = "\n".join(
             block.text for block in result.content if hasattr(block, "text")
         )

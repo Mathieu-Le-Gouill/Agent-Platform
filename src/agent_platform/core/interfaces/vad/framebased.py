@@ -26,6 +26,7 @@ class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
         state.segment_start = chunk.start
 
         if state.last_speech_end is not None:
+            # only pad backward for segments after the first (nothing precedes the very first one)
             state.segment_start = max(
                 0,
                 state.segment_start - config.speech_pad_ms,

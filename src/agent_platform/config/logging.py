@@ -13,6 +13,7 @@ def setup_logging(level: int = logging.INFO) -> None:
 
     handler.setFormatter(formatter)
 
+    # avoid duplicate log lines if setup_logging is called more than once (e.g. reload)
     if not root.handlers:
         root.addHandler(handler)
 

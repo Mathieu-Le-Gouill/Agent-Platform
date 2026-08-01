@@ -58,6 +58,7 @@ class EmbeddingClassifier(
             chunks = await self._chunker.arun(ChunkerInput([doc], None))
             chunks_per_doc[i] = chunks
 
+        # embed every doc's chunks in one batched call, then re-split by doc below
         all_chunks = [c for chunks in chunks_per_doc.values() for c in chunks]
 
         embed_response = await self._embedder.arun(EmbedderInput(all_chunks, None))

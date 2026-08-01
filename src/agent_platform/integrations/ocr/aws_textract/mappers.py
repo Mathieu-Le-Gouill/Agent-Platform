@@ -31,6 +31,8 @@ def from_textract(
                 id=uuid4(),
                 document_id=document_id,
                 text=text.strip(),
+                # Textract reports confidence on a 0-100 scale, unlike the
+                # 0-1 range used elsewhere (e.g. Google Vision).
                 confidence=Score(
                     value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100
                 ),

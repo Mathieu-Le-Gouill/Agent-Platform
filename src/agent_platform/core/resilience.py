@@ -36,6 +36,7 @@ class CircuitBreaker:
 
     @property
     def state(self) -> CircuitState:
+        # lazily flips OPEN -> HALF_OPEN on read once reset_timeout has elapsed
         if (
             self._state is CircuitState.OPEN
             and self._opened_at is not None

@@ -80,6 +80,7 @@ def create_app(settings: Settings | None = None) -> FastAPI:
                     payload = {"type": "text", "delta": event}
                 yield f"data: {json.dumps(payload)}\n\n"
 
+            # emitted last so it reflects the final cumulative totals for the whole turn
             usage_payload = {
                 "type": "usage",
                 **agent.token_usage.model_dump(),

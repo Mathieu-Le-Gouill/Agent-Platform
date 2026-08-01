@@ -9,6 +9,7 @@ from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
 from agent_platform.core.schemas.message import Prompt
 
 if TYPE_CHECKING:
+    # type-only: avoids a real runtime import from agents/, which core/ may never depend on
     from agent_platform.agents.tools.base import Tool
 
 GenerationConfigT = TypeVar("GenerationConfigT", bound=GenerationConfig)

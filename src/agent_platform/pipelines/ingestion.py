@@ -11,6 +11,7 @@ _splitter = RecursiveCharacterTextSplitter(
 
 
 def chunk_document(doc: TextDocument) -> list[TextChunk]:
+    # defensive: tolerate malformed/duck-typed docs despite the TextDocument type hint
     text = doc.text if hasattr(doc, "text") and isinstance(doc.text, str) else ""
     if not text:
         return []

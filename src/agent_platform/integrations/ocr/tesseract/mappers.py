@@ -29,9 +29,12 @@ def from_tesseract(
                 id=uuid4(),
                 document_id=document_id,
                 text=text.strip(),
+                # Tesseract reports confidence on a 0-100 scale, like Textract.
                 confidence=Score(
                     value=conf, kind=ScoreKind.CONFIDENCE, low=0, high=100
                 ),
+                # image_to_data returns pixel coordinates, not normalized 0-1
+                # fractions like the other OCR providers.
                 bbox=BoundingBox(
                     x=float((data.get("left") or [0])[i]),
                     y=float((data.get("top") or [0])[i]),

@@ -12,10 +12,10 @@ class OpenAIEmbeddingConfig(EmbeddingConfig):
     model_kwargs: dict | None = None
     # Native top-level `encoding_format` param on `embeddings.create`.
     encoding_format: Literal["float", "base64"] | None = None
-    # Unused post-migration: was LangChain's client-side auto-tokenize-and-split
-    # behavior for inputs exceeding the model's context length. The native
-    # `openai` SDK's `embeddings.create` has no equivalent; requests longer
-    # than the model's context simply get a 400 from the API.
+    # Unused: the native `openai` SDK's `embeddings.create` has no
+    # client-side tokenize-and-split behavior for inputs exceeding the
+    # model's context length; requests longer than the model's context
+    # simply get a 400 from the API.
     check_embedding_ctx_length: bool = True
 
 

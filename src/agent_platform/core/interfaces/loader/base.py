@@ -27,5 +27,5 @@ class BaseMediaLoader(ABC, Generic[DocumentT, ConfigT]):
         )
         for result in results:
             if isinstance(result, BaseException):
-                continue
+                continue  # a failed source is skipped silently, not raised
             yield result

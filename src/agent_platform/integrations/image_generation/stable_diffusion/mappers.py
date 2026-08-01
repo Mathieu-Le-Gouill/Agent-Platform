@@ -36,6 +36,8 @@ def parse_size(size: str | None) -> tuple[int, int]:
 
 
 def pluck_images(output: Any) -> list[Image.Image]:
+    # diffusers pipelines return a plain tuple when return_dict=False, an
+    # object with .images otherwise; support both call conventions.
     if isinstance(output, tuple):
         return list(output[0])
     return list(output.images)

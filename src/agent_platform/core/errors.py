@@ -86,7 +86,7 @@ def error_logged(
                 try:
                     return await func(*args, **kwargs)
                 except PlatformError:
-                    raise
+                    raise  # already a PlatformError: don't re-wrap it in re_raise
                 except Exception as exc:
                     logger.exception("%s in %s", message, func.__qualname__)
                     raise re_raise(f"{message}: {exc}") from exc

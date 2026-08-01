@@ -6,6 +6,9 @@ from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 from agent_platform.core.schemas.vector import SparseVector
 
+# structural mirror of BaseVectorStore, minus its ConfigT generic: lets callers
+# (components/, pipelines/) accept any provider without importing the ABC.
+
 
 class VectorStore(Protocol):
     async def add(

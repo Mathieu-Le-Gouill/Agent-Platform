@@ -20,6 +20,7 @@ _JUDGE_SYSTEM_PROMPT = (
     "Put the number on its own on the first line."
 )
 
+# matches a standalone 0(.x) or 1(.0) score, not digits embedded in other numbers/text
 _SCORE_PATTERN = re.compile(r"(?<![\d.])(0(?:\.\d+)?|1(?:\.0+)?)(?![\d.])")
 
 

@@ -111,7 +111,9 @@ Message = SystemMessage | UserMessage | AssistantMessage | ToolMessage
 # --- Prompt ---
 
 
-class Prompt(BaseModel):
+class Prompt(
+    BaseModel
+):  # not frozen, unlike other schemas: add_*() mutate messages in place
     messages: list[Message] = Field(default_factory=list)
 
     @classmethod

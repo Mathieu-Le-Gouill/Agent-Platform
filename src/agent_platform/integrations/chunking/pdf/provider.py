@@ -56,6 +56,8 @@ class PDFStructureChunkerProvider(
                     include_orig_elements=config.include_orig_elements,
                 )
                 if config.max_tokens is not None:
+                    # unstructured's chunk_by_title rejects max_tokens and
+                    # max_characters together, so only one may be set.
                     chunk_kwargs["max_tokens"] = config.max_tokens
                     chunk_kwargs["tokenizer"] = config.tokenizer
                 else:

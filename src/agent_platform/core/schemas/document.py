@@ -181,6 +181,7 @@ class VideoDocument(Document, frozen=True):
             )
             if video_stream is None:
                 raise ValueError(f"No video stream found in {path}")
+            # PyAV reports container.duration in AV_TIME_BASE units, not seconds
             duration_sec = (
                 float(container.duration / av.time_base) if container.duration else None
             )

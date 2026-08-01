@@ -32,7 +32,7 @@ class StaticPricingTable:
     def cost_for(self, model: str, usage: TokenUsage) -> float:
         pricing = self._prices.get(model)
         if pricing is None:
-            return 0.0
+            return 0.0  # unknown model: cost silently omitted rather than raising
         return (
             usage.input_tokens / 1000 * pricing.input_per_1k
             + usage.output_tokens / 1000 * pricing.output_per_1k

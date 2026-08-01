@@ -65,6 +65,8 @@ class SimilarityScorer(Component[SimilarityInput, ClassificationResult]):
 
         result: dict[str, float] = {}
         for label, scores in label_scores.items():
+            # score a label by its top_k best-matching chunks, not all of them,
+            # so one strong match isn't diluted by many weak ones
             scores.sort(reverse=True)
             result[label] = sum(scores[: config.top_k]) / min(len(scores), config.top_k)
 

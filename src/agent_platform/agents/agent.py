@@ -249,6 +249,7 @@ class Agent:
                     is_error = chunk.is_error
                     is_validation_error = chunk.is_validation_error
                     if is_error:
+                        # final error chunk carries the whole message, not a fragment
                         content = chunk.delta
                     else:
                         content += chunk.delta

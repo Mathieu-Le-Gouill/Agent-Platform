@@ -49,6 +49,7 @@ class Score(BaseModel, frozen=True):
 
     @classmethod
     def logit(cls, value: float, kind: ScoreKind = ScoreKind.CONFIDENCE) -> Score:
+        # unbounded wrapper (not an actual logit transform) for raw provider scores that may fall outside [0, 1]
         return cls(value=value, kind=kind, low=float("-inf"), high=float("inf"))
 
     @property

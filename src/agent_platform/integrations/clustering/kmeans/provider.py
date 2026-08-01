@@ -54,6 +54,7 @@ class KMeansClusterer(BaseClusteringAlgorithm[KMeansConfig]):
         )
         labels = clusterer.fit_predict(vectors)
         distances = clusterer.transform(vectors)
+        # Negate distances so the closest centroid gets the highest softmax weight.
         probs = softmax(-distances)
 
         return build_result(items, labels, probs)

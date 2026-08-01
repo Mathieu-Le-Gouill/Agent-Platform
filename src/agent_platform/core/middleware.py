@@ -25,10 +25,11 @@ class MiddlewarePipeline(Generic[CtxT, ResultT]):
         for middleware in self._middlewares:
             short_circuit = await middleware.before(ctx)
             if short_circuit is not None:
-                return short_circuit
+                return short_circuit  # skips operation() and every after()
 
         result = await operation(ctx)
 
+        # reverse order so the first middleware wraps outermost (onion/decorator model)
         for middleware in reversed(self._middlewares):
             result = await middleware.after(ctx, result)
 

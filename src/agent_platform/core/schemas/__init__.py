@@ -67,6 +67,8 @@ from agent_platform.core.schemas.vector import SparseVector
 
 @functools.lru_cache(maxsize=128)
 def model_schema(model: type[BaseModel]) -> dict[str, Any]:
+    # bare BaseModel is the "no parameters" sentinel for tools; special-cased to
+    # avoid a stray "BaseModel"-titled schema being sent to the provider
     if model is BaseModel:
         return {"type": "object", "properties": {}}
     return model.model_json_schema()

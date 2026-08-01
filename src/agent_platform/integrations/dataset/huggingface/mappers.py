@@ -144,6 +144,8 @@ def _split_by_ratio(
     remaining = dataset
     result: dict[DatasetSplit, Dataset] = {}
 
+    # Splits are peeled off sequentially (eval, then test), so each ratio is
+    # recomputed relative to what remains rather than the original total.
     eval_ratio = split_ratios.get(DatasetSplit.EVAL, 0.0) / total
     if eval_ratio:
         split_out = remaining.train_test_split(test_size=eval_ratio, seed=seed)

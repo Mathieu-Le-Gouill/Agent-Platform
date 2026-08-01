@@ -40,6 +40,7 @@ def _from_numpy_dtype(dtype: np.dtype) -> DataType:
         case np.float32:
             return DataType.FLOAT32
         case np.float64:
+            # no dedicated FLOAT64 variant; float64 arrays are represented as FLOAT32
             return DataType.FLOAT32
         case _:
             raise ValueError(f"Unsupported numpy dtype: {dtype}")
@@ -91,6 +92,7 @@ class AudioIO:
         arr: np.ndarray = np.frombuffer(segment.data, dtype=np_dtype)
         if segment.channels > 1:
             arr = arr.reshape(segment.channels, -1)
+        # copy: np.frombuffer is a read-only view, and torch.from_numpy requires writable data
         return torch.from_numpy(arr.copy())
 
     @staticmethod

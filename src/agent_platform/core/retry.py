@@ -31,11 +31,13 @@ def with_retry(
                     return await func(*args, **kwargs)
                 except retry_on as exc:
                     if isinstance(exc, PlatformError) and not exc.retryable:
-                        raise
+                        raise  # explicit non-retryable errors skip the backoff entirely
                     if attempt == max_attempts:
                         raise
                     delay = min(max_delay, base_delay * 2 ** (attempt - 1))
-                    delay *= 1 + random.random() * 0.25
+                    delay *= (
+                        1 + random.random() * 0.25
+                    )  # jitter to avoid thundering herd
                     logger.warning(
                         "%s failed (attempt %d/%d), retrying in %.2fs",
                         func.__qualname__,

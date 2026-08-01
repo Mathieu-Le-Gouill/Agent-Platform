@@ -66,6 +66,7 @@ class EvalRunner:
                     tags=case.tags,
                 )
             except asyncio.CancelledError:
+                # never swallow cancellation as a case failure (e.g. run-level timeout/shutdown)
                 raise
             except Exception as exc:
                 logger.exception("Eval case '%s' failed", case.id)

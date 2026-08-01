@@ -68,6 +68,8 @@ class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
 
         response_format = config.response_format
         if response_format is None:
+            # Only the whisper-1 model supports verbose_json/segment timestamps;
+            # newer gpt-4o-transcribe family models reject it and need plain json.
             response_format = "verbose_json" if "whisper" in config.model else "json"
 
         create_kwargs: dict = dict(
