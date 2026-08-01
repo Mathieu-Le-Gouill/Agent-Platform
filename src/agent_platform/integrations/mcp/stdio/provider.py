@@ -61,7 +61,7 @@ class StdioMCPClient(BaseMCPClient[MCPClientConfig]):
             MCPToolSpec(
                 name=tool.name,
                 description=tool.description or "",
-                input_schema=tool.inputSchema,
+                input_schema=tool.input_schema,
             )
             for tool in result.tools
         ]
@@ -79,6 +79,6 @@ class StdioMCPClient(BaseMCPClient[MCPClientConfig]):
         text = "\n".join(
             block.text for block in result.content if hasattr(block, "text")
         )
-        if result.isError:
+        if result.is_error:
             raise ProviderError(f"MCP tool '{name}' returned an error: {text}")
         return text

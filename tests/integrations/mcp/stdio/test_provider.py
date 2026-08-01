@@ -17,7 +17,7 @@ class _FakeSession:
                 SimpleNamespace(
                     name="echo",
                     description="Echoes input",
-                    inputSchema={
+                    input_schema={
                         "type": "object",
                         "properties": {"text": {"type": "string"}},
                         "required": ["text"],
@@ -26,7 +26,7 @@ class _FakeSession:
             ]
         )
         self.call_tool_result = SimpleNamespace(
-            content=[SimpleNamespace(text="hello")], isError=False
+            content=[SimpleNamespace(text="hello")], is_error=False
         )
 
     async def initialize(self) -> None:
@@ -98,7 +98,7 @@ class TestStdioMCPClient:
     @pytest.mark.asyncio
     async def test_call_tool_error_raises_provider_error(self, client, fake_session):
         fake_session.call_tool_result = SimpleNamespace(
-            content=[SimpleNamespace(text="boom")], isError=True
+            content=[SimpleNamespace(text="boom")], is_error=True
         )
         async with client:
             with pytest.raises(ProviderError, match="boom"):
