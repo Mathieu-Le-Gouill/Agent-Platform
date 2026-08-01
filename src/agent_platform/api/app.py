@@ -12,7 +12,12 @@ from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.base import ToolStreamChunk
 from agent_platform.api.schemas import ChatRequest, ChatResponse
-from agent_platform.config import Settings, build_agent, get_settings, setup_logging
+from agent_platform.config import (
+    Settings,
+    build_agent_async,
+    get_settings,
+    setup_logging,
+)
 from agent_platform.core.tracing import configure_tracing
 
 
@@ -23,8 +28,12 @@ def create_app(settings: Settings | None = None) -> FastAPI:
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:
-        app.state.agent = build_agent(settings)
-        yield
+        app.state.agent, mcp_clients = await build_agent_async(settings)
+        try:
+            yield
+        finally:
+            for client in mcp_clients:
+                await client.aclose()
 
     app = FastAPI(title="agent_platform API", lifespan=lifespan)
 

@@ -179,6 +179,15 @@ unmodified.
     `agents/tools/mcp/discovery.py::discover_mcp_tools()` depend only on
     `BaseMCPClient`, so they import fine even without the `mcp` SDK
     installed; only constructing a concrete `StdioMCPClient` needs the extra.
+  - Settings-driven wiring: `Settings.mcp_stdio_servers` (`{name: [command,
+    *args]}`, the same shape as Claude Desktop/VS Code's `mcpServers` config)
+    plus `config/container.py::build_agent_async()` - a separate async
+    entrypoint from the sync `build_agent()`, since connecting to an MCP
+    server is an async handshake and every other provider `build_agent`
+    resolves is synchronous. `api/app.py`'s lifespan calls it and closes
+    each returned client on shutdown; non-API callers (evals, scripts, most
+    tests) keep using the plain sync `build_agent()` and simply get no MCP
+    tools unless they opt into the async variant.
 
 ### Phase 4 — Production hygiene / observability polish (done)
 

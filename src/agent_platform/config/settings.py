@@ -29,6 +29,14 @@ class Settings(BaseSettings):
     # Only takes effect when fallback_llm_models is non-empty (see build_llm_with_fallback).
     llm_rate_limit: float | None = None
     llm_rate_limit_burst: float | None = None
+    # MCP servers to launch over stdio and register tools from, keyed by an
+    # arbitrary name; each value is `[command, *args]` (the same shape as
+    # Claude Desktop/VS Code's `mcpServers` config), e.g.
+    # {"docs": ["npx", "-y", "@modelcontextprotocol/server-docs"]}. Empty by
+    # default: no MCP tools. Only takes effect via `build_agent_async` (see
+    # config/container.py), since MCP discovery is async; the plain sync
+    # `build_agent` ignores this setting.
+    mcp_stdio_servers: dict[str, list[str]] = Field(default_factory=dict)
     default_image_model: str = "dalle:dall-e-3"
     default_audio_model: str = "openai:whisper-1"
     agent_name: str = "assistant"

@@ -5,6 +5,7 @@ from typing import Any
 
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.tools.generate_image.tool import GenerateImageTool
+from agent_platform.agents.tools.mcp.discovery import discover_mcp_tools
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.agents.tools.transcribe.tool import TranscribeTool
 from agent_platform.components.speech_to_text.component import SpeechToText
@@ -16,6 +17,7 @@ from agent_platform.core.interfaces.llm.fallback import (
     FallbackEntry,
     FallbackLLMProvider,
 )
+from agent_platform.core.interfaces.mcp.base import BaseMCPClient
 from agent_platform.core.interfaces.speech.config import SpeechConfig
 from agent_platform.core.resilience import RateLimiter
 from agent_platform.core.token_usage import TokenUsageAggregator
@@ -121,8 +123,57 @@ def build_agent(settings: Settings) -> ConversationAgent:
     )
 
 
+async def _build_mcp_client(command: list[str]) -> BaseMCPClient:
+    """Construct a `BaseMCPClient` for a `[command, *args]` entry.
+
+    Imports `StdioMCPClient` lazily, same reason `build_agent` imports
+    `integrations.llm`/etc. inside the function rather than at module scope:
+    it lives behind the optional `tools-mcp` extra (it's the one file that
+    imports the third-party `mcp` SDK, per `integrations/README.md`'s "only
+    integrations/ imports third-party packages" rule), so importing it
+    unconditionally at module level would break `build_agent`/this module
+    for anyone without that extra installed, even if they never configure
+    `mcp_stdio_servers`.
+    """
+    from agent_platform.integrations.mcp.stdio.provider import StdioMCPClient
+
+    executable, *args = command
+    return StdioMCPClient(executable, args)
+
+
+async def build_agent_async(
+    settings: Settings,
+) -> tuple[ConversationAgent, list[BaseMCPClient]]:
+    """`build_agent`, plus MCP tools discovered from `settings.mcp_stdio_servers`.
+
+    A separate entrypoint rather than making `build_agent` itself async:
+    connecting to an MCP server is an inherently async handshake (subprocess
+    launch + initialize), unlike every other provider `build_agent` resolves
+    synchronously, so forcing that on every caller (evals, scripts, most of
+    the test suite) would be a needless breaking change for the common case
+    of zero configured MCP servers.
+
+    Returns the connected clients alongside the agent so the caller (see
+    `api/app.py`'s lifespan) can `aclose()` each one at shutdown - an MCP
+    server is a stateful session (`BaseMCPClient`'s docstring), not a
+    fire-and-forget call, so something has to own closing it.
+    """
+    agent = build_agent(settings)
+
+    clients: list[BaseMCPClient] = []
+    for command in settings.mcp_stdio_servers.values():
+        client = await _build_mcp_client(command)
+        await client.connect()
+        clients.append(client)
+        for tool in await discover_mcp_tools(client):
+            agent.tool_registry.register(tool)
+
+    return agent, clients
+
+
 __all__ = [
     "build_agent",
+    "build_agent_async",
     "build_llm_with_fallback",
     "build_provider",
     "build_provider_from_model_string",

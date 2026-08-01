@@ -1,13 +1,18 @@
 import json
+from typing import Any
 from unittest.mock import MagicMock
 
 from fastapi.testclient import TestClient
 from pydantic import BaseModel
 
 from agent_platform.agents.agent import Agent
+from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.api.app import create_app, main
+from agent_platform.config.settings import Settings
+from agent_platform.core.interfaces.mcp.base import BaseMCPClient
+from agent_platform.core.schemas.mcp import MCPToolSpec
 from agent_platform.core.schemas.token import TokenUsage
 from tests.helpers import (
     make_fake_stream,
@@ -148,6 +153,48 @@ class TestChatStream:
             response = client.post("/chat/stream", json={})
 
         assert response.status_code == 422
+
+
+class _FakeMCPClient(BaseMCPClient):
+    def __init__(self, tools: list[MCPToolSpec]) -> None:
+        self._tools = tools
+        self.closed = False
+
+    async def connect(self) -> None:
+        pass
+
+    async def aclose(self) -> None:
+        self.closed = True
+
+    async def list_tools(self, config: Any = None) -> list[MCPToolSpec]:
+        return self._tools
+
+    async def call_tool(self, name: str, arguments: dict, config: Any = None) -> Any:
+        return "ok"
+
+
+class TestLifespan:
+    def test_builds_conversation_agent_via_lifespan(self):
+        with TestClient(create_app()) as client:
+            assert isinstance(client.app.state.agent, ConversationAgent)
+
+    def test_closes_mcp_clients_on_shutdown(self, mocker):
+        fake_client = _FakeMCPClient(
+            [MCPToolSpec(name="search_docs", description="", input_schema={})]
+        )
+        mocker.patch(
+            "agent_platform.config.container._build_mcp_client",
+            return_value=fake_client,
+        )
+        settings = Settings(
+            _env_file=None, mcp_stdio_servers={"docs": ["npx", "-y", "server-docs"]}
+        )
+
+        with TestClient(create_app(settings)) as client:
+            assert "search_docs" in client.app.state.agent.tool_registry.all()
+            assert fake_client.closed is False
+
+        assert fake_client.closed is True
 
 
 class TestMain:
