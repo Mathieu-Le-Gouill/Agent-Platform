@@ -89,7 +89,7 @@ ocr = ["agent_platform[ocr-tesseract,ocr-google-vision,ocr-aws-textract,ocr-mist
 
 # --- VAD ---
 vad-silero = ["silero-vad", "torch"]
-vad-webrtc = ["webrtcvad"]
+vad-webrtc = ["webrtcvad", "setuptools<81"]
 vad-pvcobra = ["pvcobra"]
 vad-ten = ["ten-vad @ git+https://github.com/TEN-framework/ten-vad.git@22a3bcd4509d0faaa8eef4881e8af5f39c178950"]
 vad = ["agent_platform[vad-silero,vad-webrtc,vad-pvcobra,vad-ten]"]
@@ -132,7 +132,7 @@ chunking-recursive = ["langchain-text-splitters~=1.0"]
 chunking-html = ["langchain-text-splitters~=1.0"]
 chunking-latex = ["langchain-text-splitters~=1.0"]
 chunking-markdown = ["langchain-text-splitters~=1.0"]
-chunking-pdf = ["unstructured[pdf]>=0.21,<0.23"]
+chunking-pdf = ["unstructured[pdf]>=0.21,<0.23", "langchain-community"]
 chunking = ["agent_platform[chunking-recursive,chunking-html,chunking-latex,chunking-markdown,chunking-pdf]"]
 
 # --- Loader strategies ---
