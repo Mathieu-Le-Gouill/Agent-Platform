@@ -45,7 +45,20 @@ class CircuitBreaker:
             self._state = CircuitState.HALF_OPEN
         return self._state
 
-    async def call(
+    def call(self, func: Callable[..., _T], *args: Any, **kwargs: Any) -> _T:
+        if self.state is CircuitState.OPEN:
+            raise ProviderError("Circuit breaker is open", retryable=True)
+
+        try:
+            result = func(*args, **kwargs)
+        except Exception:
+            self.record_failure()
+            raise
+        else:
+            self.record_success()
+            return result
+
+    async def acall(
         self, func: Callable[..., Awaitable[_T]], *args: Any, **kwargs: Any
     ) -> _T:
         if self.state is CircuitState.OPEN:
@@ -62,7 +75,7 @@ class CircuitBreaker:
 
     def record_success(self) -> None:
         """Reset the breaker to closed. Public so callers that can't route a
-        call through `call()` (a sync call site, or one step of a streaming
+        call through `call()`/`acall()` (e.g. one step of a streaming
         response) can still report the outcome, e.g. `FallbackLLMProvider`."""
         self._failure_count = 0
         self._state = CircuitState.CLOSED

@@ -69,16 +69,15 @@ class FallbackLLMProvider(BaseLLMProvider):
             if circuit.state is CircuitState.OPEN:
                 continue
             try:
-                # sync call site: can't await circuit.call(), so record_success/failure by hand
-                result = entry.provider.generate(
-                    prompt, self._config_for(config, entry.model), tools
+                return circuit.call(
+                    entry.provider.generate,
+                    prompt,
+                    self._config_for(config, entry.model),
+                    tools,
                 )
             except Exception as exc:  # noqa: BLE001 - any provider failure falls through
-                circuit.record_failure()
                 last_exc = exc
                 continue
-            circuit.record_success()
-            return result
         raise ProviderError(
             "All providers in the fallback chain failed", retryable=False
         ) from last_exc
@@ -96,7 +95,7 @@ class FallbackLLMProvider(BaseLLMProvider):
             if circuit.state is CircuitState.OPEN:
                 continue
             try:
-                return await circuit.call(
+                return await circuit.acall(
                     entry.provider.agenerate,
                     prompt,
                     self._config_for(config, entry.model),

@@ -12,7 +12,7 @@ class TestCircuitBreaker:
         async def succeeds():
             return "ok"
 
-        assert await breaker.call(succeeds) == "ok"
+        assert await breaker.acall(succeeds) == "ok"
         assert breaker.state is CircuitState.CLOSED
 
     @pytest.mark.asyncio
@@ -24,7 +24,7 @@ class TestCircuitBreaker:
 
         for _ in range(2):
             with pytest.raises(ValueError):
-                await breaker.call(fails)
+                await breaker.acall(fails)
 
         assert breaker.state is CircuitState.OPEN
 
@@ -38,10 +38,10 @@ class TestCircuitBreaker:
             raise ValueError("boom")
 
         with pytest.raises(ValueError):
-            await breaker.call(fails)
+            await breaker.acall(fails)
 
         with pytest.raises(ProviderError, match="open"):
-            await breaker.call(fails)
+            await breaker.acall(fails)
 
         assert called["n"] == 1
 
@@ -59,7 +59,7 @@ class TestCircuitBreaker:
             raise ValueError("boom")
 
         with pytest.raises(ValueError):
-            await breaker.call(fails)
+            await breaker.acall(fails)
         assert breaker.state is CircuitState.OPEN
 
         clock["t"] += 11.0
@@ -82,10 +82,10 @@ class TestCircuitBreaker:
             return "recovered"
 
         with pytest.raises(ValueError):
-            await breaker.call(fails)
+            await breaker.acall(fails)
         clock["t"] += 11.0
 
-        assert await breaker.call(succeeds) == "recovered"
+        assert await breaker.acall(succeeds) == "recovered"
         assert breaker.state is CircuitState.CLOSED
 
     @pytest.mark.asyncio
@@ -102,12 +102,12 @@ class TestCircuitBreaker:
             raise ValueError("boom")
 
         with pytest.raises(ValueError):
-            await breaker.call(fails)
+            await breaker.acall(fails)
         clock["t"] += 11.0
         assert breaker.state is CircuitState.HALF_OPEN
 
         with pytest.raises(ValueError):
-            await breaker.call(fails)
+            await breaker.acall(fails)
         assert breaker.state is CircuitState.OPEN
 
 
