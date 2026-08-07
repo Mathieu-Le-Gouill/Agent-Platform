@@ -2,7 +2,7 @@
 
 ## Design
 
-`core/` is the **near-zero-dependency foundation** of the platform. It defines everything that does not depend on an external library, pure Python ABCs, Pydantic schemas, enums, and error types, plus `tracing.py`/`genai_tracing.py`, whose one exception is depending on the lightweight `opentelemetry-api` (always installed; a no-op unless the optional `tracing` extra and an OTLP endpoint are configured). No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
+`core/` is the **near-zero-dependency foundation** of the platform. It defines everything that does not depend on an external library, pure Python ABCs, Pydantic schemas, enums, and error types. That now includes tracing: `interfaces/tracing/` declares the `BaseTracer`/`Span` contract and a working `NoOpTracer` default, while every real backend (OpenTelemetry today) lives in `integrations/tracing/`, so no tracing SDK is a runtime dependency of this layer. No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
 
 ## Directory Layout
 
@@ -17,8 +17,9 @@ core/
 ├── persistence.py    # Checkpointer[StateT] protocol + InMemoryCheckpointer
 ├── token_usage.py    # TokenUsageAggregator: accumulates TokenUsage per string key
 ├── credentials.py    # Credentials (secrets only, e.g. api_key), ClientOptions (base_url/timeout/max_retries)
-├── tracing.py        # TracingBackend, TracingConfig, configure_tracing(), traced_span(), mark_span_error()
-├── genai_tracing.py  # GenAIAttributes, traced_operation_span(), record_token_usage()
+├── tracing/          # Everything call sites need to emit a span (contract lives in interfaces/tracing/)
+│   ├── runtime.py    #   Backend-agnostic facade: set_tracer()/get_tracer()/reset_tracer(), traced_span()
+│   └── genai.py      #   GenAIAttributes, traced_operation_span(), record_token_usage()
 ├── similarity.py     # Vector similarity math helpers (compute_similarity, similarity_bounds), used by components/ and evals/
 ├── interfaces/       # ABCs for every capability (the "contract" layer)
 │   ├── llm/
@@ -35,6 +36,9 @@ core/
 │   ├── loader/
 │   ├── image_generation/
 │   ├── dataset/
+│   ├── tracing/      # BaseTracer + Span protocol + NoOpTracer default (see below),
+│   │                   #   the one domain whose "no provider installed" case is a
+│   │                   #   usable implementation rather than an error
 │   └── mcp/          # BaseMCPClient: connect()/aclose() + list_tools()/call_tool(),
 │                       #   the one domain ABC that owns connection lifecycle (an MCP
 │                       #   server is a stateful session, not a stateless per-call provider)
@@ -99,17 +103,25 @@ PlatformError
 
 Every error carries `code`, `retryable`, and `context` fields. `retry.py`'s `with_retry()` decorator (exponential backoff with jitter, `max_attempts`/`retry_on` configurable) checks this flag: if a caught exception is a `PlatformError` with `retryable=False`, it re-raises immediately instead of burning through retry attempts. Since every current `@with_retry()` call site in `integrations/` sits *inside* an outer `@error_logged(re_raise=ProviderError)` (decorator order: `error_logged` above `with_retry`), `with_retry` there only ever sees the raw underlying SDK exception, never the translated `PlatformError`, so this flag-check is a no-op for those call sites today; it takes effect wherever `with_retry` wraps a call that itself raises `PlatformError` directly (e.g. a tool or agent-loop retry).
 
-### `tracing.py`: Vendor-Agnostic Observability
+### `interfaces/tracing/` + `tracing/`: Backend-Agnostic Observability
 
-Contains zero vendor-specific code and zero GenAI-specific code: it only knows OpenTelemetry primitives, `TracingBackend` is `AUTO` (default, exports over OTLP whenever `OTEL_EXPORTER_OTLP_ENDPOINT`/`_TRACES_ENDPOINT` is set, otherwise a safe no-op), `NONE` (force-disabled), or `CONSOLE` (stdout, for local debugging). `configure_tracing()` is called once at process startup (`api/app.py`) to install a `TracerProvider`; it defers to any provider already installed by something else (`opentelemetry-instrument`, an APM agent, the host application) instead of overwriting it, and accepts an `exporter=` override for backends with no standard OTLP path.
+Tracing is split like any other domain: `core` owns the contract, `integrations/tracing/` owns the backends.
 
-`traced_span(name, attributes=None)` is the generic context manager every span-producing call site is built on: it records latency as span duration automatically and, on a propagating exception, calls `mark_span_error(span, exc)`. `mark_span_error(span, exc, *, record_exception=True)` sets the OTel error-status attributes by hand; pass `record_exception=False` for call sites that catch and swallow an error (rather than re-raise it) but still need the span tagged as failed, e.g. tool calls in `agents/tools/registry.py`.
+`interfaces/tracing/` holds the generic layer, with no tracing SDK imported anywhere in it:
+- `span.py`: the `Span` protocol (`set_attribute()`, `record_error()`, `trace_id`, `span_id`) and `AttributeValue`, the narrow set of value types an attribute may hold. It is a `Protocol` rather than an ABC because implementations adapt a backend's own span object instead of subclassing ours. `record_error(exc, record_exception=False)` is for call sites that catch and swallow an error (rather than re-raise it) but still need the span tagged as failed, e.g. tool calls in `agents/tools/registry.py`. `trace_id`/`span_id` exist so a caller can correlate a trace with data submitted to a backend out of band, e.g. attaching an eval score or user feedback to a Langfuse/LangSmith trace after the fact.
+- `base.py`: `BaseTracer`, a single `start_span(name, attributes)` returning a context manager. The seam is deliberately at the tracer level, not the span-context level: an implementation delegates parent/child nesting and cross-task context propagation to its backend rather than reimplementing them.
+- `noop.py`: `NoOpTracer`/`NoOpSpan`, the default. This is what lets every call site use `traced_span` unconditionally with no "is tracing enabled" branch and no tracing extra installed.
+- `config.py`: `TracingConfig`, only what every backend understands (`service_name`). Exporter protocols, endpoints and credentials belong on a subclass owned by that backend's integration.
 
-Vendor endpoint/auth recipes (LangSmith, Langfuse, ...) live in `integrations/README.md` as env var snippets, not in this module, any OTLP-speaking backend works via the same `AUTO` path.
+`tracing/runtime.py` is the facade over that contract: `set_tracer()` installs the process-wide tracer once at startup (`api/app.py`, via `config.container.build_tracer()`), `reset_tracer()` restores the no-op, and `traced_span(name, attributes=None)` is the generic context manager every span-producing call site is built on. It records latency as span duration, drops `None`-valued attributes so call sites can pass optional values without branching, and on a propagating exception calls `span.record_error(exc)`. Nothing here selects or knows about a backend.
 
-### `genai_tracing.py`: GenAI Semantic Conventions
+Both `runtime.py` and `genai.py` are re-exported from the `tracing/` package, so a call site needing a span imports everything from one path: `from agent_platform.core.tracing import GenAIAttributes, traced_operation_span`.
 
-Paired with `tracing.py`, this is where GenAI-specific knowledge lives. `traced_operation_span(operation, attributes=None)` (a thin wrapper over `traced_span()`) is what every instrumented call site uses, it names the span after `operation` and sets `gen_ai.operation.name` to match. `GenAIAttributes` centralizes the `gen_ai.*` semantic-convention attribute keys so every call site (and any future one, embeddings, reranking, ...) spells them identically; `record_token_usage(span, usage)` records token counts the same way everywhere. Currently wired into the agent loop (`agents/executor.py`), tool calls (`agents/tools/registry.py`), and LLM calls (each `integrations/llm/<provider>/provider.py`). `GenAIAttributes.CONVERSATION_ID` is set on `agents/executor.py`'s `invoke_agent` span whenever a caller passes a `conversation_id` (`AgentExecutor.run`/`run_with_messages`/`run_streaming`'s optional keyword; `ConversationAgent.chat()` and `api/app.py`'s `/chat`, `/chat/stream` routes always do), so a multi-turn session's spans correlate without an external join; omitted entirely (not set to `None`) for callers that don't have one, e.g. a bare `Agent` driven directly.
+Backend selection, OTLP wiring and vendor endpoint/auth recipes live in `integrations/tracing/` and `integrations/README.md`.
+
+### `tracing/genai.py`: GenAI Semantic Conventions
+
+Paired with `runtime.py`, this is where GenAI-specific knowledge lives, kept out of the facade so non-GenAI call sites (`workflows/graph.py`, `workflows/nodes/fan_out.py`) use `traced_span` without inheriting any of it. It stays vendor-free the same way: the `gen_ai.*` keys are OpenTelemetry *semantic-convention* strings, a spec, not an SDK API, so nothing is imported to spell them. `traced_operation_span(operation, attributes=None)` (a thin wrapper over `traced_span()`) is what every instrumented call site uses, it names the span after `operation` and sets `gen_ai.operation.name` to match. `GenAIAttributes` centralizes the `gen_ai.*` semantic-convention attribute keys so every call site (and any future one, embeddings, reranking, ...) spells them identically; `record_token_usage(span, usage)` records token counts the same way everywhere. Currently wired into the agent loop (`agents/executor.py`), tool calls (`agents/tools/registry.py`), and LLM calls (each `integrations/llm/<provider>/provider.py`). `GenAIAttributes.CONVERSATION_ID` is set on `agents/executor.py`'s `invoke_agent` span whenever a caller passes a `conversation_id` (`AgentExecutor.run`/`run_with_messages`/`run_streaming`'s optional keyword; `ConversationAgent.chat()` and `api/app.py`'s `/chat`, `/chat/stream` routes always do), so a multi-turn session's spans correlate without an external join; omitted entirely (not set to `None`) for callers that don't have one, e.g. a bare `Agent` driven directly.
 
 ### `resilience.py`: Circuit Breaker & Rate Limiter
 
@@ -165,5 +177,5 @@ core/interfaces/<new_domain>/
 ## Constraints
 
 - **No imports from `integrations/`, `components/`, `pipelines/`, or `agents/`**
-- **No external library imports** (no langchain, no openai, no numpy, etc.), only `pydantic`, `abc`, `typing`, `uuid`, `datetime`, and `opentelemetry-api` (used only by `tracing.py`/`genai_tracing.py`)
+- **No external library imports** (no langchain, no openai, no opentelemetry, etc.), only `pydantic`, `abc`, `typing`, `uuid`, `datetime`
 - ABCs use `Generic` TypeVars for type safety where appropriate

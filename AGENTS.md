@@ -39,8 +39,8 @@ Purpose only, enough to know which README to open next.
 
 | Path | Purpose | Has local README? |
 |---|---|---|
-| `src/agent_platform/core/` | Near-zero-dependency foundation: ABCs, Pydantic schemas, error hierarchy, credentials, OTel-based tracing | yes |
-| `src/agent_platform/integrations/` | Provider adapters per domain (llm, embeddings, vector_store, reranking, ocr, speech_to_text, translation, vad, chunking, clustering, loader, image_generation, classification), 13 domains | yes |
+| `src/agent_platform/core/` | Near-zero-dependency foundation: ABCs, Pydantic schemas, error hierarchy, credentials, backend-agnostic tracing contract | yes |
+| `src/agent_platform/integrations/` | Provider adapters per domain (llm, embeddings, vector_store, reranking, ocr, speech_to_text, translation, vad, chunking, clustering, loader, image_generation, classification, dataset, moderation, mcp, tracing), 17 domains | yes |
 | `src/agent_platform/components/` | Reusable processing units wrapping one or more integrations (`Chunker`, `Embedder`, `Reranker`, classifiers) | yes |
 | `src/agent_platform/pipelines/` | Multi-step orchestration flows composing components (ingestion, RAG, speech translation) | yes |
 | `src/agent_platform/agents/` | Top-level composition: `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, tools (incl. MCP), guardrails | yes |
@@ -185,7 +185,9 @@ rather than guessing silently.
   `pyproject.toml` enforces the layer order and that `core/` never imports
   a sibling layer; run `lint-imports` to check, CI fails the same way.
 - **`core/` has no external deps** beyond `pydantic`, `abc`, `typing`,
-  `uuid`, `datetime`, `opentelemetry` (tracing only).
+  `uuid`, `datetime`. Tracing is no exception: `core` defines `BaseTracer`/
+  `Span` and a `NoOpTracer` default, every backend lives in
+  `integrations/tracing/`.
 - **All IO is async.** Use `asyncio.to_thread()` for blocking calls; `run()`
   on `Component` is a sync convenience wrapper around `arun()`, nothing more.
 - **Backends are injected**, never instantiated inside a component or tool.
