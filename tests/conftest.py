@@ -99,17 +99,21 @@ def no_retry_sleep(monkeypatch) -> None:
 
 
 @pytest.fixture
-def recorded_spans(monkeypatch):
+def recorded_spans():
     """Redirect `traced_span`'s tracer to an in-memory exporter so a test can
     assert on the spans a call produced. Root-level (not `tests/core/`
     only) since span attributes - `gen_ai.conversation.id` in particular -
     are asserted on from `agents/`, not just `core/`."""
+    from agent_platform.integrations.tracing.otel.provider import OTelTracer
+
     exporter = InMemorySpanExporter()
     provider = TracerProvider()
     provider.add_span_processor(SimpleSpanProcessor(exporter))
-    tracer = provider.get_tracer("test")
-    monkeypatch.setattr(tracing, "get_tracer", lambda: tracer)
-    return exporter
+    # `tracer_provider=` keeps this off the OTel process-global provider, so
+    # only the platform-level tracer has to be restored afterwards.
+    tracing.set_tracer(OTelTracer(tracer_provider=provider))
+    yield exporter
+    tracing.reset_tracer()
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:

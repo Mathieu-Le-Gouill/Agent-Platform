@@ -6,7 +6,7 @@ import time
 from collections.abc import Iterable
 from uuid import UUID, uuid4
 
-from agent_platform.core.genai_tracing import traced_operation_span
+from agent_platform.core.tracing import traced_operation_span
 from agent_platform.evals.schemas import EvalCase, EvalReport, EvalResult
 from agent_platform.evals.scorer import Scorer
 from agent_platform.evals.targets import EvalTarget

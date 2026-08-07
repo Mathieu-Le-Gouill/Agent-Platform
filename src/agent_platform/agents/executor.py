@@ -9,7 +9,6 @@ from agent_platform.agents.errors import AgentMaxIterations, AgentRecoveryExhaus
 from agent_platform.agents.tools.base import ToolStreamChunk
 from agent_platform.agents.tools.registry import is_tool_validation_error
 from agent_platform.agents.validation import retry_once_on_invalid
-from agent_platform.core.genai_tracing import GenAIAttributes, traced_operation_span
 from agent_platform.core.interfaces.llm.response import ToolCallDelta
 from agent_platform.core.schemas.message import (
     AssistantMessage,
@@ -18,6 +17,7 @@ from agent_platform.core.schemas.message import (
     ToolMessage,
     UserMessage,
 )
+from agent_platform.core.tracing import GenAIAttributes, traced_operation_span
 
 _ThinkActResult = tuple[AssistantMessage, list[ToolMessage]]
 

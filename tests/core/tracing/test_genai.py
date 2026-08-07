@@ -1,10 +1,10 @@
-from agent_platform.core.genai_tracing import (
+from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.core.tracing import (
     GenAIAttributes,
     record_token_usage,
     traced_operation_span,
+    traced_span,
 )
-from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import traced_span
 
 
 class TestRecordTokenUsage:

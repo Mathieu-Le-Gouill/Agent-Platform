@@ -7,13 +7,13 @@ from agent_platform.agents.context import TurnCountStrategy
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.core.genai_tracing import GenAIAttributes
 from agent_platform.core.persistence import InMemoryCheckpointer
 from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.token_usage import TokenUsageAggregator
+from agent_platform.core.tracing import GenAIAttributes
 from tests.helpers import make_fake_llm_response
 
 

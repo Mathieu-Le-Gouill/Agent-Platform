@@ -5,19 +5,18 @@ from collections.abc import AsyncIterator
 from contextlib import AbstractContextManager
 from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar, cast
 
-from opentelemetry.trace import Span
-
 from agent_platform.core.credentials import ClientOptions, Credentials
 from agent_platform.core.errors import ProviderError, error_logged
-from agent_platform.core.genai_tracing import (
+from agent_platform.core.interfaces.llm.base import BaseLLMProvider, GenerationConfigT
+from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
+from agent_platform.core.interfaces.tracing.span import Span
+from agent_platform.core.retry import with_retry
+from agent_platform.core.schemas.message import Prompt
+from agent_platform.core.tracing import (
     GenAIAttributes,
     record_token_usage,
     traced_operation_span,
 )
-from agent_platform.core.interfaces.llm.base import BaseLLMProvider, GenerationConfigT
-from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
-from agent_platform.core.retry import with_retry
-from agent_platform.core.schemas.message import Prompt
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool

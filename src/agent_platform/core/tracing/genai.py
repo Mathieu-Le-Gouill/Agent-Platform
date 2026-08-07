@@ -2,12 +2,10 @@ from __future__ import annotations
 
 from collections.abc import Mapping
 from contextlib import AbstractContextManager
-from typing import Any
 
-from opentelemetry.trace import Span
-
+from agent_platform.core.interfaces.tracing.span import AttributeValue, Span
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import traced_span
+from agent_platform.core.tracing.runtime import traced_span
 
 __all__ = [
     "GenAIAttributes",
@@ -43,7 +41,7 @@ def record_token_usage(span: Span, usage: TokenUsage) -> None:
 
 
 def traced_operation_span(
-    operation: str, /, attributes: Mapping[str, Any] | None = None
+    operation: str, /, attributes: Mapping[str, AttributeValue | None] | None = None
 ) -> AbstractContextManager[Span]:
     """`traced_span` for a GenAI operation: names the span `operation` and sets
     `gen_ai.operation.name` to match.

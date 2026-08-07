@@ -14,11 +14,6 @@ from agent_platform.core.credentials import (
     resolve_timeout,
 )
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
-from agent_platform.core.genai_tracing import (
-    GenAIAttributes,
-    record_token_usage,
-    traced_operation_span,
-)
 from agent_platform.core.interfaces.llm.batch import (
     BaseBatchLLMProvider,
     BatchJob,
@@ -35,6 +30,11 @@ from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.core.tracing import (
+    GenAIAttributes,
+    record_token_usage,
+    traced_operation_span,
+)
 from agent_platform.integrations.credentials import AnthropicCredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig

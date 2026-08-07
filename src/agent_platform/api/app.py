@@ -15,16 +15,17 @@ from agent_platform.api.schemas import ChatRequest, ChatResponse
 from agent_platform.config import (
     Settings,
     build_agent_async,
+    build_tracer,
     get_settings,
     setup_logging,
 )
-from agent_platform.core.tracing import configure_tracing
+from agent_platform.core.tracing import set_tracer
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:
     settings = settings or get_settings()
     setup_logging(getattr(logging, settings.log_level.upper(), logging.INFO))
-    configure_tracing()
+    set_tracer(build_tracer(settings))
 
     @asynccontextmanager
     async def lifespan(app: FastAPI) -> AsyncIterator[None]:

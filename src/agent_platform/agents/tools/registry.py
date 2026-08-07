@@ -17,13 +17,12 @@ from agent_platform.agents.tools.errors import (
     ToolRegistrationError,
     ToolTimeoutError,
 )
-from agent_platform.core.genai_tracing import GenAIAttributes, traced_operation_span
 from agent_platform.core.schemas.message import (
     ToolCall,
     ToolMessage,
     ToolResult,
 )
-from agent_platform.core.tracing import mark_span_error
+from agent_platform.core.tracing import GenAIAttributes, traced_operation_span
 
 logger = logging.getLogger(__name__)
 
@@ -148,12 +147,12 @@ class ToolRegistry:
                     content = str(exc)
                     is_error = True
                     metadata = {TOOL_CALL_VALIDATION_ERROR_KEY: True}
-                    mark_span_error(span, exc, record_exception=False)
+                    span.record_error(exc, record_exception=False)
                 except Exception as exc:
                     logger.exception("Tool call '%s' failed", call.name)
                     content = str(exc)
                     is_error = True
-                    mark_span_error(span, exc, record_exception=False)
+                    span.record_error(exc, record_exception=False)
 
         return ToolMessage(
             result=ToolResult(
@@ -196,7 +195,7 @@ class ToolRegistry:
                     raise
                 except ToolCallValidationError as exc:
                     logger.info("Tool call '%s' failed argument validation", call.name)
-                    mark_span_error(span, exc, record_exception=False)
+                    span.record_error(exc, record_exception=False)
                     yield ToolStreamChunk(
                         tool_call_id=call.id,
                         delta=str(exc),
@@ -206,7 +205,7 @@ class ToolRegistry:
                     )
                 except Exception as exc:
                     logger.exception("Tool stream '%s' failed", call.name)
-                    mark_span_error(span, exc, record_exception=False)
+                    span.record_error(exc, record_exception=False)
                     yield ToolStreamChunk(
                         tool_call_id=call.id,
                         delta=str(exc),

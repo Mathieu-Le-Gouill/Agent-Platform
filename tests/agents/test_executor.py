@@ -6,10 +6,10 @@ from agent_platform.agents.errors import AgentMaxIterations, AgentThinkError
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.core.genai_tracing import GenAIAttributes
 from agent_platform.core.schemas.message import (
     UserMessage,
 )
+from agent_platform.core.tracing import GenAIAttributes
 from tests.helpers import (
     make_fake_llm_response,
     make_fake_stream,

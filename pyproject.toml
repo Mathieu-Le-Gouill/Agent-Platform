@@ -22,7 +22,6 @@ classifiers = [
 
 dependencies = [
     # --- Core framework (always installed) ---
-    "opentelemetry-api~=1.29",
     "numpy",
     "pillow",
     "pydantic-settings~=2.0",
@@ -117,11 +116,14 @@ moderation = ["agent_platform[moderation-openai]"]
 api = ["fastapi~=0.121", "uvicorn[standard]~=0.34"]
 
 # --- Tracing (OpenTelemetry export; backend is chosen via AGENT_PLATFORM_TRACING) ---
-# `tracing` covers OTLP/HTTP (the default protocol, and what the langsmith/
-# langfuse presets always use); add `tracing-grpc` too if OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-# is needed for the generic `otlp` backend (e.g. talking directly to some
-# self-hosted OTel Collectors).
+# Optional in full: `core` only depends on its own `BaseTracer`/`Span`
+# abstractions and defaults to `NoOpTracer`, so OpenTelemetry is pulled in
+# only by `integrations/tracing/otel/`.
+# `tracing` covers OTLP/HTTP (the default protocol, and what LangSmith/
+# Langfuse ingestion uses); add `tracing-grpc` too if OTEL_EXPORTER_OTLP_PROTOCOL=grpc
+# is needed (e.g. talking directly to some self-hosted OTel Collectors).
 tracing = [
+    "opentelemetry-api~=1.29",
     "opentelemetry-sdk~=1.29",
     "opentelemetry-exporter-otlp-proto-http~=1.29",
 ]
