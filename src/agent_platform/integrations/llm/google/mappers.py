@@ -61,9 +61,13 @@ def content_to_native_parts(m: ContentMessage) -> list[types.Part]:
     return [block_to_native_part(b) for b in m.blocks]
 
 
-def to_native_contents(prompt: Prompt) -> tuple[str | None, list[types.Content]]:
+def to_native_contents(
+    prompt: Prompt,
+) -> tuple[str | None, list[types.ContentUnionDict]]:
     system_parts: list[str] = []
-    contents: list[types.Content] = []
+    # Typed as the SDK's element type, not `Content`: `list` is invariant, so
+    # `generate_content(contents=...)` rejects a `list[Content]`.
+    contents: list[types.ContentUnionDict] = []
 
     for m in prompt.messages:
         match m:
