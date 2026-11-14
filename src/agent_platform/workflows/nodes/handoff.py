@@ -3,6 +3,7 @@ from __future__ import annotations
 from typing import TypeVar
 
 from agent_platform.agents.agent import Agent
+from agent_platform.core.observability import Handoff, emit
 from agent_platform.workflows.graph import NodeFn
 from agent_platform.workflows.nodes.agent_node import agent_node
 from agent_platform.workflows.state import HandoffState
@@ -25,6 +26,9 @@ def handoff_node(agent: Agent, *, max_iterations: int = 10) -> NodeFn[StateT]:
     run_agent: NodeFn[StateT] = agent_node(agent, max_iterations=max_iterations)
 
     async def node(state: StateT) -> StateT:
+        # Stamped on the enclosing `workflow_node` span: without it a handoff
+        # shows up as a node name, with no record of who took over.
+        emit(Handoff(to=agent.name))
         new_state = await run_agent(state)
         return new_state.model_copy(update={"active_agent": agent.name})
 

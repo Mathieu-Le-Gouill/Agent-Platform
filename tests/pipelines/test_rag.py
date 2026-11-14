@@ -215,3 +215,26 @@ class TestQuery:
         assert "result 1" in system_text
         assert "result 2" in system_text
         assert prompt.last_user_message().text == "what is this?"
+
+    async def test_query_is_one_span_describing_the_retrieval(
+        self,
+        mock_embedder,
+        mock_vector_search,
+        mock_reranker,
+        mock_generator,
+        recorded_spans,
+    ):
+        await query(
+            "what is this?",
+            mock_embedder,
+            mock_vector_search,
+            mock_reranker,
+            mock_generator,
+            k=3,
+        )
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.name == "pipeline"
+        assert span.attributes["pipeline.name"] == "rag.query"
+        assert span.attributes["retrieval.top_k"] == 3
+        assert span.attributes["retrieval.hits"] == 2

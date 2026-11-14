@@ -21,6 +21,10 @@ class Embedder(
     Component[EmbedderInput[EmbedConfigT], EmbeddingResponse],
     Generic[EmbedConfigT],
 ):
+    # A GenAI semantic-convention operation name, unlike the class-derived
+    # default, so embedding calls are comparable with the rest of the domain.
+    operation_name = "embeddings"
+
     def __init__(
         self,
         backend: BaseEmbeddingProvider[EmbedConfigT],

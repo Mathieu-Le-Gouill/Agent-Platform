@@ -8,7 +8,6 @@ from openai.types.chat import ChatCompletion
 
 from agent_platform.core.interfaces.llm.batch import BatchJob, BatchStatus
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     ResponseFormat,
 )
@@ -26,6 +25,7 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 
 __all__ = [
@@ -206,5 +206,6 @@ def from_native_response(response: ChatCompletion, model: str) -> LLMResponse:
             output_tokens=usage.completion_tokens if usage else 0,
         ),
         model=model,
-        finish_reason=FinishReason.STOP,
+        finish_reason=to_finish_reason(response.choices[0].finish_reason),
+        response_id=response.id,
     )

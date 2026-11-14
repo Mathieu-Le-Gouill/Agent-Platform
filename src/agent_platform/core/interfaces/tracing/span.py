@@ -31,8 +31,7 @@ class Span(Protocol):
 
     Intentionally minimal: attributes plus error state cover every call site
     and every backend-specific convention the platform needs to express
-    (`gen_ai.*` semantic conventions, vendor keys such as Langfuse's
-    `langfuse.observation.*`). Span timing is the backend's responsibility,
+    (a backend maps the platform's attribute keys onto its own fields). Span timing is the backend's responsibility,
     it starts when the span is created and ends when its context manager
     exits.
     """

@@ -84,3 +84,12 @@ class TestChunkDocument:
         chunks = chunk_document(doc)
         for c in chunks:
             assert c.document_id == doc.id
+
+
+class TestChunkDocumentTracing:
+    def test_chunking_is_a_named_pipeline_span(self, recorded_spans):
+        chunk_document(_make_doc("some text to split"))
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.name == "pipeline"
+        assert span.attributes["pipeline.name"] == ("ingestion.chunk_document")

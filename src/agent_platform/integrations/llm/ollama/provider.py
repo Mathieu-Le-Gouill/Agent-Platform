@@ -24,7 +24,6 @@ from agent_platform.core.interfaces.llm.response import (
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import record_token_usage
 from agent_platform.integrations.credentials import OllamaCredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
@@ -147,7 +146,7 @@ class OllamaLLM(
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with self._span(config) as span:
+        with self._observe(config) as call:
             usage_totals = TokenUsage.zero()
             events = await client.chat(
                 model=config.model, messages=messages, stream=True, **params
@@ -184,5 +183,5 @@ class OllamaLLM(
                         usage=chunk_usage,
                     )
 
-            record_token_usage(span, usage_totals)
+            self._record_usage(call, usage_totals)
             yield StreamChunk(delta="", finish_reason=FinishReason.STOP)

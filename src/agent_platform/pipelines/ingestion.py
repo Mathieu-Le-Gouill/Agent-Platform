@@ -1,5 +1,6 @@
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 
+from agent_platform.core.observability import PipelineRun, traced
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 
@@ -10,6 +11,7 @@ _splitter = RecursiveCharacterTextSplitter(
 )
 
 
+@traced(PipelineRun, name="ingestion.chunk_document")
 def chunk_document(doc: TextDocument) -> list[TextChunk]:
     # defensive: tolerate malformed/duck-typed docs despite the TextDocument type hint
     text = doc.text if hasattr(doc, "text") and isinstance(doc.text, str) else ""

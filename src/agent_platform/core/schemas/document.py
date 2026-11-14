@@ -190,6 +190,9 @@ class VideoDocument(Document, frozen=True):
             )
             codec = video_stream.codec.name if video_stream.codec else None
             video_bitrate = video_stream.bit_rate
+            dimensions = Dimensions(
+                width=video_stream.width, height=video_stream.height
+            )
             has_audio = audio_stream is not None
             audio_codec = (
                 audio_stream.codec.name if audio_stream and audio_stream.codec else None
@@ -204,7 +207,7 @@ class VideoDocument(Document, frozen=True):
             content=content,
             format=fmt,
             duration=duration_sec,
-            dimensions=Dimensions(width=video_stream.width, height=video_stream.height),
+            dimensions=dimensions,
             frame_rate=frame_rate,
             codec=codec,
             bitrate=video_bitrate,

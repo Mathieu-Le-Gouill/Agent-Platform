@@ -142,3 +142,26 @@ class TestStream:
 
         assert results[0].utterances[0].text == "hi"
         translator.atranslate.assert_not_awaited()
+
+
+class TestTracing:
+    async def test_a_run_nests_its_translation_span(self, recorded_spans):
+        translator = AsyncMock()
+        translator.atranslate = AsyncMock(return_value=TextChunk(text="bonjour"))
+        stt = AsyncMock()
+        stt.transcribe = AsyncMock(
+            return_value=Transcript(
+                utterances=[Utterance(text="hello")], language=Language.EN
+            )
+        )
+        pipeline = SpeechTranslationPipeline(stt=stt, translator=translator)
+
+        await pipeline.run(
+            AudioChunk(content=b"\x00", sample_rate=16000), target=Language.FR
+        )
+
+        names = [
+            span.attributes["pipeline.name"]
+            for span in recorded_spans.get_finished_spans()
+        ]
+        assert names == ["speech_translation.translate", "speech_translation"]

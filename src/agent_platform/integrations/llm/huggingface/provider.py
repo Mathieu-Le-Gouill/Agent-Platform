@@ -21,7 +21,6 @@ from agent_platform.core.interfaces.llm.response import (
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.core.tracing import record_token_usage
 from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.huggingface.config import (
@@ -143,7 +142,7 @@ class HuggingFaceLLM(
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with self._span(config) as span:
+        with self._observe(config) as call:
             usage_totals = TokenUsage.zero()
             events = await client.chat_completion(
                 messages=messages, stream=True, **params
@@ -178,5 +177,5 @@ class HuggingFaceLLM(
                         usage=chunk_usage,
                     )
 
-            record_token_usage(span, usage_totals)
+            self._record_usage(call, usage_totals)
             yield StreamChunk(delta="", finish_reason=FinishReason.STOP)

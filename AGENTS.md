@@ -39,7 +39,7 @@ Purpose only, enough to know which README to open next.
 
 | Path | Purpose | Has local README? |
 |---|---|---|
-| `src/agent_platform/core/` | Near-zero-dependency foundation: ABCs, Pydantic schemas, error hierarchy, credentials, backend-agnostic tracing contract | yes |
+| `src/agent_platform/core/` | Near-zero-dependency foundation: ABCs, Pydantic schemas, error hierarchy, credentials, the backend-agnostic tracing contract, and the typed observations (`observability/`) every layer records through | yes |
 | `src/agent_platform/integrations/` | Provider adapters per domain (llm, embeddings, vector_store, reranking, ocr, speech_to_text, translation, vad, chunking, clustering, loader, image_generation, classification, dataset, moderation, mcp, tracing), 17 domains | yes |
 | `src/agent_platform/components/` | Reusable processing units wrapping one or more integrations (`Chunker`, `Embedder`, `Reranker`, classifiers) | yes |
 | `src/agent_platform/pipelines/` | Multi-step orchestration flows composing components (ingestion, RAG, speech translation) | yes |
@@ -185,9 +185,12 @@ rather than guessing silently.
   `pyproject.toml` enforces the layer order and that `core/` never imports
   a sibling layer; run `lint-imports` to check, CI fails the same way.
 - **`core/` has no external deps** beyond `pydantic`, `abc`, `typing`,
-  `uuid`, `datetime`. Tracing is no exception: `core` defines `BaseTracer`/
-  `Span` and a `NoOpTracer` default, every backend lives in
-  `integrations/tracing/`.
+  `uuid`, `datetime`. Observability is no exception: `core` defines
+  `BaseTracer`/`Span` with no-op defaults, every backend lives in
+  `integrations/tracing/`. `core/` also owns
+  no backend's *vocabulary*: it records typed `Observation`s named the
+  platform's own way, and `integrations/tracing/langfuse/mapping.py` is the only
+  place those names become Langfuse fields.
 - **All IO is async.** Use `asyncio.to_thread()` for blocking calls; `run()`
   on `Component` is a sync convenience wrapper around `arun()`, nothing more.
 - **Backends are injected**, never instantiated inside a component or tool.

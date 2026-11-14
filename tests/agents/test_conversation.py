@@ -13,7 +13,6 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.token_usage import TokenUsageAggregator
-from agent_platform.core.tracing import GenAIAttributes
 from tests.helpers import make_fake_llm_response
 
 
@@ -492,6 +491,4 @@ class TestConversationTracing:
         await agent.chat("Hi")
 
         (span,) = recorded_spans.get_finished_spans()
-        assert span.attributes[GenAIAttributes.CONVERSATION_ID] == str(
-            agent.conversation_id
-        )
+        assert span.attributes["conversation.id"] == str(agent.conversation_id)

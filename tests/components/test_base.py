@@ -59,3 +59,65 @@ async def test_rshift_propagates_error_from_second_stage():
     chain = _AddOne() >> _Fails()
     with pytest.raises(ValueError, match="boom"):
         await chain.arun(1)
+
+
+class _NamedOperation(Component[int, int]):
+    operation_name = "embeddings"
+
+    async def arun(self, input: int) -> int:
+        return input
+
+
+class _InheritsArun(_AddOne):
+    pass
+
+
+class TestComponentTracing:
+    @pytest.mark.asyncio
+    async def test_a_component_run_is_a_span_named_after_its_class(
+        self, recorded_spans
+    ):
+        await _AddOne().arun(1)
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.name == "add_one"
+        assert span.attributes["operation.name"] == "add_one"
+
+    @pytest.mark.asyncio
+    async def test_operation_name_overrides_the_class_derived_default(
+        self, recorded_spans
+    ):
+        await _NamedOperation().arun(1)
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.name == "embeddings"
+
+    @pytest.mark.asyncio
+    async def test_an_inherited_arun_is_traced_once(self, recorded_spans):
+        await _InheritsArun().arun(1)
+
+        assert [s.name for s in recorded_spans.get_finished_spans()] == ["add_one"]
+
+    @pytest.mark.asyncio
+    async def test_a_chain_traces_every_step(self, recorded_spans):
+        await (_AddOne() >> _ToStr()).arun(1)
+
+        assert [s.name for s in recorded_spans.get_finished_spans()] == [
+            "add_one",
+            "to_str",
+            "chain",
+        ]
+
+    @pytest.mark.asyncio
+    async def test_a_failing_component_still_closes_its_span(self, recorded_spans):
+        with pytest.raises(ValueError):
+            await _Fails().arun(1)
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.name == "fails"
+
+    @pytest.mark.asyncio
+    async def test_the_embedder_reports_the_embeddings_operation(self):
+        from agent_platform.components.retrieval.embedder.component import Embedder
+
+        assert Embedder.operation_name == "embeddings"

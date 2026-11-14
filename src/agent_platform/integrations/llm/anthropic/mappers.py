@@ -8,7 +8,6 @@ from anthropic.types import Message
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.llm.batch import BatchJob, BatchStatus
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     ResponseFormat,
 )
@@ -26,6 +25,7 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 
 __all__ = [
@@ -223,5 +223,6 @@ def from_native_response(response: Message, model: str) -> LLMResponse:
             output_tokens=usage.output_tokens,
         ),
         model=model,
-        finish_reason=FinishReason.STOP,
+        finish_reason=to_finish_reason(response.stop_reason),
+        response_id=response.id,
     )

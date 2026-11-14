@@ -29,7 +29,7 @@
 
 ### `core/`: Foundation
 
-Near-zero external dependencies. Everything here is pure Python, `pydantic`, `abc`, `typing`, `uuid`, `datetime`, with no exceptions: tracing is defined here only as the `BaseTracer`/`Span` contract plus a `NoOpTracer` default, and every real backend (OpenTelemetry today) lives in `integrations/tracing/`.
+Near-zero external dependencies. Everything here is pure Python, `pydantic`, `abc`, `typing`, `uuid`, `datetime`, with no exceptions: observability is defined here only as the `BaseTracer`/`Span` contract plus its no-op default, and every real backend (Langfuse today) lives in `integrations/tracing/`.
 
 | Path | Contents |
 |---|---|
@@ -37,8 +37,8 @@ Near-zero external dependencies. Everything here is pure Python, `pydantic`, `ab
 | `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends; `ModelConfig`, a `ProviderConfig` subclass adding `model: str` for model-backed domains (llm, embeddings, reranking, speech, image_generation); `RequestOptions`, a `ProviderConfig` subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs alongside `ModelConfig` (currently `llm`, `embeddings`, `moderation`) |
 | `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
 | `core/credentials.py` | `Credentials` (secrets only, e.g. `api_key`), `ClientOptions` (non-secret construction-time transport settings: `base_url`, `timeout`, `max_retries`) |
-| `core/interfaces/tracing/` | Backend-agnostic tracing contract: `BaseTracer`, the `Span` protocol (`set_attribute()`, `record_error()`, `trace_id`, `span_id`), `TracingConfig`, and the `NoOpTracer`/`NoOpSpan` default |
-| `core/tracing/` | What call sites use, re-exported from the package root: `runtime.py`'s facade over that contract (`set_tracer()`, `get_tracer()`, `reset_tracer()`, `traced_span()`) and `genai.py`'s GenAI semantic-convention layer on top of it (`traced_operation_span()`, `record_token_usage()`, `GenAIAttributes`) |
+| `core/interfaces/tracing/` | Backend-agnostic tracing contract: `BaseTracer`, the `Span` protocol (`set_attribute()`, `record_error()`, `trace_id`, `span_id`), and the `NoOpTracer`/`NoOpSpan` default |
+| `core/observability/` | What call sites use: typed `Observation`s describing what the platform observed in its own vocabulary (`observations.py`: `LLMCall`, `ToolRun`, `AgentRun`, `GuardrailCheck`, `WorkflowNode`, `PipelineRun`, ...), the `Fact` annotation and `flatten()` that derive span attributes and payload policy from them (`facts.py`), the `observe()`/`emit()`/`current()` runtime, the tracer registry, opt-in payload capture, and `@traced`. No backend name appears here: `integrations/tracing/langfuse/mapping.py` maps the platform's vocabulary onto Langfuse fields |
 | `core/interfaces/<domain>/` | ABCs for every capability (llm, embeddings, vad, ocr, vector_store, reranking, chunking, speech, translation, clustering, classification, loader, image_generation, dataset) |
 | `core/schemas/` | Shared Pydantic v2 data models used across all layers |
 
@@ -100,7 +100,7 @@ Multi-step operations that chain components together. See `pipelines/README.md`.
 
 ### `api/`: FastAPI Entrypoint
 
-`app.py` wires one `ConversationAgent` via `config.build_agent()` behind `/chat` and `/health`, using `config.Settings`/`get_settings()` for configuration and `config.setup_logging()` + `core.tracing.set_tracer(config.build_tracer(settings))` at startup. That agent already carries image-generation and transcription tools (see `config/` above), not chat only.
+`app.py` wires one `ConversationAgent` via `config.build_agent()` behind `/chat` and `/health`, using `config.Settings`/`get_settings()` for configuration and `config.setup_logging()` + `core.observability.set_tracer(config.build_tracer(settings))` at startup. That agent already carries image-generation and transcription tools (see `config/` above), not chat only.
 
 ## Extension Patterns
 

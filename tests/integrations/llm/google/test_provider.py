@@ -49,7 +49,7 @@ def _function_call(id, name, args):
     return SimpleNamespace(id=id, name=name, args=args)
 
 
-def _response(parts, prompt_tokens=None, candidates_tokens=None):
+def _response(parts, prompt_tokens=None, candidates_tokens=None, finish_reason="STOP"):
     usage = (
         SimpleNamespace(
             prompt_token_count=prompt_tokens, candidates_token_count=candidates_tokens
@@ -58,8 +58,13 @@ def _response(parts, prompt_tokens=None, candidates_tokens=None):
         else None
     )
     return SimpleNamespace(
-        candidates=[SimpleNamespace(content=SimpleNamespace(parts=parts))],
+        candidates=[
+            SimpleNamespace(
+                content=SimpleNamespace(parts=parts), finish_reason=finish_reason
+            )
+        ],
         usage_metadata=usage,
+        response_id="resp-1",
     )
 
 

@@ -17,12 +17,12 @@ from agent_platform.agents.tools.errors import (
     ToolRegistrationError,
     ToolTimeoutError,
 )
+from agent_platform.core.observability import ToolRun, observe
 from agent_platform.core.schemas.message import (
     ToolCall,
     ToolMessage,
     ToolResult,
 )
-from agent_platform.core.tracing import GenAIAttributes, traced_operation_span
 
 logger = logging.getLogger(__name__)
 
@@ -126,15 +126,22 @@ class ToolRegistry:
         semaphore = self._semaphores.get(name)
         return semaphore if semaphore is not None else contextlib.nullcontext()
 
+    def _observation(self, call: ToolCall) -> ToolRun:
+        # Looked up leniently: an unknown tool still gets a span, and still
+        # fails the same way it always has, inside `resolve_call`.
+        tool = self._tools.get(call.name)
+        return ToolRun(
+            tool_name=call.name,
+            call_id=call.id,
+            kind=tool.tool_kind if tool else None,
+            source=tool.tool_source if tool else None,
+            description=tool.description if tool else None,
+            arguments=call.arguments,
+        )
+
     async def call_and_wrap(self, call: ToolCall) -> ToolMessage:
         async with self._concurrency_guard(call.name):
-            with traced_operation_span(
-                "execute_tool",
-                {
-                    GenAIAttributes.TOOL_NAME: call.name,
-                    GenAIAttributes.TOOL_CALL_ID: call.id,
-                },
-            ) as span:
+            with observe(self._observation(call)) as run:
                 metadata: dict[str, Any] = {}
                 try:
                     raw = await self.resolve_call(call)
@@ -147,12 +154,15 @@ class ToolRegistry:
                     content = str(exc)
                     is_error = True
                     metadata = {TOOL_CALL_VALIDATION_ERROR_KEY: True}
-                    span.record_error(exc, record_exception=False)
+                    run.record_error(exc)
                 except Exception as exc:
                     logger.exception("Tool call '%s' failed", call.name)
                     content = str(exc)
                     is_error = True
-                    span.record_error(exc, record_exception=False)
+                    run.record_error(exc)
+
+                run.result = content
+                run.is_error = is_error
 
         return ToolMessage(
             result=ToolResult(
@@ -179,23 +189,21 @@ class ToolRegistry:
             return
 
         async with self._concurrency_guard(call.name):
-            with traced_operation_span(
-                "execute_tool",
-                {
-                    GenAIAttributes.TOOL_NAME: call.name,
-                    GenAIAttributes.TOOL_CALL_ID: call.id,
-                },
-            ) as span:
+            with observe(self._observation(call)) as run:
+                failed = False
+                streamed: list[str] = []
                 try:
                     self._validate_arguments(tool, call)
                     async for delta in tool.astream(**call.arguments):
+                        streamed.append(delta)
                         yield ToolStreamChunk(tool_call_id=call.id, delta=delta)
                     yield ToolStreamChunk(tool_call_id=call.id, delta="", is_final=True)
                 except asyncio.CancelledError:
                     raise
                 except ToolCallValidationError as exc:
                     logger.info("Tool call '%s' failed argument validation", call.name)
-                    span.record_error(exc, record_exception=False)
+                    failed = True
+                    run.record_error(exc)
                     yield ToolStreamChunk(
                         tool_call_id=call.id,
                         delta=str(exc),
@@ -205,13 +213,18 @@ class ToolRegistry:
                     )
                 except Exception as exc:
                     logger.exception("Tool stream '%s' failed", call.name)
-                    span.record_error(exc, record_exception=False)
+                    failed = True
+                    run.record_error(exc)
                     yield ToolStreamChunk(
                         tool_call_id=call.id,
                         delta=str(exc),
                         is_final=True,
                         is_error=True,
                     )
+
+                run.stream_chunks = len(streamed)
+                run.result = "".join(streamed)
+                run.is_error = failed
 
     def __len__(self) -> int:
         return len(self._tools)

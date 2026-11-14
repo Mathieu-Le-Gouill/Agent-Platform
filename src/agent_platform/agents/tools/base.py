@@ -6,6 +6,7 @@ from typing import Any, Protocol
 from pydantic import BaseModel
 
 from agent_platform.agents.tools.errors import ToolError as ToolError
+from agent_platform.core.observability import ToolKind
 
 
 class ToolStreamChunk(BaseModel, frozen=True):
@@ -22,6 +23,13 @@ class Tool(Protocol):
     input_schema: type[BaseModel] = BaseModel
     output_schema: type[BaseModel] | None = None
     supports_streaming: bool = False
+    # What kind of thing runs this tool, for traces: local Python
+    # by default, `REMOTE` for anything executed outside the process. Left to
+    # the tool because a registry cannot tell the difference from outside.
+    tool_kind: str = ToolKind.FUNCTION
+    # Optional finer-grained origin ("mcp", ...) where `tool_kind` alone is
+    # too coarse to answer "which of these are ours".
+    tool_source: str | None = None
 
     def __init_subclass__(cls, **kwargs):
         super().__init_subclass__(**kwargs)

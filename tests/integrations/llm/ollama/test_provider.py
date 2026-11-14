@@ -48,9 +48,11 @@ def _response(
     tool_calls: list[SimpleNamespace] | None = None,
     prompt_eval_count: int = 0,
     eval_count: int = 0,
+    done_reason: str | None = "stop",
 ) -> SimpleNamespace:
     return SimpleNamespace(
         message=SimpleNamespace(content=content, tool_calls=tool_calls),
+        done_reason=done_reason,
         prompt_eval_count=prompt_eval_count,
         eval_count=eval_count,
     )

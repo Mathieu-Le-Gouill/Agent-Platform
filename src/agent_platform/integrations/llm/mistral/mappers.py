@@ -8,7 +8,6 @@ from uuid import uuid4
 from mistralai.models import ChatCompletionResponse
 
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     ResponseFormat,
 )
@@ -26,6 +25,7 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
 
 __all__ = [
@@ -169,5 +169,6 @@ def from_native_response(response: ChatCompletionResponse, model: str) -> LLMRes
             output_tokens=(usage.completion_tokens or 0) if usage else 0,
         ),
         model=model,
-        finish_reason=FinishReason.STOP,
+        finish_reason=to_finish_reason(response.choices[0].finish_reason),
+        response_id=response.id,
     )

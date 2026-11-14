@@ -25,6 +25,8 @@ class Component(ABC, Generic[Out]):
 
 Every component receives typed input and returns typed output. The sync `run()` is a convenience wrapper around `arun()`.
 
+**Every component is traced without doing anything.** `Component.__init_subclass__` wraps a subclass's own `arun` in `core/observability.traced(ComponentRun, ...)`, so one span per `arun` call (with its latency, and its error type when it fails) comes for free and no component body contains tracing code. The span is named after the class in snake_case (`SemanticChunker` becomes `semantic_chunker`); set the `operation_name` class attribute to override it, which is what `Embedder` does to report `embeddings`. Only a subclass's *own* `arun` is wrapped, so inheriting one never produces a doubly-nested span.
+
 ## Directory Layout
 
 Components sit in a stage folder named for the pipeline step they serve: `ingestion/`, `chunking/`, `retrieval/`, `classification/`, `generation/`. A stage folder only groups components and adds no layer: `components` stays one layer for the import contracts.

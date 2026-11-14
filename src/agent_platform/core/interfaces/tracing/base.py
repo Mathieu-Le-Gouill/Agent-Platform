@@ -27,3 +27,13 @@ class BaseTracer(ABC):
         The returned span becomes the parent of any span started inside the
         `with` block, including from other coroutines it awaits.
         """
+
+    @abstractmethod
+    def current_span(self) -> Span:
+        """The innermost span currently in scope, or an inert span if none is.
+
+        Lets code nested under a span annotate it without that span being
+        threaded through every signature in between (a workflow node
+        stamping the node span, an agent stamping its loop span). Never
+        returns `None`, so call sites annotate unconditionally.
+        """

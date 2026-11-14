@@ -31,7 +31,7 @@ dependencies = [
 # --- LLM ---
 llm-openai = ["openai>=2.48"]
 llm-anthropic = ["anthropic>=0.116"]
-llm-mistral = ["mistralai>=1.12"]
+llm-mistral = ["mistralai>=1.12,<2"]
 llm-ollama = ["ollama>=0.6"]
 llm-huggingface = ["huggingface_hub>=1.24"]
 llm-google = ["google-genai>=1.0"]
@@ -39,7 +39,7 @@ llm = ["agent_platform[llm-openai,llm-anthropic,llm-mistral,llm-ollama,llm-huggi
 
 # --- Embeddings ---
 embeddings-openai = ["openai>=2.48"]
-embeddings-mistral = ["mistralai>=1.12"]
+embeddings-mistral = ["mistralai>=1.12,<2"]
 embeddings-ollama = ["ollama>=0.6"]
 embeddings-huggingface = [
     "huggingface_hub>=1.24",
@@ -115,19 +115,11 @@ moderation = ["agent_platform[moderation-openai]"]
 # --- API ---
 api = ["fastapi~=0.121", "uvicorn[standard]~=0.34"]
 
-# --- Tracing (OpenTelemetry export; backend is chosen via AGENT_PLATFORM_TRACING) ---
+# --- Tracing (Langfuse SDK; enabled by LANGFUSE_PUBLIC_KEY / LANGFUSE_SECRET_KEY) ---
 # Optional in full: `core` only depends on its own `BaseTracer`/`Span`
-# abstractions and defaults to `NoOpTracer`, so OpenTelemetry is pulled in
-# only by `integrations/tracing/otel/`.
-# `tracing` covers OTLP/HTTP (the default protocol, and what LangSmith/
-# Langfuse ingestion uses); add `tracing-grpc` too if OTEL_EXPORTER_OTLP_PROTOCOL=grpc
-# is needed (e.g. talking directly to some self-hosted OTel Collectors).
-tracing = [
-    "opentelemetry-api~=1.29",
-    "opentelemetry-sdk~=1.29",
-    "opentelemetry-exporter-otlp-proto-http~=1.29",
-]
-tracing-grpc = ["opentelemetry-exporter-otlp-proto-grpc~=1.29"]
+# abstractions and defaults to `NoOpTracer`, so the Langfuse SDK is imported
+# only by `integrations/tracing/langfuse/`.
+tracing = ["langfuse~=5.2"]
 
 # --- Chunking (structure-based) ---
 chunking-recursive = ["langchain-text-splitters~=1.0"]
@@ -156,7 +148,7 @@ tools-mcp = ["mcp>=1.2"]
 
 # --- Everything (parity with the old monolithic install) ---
 all = [
-    "agent_platform[llm,embeddings,vector-store,reranking,stt,translation,ocr,vad,image,clustering,classification-transformers,moderation,chunking,loader-av,loader-soundfile,dataset,evals,tools-mcp,api,tracing,tracing-grpc]",
+    "agent_platform[llm,embeddings,vector-store,reranking,stt,translation,ocr,vad,image,clustering,classification-transformers,moderation,chunking,loader-av,loader-soundfile,dataset,evals,tools-mcp,api,tracing]",
 ]
 
 dev = [
@@ -238,6 +230,9 @@ exclude_also = [
 [tool.importlinter]
 root_package = "agent_platform"
 exclude_type_checking_imports = true
+# Needed by the "Core imports no tracing SDK" contract; import-linter only
+# accepts it at the root, where it applies to every contract.
+include_external_packages = true
 
 [[tool.importlinter.contracts]]
 name = "Layered architecture"
@@ -263,3 +258,9 @@ forbidden_modules = [
     "agent_platform.agents",
     "agent_platform.workflows",
 ]
+
+[[tool.importlinter.contracts]]
+name = "Core imports no tracing SDK"
+type = "forbidden"
+source_modules = ["agent_platform.core"]
+forbidden_modules = ["langfuse", "opentelemetry"]

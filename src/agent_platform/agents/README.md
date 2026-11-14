@@ -196,8 +196,8 @@ above landed.
 
 - ~~Attach `conversation_id`/`session_id` as a span attribute~~ **done**:
   `AgentExecutor.run`/`run_with_messages`/`run_streaming` take an optional
-  `conversation_id` keyword and set `GenAIAttributes.CONVERSATION_ID` on the
-  `invoke_agent` span when given (omitted, not set to `None`, otherwise);
+  `conversation_id` keyword and set it on the `AgentRun` observation when
+  given (omitted, not set to `None`, otherwise);
   `ConversationAgent.chat()` and `api/app.py`'s `/chat`, `/chat/stream` routes
   always pass theirs, so a multi-turn session's spans correlate without an
   external join.
@@ -224,6 +224,33 @@ above landed.
 
 ## Infrastructure notes
 
+- **Observability**, the agent layer emits three kinds of span, all through
+  `core/observability`'s typed observations (no backend name anywhere
+  here, and a cheap no-op when no backend is installed):
+  - `invoke_agent` (`executor.py`) wraps the whole think-act loop. `_LoopTrace`
+    collects what makes a loop pathological rather than merely slow:
+    `agent.iterations` against `.max_iterations`, the
+    `.exit_reason` (`stop`, `max_iterations`, `recovery_exhausted`, or the
+    exception's type name), whether tool-call recovery fired
+    (`.recovery_attempted`, notified by `validation.py`'s `on_retry` callback),
+    and how many tool calls the model requested versus how many actually ran.
+  - `execute_tool` (`tools/registry.py`), a `ToolRun` recording the tool's
+    name, call id, kind and source, which is what makes an MCP tool
+    distinguishable from a local one in a trace (the MCP adapter declares
+    `ToolKind.REMOTE`/`mcp`, a plain `Tool` defaults to `ToolKind.FUNCTION`).
+    Arguments and results contribute their size and a short digest always, and
+    their content only under the opt-in content-capture switch (see
+    `core/README.md`); streaming tools also report their chunk count.
+  - `guardrail` (`guardrails.py`), a `GuardrailCheck` per `before`/`after`
+    stage, via `TracedGuardrail`. `Agent` wraps every guardrail it is given, so any
+    third-party object satisfying the `Guardrail` protocol gets a span
+    without implementing anything extra, and a blocked request stops being an
+    action with no trace evidence.
+
+  Cost is attached in `agent.py::_record_usage`: the estimator prices each
+  `TokenUsage` and `emit(ModelCost(...))` stamps it onto the enclosing span
+  (the provider's own `chat` span is already closed by then). When several
+  model calls share one `invoke_agent` span the attribute reports the latest.
 - **Streaming**, `Agent.think_stream()` and `AgentExecutor.run_streaming()`
   now stream the assistant's own text, not just tool-call deltas; `/chat/stream`
   exposes this over SSE. Note `/chat/stream` is single-turn (built directly on

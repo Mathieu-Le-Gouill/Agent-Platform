@@ -2,7 +2,7 @@
 
 ## Design
 
-`core/` is the **near-zero-dependency foundation** of the platform. It defines everything that does not depend on an external library, pure Python ABCs, Pydantic schemas, enums, and error types. That now includes tracing: `interfaces/tracing/` declares the `BaseTracer`/`Span` contract and a working `NoOpTracer` default, while every real backend (OpenTelemetry today) lives in `integrations/tracing/`, so no tracing SDK is a runtime dependency of this layer. No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
+`core/` is the **near-zero-dependency foundation** of the platform. It defines everything that does not depend on an external library, pure Python ABCs, Pydantic schemas, enums, and error types. That now includes observability: `interfaces/tracing/` declares the `BaseTracer`/`Span` contract plus a working no-op default, while every real backend (Langfuse today) lives in `integrations/tracing/`, so no telemetry SDK is a runtime dependency of this layer. No integration, component, pipeline, or agent ever imports from outside `core/` for its base abstractions.
 
 ## Directory Layout
 
@@ -17,9 +17,13 @@ core/
 ├── persistence.py    # Checkpointer[StateT] protocol + InMemoryCheckpointer
 ├── token_usage.py    # TokenUsageAggregator: accumulates TokenUsage per string key
 ├── credentials.py    # Credentials (secrets only, e.g. api_key), ClientOptions (base_url/timeout/max_retries)
-├── tracing/          # Everything call sites need to emit a span (contract lives in interfaces/tracing/)
-│   ├── runtime.py    #   Backend-agnostic facade: set_tracer()/get_tracer()/reset_tracer(), traced_span()
-│   └── genai.py      #   GenAIAttributes, traced_operation_span(), record_token_usage()
+├── observability/    # What the platform observed, in its own vocabulary (the contract lives in interfaces/tracing/)
+│   ├── facts.py      #   Observation base + @Fact-annotated fields, flatten() -> span attributes
+│   ├── observations.py #  The vocabulary itself: LLMCall, LLMBatch, ModelCost, ToolRun, AgentRun, GuardrailCheck, WorkflowNode, Handoff, PipelineRun, Retrieval, ComponentRun
+│   ├── runtime.py    #   observe(observation) (one span), emit(observation) (facts on the enclosing span), current(kind)
+│   ├── tracer.py     #   Tracer registry: set_tracer()/get_tracer()/reset_tracer(), current_span()
+│   ├── content.py    #   Opt-in payload capture: capture_content(), payload_facts()
+│   └── decorators.py #   @traced(Observation, **facts): wrap any sync or async function in one
 ├── similarity.py     # Vector similarity math helpers (compute_similarity, similarity_bounds), used by components/ and evals/
 ├── interfaces/       # ABCs for every capability (the "contract" layer)
 │   ├── llm/
@@ -103,25 +107,70 @@ PlatformError
 
 Every error carries `code`, `retryable`, and `context` fields. `retry.py`'s `with_retry()` decorator (exponential backoff with jitter, `max_attempts`/`retry_on` configurable) checks this flag: if a caught exception is a `PlatformError` with `retryable=False`, it re-raises immediately instead of burning through retry attempts. Since every current `@with_retry()` call site in `integrations/` sits *inside* an outer `@error_logged(re_raise=ProviderError)` (decorator order: `error_logged` above `with_retry`), `with_retry` there only ever sees the raw underlying SDK exception, never the translated `PlatformError`, so this flag-check is a no-op for those call sites today; it takes effect wherever `with_retry` wraps a call that itself raises `PlatformError` directly (e.g. a tool or agent-loop retry).
 
-### `interfaces/tracing/` + `tracing/`: Backend-Agnostic Observability
+### `interfaces/tracing/`: The Backend Contract
 
-Tracing is split like any other domain: `core` owns the contract, `integrations/tracing/` owns the backends.
+Observability is split like any other domain: `core` owns the contract, `integrations/tracing/` owns the backends.
 
 `interfaces/tracing/` holds the generic layer, with no tracing SDK imported anywhere in it:
 - `span.py`: the `Span` protocol (`set_attribute()`, `record_error()`, `trace_id`, `span_id`) and `AttributeValue`, the narrow set of value types an attribute may hold. It is a `Protocol` rather than an ABC because implementations adapt a backend's own span object instead of subclassing ours. `record_error(exc, record_exception=False)` is for call sites that catch and swallow an error (rather than re-raise it) but still need the span tagged as failed, e.g. tool calls in `agents/tools/registry.py`. `trace_id`/`span_id` exist so a caller can correlate a trace with data submitted to a backend out of band, e.g. attaching an eval score or user feedback to a Langfuse/LangSmith trace after the fact.
 - `base.py`: `BaseTracer`, a single `start_span(name, attributes)` returning a context manager. The seam is deliberately at the tracer level, not the span-context level: an implementation delegates parent/child nesting and cross-task context propagation to its backend rather than reimplementing them.
-- `noop.py`: `NoOpTracer`/`NoOpSpan`, the default. This is what lets every call site use `traced_span` unconditionally with no "is tracing enabled" branch and no tracing extra installed.
-- `config.py`: `TracingConfig`, only what every backend understands (`service_name`). Exporter protocols, endpoints and credentials belong on a subclass owned by that backend's integration.
+- `noop.py`: `NoOpTracer`/`NoOpSpan`, the default. This is what lets every call site use `observe()` unconditionally with no "is tracing enabled" branch and no tracing extra installed.
 
-`tracing/runtime.py` is the facade over that contract: `set_tracer()` installs the process-wide tracer once at startup (`api/app.py`, via `config.container.build_tracer()`), `reset_tracer()` restores the no-op, and `traced_span(name, attributes=None)` is the generic context manager every span-producing call site is built on. It records latency as span duration, drops `None`-valued attributes so call sites can pass optional values without branching, and on a propagating exception calls `span.record_error(exc)`. Nothing here selects or knows about a backend.
+Backend selection and the Langfuse wiring live in `integrations/tracing/` and `integrations/README.md`.
 
-Both `runtime.py` and `genai.py` are re-exported from the `tracing/` package, so a call site needing a span imports everything from one path: `from agent_platform.core.tracing import GenAIAttributes, traced_operation_span`.
+### `observability/`: Typed Observations
 
-Backend selection, OTLP wiring and vendor endpoint/auth recipes live in `integrations/tracing/` and `integrations/README.md`.
+`core` describes **what the platform observed, in the platform's own words**. It never spells a backend's field names: `integrations/tracing/langfuse/mapping.py` is the single place the platform's vocabulary is translated into Langfuse's. That is what lets a backend change its fields without a single call site changing.
 
-### `tracing/genai.py`: GenAI Semantic Conventions
+The unit is an `Observation`: a mutable dataclass whose fields are annotated with `Fact`.
 
-Paired with `runtime.py`, this is where GenAI-specific knowledge lives, kept out of the facade so non-GenAI call sites (`workflows/graph.py`, `workflows/nodes/fan_out.py`) use `traced_span` without inheriting any of it. It stays vendor-free the same way: the `gen_ai.*` keys are OpenTelemetry *semantic-convention* strings, a spec, not an SDK API, so nothing is imported to spell them. `traced_operation_span(operation, attributes=None)` (a thin wrapper over `traced_span()`) is what every instrumented call site uses, it names the span after `operation` and sets `gen_ai.operation.name` to match. `GenAIAttributes` centralizes the `gen_ai.*` semantic-convention attribute keys so every call site (and any future one, embeddings, reranking, ...) spells them identically; `record_token_usage(span, usage)` records token counts the same way everywhere. Currently wired into the agent loop (`agents/executor.py`), tool calls (`agents/tools/registry.py`), and LLM calls (each `integrations/llm/<provider>/provider.py`). `GenAIAttributes.CONVERSATION_ID` is set on `agents/executor.py`'s `invoke_agent` span whenever a caller passes a `conversation_id` (`AgentExecutor.run`/`run_with_messages`/`run_streaming`'s optional keyword; `ConversationAgent.chat()` and `api/app.py`'s `/chat`, `/chat/stream` routes always do), so a multi-turn session's spans correlate without an external join; omitted entirely (not set to `None`) for callers that don't have one, e.g. a bare `Agent` driven directly.
+```python
+@dataclass
+class ToolRun(Observation):
+    operation = "execute_tool"
+
+    tool_name: Annotated[str, Fact("tool.name")]
+    call_id: Annotated[str | None, Fact("tool.call.id")] = None
+    arguments: Annotated[Any | None, Fact("tool.arguments", payload=True)] = None
+```
+
+One object therefore declares everything a backend needs, and `facts.py::flatten()` derives all of it:
+- the **span attributes**, from every non-`None` fact;
+- the **payload policy**, from the facts marked `payload=True`, which expand into `{key}.size` and `{key}.digest` always and `{key}.content` only when capture is on.
+
+Adding a fact is one annotated field rather than an edit in several places.
+
+`observations.py` holds the vocabulary itself, and is the only file to read to know what the platform reports: `LLMCall`, `LLMBatch`, `ModelCost`, `ToolRun`, `AgentRun`, `GuardrailCheck`, `WorkflowNode`, `Handoff`, `PipelineRun`, `Retrieval`, `ComponentRun`. A layer with a concept `core` has no business knowing about declares its own locally instead, which is what `evals/runner.py` does with `_EvalCaseRun`.
+
+### `observability/runtime.py`: `observe`, `emit`, `current`
+
+`observe(observation)` runs a unit of work: it opens one span named after `observation.operation_name` and tags a failure (raised or swallowed via `record_error`) with `error.type`. Duration is the span's own, so nothing here times the block.
+
+Observations are mutable on purpose, because most of what is worth recording is only known once the work is done. `observe` yields the observation back, records what was known when the span opened, and flushes whatever changed when it closes:
+
+```python
+with observe(LLMCall(provider="openai", request_model=model)) as call:
+    response = await client.chat(...)
+    call.response_model = response.model
+    call.input_tokens = response.usage.input_tokens
+```
+
+`emit(observation)` is the event counterpart: facts are stamped on whatever span is already open, but there is no duration, because there is nothing to time. It is for a step inside someone else's unit of work: what a retrieval found (`Retrieval`), who a workflow node handed off to (`Handoff`), what a finished model call cost (`ModelCost`, priced only after the call it describes has ended).
+
+`current(ObservationType)` returns the innermost open observation of that type, so code nested under someone else's `observe` can annotate it without that object being threaded through every signature in between.
+
+`tracer.py` is the registry behind both: `set_tracer()` installs the process-wide backend once at startup (`api/app.py`, via `config.container.build_tracer()`) and `reset_tracer()` restores the no-op. Nothing here selects or knows about a backend.
+
+### `observability/content.py`: Opt-In Payload Capture
+
+Prompts, tool arguments and tool results are the most useful thing in a trace and the most likely to contain personal data, so they are **off by default**. What is always exported is the shape of a payload, never its content: `payload_facts(value)` returns its serialized size in bytes and a 16-character sha256 digest, which is enough to spot an oversized argument or to tell two identical calls apart without a backend ever seeing the text.
+
+`capture_content()` decides whether the content itself is exported, reading `AGENT_PLATFORM_CAPTURE_CONTENT` per call, so toggling it needs no restart. It is the only switch: a backend never decides capture itself.
+
+### `observability/decorators.py`: `@traced`
+
+`traced(ObservationType, **facts)` wraps any function, sync or async, in `observe(ObservationType(**facts))`. It exists so that instrumenting a whole unit of work is one line and no indentation change, which is what makes it practical to trace every pipeline entry point (`pipelines/`) and every `Component.arun` (`components/base.py` applies it automatically in `__init_subclass__`). A fresh observation is built per call, since an observation is mutable; anything only known at runtime is set through `current(...)` inside the body. It preserves the wrapped function's identity through `functools.wraps`, so it composes with the rest of the decorator stack.
+
 
 ### `resilience.py`: Circuit Breaker & Rate Limiter
 

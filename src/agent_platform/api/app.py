@@ -19,7 +19,7 @@ from agent_platform.config import (
     get_settings,
     setup_logging,
 )
-from agent_platform.core.tracing import set_tracer
+from agent_platform.core.observability import set_tracer
 
 
 def create_app(settings: Settings | None = None) -> FastAPI:

@@ -17,6 +17,7 @@ from agent_platform.core.interfaces.llm.response import (
     ResponseFormat,
     StreamChunk,
 )
+from agent_platform.core.observability import AgentRun, observe
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     ToolCall,
@@ -761,3 +762,75 @@ class TestAgentTokenUsage:
         assert aggregator.total_for("streamer") == TokenUsage(
             input_tokens=4, output_tokens=1
         )
+
+
+class TestAgentCostObservability:
+    @pytest.mark.asyncio
+    async def test_a_priced_call_lands_on_the_enclosing_span(
+        self, mock_llm, registry, recorded_spans
+    ):
+        pricing = StaticPricingTable(
+            {"test-model": ModelPricing(input_per_1k=1.0, output_per_1k=2.0)}
+        )
+        agent = Agent(
+            name="priced-agent",
+            llm=mock_llm,
+            tool_registry=registry,
+            model="test-model",
+            cost_estimator=pricing,
+        )
+        mock_llm.agenerate.return_value = LLMResponse(
+            message=AssistantMessage(content="hi"),
+            usage=TokenUsage(input_tokens=1000, output_tokens=500),
+            model="test-model",
+            finish_reason=FinishReason.STOP,
+        )
+
+        with observe(AgentRun(agent_name="pricey")):
+            await agent.think([UserMessage(content="hi")])
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes["llm.usage.cost"] == pytest.approx(2.0)
+
+    @pytest.mark.asyncio
+    async def test_nothing_is_priced_without_an_estimator(
+        self, mock_llm, registry, recorded_spans
+    ):
+        agent = Agent(name="free", llm=mock_llm, tool_registry=registry)
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="hi")
+
+        with observe(AgentRun(agent_name="pricey")):
+            await agent.think([UserMessage(content="hi")])
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert "llm.usage.cost" not in span.attributes
+
+    @pytest.mark.asyncio
+    async def test_streamed_usage_is_priced_too(
+        self, mock_llm, registry, recorded_spans
+    ):
+        pricing = StaticPricingTable(
+            {"test-model": ModelPricing(input_per_1k=1.0, output_per_1k=2.0)}
+        )
+        agent = Agent(
+            name="priced-agent",
+            llm=mock_llm,
+            tool_registry=registry,
+            model="test-model",
+            cost_estimator=pricing,
+        )
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            [
+                StreamChunk(
+                    delta="hi",
+                    usage=TokenUsage(input_tokens=1000, output_tokens=500),
+                )
+            ]
+        )
+
+        with observe(AgentRun(agent_name="pricey")):
+            async for _chunk in agent.think_stream([UserMessage(content="hi")]):
+                pass
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes["llm.usage.cost"] == pytest.approx(2.0)

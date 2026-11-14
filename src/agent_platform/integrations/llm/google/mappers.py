@@ -6,7 +6,6 @@ from uuid import uuid4
 from google.genai import types
 
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     ResponseFormat,
 )
@@ -24,6 +23,7 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
 
 __all__ = [
@@ -176,5 +176,6 @@ def from_native_response(
             output_tokens=(usage.candidates_token_count or 0) if usage else 0,
         ),
         model=model,
-        finish_reason=FinishReason.STOP,
+        finish_reason=to_finish_reason(candidate.finish_reason if candidate else None),
+        response_id=response.response_id,
     )

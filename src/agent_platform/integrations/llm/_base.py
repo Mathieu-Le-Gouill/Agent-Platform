@@ -9,14 +9,10 @@ from agent_platform.core.credentials import ClientOptions, Credentials
 from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider, GenerationConfigT
 from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
-from agent_platform.core.interfaces.tracing.span import Span
+from agent_platform.core.observability import LLMCall, observe
 from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.message import Prompt
-from agent_platform.core.tracing import (
-    GenAIAttributes,
-    record_token_usage,
-    traced_operation_span,
-)
+from agent_platform.core.schemas.token import TokenUsage
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
@@ -46,7 +42,7 @@ class NativeLLMProvider(
     accumulation differs enough per vendor (e.g. Anthropic's additive
     `message_start`/`message_delta` events vs. a single final-chunk usage
     elsewhere) that forcing one shape risks silently misreporting usage;
-    each provider implements `stream()` directly but can still reuse `_span`.
+    each provider implements `stream()` directly but can still reuse `_observe`.
     """
 
     _provider_name: ClassVar[str]
@@ -61,14 +57,37 @@ class NativeLLMProvider(
     def _model_name(self, config: GenerationConfigT) -> str:
         return config.model
 
-    def _span(self, config: GenerationConfigT) -> AbstractContextManager[Span]:
-        return traced_operation_span(
-            "chat",
-            {
-                GenAIAttributes.PROVIDER_NAME: self._provider_name,
-                GenAIAttributes.REQUEST_MODEL: self._model_name(config),
-            },
+    def _observe(self, config: GenerationConfigT) -> AbstractContextManager[LLMCall]:
+        return observe(
+            LLMCall(
+                provider=self._provider_name, request_model=self._model_name(config)
+            )
         )
+
+    @staticmethod
+    def _record_usage(call: LLMCall, usage: TokenUsage) -> None:
+        """Record a finished stream's accumulated usage on its observation.
+
+        Streaming stays per-provider (see the class docstring), so this is the
+        one piece of it the base can still own, keeping streamed and
+        non-streamed calls comparable in a dashboard.
+        """
+        call.input_tokens = usage.input_tokens
+        call.output_tokens = usage.output_tokens
+
+    @classmethod
+    def _record_response(cls, call: LLMCall, response: LLMResponse) -> None:
+        """Record the response side of a chat call: what came back, not just what went out.
+
+        Without this a trace shows a model was called but not which model
+        answered, how the turn ended, or how many tool calls it asked for.
+        """
+        call.response_model = response.model
+        call.response_id = response.response_id
+        call.finish_reasons = (response.finish_reason.value,)
+        if response.message is not None:
+            call.tool_call_count = len(response.message.tool_calls)
+        cls._record_usage(call, response.usage)
 
     @abstractmethod
     def _async_client(self, config: GenerationConfigT) -> AsyncClientT: ...
@@ -110,11 +129,11 @@ class NativeLLMProvider(
     ) -> LLMResponse:
         config = config or self._default_config()
 
-        with self._span(config) as span:
+        with self._observe(config) as call:
             client = self._sync_client(config)
             response = self._invoke_sync(client, prompt, config, tools)
             result = self._from_native(response, self._model_name(config))
-            record_token_usage(span, result.usage)
+            self._record_response(call, result)
             return result
 
     @error_logged(re_raise=ProviderError, message="LLM generation failed")
@@ -127,11 +146,11 @@ class NativeLLMProvider(
     ) -> LLMResponse:
         config = config or self._default_config()
 
-        with self._span(config) as span:
+        with self._observe(config) as call:
             client = self._async_client(config)
             response = await self._invoke_async(client, prompt, config, tools)
             result = self._from_native(response, self._model_name(config))
-            record_token_usage(span, result.usage)
+            self._record_response(call, result)
             return result
 
     @abstractmethod

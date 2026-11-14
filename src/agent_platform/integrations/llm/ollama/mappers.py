@@ -8,7 +8,6 @@ from ollama import ChatResponse
 
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     ResponseFormat,
 )
@@ -25,6 +24,7 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 
 __all__ = [
@@ -154,5 +154,5 @@ def from_native_response(response: ChatResponse, model: str) -> LLMResponse:
             output_tokens=response.eval_count or 0,
         ),
         model=model,
-        finish_reason=FinishReason.STOP,
+        finish_reason=to_finish_reason(response.done_reason),
     )

@@ -210,4 +210,5 @@ __all__ = [
     "build_llm_with_fallback",
     "build_provider",
     "build_provider_from_model_string",
+    "build_tracer",
 ]

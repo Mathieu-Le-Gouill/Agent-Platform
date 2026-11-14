@@ -267,12 +267,14 @@ class TestBuildAgentAsync:
 
 
 class TestBuildTracer:
-    def test_defaults_to_the_otel_tracer(self):
-        from agent_platform.integrations.tracing.otel.provider import OTelTracer
+    def test_defaults_to_the_langfuse_tracer(self):
+        from agent_platform.integrations.tracing.langfuse.provider import (
+            LangfuseTracer,
+        )
 
         tracer = build_tracer(Settings(_env_file=None))
 
-        assert isinstance(tracer, OTelTracer)
+        assert isinstance(tracer, LangfuseTracer)
 
     def test_none_disables_tracing(self):
         tracer = build_tracer(Settings(_env_file=None, tracing_provider="none"))
@@ -286,7 +288,7 @@ class TestBuildTracer:
     def test_falls_back_to_noop_when_the_sdk_is_missing(self, mocker):
         mocker.patch(
             "agent_platform.config.container.build_provider",
-            side_effect=ImportError("no opentelemetry"),
+            side_effect=ImportError("no langfuse"),
         )
 
         tracer = build_tracer(Settings(_env_file=None))

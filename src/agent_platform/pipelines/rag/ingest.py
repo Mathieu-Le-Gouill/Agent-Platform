@@ -13,8 +13,10 @@ from agent_platform.components.retrieval.embedder.component import (
 )
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.interfaces.vector_store.port import VectorStore
+from agent_platform.core.observability import PipelineRun, traced
 
 
+@traced(PipelineRun, name="rag.ingest")
 async def ingest(
     sources: Sequence[str],
     loader: Loader[LoaderConfigT],

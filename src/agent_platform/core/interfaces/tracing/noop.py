@@ -31,7 +31,7 @@ class NoOpTracer(BaseTracer):
     """The default tracer: records nothing, costs nothing.
 
     Keeping a working no-op in `core` is what lets every call site use
-    `traced_span` unconditionally, with no "is tracing enabled" branch and no
+    `observe` unconditionally, with no "is tracing enabled" branch and no
     tracing dependency installed.
     """
 
@@ -42,3 +42,6 @@ class NoOpTracer(BaseTracer):
         self, name: str, attributes: Mapping[str, AttributeValue] | None = None
     ) -> Iterator[Span]:
         yield self._SPAN
+
+    def current_span(self) -> Span:
+        return self._SPAN
