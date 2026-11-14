@@ -54,11 +54,15 @@ def _response(
     tool_calls: list[SimpleNamespace] | None = None,
     prompt_tokens: int = 0,
     completion_tokens: int = 0,
+    finish_reason: str | None = "stop",
+    id: str = "resp-1",
 ) -> SimpleNamespace:
     return SimpleNamespace(
+        id=id,
         choices=[
             SimpleNamespace(
-                message=SimpleNamespace(content=content, tool_calls=tool_calls)
+                message=SimpleNamespace(content=content, tool_calls=tool_calls),
+                finish_reason=finish_reason,
             )
         ],
         usage=SimpleNamespace(

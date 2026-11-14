@@ -7,6 +7,7 @@ from pydantic import BaseModel, create_model
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.safe_execution import safe_call
 from agent_platform.core.interfaces.mcp.base import BaseMCPClient
+from agent_platform.core.observability import ToolKind
 from agent_platform.core.schemas.mcp import MCPToolSpec
 
 _JSON_SCHEMA_TYPES: dict[str, type] = {
@@ -55,6 +56,8 @@ class MCPToolAdapter(Tool):
 
     name = "mcp_tool"
     description = "Adapter for a single MCP server tool"
+    tool_kind = ToolKind.REMOTE
+    tool_source = "mcp"
 
     def __init__(self, client: BaseMCPClient, spec: MCPToolSpec) -> None:
         self.name = spec.name

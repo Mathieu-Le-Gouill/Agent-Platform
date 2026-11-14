@@ -21,6 +21,9 @@ class LLMResponse(BaseModel, frozen=True):
     model: str
     latency_ms: float | None = None
     finish_reason: FinishReason = FinishReason.STOP
+    # The vendor's own id for this response, when it exposes one: the only
+    # handle that ties a trace back to the provider's logs and dashboards.
+    response_id: str | None = None
 
 
 class ToolCallDelta(BaseModel, frozen=True):

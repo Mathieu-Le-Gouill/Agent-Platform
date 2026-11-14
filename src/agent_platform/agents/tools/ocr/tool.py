@@ -7,7 +7,7 @@ from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.safe_execution import safe_call
-from agent_platform.components.ocr.component import OCR
+from agent_platform.components.ingestion.ocr.component import OCR
 from agent_platform.core.interfaces.ocr.config import OCRConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import ImageDocument

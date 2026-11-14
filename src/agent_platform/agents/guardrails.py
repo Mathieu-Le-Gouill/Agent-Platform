@@ -1,8 +1,12 @@
 from __future__ import annotations
 
+from collections.abc import Iterator
+from contextlib import contextmanager
+
 from agent_platform.agents.errors import AgentGuardrailError
 from agent_platform.core.interfaces.moderation.base import BaseModerationProvider
 from agent_platform.core.middleware import Middleware
+from agent_platform.core.observability import GuardrailCheck, observe
 from agent_platform.core.schemas.message import AssistantMessage, Message, UserMessage
 
 __all__ = [
@@ -10,7 +14,11 @@ __all__ = [
     "Guardrail",
     "OutputNotEmptyGuardrail",
     "ModerationGuardrail",
+    "TracedGuardrail",
 ]
+
+_STAGE_INPUT = "input"
+_STAGE_OUTPUT = "output"
 
 
 class GuardrailContext:
@@ -19,6 +27,38 @@ class GuardrailContext:
 
 
 Guardrail = Middleware[GuardrailContext, AssistantMessage]
+
+
+class TracedGuardrail:
+    """Wraps a guardrail so each check is a span and each block is counted.
+
+    A wrapper rather than a base class, so any object satisfying `Guardrail`
+    (including third-party ones) gets the same trace evidence without
+    inheriting from the platform.
+    """
+
+    def __init__(self, guardrail: Guardrail) -> None:
+        self._guardrail = guardrail
+        self._name = type(guardrail).__name__
+
+    async def before(self, ctx: GuardrailContext) -> AssistantMessage | None:
+        with self._traced(_STAGE_INPUT):
+            return await self._guardrail.before(ctx)
+
+    async def after(
+        self, ctx: GuardrailContext, result: AssistantMessage
+    ) -> AssistantMessage:
+        with self._traced(_STAGE_OUTPUT):
+            return await self._guardrail.after(ctx, result)
+
+    @contextmanager
+    def _traced(self, stage: str) -> Iterator[None]:
+        with observe(GuardrailCheck(guardrail_name=self._name, stage=stage)) as check:
+            try:
+                yield
+            except AgentGuardrailError:
+                check.blocked = True
+                raise
 
 
 class OutputNotEmptyGuardrail:

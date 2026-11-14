@@ -13,7 +13,6 @@ from agent_platform.core.credentials import (
     resolve_timeout,
 )
 from agent_platform.core.errors import require_secret
-from agent_platform.core.genai_tracing import record_token_usage
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -136,7 +135,7 @@ class MistralLLM(
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with self._span(config) as span:
+        with self._observe(config) as call:
             usage_totals = TokenUsage.zero()
             events = await client.chat.stream_async(
                 model=config.model,
@@ -179,5 +178,5 @@ class MistralLLM(
                         usage=chunk_usage,
                     )
 
-            record_token_usage(span, usage_totals)
+            self._record_usage(call, usage_totals)
             yield StreamChunk(delta="", finish_reason=FinishReason.STOP)

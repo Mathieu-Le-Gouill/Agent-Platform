@@ -52,11 +52,17 @@ def _tool_use_block(id: str, name: str, input: dict) -> SimpleNamespace:
 
 
 def _response(
-    content: list[SimpleNamespace], input_tokens: int = 0, output_tokens: int = 0
+    content: list[SimpleNamespace],
+    input_tokens: int = 0,
+    output_tokens: int = 0,
+    stop_reason: str | None = "end_turn",
+    id: str = "msg-1",
 ) -> SimpleNamespace:
     return SimpleNamespace(
+        id=id,
         content=content,
         usage=SimpleNamespace(input_tokens=input_tokens, output_tokens=output_tokens),
+        stop_reason=stop_reason,
     )
 
 
@@ -715,9 +721,11 @@ class TestAnthropicLLMBatch:
         mock_anthropic.return_value = mock_client
 
         succeeded_message = SimpleNamespace(
+            id="msg-1",
             content=[_text_block("hi")],
             usage=SimpleNamespace(input_tokens=1, output_tokens=1),
             model="claude-sonnet-4-6",
+            stop_reason="end_turn",
         )
         entries = [
             SimpleNamespace(

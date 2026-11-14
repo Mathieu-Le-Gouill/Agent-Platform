@@ -3,15 +3,21 @@ from __future__ import annotations
 from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Generic, TypeVar
 
+from agent_platform.core.observability import WorkflowNode, observe
 from agent_platform.core.persistence import Checkpointer
-from agent_platform.core.tracing import traced_span
 from agent_platform.workflows.errors import (
     WorkflowExecutionError,
     WorkflowValidationError,
 )
 from agent_platform.workflows.state import WorkflowCheckpoint, WorkflowState
 
-__all__ = ["END", "NodeFn", "Router", "WorkflowGraph", "CompiledWorkflow"]
+__all__ = [
+    "END",
+    "NodeFn",
+    "Router",
+    "WorkflowGraph",
+    "CompiledWorkflow",
+]
 
 StateT = TypeVar("StateT", bound=WorkflowState)
 
@@ -150,7 +156,9 @@ class CompiledWorkflow(Generic[StateT]):
         self._entry_point = entry_point
         self._max_steps = max_steps
 
-    def _next_node(self, current: str, state: StateT) -> str:
+    def _next_node(self, current: str, state: StateT) -> tuple[str, str | None]:
+        """The node to run after `current`, and the route key a router picked
+        to get there (`None` for a static edge, which had no decision to make)."""
         if current in self._conditional_edges:
             router, path_map = self._conditional_edges[current]
             key = router(state)
@@ -159,8 +167,8 @@ class CompiledWorkflow(Generic[StateT]):
                     f"router at node '{current}' returned '{key}', "
                     f"not one of {sorted(path_map)}"
                 )
-            return path_map[key]
-        return self._edges[current]
+            return path_map[key], key
+        return self._edges[current], None
 
     async def arun(
         self,
@@ -219,9 +227,13 @@ class CompiledWorkflow(Generic[StateT]):
                 )
 
             node_fn = self._nodes[current]
-            with traced_span("workflow_node", {"workflow.node": current}):
+            with observe(WorkflowNode(node=current, step=steps)) as node:
                 state = await node_fn(state)
-            next_node = self._next_node(current, state)
+                # Resolved inside the span so the trace shows where the run
+                # went next, and which branch a router chose to send it there.
+                next_node, route = self._next_node(current, state)
+                node.next_node = next_node
+                node.route = route
 
             if checkpointer is not None:
                 assert run_id is not None

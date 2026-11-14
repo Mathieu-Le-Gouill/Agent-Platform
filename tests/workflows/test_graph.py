@@ -205,3 +205,47 @@ class TestCheckpointingAndResume:
         with pytest.raises(WorkflowExecutionError, match="no checkpoint"):
             async for _ in workflow.resume("missing-run", checkpointer):
                 pass
+
+
+class TestNodeTracing:
+    async def test_each_node_records_its_step_and_successor(self, recorded_spans):
+        workflow = _build_linear_graph().compile()
+
+        async for _state in workflow.arun(CounterState()):
+            pass
+
+        first, second = recorded_spans.get_finished_spans()
+        assert first.name == "workflow_node"
+        assert first.attributes["workflow.node"] == "increment"
+        assert first.attributes["workflow.step"] == 1
+        assert first.attributes["workflow.next_node"] == "double"
+        assert second.attributes["workflow.step"] == 2
+        assert second.attributes["workflow.next_node"] == END
+
+    async def test_a_static_edge_records_no_route(self, recorded_spans):
+        workflow = _build_linear_graph().compile()
+
+        async for _state in workflow.arun(CounterState()):
+            pass
+
+        first, _second = recorded_spans.get_finished_spans()
+        assert "workflow.route" not in first.attributes
+
+    async def test_a_router_records_the_branch_it_picked(self, recorded_spans):
+        graph: WorkflowGraph[CounterState] = WorkflowGraph(CounterState)
+        graph.add_node("increment", _increment)
+        graph.add_node("double", _double)
+        graph.set_entry_point("increment")
+        graph.add_conditional_edges(
+            "increment",
+            binary_router(lambda s: s.count > 0),
+            {TRUE: "double", FALSE: END},
+        )
+        graph.add_edge("double", END)
+
+        async for _state in graph.compile().arun(CounterState()):
+            pass
+
+        first, _second = recorded_spans.get_finished_spans()
+        assert first.attributes["workflow.route"] == TRUE
+        assert first.attributes["workflow.next_node"] == "double"

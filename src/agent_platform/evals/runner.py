@@ -4,17 +4,26 @@ import asyncio
 import logging
 import time
 from collections.abc import Iterable
+from dataclasses import dataclass
+from typing import Annotated
 from uuid import UUID, uuid4
 
-from agent_platform.core.genai_tracing import traced_operation_span
+from agent_platform.core.observability import Fact, Observation, observe
 from agent_platform.evals.schemas import EvalCase, EvalReport, EvalResult
 from agent_platform.evals.scorer import Scorer
 from agent_platform.evals.targets import EvalTarget
 
 logger = logging.getLogger(__name__)
 
-_EVAL_RUN_ID_ATTR = "agent_platform.eval.run_id"
-_EVAL_CASE_ID_ATTR = "agent_platform.eval.case_id"
+
+@dataclass
+class _EvalCaseRun(Observation):
+    """One scored case. Local to this layer: `core` has no eval concept."""
+
+    operation = "eval_case"
+
+    run_id: Annotated[str, Fact("eval.run_id")]
+    case_id: Annotated[str, Fact("eval.case_id")]
 
 
 class EvalRunner:
@@ -39,10 +48,7 @@ class EvalRunner:
         return EvalReport(run_id=run_id, results=list(results))
 
     async def _run_case(self, run_id: UUID, case: EvalCase) -> EvalResult:
-        with traced_operation_span(
-            "eval_case",
-            {_EVAL_RUN_ID_ATTR: str(run_id), _EVAL_CASE_ID_ATTR: case.id},
-        ):
+        with observe(_EvalCaseRun(run_id=str(run_id), case_id=case.id)):
             try:
                 start = time.monotonic()
                 output = await self._target(case)

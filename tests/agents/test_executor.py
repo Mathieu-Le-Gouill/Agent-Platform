@@ -6,7 +6,6 @@ from agent_platform.agents.errors import AgentMaxIterations, AgentThinkError
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.core.genai_tracing import GenAIAttributes
 from agent_platform.core.schemas.message import (
     UserMessage,
 )
@@ -314,7 +313,7 @@ class TestExecutorTracing:
         await ex.run("Hi", conversation_id="conv-123")
 
         (span,) = recorded_spans.get_finished_spans()
-        assert span.attributes[GenAIAttributes.CONVERSATION_ID] == "conv-123"
+        assert span.attributes["conversation.id"] == "conv-123"
 
     @pytest.mark.asyncio
     async def test_run_omits_conversation_id_when_not_given(
@@ -327,7 +326,7 @@ class TestExecutorTracing:
         await ex.run("Hi")
 
         (span,) = recorded_spans.get_finished_spans()
-        assert GenAIAttributes.CONVERSATION_ID not in span.attributes
+        assert "conversation.id" not in span.attributes
 
     @pytest.mark.asyncio
     async def test_run_streaming_sets_conversation_id_when_given(
@@ -343,7 +342,7 @@ class TestExecutorTracing:
             pass
 
         (span,) = recorded_spans.get_finished_spans()
-        assert span.attributes[GenAIAttributes.CONVERSATION_ID] == "conv-456"
+        assert span.attributes["conversation.id"] == "conv-456"
 
 
 class _StrictWeatherInput(BaseModel):
@@ -464,3 +463,122 @@ class TestAssembleToolCalls:
         assert calls[0].id == "c1"
         assert calls[0].name == "get_weather"
         assert calls[0].arguments == {}
+
+
+def _invoke_agent_span(recorded_spans):
+    spans = [s for s in recorded_spans.get_finished_spans() if s.name == "invoke_agent"]
+    assert len(spans) == 1
+    return spans[0]
+
+
+class TestExecutorLoopObservability:
+    @pytest.mark.asyncio
+    async def test_a_direct_answer_exits_after_one_iteration(
+        self, mock_llm, recorded_spans
+    ):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi")
+        ex = AgentExecutor(Agent(name="test", llm=mock_llm), max_iterations=4)
+
+        await ex.run("Hi")
+
+        span = _invoke_agent_span(recorded_spans)
+        assert span.attributes["agent.iterations"] == 1
+        assert span.attributes["agent.max_iterations"] == 4
+        assert span.attributes["agent.exit_reason"] == "stop"
+        assert span.attributes["agent.recovery_attempted"] is False
+        assert span.attributes["agent.tool_calls_requested"] == 0
+        assert span.attributes["agent.tool_calls_executed"] == 0
+
+    @pytest.mark.asyncio
+    async def test_counts_the_tool_calls_a_turn_asked_for_and_ran(
+        self, mock_llm, recorded_spans
+    ):
+        call_count = 0
+
+        async def gen(**kwargs):
+            nonlocal call_count
+            call_count += 1
+            if call_count == 1:
+                return make_fake_llm_response(
+                    content="",
+                    tool_calls=[{"id": "c1", "name": "get_weather", "args": {}}],
+                )
+            return make_fake_llm_response(content="Sunny")
+
+        mock_llm.agenerate.side_effect = gen
+        registry = ToolRegistry()
+        registry.register(_WeatherTool())
+        ex = AgentExecutor(Agent(name="test", llm=mock_llm, tool_registry=registry))
+
+        await ex.run("Weather?")
+
+        span = _invoke_agent_span(recorded_spans)
+        assert span.attributes["agent.iterations"] == 2
+        assert span.attributes["agent.tool_calls_requested"] == 1
+        assert span.attributes["agent.tool_calls_executed"] == 1
+
+    @pytest.mark.asyncio
+    async def test_running_out_of_iterations_is_recorded(
+        self, mock_llm, recorded_spans
+    ):
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content="", tool_calls=[{"id": "c1", "name": "get_weather", "args": {}}]
+        )
+        registry = ToolRegistry()
+        registry.register(_WeatherTool())
+        ex = AgentExecutor(
+            Agent(name="test", llm=mock_llm, tool_registry=registry), max_iterations=2
+        )
+
+        with pytest.raises(AgentMaxIterations):
+            await ex.run("Weather?")
+
+        span = _invoke_agent_span(recorded_spans)
+        assert span.attributes["agent.exit_reason"] == "max_iterations"
+        assert span.attributes["agent.iterations"] == 2
+        assert span.attributes["agent.name"] == "test"
+
+    @pytest.mark.asyncio
+    async def test_failed_recovery_is_recorded(self, mock_llm, recorded_spans):
+        mock_llm.agenerate.return_value = make_fake_llm_response(
+            content="", tool_calls=[{"id": "c1", "name": "strict_weather", "args": {}}]
+        )
+        registry = ToolRegistry()
+        registry.register(_StrictWeatherTool())
+        ex = AgentExecutor(Agent(name="test", llm=mock_llm, tool_registry=registry))
+
+        await ex.run("Weather?")
+
+        span = _invoke_agent_span(recorded_spans)
+        assert span.attributes["agent.exit_reason"] == "recovery_exhausted"
+        assert span.attributes["agent.recovery_attempted"] is True
+        assert span.attributes["agent.tool_calls_requested"] == 1
+
+    @pytest.mark.asyncio
+    async def test_an_unexpected_failure_exits_under_its_error_type(
+        self, mock_llm, recorded_spans
+    ):
+        mock_llm.agenerate.side_effect = RuntimeError("boom")
+        ex = AgentExecutor(Agent(name="test", llm=mock_llm))
+
+        with pytest.raises(AgentThinkError):
+            await ex.run("Hi")
+
+        span = _invoke_agent_span(recorded_spans)
+        assert span.attributes["agent.exit_reason"] == "AgentThinkError"
+
+    @pytest.mark.asyncio
+    async def test_streaming_records_the_same_loop_facts(
+        self, mock_llm, recorded_spans
+    ):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["Hi"])
+        )
+        ex = AgentExecutor(Agent(name="test", llm=mock_llm))
+
+        async for _event in ex.run_streaming("Hi"):
+            pass
+
+        span = _invoke_agent_span(recorded_spans)
+        assert span.attributes["agent.exit_reason"] == "stop"
+        assert span.attributes["agent.iterations"] == 1

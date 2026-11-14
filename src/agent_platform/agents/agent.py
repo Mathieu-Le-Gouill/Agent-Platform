@@ -8,7 +8,11 @@ from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
 from agent_platform.agents.errors import AgentRecoveryExhausted, AgentThinkError
-from agent_platform.agents.guardrails import Guardrail, GuardrailContext
+from agent_platform.agents.guardrails import (
+    Guardrail,
+    GuardrailContext,
+    TracedGuardrail,
+)
 from agent_platform.agents.tools.base import ToolStreamChunk
 from agent_platform.agents.tools.registry import (
     TOOL_CALL_VALIDATION_ERROR_KEY,
@@ -20,6 +24,7 @@ from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import ResponseFormat, StreamChunk
 from agent_platform.core.middleware import MiddlewarePipeline
+from agent_platform.core.observability import ModelCost, emit
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     Message,
@@ -59,7 +64,9 @@ class Agent:
         self._model = model
         self._generation_config = generation_config
         self._guardrail_pipeline = (
-            MiddlewarePipeline(list(guardrails)) if guardrails else None
+            MiddlewarePipeline([TracedGuardrail(g) for g in guardrails])
+            if guardrails
+            else None
         )
         self._response_schema = response_schema
         self._usage_aggregator = token_usage_aggregator
@@ -148,10 +155,30 @@ class Agent:
         if response.message is None:
             raise AgentThinkError("LLM returned empty response")
 
-        if self._usage_aggregator is not None:
-            self._usage_aggregator.record(self._usage_key, response.usage)
+        self._record_usage(response.usage)
 
         return response.message
+
+    def _record_usage(self, usage: TokenUsage) -> None:
+        """Aggregate `usage`, and price it onto the enclosing span when possible.
+
+        The chat span belongs to the provider and is already closed by now, so
+        the cost lands on whatever span encloses this call (`invoke_agent`
+        under an executor). Several model calls can share that span, in which
+        case the attribute reports the latest one while the cost histogram
+        keeps every call.
+        """
+        if self._usage_aggregator is not None:
+            self._usage_aggregator.record(self._usage_key, usage)
+        if self._cost_estimator is None:
+            return
+        emit(
+            ModelCost(
+                agent_name=self._name,
+                model=self._model,
+                cost=self._cost_estimator.cost_for(self._model, usage),
+            )
+        )
 
     async def _generate_with_guardrails(
         self, messages: list[Message]
@@ -217,8 +244,8 @@ class Agent:
             async for chunk in self._llm.stream(
                 prompt=prompt, config=config, tools=tools
             ):
-                if chunk.usage is not None and self._usage_aggregator is not None:
-                    self._usage_aggregator.record(self._usage_key, chunk.usage)
+                if chunk.usage is not None:
+                    self._record_usage(chunk.usage)
                 yield chunk
         except asyncio.CancelledError:
             raise

@@ -1,14 +1,15 @@
 from __future__ import annotations
 
+import logging
 from types import ModuleType
-from typing import Any
+from typing import Any, cast
 
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.tools.generate_image.tool import GenerateImageTool
 from agent_platform.agents.tools.mcp.discovery import discover_mcp_tools
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.agents.tools.transcribe.tool import TranscribeTool
-from agent_platform.components.speech_to_text.component import SpeechToText
+from agent_platform.components.ingestion.speech_to_text.component import SpeechToText
 from agent_platform.config.model_string import parse_model_string
 from agent_platform.config.settings import Settings
 from agent_platform.core.errors import ConfigError
@@ -19,8 +20,16 @@ from agent_platform.core.interfaces.llm.fallback import (
 )
 from agent_platform.core.interfaces.mcp.base import BaseMCPClient
 from agent_platform.core.interfaces.speech.config import SpeechConfig
+from agent_platform.core.interfaces.tracing.base import BaseTracer
+from agent_platform.core.interfaces.tracing.noop import NoOpTracer
 from agent_platform.core.resilience import RateLimiter
 from agent_platform.core.token_usage import TokenUsageAggregator
+
+logger = logging.getLogger(__name__)
+
+# `Settings.tracing_provider` value that turns tracing off outright, whatever
+# backend is installed.
+_TRACING_DISABLED = "none"
 
 
 def build_provider(domain_module: ModuleType, provider_name: str) -> Any:
@@ -84,6 +93,30 @@ def build_llm_with_fallback(settings: Settings) -> tuple[Any, str]:
         else None
     )
     return FallbackLLMProvider(entries, rate_limiter=rate_limiter), primary_model
+
+
+def build_tracer(settings: Settings) -> BaseTracer:
+    """Resolve `settings.tracing_provider` into the tracer to install process-wide.
+
+    Falls back to the no-op tracer when the backend's SDK isn't installed, so
+    a deployment that never added the `tracing` extra still starts instead of
+    failing on an import it doesn't need.
+    """
+    if settings.tracing_provider == _TRACING_DISABLED:
+        return NoOpTracer()
+
+    import agent_platform.integrations.tracing as tracing_module
+
+    try:
+        tracer = build_provider(tracing_module, settings.tracing_provider)
+    except ImportError:
+        logger.warning(
+            "Tracing provider %r is unavailable (install the matching extra); "
+            "spans will be dropped",
+            settings.tracing_provider,
+        )
+        return NoOpTracer()
+    return cast(BaseTracer, tracer)
 
 
 def build_agent(settings: Settings) -> ConversationAgent:
@@ -177,4 +210,5 @@ __all__ = [
     "build_llm_with_fallback",
     "build_provider",
     "build_provider_from_model_string",
+    "build_tracer",
 ]

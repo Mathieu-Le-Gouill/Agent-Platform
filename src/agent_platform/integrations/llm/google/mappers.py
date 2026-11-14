@@ -6,7 +6,6 @@ from uuid import uuid4
 from google.genai import types
 
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     ResponseFormat,
 )
@@ -24,6 +23,7 @@ from agent_platform.core.schemas.message import (
     UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
 
 __all__ = [
@@ -61,9 +61,13 @@ def content_to_native_parts(m: ContentMessage) -> list[types.Part]:
     return [block_to_native_part(b) for b in m.blocks]
 
 
-def to_native_contents(prompt: Prompt) -> tuple[str | None, list[types.Content]]:
+def to_native_contents(
+    prompt: Prompt,
+) -> tuple[str | None, list[types.ContentUnionDict]]:
     system_parts: list[str] = []
-    contents: list[types.Content] = []
+    # Typed as the SDK's element type, not `Content`: `list` is invariant, so
+    # `generate_content(contents=...)` rejects a `list[Content]`.
+    contents: list[types.ContentUnionDict] = []
 
     for m in prompt.messages:
         match m:
@@ -176,5 +180,6 @@ def from_native_response(
             output_tokens=(usage.candidates_token_count or 0) if usage else 0,
         ),
         model=model,
-        finish_reason=FinishReason.STOP,
+        finish_reason=to_finish_reason(candidate.finish_reason if candidate else None),
+        response_id=response.response_id,
     )

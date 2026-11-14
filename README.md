@@ -15,7 +15,7 @@ Components        (compose one or more Integrations)
       ↓ composes
 Integrations      (concrete providers for Core interfaces)
       ↓ implements
-Core              (interfaces + schemas, no external deps except opentelemetry-api for tracing)
+Core              (interfaces + schemas, no external deps; no tracing SDK either)
 ```
 
 Each layer may only import from layers below it. See `AGENTS.md` for full rules.
@@ -24,7 +24,7 @@ Each layer may only import from layers below it. See `AGENTS.md` for full rules.
 
 ```
 src/agent_platform/
-├── core/              # ABCs, schemas, error hierarchy, registry, tracing; zero external deps except opentelemetry-api
+├── core/              # ABCs, schemas, error hierarchy, registry, tracing contract; zero external deps (the Langfuse backend lives in integrations/tracing)
 ├── integrations/      # Concrete provider implementations (OpenAI, Anthropic, WhisperX, …)
 ├── components/        # Reusable processing units composing integrations
 ├── pipelines/         # Multi-step orchestration flows

@@ -9,11 +9,13 @@ from agent_platform.config.container import (
     build_llm_with_fallback,
     build_provider,
     build_provider_from_model_string,
+    build_tracer,
 )
 from agent_platform.config.settings import Settings
 from agent_platform.core.errors import ConfigError
 from agent_platform.core.interfaces.llm.fallback import FallbackLLMProvider
 from agent_platform.core.interfaces.mcp.base import BaseMCPClient
+from agent_platform.core.interfaces.tracing.noop import NoOpTracer
 from agent_platform.core.schemas.mcp import MCPToolSpec
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations import llm as llm_module
@@ -262,3 +264,33 @@ class TestBuildAgentAsync:
         assert clients == [client_a, client_b]
         assert client_a.connected is True
         assert client_b.connected is True
+
+
+class TestBuildTracer:
+    def test_defaults_to_the_langfuse_tracer(self):
+        from agent_platform.integrations.tracing.langfuse.provider import (
+            LangfuseTracer,
+        )
+
+        tracer = build_tracer(Settings(_env_file=None))
+
+        assert isinstance(tracer, LangfuseTracer)
+
+    def test_none_disables_tracing(self):
+        tracer = build_tracer(Settings(_env_file=None, tracing_provider="none"))
+
+        assert isinstance(tracer, NoOpTracer)
+
+    def test_unknown_provider_raises(self):
+        with pytest.raises(ConfigError):
+            build_tracer(Settings(_env_file=None, tracing_provider="does-not-exist"))
+
+    def test_falls_back_to_noop_when_the_sdk_is_missing(self, mocker):
+        mocker.patch(
+            "agent_platform.config.container.build_provider",
+            side_effect=ImportError("no langfuse"),
+        )
+
+        tracer = build_tracer(Settings(_env_file=None))
+
+        assert isinstance(tracer, NoOpTracer)

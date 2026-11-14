@@ -14,11 +14,6 @@ from agent_platform.core.credentials import (
     resolve_timeout,
 )
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
-from agent_platform.core.genai_tracing import (
-    GenAIAttributes,
-    record_token_usage,
-    traced_operation_span,
-)
 from agent_platform.core.interfaces.llm.batch import (
     BaseBatchLLMProvider,
     BatchJob,
@@ -31,6 +26,7 @@ from agent_platform.core.interfaces.llm.response import (
     StreamChunk,
     ToolCallDelta,
 )
+from agent_platform.core.observability import LLMBatch, observe
 from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
@@ -154,7 +150,7 @@ class AnthropicLLM(
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with self._span(config) as span:
+        with self._observe(config) as call:
             usage_totals = TokenUsage.zero()
             events = cast(
                 "AsyncStream[RawMessageStreamEvent]",
@@ -220,7 +216,7 @@ class AnthropicLLM(
                         usage=chunk_usage,
                     )
 
-            record_token_usage(span, usage_totals)
+            self._record_usage(call, usage_totals)
             yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
 
     @error_logged(re_raise=ProviderError, message="Batch submission failed")
@@ -247,9 +243,7 @@ class AnthropicLLM(
                 }
             )
 
-        with traced_operation_span(
-            "llm_batch_submit", {GenAIAttributes.PROVIDER_NAME: self._provider_name}
-        ):
+        with observe(LLMBatch(stage="submit", provider=self._provider_name)):
             batch = await client.messages.batches.create(
                 requests=batch_requests  # type: ignore[arg-type]
             )
@@ -259,12 +253,8 @@ class AnthropicLLM(
     @with_retry()
     async def get_batch_status(self, batch_id: str) -> BatchJob:
         client = self._async_client(self._default_config())
-        with traced_operation_span(
-            "llm_batch_status",
-            {
-                GenAIAttributes.PROVIDER_NAME: self._provider_name,
-                GenAIAttributes.BATCH_ID: batch_id,
-            },
+        with observe(
+            LLMBatch(stage="status", provider=self._provider_name, batch_id=batch_id)
         ):
             batch = await client.messages.batches.retrieve(batch_id)
             return batch_job_from_native(batch)
@@ -273,12 +263,8 @@ class AnthropicLLM(
     @with_retry()
     async def fetch_batch_results(self, batch_id: str) -> list[BatchResult]:
         client = self._async_client(self._default_config())
-        with traced_operation_span(
-            "llm_batch_results",
-            {
-                GenAIAttributes.PROVIDER_NAME: self._provider_name,
-                GenAIAttributes.BATCH_ID: batch_id,
-            },
+        with observe(
+            LLMBatch(stage="results", provider=self._provider_name, batch_id=batch_id)
         ):
             results: list[BatchResult] = []
             async for entry in await client.messages.batches.results(batch_id):

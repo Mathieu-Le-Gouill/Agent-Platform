@@ -1,30 +1,32 @@
 from typing import Any
 
-from agent_platform.components.embedder.component import (
-    EmbedConfigT,
-    Embedder,
-    EmbedderInput,
-)
-from agent_platform.components.generator.component import (
+from agent_platform.components.generation.generator.component import (
     GenerationConfigT,
     Generator,
     GeneratorInput,
 )
-from agent_platform.components.reranker.component import (
+from agent_platform.components.retrieval.embedder.component import (
+    EmbedConfigT,
+    Embedder,
+    EmbedderInput,
+)
+from agent_platform.components.retrieval.reranker.component import (
     Reranker,
     RerankerConfigT,
     RerankerInput,
 )
-from agent_platform.components.vector_search.component import (
+from agent_platform.components.retrieval.vector_search.component import (
     VectorSearch,
     VectorSearchInput,
 )
 from agent_platform.core.interfaces.llm.response import LLMResponse
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
+from agent_platform.core.observability import PipelineRun, Retrieval, emit, traced
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.message import Prompt
 
 
+@traced(PipelineRun, name="rag.query")
 async def query(
     query_text: str,
     embedder: Embedder[EmbedConfigT],
@@ -46,6 +48,10 @@ async def query(
         VectorSearchInput(vector, k, filter, search_config)
     )
     chunks = [chunk for chunk, _score in results]
+
+    # How much context the answer was built from: a thin retrieval (or none at
+    # all) explains a bad answer that the generation span alone would not.
+    emit(Retrieval(top_k=k, hits=len(chunks)))
 
     reranked = await reranker.arun(RerankerInput(query_text, chunks, reranker_config))
     context = "\n\n".join(chunk.text for chunk in reranked)

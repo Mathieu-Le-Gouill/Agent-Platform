@@ -1,6 +1,7 @@
 import pytest
 
 from agent_platform.agents.agent import Agent
+from agent_platform.core.observability import WorkflowNode, observe
 from agent_platform.core.schemas.message import UserMessage
 from agent_platform.workflows.nodes.handoff import handoff_node
 from agent_platform.workflows.state import HandoffState
@@ -31,3 +32,16 @@ class TestHandoffNode:
         state = await handoff_node(agent_b)(state)
 
         assert state.active_agent == "agent_b"
+
+    @pytest.mark.asyncio
+    async def test_records_the_agent_it_handed_to(self, mock_llm, recorded_spans):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="handled")
+        node = handoff_node(Agent(name="specialist", llm=mock_llm))
+
+        with observe(WorkflowNode(node="delegate")):
+            await node(HandoffState(messages=[UserMessage(content="hi")]))
+
+        node_span = next(
+            s for s in recorded_spans.get_finished_spans() if s.name == "workflow_node"
+        )
+        assert node_span.attributes["workflow.handoff.to"] == "specialist"

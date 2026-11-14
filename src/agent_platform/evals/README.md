@@ -52,9 +52,11 @@ and recorded as a failed `EvalResult` (`error` set, `passed=False`) rather
 than aborting the run, the same pattern `ToolRegistry.call_and_wrap`
 (`agents/tools/registry.py`) already uses for tool calls. Cases run
 concurrently, bounded by `EvalRunner(concurrency=...)`, and each is wrapped
-in a `traced_operation_span("eval_case", ...)` (`core/genai_tracing.py`) tagged
-with `agent_platform.eval.run_id`/`agent_platform.eval.case_id`, so a
-failing case is debuggable through the existing OTel pipeline.
+in an `_EvalCaseRun` observation (`core/observability`) tagged with
+`eval.run_id`/`eval.case_id`, so a failing case is debuggable through the
+existing tracing backend. `_EvalCaseRun` is declared here rather than in
+`core/observability/observations.py` on purpose: `core` has no eval concept,
+and any layer can declare its own `Observation` the same way.
 
 ## Adding a Scorer
 

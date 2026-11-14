@@ -1,20 +1,22 @@
 from collections.abc import Sequence
 
-from agent_platform.components.chunker.component import (
+from agent_platform.components.chunking.chunker.component import (
     Chunker,
     ChunkerConfigT,
     ChunkerInput,
 )
-from agent_platform.components.embedder.component import (
+from agent_platform.components.ingestion.loader.component import Loader, LoaderConfigT
+from agent_platform.components.retrieval.embedder.component import (
     EmbedConfigT,
     Embedder,
     EmbedderInput,
 )
-from agent_platform.components.loader.component import Loader, LoaderConfigT
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.interfaces.vector_store.port import VectorStore
+from agent_platform.core.observability import PipelineRun, traced
 
 
+@traced(PipelineRun, name="rag.ingest")
 async def ingest(
     sources: Sequence[str],
     loader: Loader[LoaderConfigT],

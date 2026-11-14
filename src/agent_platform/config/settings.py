@@ -43,6 +43,12 @@ class Settings(BaseSettings):
     agent_system_prompt: str | None = None
     max_iterations: int = 10
     log_level: str = "INFO"
+    # Tracing backend slug resolved against integrations/tracing's
+    # PROVIDER_ALIASES by config/container.py::build_tracer, or "none" to
+    # disable tracing outright. The default Langfuse backend is itself a safe
+    # no-op until LANGFUSE_PUBLIC_KEY and LANGFUSE_SECRET_KEY are set (see
+    # integrations/README.md), so this rarely needs changing.
+    tracing_provider: str = "langfuse"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
 

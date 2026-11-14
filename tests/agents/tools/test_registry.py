@@ -458,3 +458,97 @@ class TestDiscoverEntryPoints:
             "agent_platform.agents.tools.registry.entry_points", lambda group: []
         )
         assert registry.discover_entry_points() == []
+
+
+class TestToolCallObservability:
+    async def test_span_describes_the_tool_and_its_arguments(
+        self, registry, recorded_spans
+    ):
+        registry.register(_StrictTool())
+
+        await registry.call_and_wrap(
+            ToolCall(id="c1", name="strict", arguments={"location": "Paris"})
+        )
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.name == "execute_tool"
+        assert span.attributes["tool.name"] == "strict"
+        assert span.attributes["tool.call.id"] == "c1"
+        assert span.attributes["tool.kind"] == "function"
+        assert span.attributes["tool.arguments.size"] > 0
+        assert span.attributes["tool.arguments.digest"]
+        # Off by default: arguments routinely carry user data.
+        assert "tool.arguments.content" not in span.attributes
+
+    async def test_span_describes_the_result(self, registry, recorded_spans):
+        registry.register(_DummyTool())
+
+        await registry.call_and_wrap(ToolCall(id="c1", name="dummy", arguments={}))
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes["tool.result.is_error"] is False
+        assert span.attributes["tool.result.size"] > 0
+
+    async def test_a_failing_call_is_marked_with_its_error_type(
+        self, registry, recorded_spans
+    ):
+        registry.register(_StrictTool())
+
+        await registry.call_and_wrap(
+            ToolCall(id="c1", name="strict", arguments={"wrong": 1})
+        )
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes["tool.result.is_error"] is True
+        assert span.attributes["error.type"] == "ToolCallValidationError"
+
+    async def test_an_unknown_tool_still_produces_a_span(
+        self, registry, recorded_spans
+    ):
+        await registry.call_and_wrap(ToolCall(id="c1", name="nope", arguments={}))
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes["tool.name"] == "nope"
+        assert "tool.kind" not in span.attributes
+
+    async def test_streaming_records_the_chunk_count_and_joined_result(
+        self, registry, recorded_spans
+    ):
+        registry.register(_StreamingTool())
+
+        async for _chunk in registry.call_and_stream(
+            ToolCall(id="c1", name="streamer", arguments={})
+        ):
+            pass
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes["tool.stream.chunks"] == 2
+        assert span.attributes["tool.result.size"] == len("hello world")
+        assert span.attributes["tool.result.is_error"] is False
+
+    async def test_a_failing_stream_is_marked_as_an_error(
+        self, registry, recorded_spans
+    ):
+        registry.register(_FailingStreamingTool())
+
+        async for _chunk in registry.call_and_stream(
+            ToolCall(id="c1", name="failing_streamer", arguments={})
+        ):
+            pass
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert span.attributes["tool.result.is_error"] is True
+
+    async def test_captured_content_lands_on_the_span_when_enabled(
+        self, registry, recorded_spans, monkeypatch
+    ):
+        monkeypatch.setenv("AGENT_PLATFORM_CAPTURE_CONTENT", "1")
+        registry.register(_StrictTool())
+
+        await registry.call_and_wrap(
+            ToolCall(id="c1", name="strict", arguments={"location": "Paris"})
+        )
+
+        (span,) = recorded_spans.get_finished_spans()
+        assert "Paris" in span.attributes["tool.arguments.content"]
+        assert span.attributes["tool.result.content"] == "weather for Paris"

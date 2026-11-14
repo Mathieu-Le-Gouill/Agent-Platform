@@ -3,9 +3,15 @@ from collections.abc import AsyncIterator
 
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.core.interfaces.translation.base import BaseTranslator
+from agent_platform.core.observability import PipelineRun, traced
 from agent_platform.core.schemas.chunk import AudioChunk, TextChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.core.schemas.enums import Language
+
+_RUN = "speech_translation"
+# Named apart from the whole run because it is also the unit of work in
+# `stream()`, where there is no enclosing `run()` span to attribute it to.
+_TRANSLATE = "speech_translation.translate"
 
 
 class SpeechTranslationPipeline:
@@ -13,6 +19,7 @@ class SpeechTranslationPipeline:
         self._stt = stt
         self._translator = translator
 
+    @traced(PipelineRun, name=_RUN)
     async def run(self, audio: AudioChunk, target: Language) -> Transcript:
         transcript = await self._stt.transcribe(audio)
         return await self._translate_transcript(transcript, target)
@@ -26,6 +33,7 @@ class SpeechTranslationPipeline:
 
         return _stream()
 
+    @traced(PipelineRun, name=_TRANSLATE)
     async def _translate_transcript(
         self, transcript: Transcript, target: Language
     ) -> Transcript:

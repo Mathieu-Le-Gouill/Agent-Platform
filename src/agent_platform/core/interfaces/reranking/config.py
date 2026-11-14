@@ -12,7 +12,7 @@ class RerankerConfig(RequestOptions, ModelConfig):
     # Whether to populate TextChunk.confidence with the provider's
     # relevance score. See integrations/reranking/scoring.py.
     return_scores: bool = False
-    # Batch size for chunked reranking (components/reranker.py); not every
+    # Batch size for chunked reranking (components/retrieval/reranker/component.py); not every
     # provider has a native equivalent (e.g. flashrank has none).
     batch_size: int = 32
     # When True, min-max normalize returned scores into [0, 1]; when False,

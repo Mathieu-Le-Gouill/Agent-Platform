@@ -5,7 +5,7 @@ import pytest
 from pydantic import ValidationError
 
 from agent_platform.agents.tools import OCRInput, OCRTool, ToolError
-from agent_platform.components.ocr.component import OCR
+from agent_platform.components.ingestion.ocr.component import OCR
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat

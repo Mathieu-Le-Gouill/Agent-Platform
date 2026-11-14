@@ -10,7 +10,6 @@ from google.genai import types
 
 from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import require_secret
-from agent_platform.core.genai_tracing import record_token_usage
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -86,7 +85,7 @@ class GoogleLLM(
         native_config = to_native_config(config, system, tools, self._tool_to_schema)
         return client.models.generate_content(
             model=config.model,
-            contents=contents,  # type: ignore[arg-type]
+            contents=contents,
             config=native_config,
         )
 
@@ -101,7 +100,7 @@ class GoogleLLM(
         native_config = to_native_config(config, system, tools, self._tool_to_schema)
         return await client.aio.models.generate_content(
             model=config.model,
-            contents=contents,  # type: ignore[arg-type]
+            contents=contents,
             config=native_config,
         )
 
@@ -121,11 +120,11 @@ class GoogleLLM(
         system, contents = to_native_contents(prompt)
         native_config = to_native_config(config, system, tools, self._tool_to_schema)
 
-        with self._span(config) as span:
+        with self._observe(config) as call:
             usage_totals = TokenUsage.zero()
             events = await client.aio.models.generate_content_stream(
                 model=config.model,
-                contents=contents,  # type: ignore[arg-type]
+                contents=contents,
                 config=native_config,
             )
             async for chunk in events:
@@ -163,5 +162,5 @@ class GoogleLLM(
                         usage=chunk_usage,
                     )
 
-            record_token_usage(span, usage_totals)
+            self._record_usage(call, usage_totals)
             yield StreamChunk(delta="", finish_reason=FinishReason.STOP)

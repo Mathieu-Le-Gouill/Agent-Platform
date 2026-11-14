@@ -4,7 +4,7 @@ import asyncio
 from collections.abc import Callable, Sequence
 from typing import TypeVar
 
-from agent_platform.core.tracing import traced_span
+from agent_platform.core.observability import WorkflowNode, observe
 from agent_platform.workflows.graph import NodeFn
 from agent_platform.workflows.state import WorkflowState
 
@@ -29,7 +29,7 @@ def fan_out(
 
     async def node(state: StateT) -> StateT:
         async def run_branch(name: str, branch: NodeFn[StateT]) -> StateT:
-            with traced_span("workflow_node", {"workflow.node": name}):
+            with observe(WorkflowNode(node=name)):
                 return await branch(state)
 
         results = await asyncio.gather(

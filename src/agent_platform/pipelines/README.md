@@ -2,6 +2,10 @@
 
 Pipelines compose multiple integrations into multi-step, asynchronous flows.
 
+## Tracing
+
+Every pipeline entry point is decorated with `core/observability.traced(PipelineRun, name="<name>")`, so a run produces one `pipeline` span with the steps below it (each `Component.arun` traces itself, and LLM calls trace themselves) instead of a flat, unattributable block of latency. Names in use: `ingestion.chunk_document`, `rag.ingest`, `rag.query`, `speech_translation` and `speech_translation.translate` (named apart because translation is also the unit of work in `stream()`, where there is no enclosing run). `rag/query.py` additionally emits a `Retrieval` observation recording how much context an answer was built from (its `top_k` and how many chunks came back), since a thin retrieval explains a bad answer that the generation span alone would not.
+
 ## Current Pipelines
 
 ### Ingestion (`ingestion.py`)

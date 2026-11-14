@@ -25,47 +25,60 @@ class Component(ABC, Generic[Out]):
 
 Every component receives typed input and returns typed output. The sync `run()` is a convenience wrapper around `arun()`.
 
+**Every component is traced without doing anything.** `Component.__init_subclass__` wraps a subclass's own `arun` in `core/observability.traced(ComponentRun, ...)`, so one span per `arun` call (with its latency, and its error type when it fails) comes for free and no component body contains tracing code. The span is named after the class in snake_case (`SemanticChunker` becomes `semantic_chunker`); set the `operation_name` class attribute to override it, which is what `Embedder` does to report `embeddings`. Only a subclass's *own* `arun` is wrapped, so inheriting one never produces a doubly-nested span.
+
 ## Directory Layout
 
-Every component is a directory, one per component, matching the convention `integrations/<domain>/<provider>/` already uses: `component.py` always, `config.py` only if the component owns a config the domain-level `core/interfaces` config doesn't already cover, `strategies/` or other sub-modules only if the component actually needs them. No per-component `__init__.py`, callers import the submodule directly (`from agent_platform.components.embedder.component import Embedder`), same as integration providers.
+Components sit in a stage folder named for the pipeline step they serve: `ingestion/`, `chunking/`, `retrieval/`, `classification/`, `generation/`. A stage folder only groups components and adds no layer: `components` stays one layer for the import contracts.
+
+Inside a stage, every component is a directory, one per component, matching the convention `integrations/<domain>/<provider>/` already uses: `component.py` always, `config.py` only if the component owns a config the domain-level `core/interfaces` config doesn't already cover, `strategies/` or other sub-modules only if the component actually needs them. No `__init__.py` in a stage folder or a component folder, callers import the submodule directly (`from agent_platform.components.retrieval.embedder.component import Embedder`), same as integration providers.
 
 ```
 components/
 ├── __init__.py
-├── base.py                       # Component[InputT, OutputT] ABC
-├── chunker/
-│   └── component.py               # TextDocument → TextChunk (wraps BaseChunker)
-├── embedder/
-│   └── component.py               # TextChunk → EmbeddingResponse (wraps BaseEmbeddingProvider)
-├── reranker/
-│   └── component.py               # list[T] → list[T] (wraps BaseReranker)
-├── ocr/
-│   └── component.py               # (source, config) → list[TextChunk] (wraps BaseOCR)
-├── speech_to_text/
-│   └── component.py               # (AudioChunk, config) → Transcript, plus astream() (wraps BaseSpeechToText)
-├── vector_search/
-│   └── component.py               # (vector, k, filter, config) → list[(TextChunk, Score)] (wraps VectorStore.search_with_scores)
-├── dataset/
-│   └── component.py               # (path, config) → dict[DatasetSplit, BaseDatasetSplit[T]] (wraps BaseDatasetProvider, same per-call (data, config) input tuple as OCR/SpeechToText)
-├── similarity_scorer/
-│   └── component.py               # Chunks × label vectors → ClassificationResult (pure logic)
-├── semantic_chunker/              # TextDocument → TextChunk, splits on embedding-similarity breakpoints
-│   ├── component.py
-│   └── config.py
-├── contextual_chunker/            # TextDocument → TextChunk, prepends an LLM-generated context blurb
-│   ├── component.py
-│   └── config.py
-├── embed_classifier/              # Embedding-based classifier
-│   ├── component.py
-│   └── config.py
-└── llm_classifier/                # LLM-based classifier with pluggable strategies
-    ├── component.py
-    ├── config.py
-    └── strategies/
-        ├── zero_shot.py
-        ├── few_shot.py
-        ├── sentiment.py
-        └── text_classification.py
+├── base.py                           # Component[InputT, OutputT] ABC
+├── ingestion/
+│   ├── loader/
+│   │   └── component.py               # (sources, config) → list[TextDocument] (wraps BaseMediaLoader)
+│   ├── ocr/
+│   │   └── component.py               # (source, config) → list[TextChunk] (wraps BaseOCR)
+│   ├── speech_to_text/
+│   │   └── component.py               # (AudioChunk, config) → Transcript, plus astream() (wraps BaseSpeechToText)
+│   └── dataset/
+│       └── component.py               # (path, config) → dict[DatasetSplit, BaseDatasetSplit[T]] (wraps BaseDatasetProvider, same per-call (data, config) input tuple as OCR/SpeechToText)
+├── chunking/
+│   ├── chunker/
+│   │   └── component.py               # TextDocument → TextChunk (wraps BaseChunker)
+│   ├── semantic_chunker/              # TextDocument → TextChunk, splits on embedding-similarity breakpoints
+│   │   ├── component.py
+│   │   └── config.py
+│   └── contextual_chunker/            # TextDocument → TextChunk, prepends an LLM-generated context blurb
+│       ├── component.py
+│       └── config.py
+├── retrieval/
+│   ├── embedder/
+│   │   └── component.py               # TextChunk → EmbeddingResponse (wraps BaseEmbeddingProvider)
+│   ├── vector_search/
+│   │   └── component.py               # (vector, k, filter, config) → list[(TextChunk, Score)] (wraps VectorStore.search_with_scores)
+│   └── reranker/
+│       └── component.py               # list[T] → list[T] (wraps BaseReranker)
+├── classification/
+│   ├── embed_classifier/              # Embedding-based classifier
+│   │   ├── component.py
+│   │   └── config.py
+│   ├── llm_classifier/                # LLM-based classifier with pluggable strategies
+│   │   ├── component.py
+│   │   ├── config.py
+│   │   └── strategies/
+│   │       ├── zero_shot.py
+│   │       ├── few_shot.py
+│   │       ├── sentiment.py
+│   │       └── text_classification.py
+│   └── similarity_scorer/
+│       └── component.py               # Chunks × label vectors → ClassificationResult (pure logic)
+└── generation/
+    └── generator/
+        └── component.py               # (Prompt, config) → LLMResponse (wraps BaseLLMProvider)
 ```
 
 ## Component Patterns
@@ -122,17 +135,18 @@ class SimilarityScorer(Component[SimilarityInput, ClassificationResult]):
 ### Add a component
 
 ```
-components/<name>/
+components/<stage>/<name>/
 └── component.py      # The component class
 ```
 
-1. Create `components/<name>/component.py`
-2. Subclass `Component[InputT, OutputT]`
-3. Accept the backend Integration(s) in `__init__`
-4. Implement `arun()`, one async method that orchestrates the backend(s)
-5. Add `config.py` alongside it only if the component needs its own config beyond the domain-level `core/interfaces` config; add `strategies/` or other sub-modules only if the component actually needs them
+1. Pick the stage of the pipeline step the component serves: `ingestion`, `chunking`, `retrieval`, `classification` or `generation`. Add a 6th stage folder only when no existing stage fits, and list it in the Directory Layout tree above
+2. Create `components/<stage>/<name>/component.py`
+3. Subclass `Component[InputT, OutputT]`
+4. Accept the backend Integration(s) in `__init__`
+5. Implement `arun()`, one async method that orchestrates the backend(s)
+6. Add `config.py` alongside it only if the component needs its own config beyond the domain-level `core/interfaces` config; add `strategies/` or other sub-modules only if the component actually needs them
 
-No `__init__.py`, callers import `components.<name>.component` directly.
+No `__init__.py`, callers import `components.<stage>.<name>.component` directly.
 
 ### Component conventions
 
@@ -141,4 +155,4 @@ No `__init__.py`, callers import `components.<name>.component` directly.
 - Config always goes into the `arun()` input alongside the data as a `(data, config)` tuple, never into `__init__`, see "Where config lives" above
 - Errors are translated to `core/errors.py` types
 - Components may import from `core/`, `integrations/`, and `components/`, never from `pipelines/` or `agents/`
-- Every component is a directory (`components/<name>/component.py`), no flat-file components, matching `integrations/<domain>/<provider>/`'s layout
+- Every component is a directory under a stage folder (`components/<stage>/<name>/component.py`), no flat-file components, matching `integrations/<domain>/<provider>/`'s layout

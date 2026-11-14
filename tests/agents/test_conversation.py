@@ -7,7 +7,6 @@ from agent_platform.agents.context import TurnCountStrategy
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.core.genai_tracing import GenAIAttributes
 from agent_platform.core.persistence import InMemoryCheckpointer
 from agent_platform.core.schemas.message import (
     UserMessage,
@@ -262,9 +261,13 @@ class TestConversationTruncation:
 @pytest.mark.asyncio
 async def test_transcribe_search_summarize_integration():
     from agent_platform.agents.tools import SearchTool, TranscribeTool
-    from agent_platform.components.embedder.component import Embedder
-    from agent_platform.components.speech_to_text.component import SpeechToText
-    from agent_platform.components.vector_search.component import VectorSearch
+    from agent_platform.components.ingestion.speech_to_text.component import (
+        SpeechToText,
+    )
+    from agent_platform.components.retrieval.embedder.component import Embedder
+    from agent_platform.components.retrieval.vector_search.component import (
+        VectorSearch,
+    )
     from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
     from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
     from agent_platform.core.interfaces.speech.base import BaseSpeechToText
@@ -488,6 +491,4 @@ class TestConversationTracing:
         await agent.chat("Hi")
 
         (span,) = recorded_spans.get_finished_spans()
-        assert span.attributes[GenAIAttributes.CONVERSATION_ID] == str(
-            agent.conversation_id
-        )
+        assert span.attributes["conversation.id"] == str(agent.conversation_id)

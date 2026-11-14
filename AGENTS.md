@@ -39,8 +39,8 @@ Purpose only, enough to know which README to open next.
 
 | Path | Purpose | Has local README? |
 |---|---|---|
-| `src/agent_platform/core/` | Near-zero-dependency foundation: ABCs, Pydantic schemas, error hierarchy, credentials, OTel-based tracing | yes |
-| `src/agent_platform/integrations/` | Provider adapters per domain (llm, embeddings, vector_store, reranking, ocr, speech_to_text, translation, vad, chunking, clustering, loader, image_generation, classification), 13 domains | yes |
+| `src/agent_platform/core/` | Near-zero-dependency foundation: ABCs, Pydantic schemas, error hierarchy, credentials, the backend-agnostic tracing contract, and the typed observations (`observability/`) every layer records through | yes |
+| `src/agent_platform/integrations/` | Provider adapters per domain (llm, embeddings, vector_store, reranking, ocr, speech_to_text, translation, vad, chunking, clustering, loader, image_generation, classification, dataset, moderation, mcp, tracing), 17 domains | yes |
 | `src/agent_platform/components/` | Reusable processing units wrapping one or more integrations (`Chunker`, `Embedder`, `Reranker`, classifiers) | yes |
 | `src/agent_platform/pipelines/` | Multi-step orchestration flows composing components (ingestion, RAG, speech translation) | yes |
 | `src/agent_platform/agents/` | Top-level composition: `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, tools (incl. MCP), guardrails | yes |
@@ -165,7 +165,7 @@ dependency system. No `uv.lock` is committed.
 | Want to add | Start here |
 |---|---|
 | New LLM / embedding / OCR / vector store / … provider | `integrations/<domain>/<new_provider>/` implementing `core/interfaces/<domain>/base.py`; register in that domain's `_PROVIDERS` map in `integrations/<domain>/__init__.py`; add its package(s) as a `<domain>-<new_provider>` extra in `pyproject.toml` and append it to that domain's bundle extra and to `all` |
-| New processing unit | `components/<name>.py` subclassing `Component[InputT, OutputT]`, see `components/README.md` |
+| New processing unit | `components/<stage>/<name>/component.py` subclassing `Component[InputT, OutputT]`, in the stage of the pipeline step it serves (rule in `components/README.md`) |
 | New orchestration flow | `pipelines/<name>.py` composing existing components, see `pipelines/README.md` |
 | New agent tool | `agents/tools/<name>.py` implementing the `Tool` protocol, wrapped with `safe_call()`, see `agents/README.md` |
 | New error type | `core/errors.py` (or the layer-local hierarchy) under the correct `PlatformError` branch |
@@ -185,7 +185,12 @@ rather than guessing silently.
   `pyproject.toml` enforces the layer order and that `core/` never imports
   a sibling layer; run `lint-imports` to check, CI fails the same way.
 - **`core/` has no external deps** beyond `pydantic`, `abc`, `typing`,
-  `uuid`, `datetime`, `opentelemetry` (tracing only).
+  `uuid`, `datetime`. Observability is no exception: `core` defines
+  `BaseTracer`/`Span` with no-op defaults, every backend lives in
+  `integrations/tracing/`. `core/` also owns
+  no backend's *vocabulary*: it records typed `Observation`s named the
+  platform's own way, and `integrations/tracing/langfuse/mapping.py` is the only
+  place those names become Langfuse fields.
 - **All IO is async.** Use `asyncio.to_thread()` for blocking calls; `run()`
   on `Component` is a sync convenience wrapper around `arun()`, nothing more.
 - **Backends are injected**, never instantiated inside a component or tool.

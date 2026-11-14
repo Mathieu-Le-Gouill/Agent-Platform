@@ -15,7 +15,7 @@ class MistralEmbeddingConfig(EmbeddingConfig):
     endpoint: str = "https://api.mistral.ai/v1/"
     # Unused: the provider issues one `embeddings.create` call per
     # `embed_document`/`embed_query` invocation (batching happens one level
-    # up, in `components/embedder.py`), so there is no per-provider
+    # up, in `components/retrieval/embedder/component.py`), so there is no per-provider
     # concurrency to throttle.
     wait_time: int | None = None
     # Unused, same reason as `wait_time` above.
