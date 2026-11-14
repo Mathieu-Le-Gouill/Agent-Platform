@@ -262,9 +262,13 @@ class TestConversationTruncation:
 @pytest.mark.asyncio
 async def test_transcribe_search_summarize_integration():
     from agent_platform.agents.tools import SearchTool, TranscribeTool
-    from agent_platform.components.embedder.component import Embedder
-    from agent_platform.components.speech_to_text.component import SpeechToText
-    from agent_platform.components.vector_search.component import VectorSearch
+    from agent_platform.components.ingestion.speech_to_text.component import (
+        SpeechToText,
+    )
+    from agent_platform.components.retrieval.embedder.component import Embedder
+    from agent_platform.components.retrieval.vector_search.component import (
+        VectorSearch,
+    )
     from agent_platform.core.interfaces.embeddings.base import BaseEmbeddingProvider
     from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
     from agent_platform.core.interfaces.speech.base import BaseSpeechToText

@@ -165,7 +165,7 @@ dependency system. No `uv.lock` is committed.
 | Want to add | Start here |
 |---|---|
 | New LLM / embedding / OCR / vector store / … provider | `integrations/<domain>/<new_provider>/` implementing `core/interfaces/<domain>/base.py`; register in that domain's `_PROVIDERS` map in `integrations/<domain>/__init__.py`; add its package(s) as a `<domain>-<new_provider>` extra in `pyproject.toml` and append it to that domain's bundle extra and to `all` |
-| New processing unit | `components/<name>.py` subclassing `Component[InputT, OutputT]`, see `components/README.md` |
+| New processing unit | `components/<stage>/<name>/component.py` subclassing `Component[InputT, OutputT]`, in the stage of the pipeline step it serves (rule in `components/README.md`) |
 | New orchestration flow | `pipelines/<name>.py` composing existing components, see `pipelines/README.md` |
 | New agent tool | `agents/tools/<name>.py` implementing the `Tool` protocol, wrapped with `safe_call()`, see `agents/README.md` |
 | New error type | `core/errors.py` (or the layer-local hierarchy) under the correct `PlatformError` branch |

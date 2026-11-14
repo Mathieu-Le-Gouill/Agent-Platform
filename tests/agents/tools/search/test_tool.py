@@ -10,8 +10,8 @@ from agent_platform.agents.tools import (
     SearchTool,
     ToolError,
 )
-from agent_platform.components.embedder.component import Embedder
-from agent_platform.components.vector_search.component import VectorSearch
+from agent_platform.components.retrieval.embedder.component import Embedder
+from agent_platform.components.retrieval.vector_search.component import VectorSearch
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.embedding import Embedding

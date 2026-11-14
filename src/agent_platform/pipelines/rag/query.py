@@ -1,21 +1,21 @@
 from typing import Any
 
-from agent_platform.components.embedder.component import (
-    EmbedConfigT,
-    Embedder,
-    EmbedderInput,
-)
-from agent_platform.components.generator.component import (
+from agent_platform.components.generation.generator.component import (
     GenerationConfigT,
     Generator,
     GeneratorInput,
 )
-from agent_platform.components.reranker.component import (
+from agent_platform.components.retrieval.embedder.component import (
+    EmbedConfigT,
+    Embedder,
+    EmbedderInput,
+)
+from agent_platform.components.retrieval.reranker.component import (
     Reranker,
     RerankerConfigT,
     RerankerInput,
 )
-from agent_platform.components.vector_search.component import (
+from agent_platform.components.retrieval.vector_search.component import (
     VectorSearch,
     VectorSearchInput,
 )

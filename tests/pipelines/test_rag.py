@@ -3,10 +3,12 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.components.chunker.component import ChunkerInput
-from agent_platform.components.embedder.component import EmbedderInput
-from agent_platform.components.reranker.component import RerankerInput
-from agent_platform.components.vector_search.component import VectorSearchInput
+from agent_platform.components.chunking.chunker.component import ChunkerInput
+from agent_platform.components.retrieval.embedder.component import EmbedderInput
+from agent_platform.components.retrieval.reranker.component import RerankerInput
+from agent_platform.components.retrieval.vector_search.component import (
+    VectorSearchInput,
+)
 from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.interfaces.llm.response import LLMResponse
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig

@@ -2,7 +2,7 @@ from agent_platform.core.config import ModelConfig, RequestOptions
 
 
 class EmbeddingConfig(RequestOptions, ModelConfig):
-    # Local input-list batching size used by `components/embedder.py` before
+    # Local input-list batching size used by `components/retrieval/embedder/component.py` before
     # calling the provider (see `chunked(input, batch_size)`), independent of
     # any provider-side request-batching knob.
     batch_size: int = 32

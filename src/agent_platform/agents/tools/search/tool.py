@@ -8,8 +8,11 @@ from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.agents.tools.safe_execution import safe_call
-from agent_platform.components.embedder.component import Embedder, EmbedderInput
-from agent_platform.components.vector_search.component import (
+from agent_platform.components.retrieval.embedder.component import (
+    Embedder,
+    EmbedderInput,
+)
+from agent_platform.components.retrieval.vector_search.component import (
     VectorSearch,
     VectorSearchInput,
 )
