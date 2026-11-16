@@ -33,7 +33,7 @@ src/agent_platform/
 ├── audio/             # Audio I/O + DSP utilities
 ├── utils/             # Shared helpers
 ├── config/            # Settings (pydantic-settings), logging, DI container (build_agent, build_provider)
-├── api/               # FastAPI app, /chat and /health
+├── api/               # FastAPI app, bearer-key auth, per-key /chat conversations, /health
 └── workflows/         # Orchestration engine (empty stub)
 ```
 

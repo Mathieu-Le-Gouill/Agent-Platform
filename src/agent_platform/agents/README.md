@@ -202,8 +202,8 @@ above landed.
   `conversation_id` keyword and set it on the `AgentRun` observation when
   given (omitted, not set to `None`, otherwise);
   `ConversationAgent.chat()` and `api/app.py`'s `/chat`, `/chat/stream` routes
-  always pass theirs, so a multi-turn session's spans correlate without an
-  external join.
+  always pass theirs (`/chat/stream` uses a throwaway id per request), so a
+  multi-turn session's spans correlate without an external join.
 - ~~Rate limiter and circuit breaker utilities wired into an LLM call site~~
   **done, for `CircuitBreaker`**: `core/interfaces/llm/fallback.py`'s
   `FallbackLLMProvider` tries an ordered list of `BaseLLMProvider`s, each
@@ -218,8 +218,9 @@ above landed.
   `_generate()` call and every `think_stream()` chunk that carries one, and
   exposes the running total via `Agent.token_usage`. `ConversationAgent` uses
   its own `conversation_id` as the key; `config/container.py::build_agent`
-  wires one in by default, and `api/app.py`'s `/chat` route returns it as
-  `ChatResponse.usage`.
+  wires one in by default. `ConversationAgent.with_conversation()` gives each
+  fork its own aggregator, and `api/app.py`'s `/chat` route returns the
+  conversation's total as `ChatResponse.usage`.
 - ~~Guardrails as an extension point~~ **done**: see Phase 3 above
   (`agents/guardrails.py`).
 - ~~`ConversationAgent` session persistence~~ **done**: see Phase 3 above

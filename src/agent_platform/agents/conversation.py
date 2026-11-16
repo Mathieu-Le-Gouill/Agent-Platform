@@ -96,6 +96,30 @@ class ConversationAgent(Agent):
             return
         self._history = await self._context_strategy.trim(self._history)
 
+    def with_conversation(self, conversation_id: UUID) -> ConversationAgent:
+        """Returns a new agent with this agent's configuration and an empty history.
+
+        The fork shares the LLM, tools and checkpointer but gets its own
+        `TokenUsageAggregator` (only when this agent has one), so its
+        `token_usage` is that conversation's total and dropping the fork frees it.
+        """
+        return type(self)(
+            name=self.name,
+            llm=self._llm,
+            tool_registry=self._tool_registry,
+            system_prompt=self._system_prompt,
+            model=self._model,
+            generation_config=self._generation_config,
+            max_iterations=self._executor.max_iterations,
+            context_strategy=self._context_strategy,
+            checkpointer=self._checkpointer,
+            conversation_id=conversation_id,
+            token_usage_aggregator=(
+                TokenUsageAggregator() if self._usage_aggregator is not None else None
+            ),
+            cost_estimator=self._cost_estimator,
+        )
+
     @classmethod
     async def resume(
         cls,

@@ -100,7 +100,11 @@ Multi-step operations that chain components together. See `pipelines/README.md`.
 
 ### `api/`: FastAPI Entrypoint
 
-`app.py` wires one `ConversationAgent` via `config.build_agent()` behind `/chat` and `/health`, using `config.Settings`/`get_settings()` for configuration and `config.setup_logging()` + `core.observability.set_tracer(config.build_tracer(settings))` at startup. That agent already carries image-generation and transcription tools (see `config/` above), not chat only.
+`app.py` builds a template `ConversationAgent` via `config.build_agent_async()` behind `/chat`, `/chat/stream` and `/health`, using `config.Settings`/`get_settings()` for configuration and `config.setup_logging()` + `core.observability.set_tracer(config.build_tracer(settings))` at startup. That agent already carries image-generation and transcription tools (see `config/` above), not chat only. `create_app()` builds the app; there is no module-level `app`, and `main()` (the `agent-platform-api` script) calls it.
+
+- **Auth** (`auth.py`): `/chat` and `/chat/stream` require `Authorization: Bearer <key>` with a key from `AGENT_PLATFORM_API_KEYS` (a JSON list); anything else is 401. `/health` stays open. The app refuses to start (`ConfigError`) with no keys unless `AGENT_PLATFORM_API_AUTH_DISABLED=true`; then every caller is one anonymous owner, with one shared conversation cap, and the `/docs`, `/redoc` and `/openapi.json` routes stay on (they are off when auth is enabled). A caller's key id is the SHA-256 digest of its key; the raw key is never stored or logged.
+- **Conversations** (`conversations.py`): `/chat` starts a conversation when `conversation_id` is absent and returns its id in `ChatResponse.conversation_id`; send it back to continue. Each conversation is a `ConversationAgent.with_conversation()` fork of the template, private to the key that created it: another key's id answers 404, the same as an unknown id. Turns on one conversation run one after the other. Each key keeps at most `AGENT_PLATFORM_API_MAX_CONVERSATIONS_PER_KEY` (default 100); one more evicts its least recently used. Storage is in memory: lost on restart and not shared between uvicorn workers.
+- **`/chat/stream`** is stateless: it ignores `conversation_id` and runs on a throwaway fork, so its usage event covers that turn only.
 
 ## Extension Patterns
 

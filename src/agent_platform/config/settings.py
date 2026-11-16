@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from functools import lru_cache
 
-from pydantic import Field
+from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -51,6 +51,23 @@ class Settings(BaseSettings):
     tracing_provider: str = "langfuse"
     api_host: str = "127.0.0.1"
     api_port: int = 8000
+    # Bearer keys accepted by the API, as a JSON list in the environment
+    # (`["key-1", "key-2"]`). Each key owns its own conversations. The API
+    # refuses to start with none unless `api_auth_disabled` is true.
+    api_keys: list[SecretStr] = Field(default_factory=list)
+    # Turns authentication off: every caller is one anonymous owner. For local
+    # development only.
+    api_auth_disabled: bool = False
+    # Conversations each key may hold in memory; creating one more evicts the
+    # key's least recently used conversation.
+    api_max_conversations_per_key: int = Field(default=100, ge=1)
+
+    @field_validator("api_keys")
+    @classmethod
+    def _reject_blank_api_keys(cls, keys: list[SecretStr]) -> list[SecretStr]:
+        if any(not key.get_secret_value().strip() for key in keys):
+            raise ValueError("api_keys must not contain an empty or blank key")
+        return keys
 
 
 @lru_cache

@@ -1,4 +1,5 @@
 from unittest.mock import AsyncMock, MagicMock
+from uuid import uuid4
 
 import pytest
 from pydantic import BaseModel
@@ -478,6 +479,65 @@ class TestConversationTokenUsage:
 
         assert first.token_usage == TokenUsage(input_tokens=10, output_tokens=5)
         assert second.token_usage == TokenUsage.zero()
+
+
+class TestWithConversation:
+    def test_fork_shares_configuration_and_starts_empty(self, mock_llm, registry):
+        checkpointer = InMemoryCheckpointer()
+        strategy = TurnCountStrategy(3)
+        generation_config = MagicMock()
+        cost_estimator = MagicMock()
+        template = ConversationAgent(
+            name="conv",
+            llm=mock_llm,
+            tool_registry=registry,
+            system_prompt="be brief",
+            model="m",
+            generation_config=generation_config,
+            max_iterations=4,
+            context_strategy=strategy,
+            checkpointer=checkpointer,
+            cost_estimator=cost_estimator,
+        )
+        template.add_user_message("old")
+        cid = uuid4()
+
+        fork = template.with_conversation(cid)
+
+        assert fork is not template
+        assert fork.conversation_id == cid
+        assert fork.history == []
+        assert fork.name == "conv"
+        assert fork._llm is mock_llm
+        assert fork.tool_registry is registry
+        assert fork.system_prompt == "be brief"
+        assert fork._model == "m"
+        assert fork._executor.max_iterations == 4
+        assert fork._context_strategy is strategy
+        assert fork._checkpointer is checkpointer
+        assert fork._generation_config is generation_config
+        assert fork._cost_estimator is cost_estimator
+
+    @pytest.mark.asyncio
+    async def test_fork_has_its_own_usage_aggregator(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hi back")
+        template = ConversationAgent(
+            name="conv", llm=mock_llm, token_usage_aggregator=TokenUsageAggregator()
+        )
+        fork = template.with_conversation(uuid4())
+
+        await fork.chat("Hi")
+
+        assert fork.token_usage == TokenUsage(input_tokens=10, output_tokens=5)
+        assert template.token_usage == TokenUsage.zero()
+
+    def test_fork_has_no_aggregator_when_template_has_none(self, mock_llm):
+        template = ConversationAgent(name="conv", llm=mock_llm)
+
+        fork = template.with_conversation(uuid4())
+
+        assert fork._usage_aggregator is None
+        assert fork.token_usage == TokenUsage.zero()
 
 
 class TestConversationTracing:

@@ -49,7 +49,7 @@ Purpose only, enough to know which README to open next.
 | `src/agent_platform/audio/` | DSP utilities, resampling, waveform chunking, tensor/numpy/base64 conversion | no |
 | `src/agent_platform/utils/` | Shared helpers: async batching, env var parsing, score utilities | no |
 | `src/agent_platform/config/` | Logging setup, `Settings` (pydantic-settings), `build_agent()` DI factory, generic `build_provider(domain_module, provider_name)` factory reused by any future domain wiring | no |
-| `src/agent_platform/api/` | FastAPI app wiring `build_agent()` behind `/chat` and `/health` | no |
+| `src/agent_platform/api/` | FastAPI app wiring `build_agent()` behind `/chat`, `/chat/stream` and `/health`; bearer-key auth on the chat routes and in-memory conversations private to each key | no |
 | `tests/` | Test suite, one file per source module; provider domains (`integrations/<domain>/<provider>/`) are flattened to `tests/integrations/<domain>/test_<provider>.py` with shared `test_base.py`/`test_config.py`/`test_providers.py` per domain rather than a strict 1:1 path mirror | no |
 
 Read `src/agent_platform/README.md` first for the full layer diagram before
