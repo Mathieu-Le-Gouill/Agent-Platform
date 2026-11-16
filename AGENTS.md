@@ -65,7 +65,7 @@ any subdirectory, so there is nothing venv-related to write down beyond this
 paragraph.
 
 ```bash
-uv run --extra dev pytest -v                          # full suite (creates/updates .venv from pyproject on first run)
+uv run --extra dev --extra all pytest -v              # full suite, with every provider extra as in CI (creates/updates .venv on first run)
 uv run pytest -v -m unit                               # unit tests only (currently: all of them, see below)
 uv run pytest -v tests/agents/test_executor.py          # single file
 uv run mypy src/                                       # type-check
