@@ -4,13 +4,18 @@ from agent_platform.agents.tools.errors import (
     ToolCallValidationError,
     ToolNotFoundError,
     ToolRegistrationError,
+    ToolSourceNotAllowedError,
 )
 from agent_platform.agents.tools.generate_image.tool import (
     GenerateImageInput,
     GenerateImageTool,
 )
 from agent_platform.agents.tools.mcp import MCPToolAdapter, discover_mcp_tools
-from agent_platform.agents.tools.ocr.tool import OCRInput, OCRTool
+from agent_platform.agents.tools.ocr.tool import (
+    OCRInput,
+    OCRSourcePolicy,
+    OCRTool,
+)
 from agent_platform.agents.tools.registry import ToolRegistry, is_tool_validation_error
 from agent_platform.agents.tools.safe_execution import safe_call
 from agent_platform.agents.tools.search.tool import (
@@ -29,11 +34,13 @@ __all__ = [
     "ToolNotFoundError",
     "ToolRegistrationError",
     "ToolCallValidationError",
+    "ToolSourceNotAllowedError",
     "ToolRegistry",
     "is_tool_validation_error",
     "TranscribeInput",
     "TranscribeTool",
     "OCRInput",
+    "OCRSourcePolicy",
     "OCRTool",
     "SearchInput",
     "SearchResult",

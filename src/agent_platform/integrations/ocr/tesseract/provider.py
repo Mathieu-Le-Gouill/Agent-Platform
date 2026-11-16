@@ -12,6 +12,8 @@ from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
 from agent_platform.integrations.ocr.tesseract.mappers import from_tesseract
 
+_FETCH_TIMEOUT_SECONDS = 10
+
 
 class TesseractOCR(BaseOCR[TesseractConfig]):
     def _default_config(self) -> TesseractConfig:
@@ -44,6 +46,6 @@ class TesseractOCR(BaseOCR[TesseractConfig]):
     @staticmethod
     def _load_image(source: str) -> Image.Image:
         if source.startswith("http://") or source.startswith("https://"):
-            with urlopen(source) as response:
+            with urlopen(source, timeout=_FETCH_TIMEOUT_SECONDS) as response:
                 return Image.open(response).convert("RGB")
         return Image.open(Path(source)).convert("RGB")

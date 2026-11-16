@@ -20,7 +20,7 @@ class TestOCRLoadBytes:
         mock_urlopen.return_value.__enter__.return_value = mock_response
         result = load_bytes(source)
         assert result == fake_bytes
-        mock_urlopen.assert_called_once_with(source)
+        mock_urlopen.assert_called_once_with(source, timeout=10)
 
     def test_file_path(self, mocker):
         fake_bytes = b"fake-image-content"
@@ -42,6 +42,7 @@ class TestTesseractLoadImage:
         mock_urlopen.return_value.__enter__.return_value = mock_response
         MockImage.open.return_value.convert.return_value = "fake-rgb-image"
         result = TesseractOCR._load_image(source)
+        mock_urlopen.assert_called_once_with(source, timeout=10)
         MockImage.open.assert_called_once_with(mock_response)
         MockImage.open.return_value.convert.assert_called_once_with("RGB")
         assert result == "fake-rgb-image"

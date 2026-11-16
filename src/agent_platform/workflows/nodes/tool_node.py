@@ -31,7 +31,7 @@ def tool_node(
     gets inside `Agent.act()` applies here too, instead of calling
     `tool.run()` directly and re-implementing that handling.
     """
-    registry = ToolRegistry()
+    registry = ToolRegistry(max_result_chars=None)
     registry.register(tool)
 
     async def node(state: StateT) -> StateT:

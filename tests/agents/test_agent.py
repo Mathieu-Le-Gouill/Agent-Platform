@@ -30,6 +30,7 @@ from tests.helpers import (
     make_fake_llm_response,
     make_fake_stream,
     make_text_stream_chunks,
+    make_tool_call_stream_chunks,
 )
 
 
@@ -686,6 +687,153 @@ class TestAgentThinkStream:
         with pytest.raises(asyncio.CancelledError):
             async for _ in agent.think_stream([UserMessage(content="Hi")]):
                 pass
+
+
+class _RewritingGuardrail:
+    async def before(self, ctx):
+        return None
+
+    async def after(self, ctx, result):
+        return AssistantMessage(content="[redacted]")
+
+
+class _BlockingInputGuardrail:
+    async def before(self, ctx):
+        raise AgentGuardrailError("input blocked")
+
+    async def after(self, ctx, result):
+        return result
+
+
+def _usage_chunk() -> StreamChunk:
+    return StreamChunk(
+        delta="",
+        finish_reason=FinishReason.STOP,
+        usage=TokenUsage(input_tokens=4, output_tokens=1),
+    )
+
+
+class TestAgentThinkFromStream:
+    @pytest.mark.asyncio
+    async def test_without_checks_returns_provider_deltas_unchanged(self, mock_llm):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["Hel", "lo"])
+        )
+        agent = Agent(name="streamer", llm=mock_llm)
+
+        message, deltas = await agent.think_from_stream([UserMessage(content="Hi")])
+
+        assert message.text == "Hello"
+        assert deltas == ["Hel", "lo"]
+
+    @pytest.mark.asyncio
+    async def test_assembles_tool_calls(self, mock_llm):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_tool_call_stream_chunks(
+                [{"id": "c1", "name": "get_weather", "args": {"location": "Paris"}}]
+            )
+        )
+        agent = Agent(name="streamer", llm=mock_llm)
+
+        message, deltas = await agent.think_from_stream([UserMessage(content="Hi")])
+
+        assert [tc.name for tc in message.tool_calls] == ["get_weather"]
+        assert message.tool_calls[0].arguments == {"location": "Paris"}
+        assert deltas == []
+
+    @pytest.mark.asyncio
+    async def test_input_guardrail_stops_before_the_llm_is_called(self, mock_llm):
+        agent = Agent(
+            name="guarded", llm=mock_llm, guardrails=[_BlockingInputGuardrail()]
+        )
+
+        with pytest.raises(AgentGuardrailError, match="input blocked"):
+            await agent.think_from_stream([UserMessage(content="Hi")])
+
+        mock_llm.stream.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_output_guardrail_rewrite_replaces_the_deltas(self, mock_llm):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["secret ", "text"])
+        )
+        agent = Agent(name="guarded", llm=mock_llm, guardrails=[_RewritingGuardrail()])
+
+        message, deltas = await agent.think_from_stream([UserMessage(content="Hi")])
+
+        assert message.text == "[redacted]"
+        assert deltas == ["[redacted]"]
+
+    @pytest.mark.asyncio
+    async def test_short_circuit_text_becomes_the_only_delta(self, mock_llm):
+        class _ShortCircuit:
+            async def before(self, ctx):
+                return AssistantMessage(content="canned")
+
+            async def after(self, ctx, result):
+                return result
+
+        agent = Agent(name="guarded", llm=mock_llm, guardrails=[_ShortCircuit()])
+
+        message, deltas = await agent.think_from_stream([UserMessage(content="Hi")])
+
+        assert message.text == "canned"
+        assert deltas == ["canned"]
+        mock_llm.stream.assert_not_called()
+
+    @pytest.mark.asyncio
+    async def test_empty_rewrite_gives_no_deltas(self, mock_llm):
+        class _Blank:
+            async def before(self, ctx):
+                return None
+
+            async def after(self, ctx, result):
+                return AssistantMessage(content="")
+
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["abc"])
+        )
+        agent = Agent(name="guarded", llm=mock_llm, guardrails=[_Blank()])
+
+        _, deltas = await agent.think_from_stream([UserMessage(content="Hi")])
+
+        assert deltas == []
+
+    @pytest.mark.asyncio
+    async def test_schema_retry_keeps_only_the_accepted_attempt(self, mock_llm):
+        attempts = [
+            [StreamChunk(delta="not "), StreamChunk(delta="json"), _usage_chunk()],
+            [StreamChunk(delta='{"value":'), StreamChunk(delta=" 1}"), _usage_chunk()],
+        ]
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(attempts.pop(0))
+        aggregator = TokenUsageAggregator()
+        agent = Agent(
+            name="structured",
+            llm=mock_llm,
+            response_schema=_Answer,
+            token_usage_aggregator=aggregator,
+        )
+
+        message, deltas = await agent.think_from_stream([UserMessage(content="Hi")])
+
+        assert message.text == '{"value": 1}'
+        assert deltas == ['{"value":', " 1}"]
+        assert aggregator.total_for("structured") == TokenUsage(
+            input_tokens=8, output_tokens=2
+        )
+
+    @pytest.mark.asyncio
+    async def test_schema_failure_twice_returns_the_last_attempt(self, mock_llm):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["still ", "bad"])
+        )
+        agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
+
+        message, deltas = await agent.think_from_stream([UserMessage(content="Hi")])
+
+        assert message.text == "still bad"
+        assert deltas == ["still ", "bad"]
+        assert mock_llm.stream.call_count == 2
 
 
 class TestAgentTokenUsage:

@@ -38,6 +38,7 @@ from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 from agent_platform.integrations.llm.openai.mappers import (
     batch_job_from_native,
     from_native_response,
+    strict_json_schema,
     to_native_messages,
     to_native_params,
 )
@@ -62,13 +63,15 @@ class OpenAILLM(
         self._client_options = resolve_client_options(client_options)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
+        parameters = model_schema(tool.input_schema)
+        strict_parameters = strict_json_schema(parameters)
         return {
             "type": "function",
             "function": {
                 "name": tool.name,
                 "description": tool.description,
-                "parameters": model_schema(tool.input_schema),
-                "strict": True,
+                "parameters": strict_parameters or parameters,
+                "strict": strict_parameters is not None,
             },
         }
 

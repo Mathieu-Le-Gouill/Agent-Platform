@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import contextlib
+import json
 import logging
 from collections.abc import AsyncIterator
 from importlib.metadata import entry_points
@@ -36,10 +37,45 @@ def is_tool_validation_error(message: ToolMessage) -> bool:
     )
 
 
+def _jsonable(value: Any) -> Any:
+    """Return `value` with pydantic models dumped, containers walked and every
+    `bytes` replaced by a `<N bytes>` placeholder, so binary payloads never
+    reach the conversation."""
+    if isinstance(value, bytes):
+        return f"<{len(value)} bytes>"
+    if isinstance(value, BaseModel):
+        return _jsonable(value.model_dump())
+    if isinstance(value, dict):
+        return {str(k): _jsonable(v) for k, v in value.items()}
+    if isinstance(value, (list, tuple)):
+        return [_jsonable(v) for v in value]
+    return value
+
+
+def _serialize_result(raw: Any, max_chars: int | None) -> str:
+    """Render a tool result as message content: `""` for `None`, a `str` as is,
+    anything else as JSON (`str()` for what JSON cannot encode). Content longer
+    than `max_chars` is cut, with a marker naming the original length."""
+    if raw is None:
+        content = ""
+    elif isinstance(raw, str):
+        content = raw
+    else:
+        content = json.dumps(_jsonable(raw), default=str, ensure_ascii=False)
+    if max_chars is not None and len(content) > max_chars:
+        return (
+            f"{content[:max_chars]}\n[truncated: result was {len(content)} characters]"
+        )
+    return content
+
+
 class ToolRegistry:
     _tools: dict[str, Tool]
 
-    def __init__(self) -> None:
+    def __init__(self, *, max_result_chars: int | None = 20_000) -> None:
+        """`max_result_chars` caps the content of a tool message built by
+        `call_and_wrap()`; `None` keeps results whole."""
+        self._max_result_chars = max_result_chars
         self._tools = {}
         self._timeouts: dict[str, float] = {}
         self._semaphores: dict[str, asyncio.Semaphore] = {}
@@ -145,7 +181,7 @@ class ToolRegistry:
                 metadata: dict[str, Any] = {}
                 try:
                     raw = await self.resolve_call(call)
-                    content = str(raw) if raw is not None else ""
+                    content = _serialize_result(raw, self._max_result_chars)
                     is_error = False
                 except asyncio.CancelledError:
                     raise

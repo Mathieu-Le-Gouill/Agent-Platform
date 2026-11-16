@@ -8,8 +8,12 @@ from agent_platform.agents.errors import (
 )
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.base import Tool, ToolError
-from agent_platform.agents.tools.errors import ToolNotFoundError, ToolRegistrationError
-from agent_platform.agents.tools.ocr.tool import OCRInput, OCRTool
+from agent_platform.agents.tools.errors import (
+    ToolNotFoundError,
+    ToolRegistrationError,
+    ToolSourceNotAllowedError,
+)
+from agent_platform.agents.tools.ocr.tool import OCRInput, OCRSourcePolicy, OCRTool
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.agents.tools.safe_execution import safe_call
 from agent_platform.agents.tools.search.tool import (
@@ -28,10 +32,12 @@ __all__ = [
     "ToolError",
     "ToolNotFoundError",
     "ToolRegistrationError",
+    "ToolSourceNotAllowedError",
     "ToolRegistry",
     "TranscribeInput",
     "TranscribeTool",
     "OCRInput",
+    "OCRSourcePolicy",
     "OCRTool",
     "SearchInput",
     "SearchResult",

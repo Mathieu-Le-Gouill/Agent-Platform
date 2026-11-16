@@ -2,11 +2,16 @@ import pytest
 from pydantic import BaseModel
 
 from agent_platform.agents.agent import Agent
-from agent_platform.agents.errors import AgentMaxIterations, AgentThinkError
+from agent_platform.agents.errors import (
+    AgentGuardrailError,
+    AgentMaxIterations,
+    AgentThinkError,
+)
 from agent_platform.agents.executor import AgentExecutor
-from agent_platform.agents.tools.base import Tool
+from agent_platform.agents.tools.base import Tool, ToolStreamChunk
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.core.schemas.message import (
+    AssistantMessage,
     UserMessage,
 )
 from tests.helpers import (
@@ -24,6 +29,26 @@ class _WeatherTool(Tool):
 
     async def run(self, **kwargs):
         return {"temp": 22}
+
+
+class _Answer(BaseModel):
+    value: int
+
+
+class _BlockingGuardrail:
+    async def before(self, ctx):
+        return None
+
+    async def after(self, ctx, result):
+        raise AgentGuardrailError("output blocked")
+
+
+class _RewritingGuardrail:
+    async def before(self, ctx):
+        return None
+
+    async def after(self, ctx, result):
+        return AssistantMessage(content="[redacted]")
 
 
 @pytest.fixture
@@ -280,12 +305,89 @@ class TestExecutorRunStreaming:
 
         events = [e async for e in ex.run_streaming("Weather?")]
 
-        from agent_platform.agents.tools.base import ToolStreamChunk
-
         tool_events = [e for e in events if isinstance(e, ToolStreamChunk)]
-        assert len(tool_events) == 2
+        assert len(tool_events) == 1
         assert all(e.is_validation_error for e in tool_events)
         assert not any(isinstance(e, str) for e in events)
+
+    @pytest.mark.asyncio
+    async def test_blocking_output_guardrail_raises_without_yielding_text(
+        self, mock_llm
+    ):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["secret ", "text"])
+        )
+        agent = Agent(name="guarded", llm=mock_llm, guardrails=[_BlockingGuardrail()])
+        ex = AgentExecutor(agent)
+        events: list = []
+
+        with pytest.raises(AgentGuardrailError):
+            async for event in ex.run_streaming("Hi"):
+                events.append(event)
+
+        assert events == []
+
+    @pytest.mark.asyncio
+    async def test_rewriting_output_guardrail_yields_the_rewritten_text(self, mock_llm):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["secret ", "text"])
+        )
+        agent = Agent(name="guarded", llm=mock_llm, guardrails=[_RewritingGuardrail()])
+        ex = AgentExecutor(agent)
+
+        events = [e async for e in ex.run_streaming("Hi")]
+
+        assert events == ["[redacted]"]
+
+    @pytest.mark.asyncio
+    async def test_invalid_response_schema_retry_yields_only_the_accepted_attempt(
+        self, mock_llm
+    ):
+        attempts = [
+            make_text_stream_chunks(["not ", "json"]),
+            make_text_stream_chunks(['{"value":', " 1}"]),
+        ]
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(attempts.pop(0))
+        agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
+        ex = AgentExecutor(agent)
+
+        events = [e async for e in ex.run_streaming("Hi")]
+
+        assert events == ['{"value":', " 1}"]
+
+    @pytest.mark.asyncio
+    async def test_tool_call_retry_drops_the_first_attempts_events(self, mock_llm):
+        attempts = [
+            [
+                *make_text_stream_chunks(["draft "])[:-1],
+                *make_tool_call_stream_chunks(
+                    [{"id": "c1", "name": "strict_weather", "args": {}}]
+                ),
+            ],
+            make_tool_call_stream_chunks(
+                [
+                    {
+                        "id": "c2",
+                        "name": "strict_weather",
+                        "args": {"location": "Paris"},
+                    }
+                ]
+            ),
+            make_text_stream_chunks(["Sunny"]),
+        ]
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(attempts.pop(0))
+        registry = ToolRegistry()
+        registry.register(_StrictWeatherTool())
+        agent = Agent(name="recovering", llm=mock_llm, tool_registry=registry)
+        ex = AgentExecutor(agent)
+
+        events = [e async for e in ex.run_streaming("Weather?")]
+
+        assert "draft " not in events
+        assert not any(
+            isinstance(e, ToolStreamChunk) and e.is_validation_error for e in events
+        )
+        assert events[-1] == "Sunny"
 
 
 class TestExecutorRunWithMessages:
@@ -448,7 +550,7 @@ class TestExecutorToolCallRecovery:
 
 class TestAssembleToolCalls:
     def test_malformed_arguments_json_falls_back_to_empty_dict(self):
-        from agent_platform.agents.executor import _assemble_tool_calls
+        from agent_platform.agents.agent import _assemble_tool_calls
         from agent_platform.core.interfaces.llm.response import ToolCallDelta
 
         deltas = [

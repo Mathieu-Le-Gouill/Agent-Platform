@@ -1,21 +1,17 @@
 from __future__ import annotations
 
-import json
 from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
-from typing import Any
 
 from agent_platform.agents.agent import Agent
 from agent_platform.agents.errors import AgentMaxIterations, AgentRecoveryExhausted
 from agent_platform.agents.tools.base import ToolStreamChunk
 from agent_platform.agents.tools.registry import is_tool_validation_error
 from agent_platform.agents.validation import retry_once_on_invalid
-from agent_platform.core.interfaces.llm.response import ToolCallDelta
 from agent_platform.core.observability import AgentRun, observe
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     Message,
-    ToolCall,
     ToolMessage,
     UserMessage,
 )
@@ -35,33 +31,6 @@ def _tool_call_error(result: _ThinkActResult) -> str | None:
     if not bad:
         return None
     return "; ".join(tm.result.content for tm in bad)
-
-
-def _assemble_tool_calls(deltas: list[ToolCallDelta]) -> list[ToolCall]:
-    """Reassemble fragmented `ToolCallDelta`s (by stream index) into complete `ToolCall`s."""
-    assembled: dict[int, dict[str, Any]] = {}
-    order: list[int] = []
-    for delta in deltas:
-        if delta.index not in assembled:
-            assembled[delta.index] = {"id": "", "name": "", "arguments": ""}
-            order.append(delta.index)
-        entry = assembled[delta.index]
-        if delta.id is not None:
-            entry["id"] = delta.id
-        if delta.name is not None:
-            entry["name"] = delta.name
-        if delta.arguments_delta is not None:
-            entry["arguments"] += delta.arguments_delta
-
-    calls = []
-    for index in order:
-        entry = assembled[index]
-        try:
-            arguments = json.loads(entry["arguments"]) if entry["arguments"] else {}
-        except json.JSONDecodeError:
-            arguments = {}
-        calls.append(ToolCall(id=entry["id"], name=entry["name"], arguments=arguments))
-    return calls
 
 
 class _LoopTrace:
@@ -202,19 +171,8 @@ class AgentExecutor:
     async def _stream_think_and_act(
         self, messages: list[Message], sink: list[ToolStreamChunk | str]
     ) -> _ThinkActResult:
-        text_parts: list[str] = []
-        tool_call_deltas: list[ToolCallDelta] = []
-
-        async for chunk in self._agent.think_stream(messages):
-            if chunk.delta:
-                text_parts.append(chunk.delta)
-                sink.append(chunk.delta)
-            tool_call_deltas.extend(chunk.tool_call_deltas)
-
-        assistant_msg = AssistantMessage(
-            content="".join(text_parts),
-            tool_calls=_assemble_tool_calls(tool_call_deltas),
-        )
+        assistant_msg, deltas = await self._agent.think_from_stream(messages)
+        sink.extend(deltas)
         messages.append(assistant_msg)
 
         if not assistant_msg.tool_calls:
@@ -238,12 +196,19 @@ class AgentExecutor:
             self._agent.name, conversation_id, self._max_iterations
         ) as trace:
             for _ in range(self._max_iterations):
+                # Each attempt fills its own buffer, so only the attempt kept
+                # after the corrective retry reaches the client.
                 sink: list[ToolStreamChunk | str] = []
                 trace.start_iteration()
 
+                async def attempt() -> _ThinkActResult:
+                    nonlocal sink
+                    sink = []
+                    return await self._stream_think_and_act(messages, sink)
+
                 try:
                     assistant_msg, tool_messages = await retry_once_on_invalid(
-                        attempt=lambda: self._stream_think_and_act(messages, sink),
+                        attempt=attempt,
                         check=_tool_call_error,
                         correct=lambda error: self._correct_tool_call(messages, error),
                         on_retry=trace.on_retry,

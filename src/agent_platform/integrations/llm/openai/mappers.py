@@ -34,6 +34,7 @@ __all__ = [
     "content_to_native",
     "from_native_response",
     "is_reasoning_model",
+    "strict_json_schema",
     "to_native_messages",
     "to_native_params",
 ]
@@ -52,6 +53,74 @@ _BATCH_STATUS_MAP: dict[str, BatchStatus] = {
     "expired": BatchStatus.EXPIRED,
     "cancelled": BatchStatus.CANCELLED,
 }
+
+
+class _NotStrictError(Exception):
+    """A schema uses something OpenAI strict mode does not accept."""
+
+
+# A property schema must say what it is, or strict mode rejects it.
+_TYPING_KEYS = ("type", "$ref", "anyOf", "enum")
+_SCHEMA_MAP_KEYS = ("properties", "$defs", "definitions")
+_SCHEMA_LIST_KEYS = ("anyOf", "oneOf", "allOf", "prefixItems")
+
+
+def _strictify(schema: dict[str, Any], *, top: bool) -> dict[str, Any]:
+    """Return a copy of `schema` with `additionalProperties: false` on every
+    object; raise `_NotStrictError` on anything strict mode rejects."""
+    out = dict(schema)
+
+    is_object = out.get("type") == "object" or "properties" in out
+    if is_object:
+        if out.get("additionalProperties", False) is not False:
+            raise _NotStrictError
+        if "properties" not in out and not top:
+            raise _NotStrictError
+        properties = out.get("properties", {})
+        if not set(properties) <= set(out.get("required", [])):
+            raise _NotStrictError
+        if "required" not in out:
+            out["required"] = []
+        out["additionalProperties"] = False
+
+    for key in _SCHEMA_MAP_KEYS:
+        if key in out:
+            out[key] = {
+                name: _strictify(sub, top=False) for name, sub in out[key].items()
+            }
+    for key in _SCHEMA_LIST_KEYS:
+        if key in out:
+            out[key] = [_strictify(sub, top=False) for sub in out[key]]
+    if isinstance(out.get("items"), dict):
+        out["items"] = _strictify(out["items"], top=False)
+    # OpenAI rejects a missing `items` and does not document an empty one
+    # (a bare `list` or `list[Any]`); sending non-strict cannot fail.
+    if out.get("type") == "array":
+        items = out.get("items")
+        if not isinstance(items, dict) or not any(k in items for k in _TYPING_KEYS):
+            raise _NotStrictError
+
+    for sub in out.get("properties", {}).values():
+        if not any(k in sub for k in _TYPING_KEYS):
+            raise _NotStrictError
+    return out
+
+
+def strict_json_schema(schema: dict[str, Any]) -> dict[str, Any] | None:
+    """Return a copy of `schema` that OpenAI strict mode accepts, or `None`.
+
+    Strict mode needs `additionalProperties: false` on every object, every
+    property listed in `required`, and every property and array item typed.
+    The copy sets the
+    first; a schema that breaks the others cannot be made strict without
+    changing what the model may return (a defaulted field would become
+    mandatory), so it gets `None` and the caller sends it non-strict. `schema`
+    is never mutated: `model_schema` hands out a cached dict.
+    """
+    try:
+        return _strictify(schema, top=True)
+    except _NotStrictError:
+        return None
 
 
 def is_reasoning_model(model: str) -> bool:
@@ -169,12 +238,15 @@ def to_native_params(config: OpenAIGenerationConfig) -> dict[str, Any]:
                 raise ValueError(
                     "json_schema is required for JSON_SCHEMA response format"
                 )
+            strict_schema = (
+                strict_json_schema(config.json_schema) if config.strict else None
+            )
             params["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
                     "name": "response",
-                    "schema": config.json_schema,
-                    "strict": config.strict,
+                    "schema": strict_schema or config.json_schema,
+                    "strict": strict_schema is not None,
                 },
             }
 

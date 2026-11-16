@@ -1,14 +1,18 @@
+import copy
 import json
 from types import SimpleNamespace
+from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import BaseModel, SecretStr
 
 from agent_platform.agents.tools.base import Tool
+from agent_platform.agents.tools.generate_image.tool import GenerateImageInput
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.interfaces.llm.batch import BatchRequest, BatchStatus
 from agent_platform.core.interfaces.llm.response import ResponseFormat
+from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.document import ImageDocument
 from agent_platform.core.schemas.enums import FinishReason, ImageFormat
 from agent_platform.core.schemas.message import (
@@ -30,6 +34,9 @@ from agent_platform.integrations.llm.openai.mappers import (
 )
 from agent_platform.integrations.llm.openai.mappers import (
     from_native_response as _from_native_response,
+)
+from agent_platform.integrations.llm.openai.mappers import (
+    strict_json_schema,
 )
 from agent_platform.integrations.llm.openai.mappers import (
     to_native_messages as _to_native_messages,
@@ -244,15 +251,41 @@ class TestToNativeParams:
         assert result["response_format"] == {"type": "json_object"}
 
     def test_response_format_json_schema(self):
-        schema = {"type": "object", "properties": {"name": {"type": "string"}}}
+        schema = {
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+        }
         cfg = OpenAIGenerationConfig(
             response_format=ResponseFormat.JSON_SCHEMA, json_schema=schema
         )
         result = _to_native_params(cfg)
         assert result["response_format"] == {
             "type": "json_schema",
-            "json_schema": {"name": "response", "schema": schema, "strict": True},
+            "json_schema": {
+                "name": "response",
+                "schema": {**schema, "additionalProperties": False},
+                "strict": True,
+            },
         }
+
+    def test_response_format_json_schema_not_strict_compatible_sends_strict_false(
+        self,
+    ):
+        class _Defaulted(BaseModel):
+            name: str
+            note: str = "n/a"
+
+        schema = model_schema(_Defaulted)
+        cfg = OpenAIGenerationConfig(
+            response_format=ResponseFormat.JSON_SCHEMA, json_schema=schema
+        )
+
+        result = _to_native_params(cfg)
+
+        assert cfg.strict is True
+        assert result["response_format"]["json_schema"]["strict"] is False
+        assert result["response_format"]["json_schema"]["schema"] == schema
 
     def test_response_format_json_schema_strict_false(self):
         schema = {"type": "object"}
@@ -275,6 +308,80 @@ class TestToNativeParams:
         cfg = OpenAIGenerationConfig(extra_params={"user": "u1"})
         result = _to_native_params(cfg)
         assert result["user"] == "u1"
+
+
+class TestStrictJsonSchema:
+    def test_walks_arrays_and_unions(self):
+        class _Item(BaseModel):
+            name: str
+
+        class _Model(BaseModel):
+            items: list[_Item]
+            other: _Item | None
+
+        result = strict_json_schema(model_schema(_Model))
+
+        assert result is not None
+        assert result["$defs"]["_Item"]["additionalProperties"] is False
+
+    def test_object_without_properties_below_the_top_is_not_strict(self):
+        schema = {
+            "type": "object",
+            "properties": {"data": {"type": "object"}},
+            "required": ["data"],
+        }
+        assert strict_json_schema(schema) is None
+
+    def test_untyped_property_is_not_strict(self):
+        schema = {
+            "type": "object",
+            "properties": {"data": {"title": "Data"}},
+            "required": ["data"],
+        }
+        assert strict_json_schema(schema) is None
+
+    def test_array_of_objects_without_properties_is_not_strict(self):
+        schema = {
+            "type": "object",
+            "properties": {"rows": {"type": "array", "items": {"type": "object"}}},
+            "required": ["rows"],
+        }
+        assert strict_json_schema(schema) is None
+
+    @pytest.mark.parametrize(
+        "array_schema",
+        [{"type": "array"}, {"type": "array", "items": {}}],
+        ids=["missing-items", "empty-items"],
+    )
+    def test_array_with_untyped_items_is_not_strict(self, array_schema):
+        schema = {
+            "type": "object",
+            "properties": {"tags": array_schema},
+            "required": ["tags"],
+        }
+        assert strict_json_schema(schema) is None
+
+    def test_required_bare_list_field_is_not_strict(self):
+        class _Model(BaseModel):
+            tags: list
+
+        assert strict_json_schema(model_schema(_Model)) is None
+
+    def test_explicit_additional_properties_true_is_not_strict(self):
+        schema = {"type": "object", "properties": {}, "additionalProperties": True}
+        assert strict_json_schema(schema) is None
+
+    def test_the_input_is_left_untouched(self):
+        schema = {
+            "type": "object",
+            "properties": {"a": {"type": "string"}},
+            "required": ["a"],
+        }
+        before = copy.deepcopy(schema)
+
+        strict_json_schema(schema)
+
+        assert schema == before
 
 
 class TestFromNative:
@@ -334,6 +441,79 @@ class TestOpenAILLMConstruction:
         assert schema["type"] == "function"
         assert schema["function"]["name"] == "test_tool"
         assert "parameters" in schema["function"]
+
+    @staticmethod
+    def _tool_with(input_schema):
+        class _T(Tool):
+            name = "t"
+            description = "d"
+
+            async def run(self, **kwargs):
+                return "ok"
+
+        _T.input_schema = input_schema
+        return _T()
+
+    def test_tool_with_defaulted_fields_is_not_strict(self):
+        function = OpenAILLM(_creds())._tool_to_schema(
+            self._tool_with(GenerateImageInput)
+        )["function"]
+
+        assert function["strict"] is False
+        assert function["parameters"] == model_schema(GenerateImageInput)
+
+    def test_tool_with_all_required_fields_is_strict_on_every_object(self):
+        class _Inner(BaseModel):
+            city: str
+
+        class _Outer(BaseModel):
+            query: str
+            inner: _Inner
+
+        original = copy.deepcopy(model_schema(_Outer))
+
+        function = OpenAILLM(_creds())._tool_to_schema(self._tool_with(_Outer))[
+            "function"
+        ]
+
+        params = function["parameters"]
+        assert function["strict"] is True
+        assert params["additionalProperties"] is False
+        assert params["$defs"]["_Inner"]["additionalProperties"] is False
+        assert model_schema(_Outer) == original
+
+    def test_parameterless_tool_is_strict_with_empty_required(self):
+        function = OpenAILLM(_creds())._tool_to_schema(self._tool_with(BaseModel))[
+            "function"
+        ]
+
+        assert function["strict"] is True
+        assert function["parameters"] == {
+            "type": "object",
+            "properties": {},
+            "required": [],
+            "additionalProperties": False,
+        }
+
+    def test_tool_with_required_dict_field_is_not_strict(self):
+        class _WithDict(BaseModel):
+            options: dict[str, str]
+
+        function = OpenAILLM(_creds())._tool_to_schema(self._tool_with(_WithDict))[
+            "function"
+        ]
+
+        assert function["strict"] is False
+
+    def test_tool_with_required_any_field_is_not_strict(self):
+        class _WithAny(BaseModel):
+            payload: Any
+
+        function = OpenAILLM(_creds())._tool_to_schema(self._tool_with(_WithAny))[
+            "function"
+        ]
+
+        assert function["strict"] is False
 
     def test_missing_credential_error(self):
         provider = OpenAILLM()

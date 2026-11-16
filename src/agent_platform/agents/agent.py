@@ -1,8 +1,10 @@
 from __future__ import annotations
 
 import asyncio
+import json
 import logging
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Awaitable, Callable
+from typing import Any
 
 from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
@@ -22,13 +24,18 @@ from agent_platform.agents.validation import retry_once_on_invalid
 from agent_platform.core.cost import CostEstimator
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
-from agent_platform.core.interfaces.llm.response import ResponseFormat, StreamChunk
+from agent_platform.core.interfaces.llm.response import (
+    ResponseFormat,
+    StreamChunk,
+    ToolCallDelta,
+)
 from agent_platform.core.middleware import MiddlewarePipeline
 from agent_platform.core.observability import ModelCost, emit
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     Message,
     Prompt,
+    ToolCall,
     ToolMessage,
     ToolResult,
     UserMessage,
@@ -37,6 +44,35 @@ from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.token_usage import TokenUsageAggregator
 
 logger = logging.getLogger(__name__)
+
+_Generate = Callable[[list[Message]], Awaitable[AssistantMessage]]
+
+
+def _assemble_tool_calls(deltas: list[ToolCallDelta]) -> list[ToolCall]:
+    """Reassemble fragmented `ToolCallDelta`s (by stream index) into complete `ToolCall`s."""
+    assembled: dict[int, dict[str, Any]] = {}
+    order: list[int] = []
+    for delta in deltas:
+        if delta.index not in assembled:
+            assembled[delta.index] = {"id": "", "name": "", "arguments": ""}
+            order.append(delta.index)
+        entry = assembled[delta.index]
+        if delta.id is not None:
+            entry["id"] = delta.id
+        if delta.name is not None:
+            entry["name"] = delta.name
+        if delta.arguments_delta is not None:
+            entry["arguments"] += delta.arguments_delta
+
+    calls = []
+    for index in order:
+        entry = assembled[index]
+        try:
+            arguments = json.loads(entry["arguments"]) if entry["arguments"] else {}
+        except json.JSONDecodeError:
+            arguments = {}
+        calls.append(ToolCall(id=entry["id"], name=entry["name"], arguments=arguments))
+    return calls
 
 
 class Agent:
@@ -180,16 +216,30 @@ class Agent:
             )
         )
 
-    async def _generate_with_guardrails(
+    async def _generate_from_stream(
         self, messages: list[Message]
+    ) -> tuple[AssistantMessage, list[str]]:
+        """Consume `think_stream()` into one message and its text deltas."""
+        deltas: list[str] = []
+        tool_call_deltas: list[ToolCallDelta] = []
+        async for chunk in self.think_stream(messages):
+            if chunk.delta:
+                deltas.append(chunk.delta)
+            tool_call_deltas.extend(chunk.tool_call_deltas)
+        message = AssistantMessage(
+            content="".join(deltas),
+            tool_calls=_assemble_tool_calls(tool_call_deltas),
+        )
+        return message, deltas
+
+    async def _generate_with_guardrails(
+        self, messages: list[Message], generate: _Generate
     ) -> AssistantMessage:
         if self._guardrail_pipeline is None:
-            return await self._generate(messages)
+            return await generate(messages)
 
         ctx = GuardrailContext(messages=messages)
-        return await self._guardrail_pipeline.run(
-            ctx, lambda c: self._generate(c.messages)
-        )
+        return await self._guardrail_pipeline.run(ctx, lambda c: generate(c.messages))
 
     def _check_response_schema(self, assistant_msg: AssistantMessage) -> str | None:
         if assistant_msg.tool_calls or self._response_schema is None:
@@ -201,15 +251,44 @@ class Agent:
         return None
 
     async def think(self, messages: list[Message]) -> AssistantMessage:
+        return await self._think_checked(messages, self._generate)
+
+    async def think_from_stream(
+        self, messages: list[Message]
+    ) -> tuple[AssistantMessage, list[str]]:
+        """Runs the model as a stream and returns the checked message with the
+        text deltas a caller may emit.
+
+        Guardrails and the response-schema retry behave as in `think()`. The
+        deltas come from the accepted attempt only, so a client never sees the
+        text of a rejected attempt. When a guardrail short-circuits or rewrites
+        the text, the original deltas no longer match it and the deltas become
+        the final text alone.
+        """
+        deltas: list[str] = []
+
+        async def generate(msgs: list[Message]) -> AssistantMessage:
+            nonlocal deltas
+            message, deltas = await self._generate_from_stream(msgs)
+            return message
+
+        message = await self._think_checked(messages, generate)
+        if "".join(deltas) != message.text:
+            deltas = [message.text] if message.text else []
+        return message, deltas
+
+    async def _think_checked(
+        self, messages: list[Message], generate: _Generate
+    ) -> AssistantMessage:
         if self._response_schema is None:
-            return await self._generate_with_guardrails(messages)
+            return await self._generate_with_guardrails(messages, generate)
 
         working_messages = messages
         last_msg: AssistantMessage | None = None
 
         async def attempt() -> AssistantMessage:
             nonlocal last_msg
-            last_msg = await self._generate_with_guardrails(working_messages)
+            last_msg = await self._generate_with_guardrails(working_messages, generate)
             return last_msg
 
         async def correct(error: str) -> None:

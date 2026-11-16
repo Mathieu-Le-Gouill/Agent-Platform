@@ -1,5 +1,7 @@
 import asyncio
+import json
 from unittest.mock import AsyncMock
+from uuid import UUID
 
 import pytest
 from pydantic import BaseModel
@@ -12,6 +14,8 @@ from agent_platform.agents.tools import (
     is_tool_validation_error,
 )
 from agent_platform.agents.tools.errors import ToolTimeoutError
+from agent_platform.core.schemas.document import ImageDocument
+from agent_platform.core.schemas.enums import ImageFormat
 from agent_platform.core.schemas.message import ToolCall
 
 
@@ -252,6 +256,102 @@ class TestCallAndWrap:
         call = ToolCall(id="c1", name="dummy", arguments={})
         with pytest.raises(asyncio.CancelledError):
             await registry.call_and_wrap(call)
+
+
+class _ReturnTool(Tool):
+    name = "returner"
+    description = "Returns whatever it was given"
+    input_schema = BaseModel
+
+    def __init__(self, value):
+        self._value = value
+
+    async def run(self, **kwargs):
+        return self._value
+
+
+class _Point(BaseModel):
+    x: int
+    y: int
+
+
+async def _wrap(value, **registry_kwargs):
+    registry = ToolRegistry(**registry_kwargs)
+    registry.register(_ReturnTool(value))
+    return await registry.call_and_wrap(
+        ToolCall(id="c1", name="returner", arguments={})
+    )
+
+
+class TestCallAndWrapSerialization:
+    @pytest.mark.asyncio
+    async def test_none_gives_empty_content(self):
+        message = await _wrap(None)
+        assert message.result.content == ""
+
+    @pytest.mark.asyncio
+    async def test_dict_is_json(self):
+        message = await _wrap({"handled": True})
+        assert message.result.content == '{"handled": true}'
+
+    @pytest.mark.asyncio
+    async def test_non_ascii_text_is_kept_readable(self):
+        message = await _wrap({"text": "déjà vu 東京"})
+        assert message.result.content == '{"text": "déjà vu 東京"}'
+
+    @pytest.mark.asyncio
+    async def test_image_document_replaces_bytes_with_a_placeholder(self):
+        image = ImageDocument(content=b"\x89PNG" * 10, format=ImageFormat.PNG)
+
+        message = await _wrap(image)
+
+        parsed = json.loads(message.result.content)
+        assert parsed["content"] == "<40 bytes>"
+        assert "PNG" not in message.result.content
+
+    @pytest.mark.asyncio
+    async def test_list_of_models_is_a_json_array(self):
+        message = await _wrap([_Point(x=1, y=2), _Point(x=3, y=4)])
+        assert json.loads(message.result.content) == [
+            {"x": 1, "y": 2},
+            {"x": 3, "y": 4},
+        ]
+
+    @pytest.mark.asyncio
+    async def test_tuple_with_bytes_is_walked(self):
+        message = await _wrap((b"abc", "ok"))
+        assert json.loads(message.result.content) == ["<3 bytes>", "ok"]
+
+    @pytest.mark.asyncio
+    async def test_unencodable_value_falls_back_to_str(self):
+        message = await _wrap({"id": UUID(int=1)})
+        assert json.loads(message.result.content) == {"id": str(UUID(int=1))}
+
+    @pytest.mark.asyncio
+    async def test_short_string_is_unchanged(self):
+        message = await _wrap("plain text")
+        assert message.result.content == "plain text"
+
+    @pytest.mark.asyncio
+    async def test_long_string_is_capped_with_a_marker(self):
+        message = await _wrap("a" * 50_000)
+
+        content = message.result.content
+        assert content.startswith("a" * 20_000)
+        assert "truncated" in content
+        assert "50000" in content
+        assert len(content) < 20_200
+
+    @pytest.mark.asyncio
+    async def test_custom_cap(self):
+        message = await _wrap("a" * 100, max_result_chars=10)
+        assert message.result.content.startswith("a" * 10 + "\n")
+        assert "a" * 11 not in message.result.content
+
+    @pytest.mark.asyncio
+    async def test_no_cap_keeps_the_whole_string(self):
+        message = await _wrap("a" * 50_000, max_result_chars=None)
+        assert message.result.content == "a" * 50_000
 
 
 class TestCallAndStream:

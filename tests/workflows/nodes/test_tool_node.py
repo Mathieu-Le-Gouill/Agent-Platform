@@ -62,3 +62,19 @@ class TestToolNode:
         new_state = await node(WeatherState())
 
         assert new_state.forecast == "error"
+
+    @pytest.mark.asyncio
+    async def test_long_string_result_reaches_the_workflow_uncut(self):
+        class _LongTool(Tool):
+            name = "long"
+            description = "Returns a very long string"
+            input_schema = BaseModel
+
+            async def run(self, **kwargs):
+                return "x" * 50_000
+
+        node = tool_node(_LongTool(), input_fn=lambda s: {}, output_fn=_output_fn)
+
+        new_state = await node(WeatherState())
+
+        assert new_state.forecast == "x" * 50_000

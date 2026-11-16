@@ -8,6 +8,7 @@ __all__ = [
     "ToolRegistrationError",
     "ToolCallValidationError",
     "ToolTimeoutError",
+    "ToolSourceNotAllowedError",
 ]
 
 
@@ -29,3 +30,7 @@ class ToolCallValidationError(ToolError):
 
 class ToolTimeoutError(ToolError):
     pass
+
+
+class ToolSourceNotAllowedError(ToolError):
+    """A tool refused a file path or URL its policy does not allow."""
