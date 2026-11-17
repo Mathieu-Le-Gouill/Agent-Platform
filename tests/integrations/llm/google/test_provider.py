@@ -1,12 +1,16 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
 from pydantic import BaseModel, SecretStr
 
 pytest.importorskip("google.genai")
 
+from google.genai import errors as genai_errors
+
 from agent_platform.agents.tools.base import Tool
+from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.core.schemas.document import AudioDocument, ImageDocument
@@ -79,6 +83,53 @@ class TestGoogleLLMConstruction:
         provider = GoogleLLM(GoogleCredentials(api_key=None))
         with pytest.raises(MissingCredentialError):
             provider._client(GoogleGenerationConfig())
+
+    def test_client_gets_the_default_timeout_in_milliseconds(self, mocker):
+        client_cls = mocker.patch(
+            "agent_platform.integrations.llm.google.provider.genai.Client"
+        )
+
+        GoogleLLM(_creds())._client(GoogleGenerationConfig())
+
+        http_options = client_cls.call_args.kwargs["http_options"]
+        assert http_options.timeout == 120000
+
+    def test_client_timeout_comes_from_the_config_then_the_client_options(self, mocker):
+        client_cls = mocker.patch(
+            "agent_platform.integrations.llm.google.provider.genai.Client"
+        )
+        provider = GoogleLLM(_creds(), ClientOptions(timeout=30.0))
+
+        provider._client(GoogleGenerationConfig())
+        assert client_cls.call_args.kwargs["http_options"].timeout == 30000
+
+        provider._client(GoogleGenerationConfig(timeout=5.0))
+        assert client_cls.call_args.kwargs["http_options"].timeout == 5000
+
+    @pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+    def test_a_client_error_is_not_transient(self, status):
+        error = genai_errors.APIError(status, {"error": {"message": "bad"}})
+        assert GoogleLLM(_creds())._is_transient(error) is False
+
+    @pytest.mark.parametrize("status", [408, 409, 429, 500, 503])
+    def test_a_temporary_status_is_transient(self, status):
+        error = genai_errors.APIError(status, {"error": {"message": "busy"}})
+        assert GoogleLLM(_creds())._is_transient(error) is True
+
+    def test_a_timeout_or_connection_error_is_transient(self):
+        provider = GoogleLLM(_creds())
+
+        assert provider._is_transient(httpx.ReadTimeout("slow"))
+        assert provider._is_transient(httpx.ConnectError("down"))
+        assert provider._is_transient(ConnectionError("down"))
+        assert provider._is_transient(ValueError("other")) is False
+
+    def test_an_aiohttp_connection_error_is_transient(self):
+        aiohttp = pytest.importorskip("aiohttp")
+        provider = GoogleLLM(_creds())
+
+        assert provider._is_transient(aiohttp.ClientConnectionError("reset"))
+        assert provider._is_transient(aiohttp.ServerDisconnectedError())
 
 
 class TestToNativeContents:

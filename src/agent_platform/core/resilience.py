@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from typing import Any, TypeVar
 
-from agent_platform.core.errors import ProviderError
+from agent_platform.core.errors import PlatformError, ProviderError
 
 _T = TypeVar("_T")
 
@@ -51,8 +51,8 @@ class CircuitBreaker:
 
         try:
             result = func(*args, **kwargs)
-        except Exception:
-            self.record_failure()
+        except Exception as exc:
+            self.record_error(exc)
             raise
         else:
             self.record_success()
@@ -66,12 +66,24 @@ class CircuitBreaker:
 
         try:
             result = await func(*args, **kwargs)
-        except Exception:
-            self.record_failure()
+        except Exception as exc:
+            self.record_error(exc)
             raise
         else:
             self.record_success()
             return result
+
+    def record_error(self, exc: Exception) -> None:
+        """Count `exc` as a failure unless it is a non-retryable `PlatformError`.
+
+        A non-retryable error (a bad request, a revoked key) says nothing about
+        whether the service is up, so it must not open the circuit. Public for
+        call sites that can't route through `call()`/`acall()`, such as one
+        step of a streaming response.
+        """
+        if isinstance(exc, PlatformError) and not exc.retryable:
+            return
+        self.record_failure()
 
     def record_success(self) -> None:
         """Reset the breaker to closed. Public so callers that can't route a

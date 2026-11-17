@@ -152,6 +152,7 @@ def build_agent(settings: Settings) -> ConversationAgent:
         system_prompt=settings.agent_system_prompt,
         model=llm_model,
         max_iterations=settings.max_iterations,
+        max_history_turns=settings.max_history_turns,
         token_usage_aggregator=TokenUsageAggregator(),
     )
 

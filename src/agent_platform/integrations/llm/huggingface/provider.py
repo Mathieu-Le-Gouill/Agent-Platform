@@ -3,13 +3,14 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from huggingface_hub import AsyncInferenceClient, ChatCompletionOutput, InferenceClient
+from huggingface_hub.errors import HfHubHTTPError
 
 from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
-    resolve_timeout,
 )
 from agent_platform.core.errors import require_secret
 from agent_platform.core.interfaces.llm.response import (
@@ -22,7 +23,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import HuggingFaceCredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
@@ -75,20 +76,27 @@ class HuggingFaceLLM(
             self._credentials.api_key,
             "Hugging Face Hub API token is required but was not provided",
         )
-        kwargs: dict[str, Any] = {
+        # `config.max_retries`/`client_options.max_retries` are intentionally not wired
+        # in: `InferenceClient`/`AsyncInferenceClient` have no built-in retry-count
+        # knob. The platform retry in `NativeLLMProvider.generate`/`agenerate`
+        # provides the attempt-count-based retry instead.
+        return {
             "model": config.repo_id,
             "provider": config.provider,
             "token": api_key.get_secret_value(),
+            "timeout": self._timeout(config),
         }
-        timeout = resolve_timeout(config.timeout, self._client_options)
-        if timeout is not None:
-            kwargs["timeout"] = timeout
 
-        # `config.max_retries`/`client_options.max_retries` are intentionally not wired
-        # in: `InferenceClient`/`AsyncInferenceClient` have no built-in retry-count
-        # knob. The platform's own `@with_retry()` decorator on `agenerate` already
-        # provides equivalent attempt-count-based retry behavior.
-        return kwargs
+    def _is_transient(self, exc: Exception) -> bool:
+        # `InferenceTimeoutError` is a builtin `TimeoutError`, which the base rule covers.
+        if isinstance(exc, httpx.TransportError):
+            return True
+        if isinstance(exc, HfHubHTTPError):
+            # `response` is optional from huggingface_hub 2.x on.
+            return exc.response is not None and is_transient_status(
+                exc.response.status_code
+            )
+        return super()._is_transient(exc)
 
     def _async_client(
         self, config: HuggingFaceGenerationConfig

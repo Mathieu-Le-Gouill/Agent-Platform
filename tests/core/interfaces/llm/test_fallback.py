@@ -129,6 +129,82 @@ class TestAgenerate:
         primary.agenerate.assert_not_called()
 
 
+class TestCircuitCounting:
+    """Only a retryable failure counts against an entry's circuit; any failure falls through."""
+
+    @staticmethod
+    def _chain(primary: MagicMock, secondary: MagicMock) -> FallbackLLMProvider:
+        return FallbackLLMProvider(
+            [
+                FallbackEntry(provider=primary, model="model-a"),
+                FallbackEntry(provider=secondary, model="model-b"),
+            ]
+        )
+
+    @staticmethod
+    def _failing_stream(error: Exception):
+        def _raise(*args, **kwargs):
+            raise error
+
+        return _raise
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("retryable", "expected_state"),
+        [(False, CircuitState.CLOSED), (True, CircuitState.OPEN)],
+    )
+    async def test_agenerate(self, prompt, retryable, expected_state):
+        primary = _mock_provider()
+        primary.agenerate.side_effect = ProviderError("bad", retryable=retryable)
+        secondary = _mock_provider()
+        secondary.agenerate.return_value = make_fake_llm_response("secondary")
+        chain = self._chain(primary, secondary)
+
+        for _ in range(5):
+            result = await chain.agenerate(prompt)
+            assert result.message.text == "secondary"
+
+        assert chain._circuits[0].state is expected_state
+
+    @pytest.mark.parametrize(
+        ("retryable", "expected_state"),
+        [(False, CircuitState.CLOSED), (True, CircuitState.OPEN)],
+    )
+    def test_generate(self, prompt, retryable, expected_state):
+        primary = _mock_provider()
+        primary.generate.side_effect = ProviderError("bad", retryable=retryable)
+        secondary = _mock_provider()
+        secondary.generate.return_value = make_fake_llm_response("secondary")
+        chain = self._chain(primary, secondary)
+
+        for _ in range(5):
+            assert chain.generate(prompt).message.text == "secondary"
+
+        assert chain._circuits[0].state is expected_state
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("retryable", "expected_state"),
+        [(False, CircuitState.CLOSED), (True, CircuitState.OPEN)],
+    )
+    async def test_stream(self, prompt, retryable, expected_state):
+        primary = _mock_provider()
+        primary.stream.side_effect = self._failing_stream(
+            ProviderError("bad", retryable=retryable)
+        )
+        secondary = _mock_provider()
+        secondary.stream.side_effect = lambda *a, **kw: make_fake_stream(
+            make_text_stream_chunks(["ok"])
+        )
+        chain = self._chain(primary, secondary)
+
+        for _ in range(5):
+            chunks = [c async for c in chain.stream(prompt)]
+            assert [c.delta for c in chunks if c.delta] == ["ok"]
+
+        assert chain._circuits[0].state is expected_state
+
+
 class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_agenerate_acquires_from_rate_limiter(self, prompt):

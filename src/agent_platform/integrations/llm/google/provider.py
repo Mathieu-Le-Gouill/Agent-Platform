@@ -5,10 +5,25 @@ from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING
 from uuid import uuid4
 
+import httpx
 from google import genai
+from google.genai import errors as genai_errors
 from google.genai import types
 
-from agent_platform.core.credentials import resolve_credentials
+# google-genai sends async calls through aiohttp whenever it is installed, and
+# aiohttp's connection errors are neither `ConnectionError` nor httpx errors.
+try:
+    from aiohttp import ClientConnectionError as _AiohttpConnectionError
+
+    _AIOHTTP_CONNECTION_ERROR: type[Exception] | None = _AiohttpConnectionError
+except ImportError:  # pragma: no cover - aiohttp is optional
+    _AIOHTTP_CONNECTION_ERROR = None
+
+from agent_platform.core.credentials import (
+    ClientOptions,
+    resolve_client_options,
+    resolve_credentials,
+)
 from agent_platform.core.errors import require_secret
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
@@ -20,7 +35,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import GoogleCredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
 from agent_platform.integrations.llm.google.mappers import (
     from_native_response,
@@ -43,8 +58,13 @@ class GoogleLLM(
     _provider_name = "google"
     _missing_api_key_message = "Google API key is required but was not provided"
 
-    def __init__(self, credentials: GoogleCredentials | None = None) -> None:
+    def __init__(
+        self,
+        credentials: GoogleCredentials | None = None,
+        client_options: ClientOptions | None = None,
+    ) -> None:
         self._credentials = resolve_credentials(credentials, GoogleCredentials)
+        self._client_options = resolve_client_options(client_options)
 
     def _tool_to_schema(self, tool: Tool) -> types.Tool:
         return types.Tool(
@@ -64,7 +84,21 @@ class GoogleLLM(
         api_key = require_secret(
             self._credentials.api_key, self._missing_api_key_message
         )
-        return genai.Client(api_key=api_key.get_secret_value())
+        return genai.Client(
+            api_key=api_key.get_secret_value(),
+            http_options=types.HttpOptions(timeout=int(self._timeout(config) * 1000)),
+        )
+
+    def _is_transient(self, exc: Exception) -> bool:
+        if isinstance(exc, httpx.TransportError):
+            return True
+        if _AIOHTTP_CONNECTION_ERROR is not None and isinstance(
+            exc, _AIOHTTP_CONNECTION_ERROR
+        ):
+            return True
+        if isinstance(exc, genai_errors.APIError):
+            return is_transient_status(exc.code)
+        return super()._is_transient(exc)
 
     def _async_client(self, config: GoogleGenerationConfig) -> genai.Client:
         # Single client class, no sync/async split (like Mistral): async calls

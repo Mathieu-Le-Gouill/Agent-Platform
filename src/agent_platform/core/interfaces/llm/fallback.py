@@ -133,7 +133,7 @@ class FallbackLLMProvider(BaseLLMProvider):
                     yielded_any = True
                     yield chunk
             except Exception as exc:  # noqa: BLE001
-                circuit.record_failure()
+                circuit.record_error(exc)
                 if yielded_any:
                     raise
                 last_exc = exc

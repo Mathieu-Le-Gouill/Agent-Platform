@@ -11,7 +11,7 @@ core/
 ├── base.py           # Entity (UUID mixin), Timestamped
 ├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains), RequestOptions (ProviderConfig subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs)
 ├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
-├── retry.py          # with_retry() decorator: exponential backoff, honors PlatformError.retryable
+├── retry.py          # retry_async()/retry_sync() per-call retry and the with_retry() decorator: exponential backoff, honors PlatformError.retryable
 ├── resilience.py     # CircuitBreaker (open/half-open/closed state machine), RateLimiter (token bucket)
 ├── middleware.py     # Middleware protocol + MiddlewarePipeline: generic pre/post hooks around a typed operation
 ├── persistence.py    # Checkpointer[StateT] protocol + InMemoryCheckpointer
@@ -71,7 +71,7 @@ interfaces/<domain>/
 └── response.py       # Pydantic response model(s)
 ```
 
-`interfaces/llm/` has one file beyond that fixed pattern: `fallback.py`'s `FallbackLLMProvider` (+ `FallbackEntry`), a `BaseLLMProvider` implementation that tries an ordered list of other `BaseLLMProvider`s, one `CircuitBreaker` per entry, falling through to the next on failure (see `resilience.py` below). It belongs here rather than in `integrations/` because it composes the ABC generically and imports no vendor SDK, same rule as everything else in `interfaces/`.
+`interfaces/llm/` has one file beyond that fixed pattern: `fallback.py`'s `FallbackLLMProvider` (+ `FallbackEntry`), a `BaseLLMProvider` implementation that tries an ordered list of other `BaseLLMProvider`s, one `CircuitBreaker` per entry, falling through to the next on every failure, though only a retryable one counts against that entry's circuit (see `resilience.py` below). It belongs here rather than in `integrations/` because it composes the ABC generically and imports no vendor SDK, same rule as everything else in `interfaces/`.
 
 An interface ABC **never imports from `integrations/`**, **never imports from `components/`**, and **never imports from `pipelines/`**. It may only use `core/schemas/`, `core/config.py`, `core/errors.py`, and `core/credentials.py`. Every domain's `config.py` defines a `<Domain>Config` that extends `core/config.py`'s `ProviderConfig`, the shared base for all provider configs. Domains whose providers are parameterized by a model id (llm, embeddings, reranking, speech, image_generation) extend `ModelConfig` instead, which adds `model: str` on top of `ProviderConfig`; domains without a model concept (loader, chunking, clustering, vad, ocr, translation, classification, vector_store, dataset) extend `ProviderConfig` directly.
 
@@ -105,7 +105,7 @@ PlatformError
 └── ToolError
 ```
 
-Every error carries `code`, `retryable`, and `context` fields. `retry.py`'s `with_retry()` decorator (exponential backoff with jitter, `max_attempts`/`retry_on` configurable) checks this flag: if a caught exception is a `PlatformError` with `retryable=False`, it re-raises immediately instead of burning through retry attempts. Since every current `@with_retry()` call site in `integrations/` sits *inside* an outer `@error_logged(re_raise=ProviderError)` (decorator order: `error_logged` above `with_retry`), `with_retry` there only ever sees the raw underlying SDK exception, never the translated `PlatformError`, so this flag-check is a no-op for those call sites today; it takes effect wherever `with_retry` wraps a call that itself raises `PlatformError` directly (e.g. a tool or agent-loop retry).
+Every error carries `code`, `retryable`, and `context` fields. `retry.py` holds the retry loop in two per-call functions, `retry_async(attempt_once, max_attempts=...)` and `retry_sync(...)` (exponential backoff with jitter, `retry_on` configurable; the sync one sleeps with `time.sleep`), and the `with_retry()` decorator delegates to the async one. They check this flag: if a caught exception is a `PlatformError` with `retryable=False`, it re-raises immediately instead of burning through retry attempts. For most `@with_retry()` call sites in `integrations/`, which sit *inside* an outer `@error_logged(re_raise=ProviderError)`, the decorator only sees the raw underlying SDK exception, so the flag-check is a no-op there. The `llm` providers are the exception: `NativeLLMProvider.generate`/`agenerate` classify each vendor error as temporary or not inside one attempt (`ProviderError(retryable=...)`) and run the attempts through `retry_sync`/`retry_async`, so a bad request fails after one call and `retryable` is honored.
 
 ### `interfaces/tracing/`: The Backend Contract
 
@@ -165,7 +165,7 @@ with observe(LLMCall(provider="openai", request_model=model)) as call:
 
 Prompts, tool arguments and tool results are the most useful thing in a trace and the most likely to contain personal data, so they are **off by default**. What is always exported is the shape of a payload, never its content: `payload_facts(value)` returns its serialized size in bytes and a 16-character sha256 digest, which is enough to spot an oversized argument or to tell two identical calls apart without a backend ever seeing the text.
 
-`capture_content()` decides whether the content itself is exported, reading `AGENT_PLATFORM_CAPTURE_CONTENT` per call, so toggling it needs no restart. It is the only switch: a backend never decides capture itself.
+`capture_content()` decides whether the content itself is exported, reading `AGENT_PLATFORM_CAPTURE_CONTENT` per call, so toggling it needs no restart. It is the only switch: a backend never decides capture itself. It also covers errors: without it, a span's error carries the exception type only, never its message or stack trace.
 
 ### `observability/decorators.py`: `@traced`
 
@@ -174,7 +174,7 @@ Prompts, tool arguments and tool results are the most useful thing in a trace an
 
 ### `resilience.py`: Circuit Breaker & Rate Limiter
 
-Sits alongside `retry.py` rather than replacing it: `with_retry()` retries a single failing call, `CircuitBreaker` and `RateLimiter` guard a call site's overall traffic. `CircuitBreaker(failure_threshold, reset_timeout)` wraps an async callable via `call(func, *args, **kwargs)`; it tracks consecutive failures, opens (raising `ProviderError(retryable=True)` without invoking `func`) once `failure_threshold` is hit, and moves to half-open after `reset_timeout` seconds elapse, a single success there closes it again, a failure reopens it. `RateLimiter(rate, burst=None)` is a token-bucket limiter (`burst` defaults to `rate`, i.e. one second of headroom); `await acquire(tokens=1.0)` blocks until enough tokens have replenished. Both are generic over any async callable, no `agents/tools/` concept involved. `record_success()`/`record_failure()` on `CircuitBreaker` are public (not just reachable through `call()`) so a call site that can't route through an awaited wrapper, a sync call, or one step of a streaming response, can still report the outcome; `core/interfaces/llm/fallback.py::FallbackLLMProvider` is the first such consumer. `CircuitBreaker` is wired into that per-provider LLM fallback chain; `RateLimiter` remains available but unused by any call site so far.
+Sits alongside `retry.py` rather than replacing it: `with_retry()` retries a single failing call, `CircuitBreaker` and `RateLimiter` guard a call site's overall traffic. `CircuitBreaker(failure_threshold, reset_timeout)` wraps an async callable via `call(func, *args, **kwargs)`; it tracks consecutive failures, opens (raising `ProviderError(retryable=True)` without invoking `func`) once `failure_threshold` is hit, and moves to half-open after `reset_timeout` seconds elapse, a single success there closes it again, a failure reopens it. A `PlatformError` with `retryable=False` (a bad request, a revoked key) is re-raised without counting as a failure, since it says nothing about the service being down. `RateLimiter(rate, burst=None)` is a token-bucket limiter (`burst` defaults to `rate`, i.e. one second of headroom); `await acquire(tokens=1.0)` blocks until enough tokens have replenished. Both are generic over any async callable, no `agents/tools/` concept involved. `record_success()`/`record_failure()`/`record_error(exc)` on `CircuitBreaker` are public (not just reachable through `call()`; `record_error` applies the non-retryable rule before counting) so a call site that can't route through an awaited wrapper, a sync call, or one step of a streaming response, can still report the outcome; `core/interfaces/llm/fallback.py::FallbackLLMProvider` is the first such consumer. `CircuitBreaker` is wired into that per-provider LLM fallback chain; `RateLimiter` remains available but unused by any call site so far.
 
 ### `middleware.py`: Generic Pre/Post Hooks
 

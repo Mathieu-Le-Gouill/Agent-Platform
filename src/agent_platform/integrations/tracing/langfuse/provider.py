@@ -12,7 +12,7 @@ from langfuse import Langfuse
 from agent_platform.core.interfaces.tracing.base import BaseTracer
 from agent_platform.core.interfaces.tracing.noop import NoOpSpan, NoOpTracer
 from agent_platform.core.interfaces.tracing.span import AttributeValue, Span
-from agent_platform.core.observability import ERROR_TYPE_KEY
+from agent_platform.core.observability import ERROR_TYPE_KEY, capture_content
 from agent_platform.integrations.tracing.langfuse.mapping import (
     ObservationType,
     observation_type,
@@ -55,7 +55,15 @@ class LangfuseSpan:
     def record_error(self, exc: Exception, *, record_exception: bool = True) -> None:
         # The SDK has no public stack-trace API, so the exception type goes in
         # the status message when the caller wants the exception recorded.
-        message = f"{type(exc).__qualname__}: {exc}" if record_exception else str(exc)
+        # An exception message can hold user data or secrets, so without
+        # content capture only the type is exported.
+        type_name = type(exc).__qualname__
+        if not capture_content():
+            message = type_name
+        elif record_exception:
+            message = f"{type_name}: {exc}"
+        else:
+            message = str(exc)
         self._observation.update(
             level="ERROR",
             status_message=message,
@@ -119,6 +127,12 @@ class LangfuseTracer(BaseTracer):
         start = attributes or {}
         as_type = observation_type(start)
         fields = update_fields(as_type, start)
+        # The SDK's observation context records any exception that leaves it,
+        # message and stack trace included, whatever `capture_content()` says.
+        # An `Exception` is therefore held back until that context has closed
+        # and re-raised after it; `LangfuseSpan.record_error` exports the
+        # error under the capture policy instead.
+        failure: Exception | None = None
         with client.start_as_current_observation(
             name=name, as_type=as_type, **fields
         ) as observation:
@@ -126,8 +140,12 @@ class LangfuseTracer(BaseTracer):
             token = _current.set(span)
             try:
                 yield span
+            except Exception as exc:
+                failure = exc
             finally:
                 _current.reset(token)
+        if failure is not None:
+            raise failure
 
     def current_span(self) -> Span:
         if self._client is None:

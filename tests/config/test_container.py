@@ -1,4 +1,5 @@
 from typing import Any
+from uuid import uuid4
 
 import pytest
 
@@ -17,6 +18,7 @@ from agent_platform.core.interfaces.llm.fallback import FallbackLLMProvider
 from agent_platform.core.interfaces.mcp.base import BaseMCPClient
 from agent_platform.core.interfaces.tracing.noop import NoOpTracer
 from agent_platform.core.schemas.mcp import MCPToolSpec
+from agent_platform.core.schemas.message import Message, UserMessage
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations import llm as llm_module
 from agent_platform.integrations.llm.anthropic.provider import AnthropicLLM
@@ -54,6 +56,37 @@ class TestBuildAgent:
 
         with pytest.raises(ConfigError):
             build_agent(settings)
+
+    @staticmethod
+    async def _kept_user_turns(agent: ConversationAgent, sent: int) -> int:
+        history: list[Message] = [UserMessage(content=f"turn {i}") for i in range(sent)]
+        assert agent._context_strategy is not None
+        trimmed = await agent._context_strategy.trim(history)
+        return len(trimmed)
+
+    @pytest.mark.asyncio
+    async def test_keeps_the_last_20_user_turns_by_default(self):
+        agent = build_agent(Settings(_env_file=None))
+
+        assert await self._kept_user_turns(agent, sent=30) == 20
+
+    @pytest.mark.asyncio
+    async def test_max_history_turns_setting_sets_the_limit(self):
+        agent = build_agent(Settings(_env_file=None, max_history_turns=3))
+
+        assert await self._kept_user_turns(agent, sent=30) == 3
+
+    @pytest.mark.asyncio
+    async def test_a_forked_conversation_keeps_the_limit(self):
+        agent = build_agent(Settings(_env_file=None, max_history_turns=3))
+
+        fork = agent.with_conversation(uuid4())
+
+        assert await self._kept_user_turns(fork, sent=30) == 3
+
+    def test_max_history_turns_must_be_positive(self):
+        with pytest.raises(ValueError):
+            Settings(_env_file=None, max_history_turns=0)
 
     def test_has_a_token_usage_aggregator_wired_in(self):
         settings = Settings(_env_file=None)

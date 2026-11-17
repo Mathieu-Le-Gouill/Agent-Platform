@@ -116,12 +116,14 @@ and can proceed in parallel.
   (order-preserving).
 - ~~`with_retry` retries any exception regardless of `PlatformError.retryable`~~
   **done**: `core/retry.py`'s `with_retry()` now re-raises immediately on a
-  `PlatformError` with `retryable=False`. Note this is currently a no-op for
-  every existing `integrations/` call site, since they all wrap `with_retry()`
-  *inside* an outer `@error_logged(re_raise=ProviderError)`, so `with_retry`
-  only ever sees the raw pre-translation SDK exception there; it activates
-  wherever a future call site wraps something that raises `PlatformError`
-  directly (a tool, the agent loop).
+  `PlatformError` with `retryable=False`. Note this is a no-op for most
+  `integrations/` call sites, since they wrap `with_retry()` *inside* an outer
+  `@error_logged(re_raise=ProviderError)`, so `with_retry` only ever sees the
+  raw pre-translation SDK exception there. It applies to `llm`'s `generate`
+  and `agenerate`, whose providers classify each vendor error as a retryable
+  or non-retryable `ProviderError` inside the attempt, and wherever a call
+  site wraps something that raises `PlatformError` directly (a tool, the agent
+  loop).
 - ~~Context management: `ConversationAgent` only truncates by turn count~~
   **done**: `TokenBudgetStrategy` (token-budget-aware trimming, injected
   token counter) and `SummarizingStrategy` (folds dropped turns into an

@@ -3,6 +3,7 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any, cast
 
+import anthropic
 from anthropic import Anthropic, AsyncAnthropic, AsyncStream
 from anthropic.types import Message, RawMessageStreamEvent
 
@@ -11,7 +12,6 @@ from agent_platform.core.credentials import (
     resolve_client_options,
     resolve_credentials,
     resolve_max_retries,
-    resolve_timeout,
 )
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
 from agent_platform.core.interfaces.llm.batch import (
@@ -32,7 +32,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import AnthropicCredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 from agent_platform.integrations.llm.anthropic.mappers import (
     batch_job_from_native,
@@ -70,27 +70,44 @@ class AnthropicLLM(
     def _default_config(self) -> AnthropicGenerationConfig:
         return AnthropicGenerationConfig()
 
-    def _client_kwargs(self, config: AnthropicGenerationConfig) -> dict[str, Any]:
+    def _client_kwargs(
+        self, config: AnthropicGenerationConfig, *, sdk_retries: int = 0
+    ) -> dict[str, Any]:
         api_key = require_secret(
             self._credentials.api_key, self._missing_api_key_message
         )
-        kwargs: dict[str, Any] = {
+        return {
             "api_key": api_key.get_secret_value(),
             "base_url": self._client_options.base_url,
-            "max_retries": resolve_max_retries(
-                config.max_retries, self._client_options
-            ),
+            "max_retries": sdk_retries,
+            "timeout": self._timeout(config),
         }
-        timeout = resolve_timeout(config.timeout, self._client_options)
-        if timeout is not None:
-            kwargs["timeout"] = timeout
-        return kwargs
 
+    # `generate`/`agenerate` retry on the platform side, so their clients make
+    # no SDK retries; only the streaming client keeps them.
     def _async_client(self, config: AnthropicGenerationConfig) -> AsyncAnthropic:
         return AsyncAnthropic(**self._client_kwargs(config))
 
     def _sync_client(self, config: AnthropicGenerationConfig) -> Anthropic:
         return Anthropic(**self._client_kwargs(config))
+
+    def _stream_client(self, config: AnthropicGenerationConfig) -> AsyncAnthropic:
+        return AsyncAnthropic(
+            **self._client_kwargs(
+                config,
+                sdk_retries=resolve_max_retries(
+                    config.max_retries, self._client_options
+                ),
+            )
+        )
+
+    def _is_transient(self, exc: Exception) -> bool:
+        # `APITimeoutError` is a subclass of `APIConnectionError`.
+        if isinstance(exc, anthropic.APIConnectionError):
+            return True
+        if isinstance(exc, anthropic.APIStatusError):
+            return is_transient_status(exc.status_code)
+        return super()._is_transient(exc)
 
     def _invoke_sync(
         self,
@@ -142,7 +159,7 @@ class AnthropicLLM(
         tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
-        client = self._async_client(config)
+        client = self._stream_client(config)
         system, messages = to_native_messages(prompt)
         params = to_native_params(config)
         if system:

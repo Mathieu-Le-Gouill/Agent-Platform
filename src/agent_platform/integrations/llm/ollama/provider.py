@@ -6,14 +6,13 @@ from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import httpx
-from ollama import AsyncClient, ChatResponse, Client
+from ollama import AsyncClient, ChatResponse, Client, ResponseError
 
 from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
     resolve_max_retries,
-    resolve_timeout,
 )
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
@@ -25,7 +24,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import OllamaCredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.ollama.mappers import (
     from_native_response,
@@ -73,34 +72,43 @@ class OllamaLLM(
         base_url = self._client_options.base_url or from_env(
             "OLLAMA_BASE_URL", _DEFAULT_BASE_URL
         )
-        kwargs: dict[str, Any] = {"host": base_url}
-        timeout = resolve_timeout(config.timeout, self._client_options)
-        if timeout is not None:
-            kwargs["timeout"] = timeout
-        return kwargs
+        return {"host": base_url, "timeout": self._timeout(config)}
 
     def _max_retries(self, config: OllamaGenerationConfig) -> int:
         return resolve_max_retries(config.max_retries, self._client_options)
 
+    # `Client`/`AsyncClient` forward unrecognized kwargs straight to the
+    # underlying `httpx` client, so retries are set through a custom transport.
+    # `generate`/`agenerate` retry on the platform side (a full-request retry
+    # on any temporary failure), so their transports make no retries of their
+    # own. `httpx`'s transport-level `retries` only covers connection
+    # establishment (`ConnectError`/`ConnectTimeout`), not mid-response
+    # errors, but it is the only retry coverage `stream()` gets, so the
+    # streaming client keeps it.
     def _async_client(self, config: OllamaGenerationConfig) -> AsyncClient:
-        # `Client`/`AsyncClient` forward unrecognized kwargs straight to the
-        # underlying `httpx` client, so `max_retries` is wired through a
-        # custom transport rather than dropped. Unlike the platform's own
-        # `@with_retry()` (full-request retry on any exception, used on
-        # `agenerate`), `httpx`'s transport-level `retries` only covers
-        # connection-establishment failures (`ConnectError`/`ConnectTimeout`),
-        # not mid-response errors — but it's the only retry coverage `stream()`
-        # and the sync `generate()` get, since neither carries `@with_retry()`.
         return AsyncClient(
-            transport=httpx.AsyncHTTPTransport(retries=self._max_retries(config)),
+            transport=httpx.AsyncHTTPTransport(retries=0),
             **self._client_kwargs(config),
         )
 
     def _sync_client(self, config: OllamaGenerationConfig) -> Client:
         return Client(
-            transport=httpx.HTTPTransport(retries=self._max_retries(config)),
+            transport=httpx.HTTPTransport(retries=0),
             **self._client_kwargs(config),
         )
+
+    def _stream_client(self, config: OllamaGenerationConfig) -> AsyncClient:
+        return AsyncClient(
+            transport=httpx.AsyncHTTPTransport(retries=self._max_retries(config)),
+            **self._client_kwargs(config),
+        )
+
+    def _is_transient(self, exc: Exception) -> bool:
+        if isinstance(exc, httpx.TransportError):
+            return True
+        if isinstance(exc, ResponseError):
+            return is_transient_status(exc.status_code)
+        return super()._is_transient(exc)
 
     def _invoke_sync(
         self,
@@ -140,7 +148,7 @@ class OllamaLLM(
         tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         config = config or self._default_config()
-        client = self._async_client(config)
+        client = self._stream_client(config)
         messages = to_native_messages(prompt)
         params = to_native_params(config)
         if tools:

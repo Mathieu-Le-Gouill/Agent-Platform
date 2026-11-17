@@ -11,7 +11,7 @@ from agent_platform.core.errors import (
     catch_noraise,
     error_logged,
 )
-from agent_platform.core.retry import with_retry
+from agent_platform.core.retry import retry_async, retry_sync, with_retry
 from agent_platform.core.schemas import (
     AssistantMessage,
     AudioBlock,
@@ -77,6 +77,8 @@ __all__ = [
     "MissingCredentialError",
     "error_logged",
     "with_retry",
+    "retry_async",
+    "retry_sync",
     "catch_noraise",
     "ClientOptions",
     "Credentials",

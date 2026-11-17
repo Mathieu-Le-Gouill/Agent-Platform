@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
+from huggingface_hub.errors import HfHubHTTPError, InferenceTimeoutError
 from pydantic import BaseModel, SecretStr
 
 from agent_platform.agents.tools.base import Tool
@@ -332,13 +334,35 @@ class TestHuggingFaceLLMConstruction:
         assert kwargs["model"] == "test/model"
         assert kwargs["provider"] == "cerebras"
         assert kwargs["token"] == "hf_test"
-        assert "timeout" not in kwargs
+        assert kwargs["timeout"] == 120.0
 
     def test_client_kwargs_explicit_timeout(self):
         provider = HuggingFaceLLM(_creds())
         cfg = HuggingFaceGenerationConfig(timeout=30.0)
         kwargs = provider._client_kwargs(cfg)
         assert kwargs["timeout"] == 30.0
+
+    @staticmethod
+    def _status_error(status: int) -> HfHubHTTPError:
+        response = httpx.Response(status, request=httpx.Request("POST", "http://x"))
+        return HfHubHTTPError("boom", response=response)
+
+    @pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+    def test_a_client_error_is_not_transient(self, status):
+        provider = HuggingFaceLLM(_creds())
+        assert provider._is_transient(self._status_error(status)) is False
+
+    @pytest.mark.parametrize("status", [408, 409, 429, 500, 503])
+    def test_a_temporary_status_is_transient(self, status):
+        provider = HuggingFaceLLM(_creds())
+        assert provider._is_transient(self._status_error(status)) is True
+
+    def test_a_timeout_or_connection_error_is_transient(self):
+        provider = HuggingFaceLLM(_creds())
+
+        assert provider._is_transient(InferenceTimeoutError("slow"))
+        assert provider._is_transient(httpx.ConnectError("down"))
+        assert provider._is_transient(ValueError("other")) is False
 
 
 class TestHuggingFaceLLMGenerate:

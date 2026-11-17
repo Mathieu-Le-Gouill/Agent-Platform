@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
+from ollama import ResponseError
 from pydantic import BaseModel
 
 from agent_platform.agents.tools.base import Tool
@@ -324,10 +326,10 @@ class TestOllamaLLMConstruction:
         client = provider._async_client(cfg)
         assert client is not None
 
-    def test_client_kwargs_default_no_timeout(self):
+    def test_client_kwargs_default_timeout(self):
         provider = OllamaLLM()
         kwargs = provider._client_kwargs(OllamaGenerationConfig())
-        assert "timeout" not in kwargs
+        assert kwargs["timeout"] == 120.0
 
     def test_client_kwargs_default_host_falls_back_to_localhost(self):
         provider = OllamaLLM()
@@ -355,17 +357,38 @@ class TestOllamaLLMConstruction:
         cfg = OllamaGenerationConfig(max_retries=5)
         assert provider._max_retries(cfg) == 5
 
-    def test_client_wires_max_retries_into_async_transport(self):
+    def test_generate_client_makes_no_transport_retries(self):
         provider = OllamaLLM()
         client = provider._async_client(OllamaGenerationConfig(max_retries=2))
-        transport = client._client._transport
-        assert transport._pool._retries == 2
+        assert client._client._transport._pool._retries == 0
 
-    def test_sync_client_wires_max_retries_into_transport(self):
+    def test_sync_generate_client_makes_no_transport_retries(self):
         provider = OllamaLLM()
         client = provider._sync_client(OllamaGenerationConfig(max_retries=4))
-        transport = client._client._transport
-        assert transport._pool._retries == 4
+        assert client._client._transport._pool._retries == 0
+
+    def test_stream_client_wires_max_retries_into_transport(self):
+        provider = OllamaLLM()
+        client = provider._stream_client(OllamaGenerationConfig(max_retries=2))
+        assert client._client._transport._pool._retries == 2
+
+    @pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+    def test_a_client_error_is_not_transient(self, status):
+        provider = OllamaLLM()
+        assert provider._is_transient(ResponseError("bad", status)) is False
+
+    @pytest.mark.parametrize("status", [408, 409, 429, 500, 503])
+    def test_a_temporary_status_is_transient(self, status):
+        provider = OllamaLLM()
+        assert provider._is_transient(ResponseError("busy", status)) is True
+
+    def test_a_timeout_or_connection_error_is_transient(self):
+        provider = OllamaLLM()
+
+        assert provider._is_transient(httpx.ReadTimeout("slow"))
+        assert provider._is_transient(httpx.ConnectError("down"))
+        assert provider._is_transient(ConnectionError("down"))
+        assert provider._is_transient(ValueError("other")) is False
 
 
 class TestOllamaLLMGenerate:

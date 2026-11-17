@@ -97,10 +97,11 @@ def mock_llm():
 
 @pytest.fixture
 def no_retry_sleep(monkeypatch) -> None:
-    """Skip the real sleep delay in core.retry's retry-with-backoff helper."""
+    """Skip the real sleep delay in core.retry's retry-with-backoff helpers (async and sync)."""
     import agent_platform.core.retry as retry_mod
 
     monkeypatch.setattr(retry_mod.asyncio, "sleep", AsyncMock())
+    monkeypatch.setattr(retry_mod.time, "sleep", MagicMock())
 
 
 @dataclass

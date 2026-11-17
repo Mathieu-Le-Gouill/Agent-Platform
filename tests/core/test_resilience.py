@@ -111,6 +111,60 @@ class TestCircuitBreaker:
         assert breaker.state is CircuitState.OPEN
 
 
+class TestCircuitBreakerErrorKinds:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        ("retryable", "expected_state"),
+        [(False, CircuitState.CLOSED), (True, CircuitState.OPEN)],
+    )
+    async def test_acall_counts_only_retryable_platform_errors(
+        self, retryable, expected_state
+    ):
+        breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30.0)
+        error = ProviderError("bad", retryable=retryable)
+
+        async def fails():
+            raise error
+
+        for _ in range(5):
+            with pytest.raises(ProviderError) as caught:
+                await breaker.acall(fails)
+            assert caught.value is error
+
+        assert breaker.state is expected_state
+
+    @pytest.mark.parametrize(
+        ("retryable", "expected_state"),
+        [(False, CircuitState.CLOSED), (True, CircuitState.OPEN)],
+    )
+    def test_call_counts_only_retryable_platform_errors(
+        self, retryable, expected_state
+    ):
+        breaker = CircuitBreaker(failure_threshold=5, reset_timeout=30.0)
+        error = ProviderError("bad", retryable=retryable)
+
+        def fails():
+            raise error
+
+        for _ in range(5):
+            with pytest.raises(ProviderError) as caught:
+                breaker.call(fails)
+            assert caught.value is error
+
+        assert breaker.state is expected_state
+
+    def test_record_error_counts_retryable_and_raw_errors_only(self):
+        breaker = CircuitBreaker(failure_threshold=2, reset_timeout=30.0)
+
+        breaker.record_error(ProviderError("bad", retryable=False))
+        breaker.record_error(ProviderError("bad", retryable=False))
+        assert breaker.state is CircuitState.CLOSED
+
+        breaker.record_error(ProviderError("down", retryable=True))
+        breaker.record_error(RuntimeError("raw"))
+        assert breaker.state is CircuitState.OPEN
+
+
 class TestRateLimiter:
     @pytest.mark.asyncio
     async def test_acquire_within_burst_does_not_wait(self, mocker):

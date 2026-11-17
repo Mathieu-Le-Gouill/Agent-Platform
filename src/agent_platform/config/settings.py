@@ -42,6 +42,9 @@ class Settings(BaseSettings):
     agent_name: str = "assistant"
     agent_system_prompt: str | None = None
     max_iterations: int = 10
+    # Most recent user turns an agent keeps in a conversation's history; older
+    # turns are dropped so a long conversation stays within the model's context.
+    max_history_turns: int = Field(default=20, ge=1)
     log_level: str = "INFO"
     # Tracing backend slug resolved against integrations/tracing's
     # PROVIDER_ALIASES by config/container.py::build_tracer, or "none" to

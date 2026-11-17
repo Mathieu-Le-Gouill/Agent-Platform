@@ -1,3 +1,4 @@
+import asyncio
 import json
 import logging
 from dataclasses import dataclass
@@ -171,20 +172,56 @@ class TestEvents:
         }
 
 
+def everything_exported(span) -> str:
+    """Every attribute, event and status description of a span, as one string."""
+    events = [(e.name, dict(e.attributes or {})) for e in span.events]
+    return f"{dict(span.attributes)} {events} {span.status.description}"
+
+
 class TestErrors:
-    def test_a_raised_error_exports_level_error_and_the_error_type(self, exported):
+    def test_a_raised_error_exports_only_its_type_without_capture(self, exported):
         with pytest.raises(ValueError):
             with observe(ToolRun(tool_name="t")):
-                raise ValueError("boom")
+                raise ValueError("secret-text")
 
         span = exported.get("execute_tool")
         assert span.attributes[Attr.OBSERVATION_LEVEL] == "ERROR"
-        assert span.attributes[Attr.OBSERVATION_STATUS_MESSAGE] == "ValueError: boom"
+        assert span.attributes[Attr.OBSERVATION_STATUS_MESSAGE] == "ValueError"
+        assert metadata(span, "error.type") == "ValueError"
+        assert "secret-text" not in everything_exported(span)
+
+    def test_a_raised_error_exports_its_message_with_capture(
+        self, exported, monkeypatch
+    ):
+        monkeypatch.setenv("AGENT_PLATFORM_CAPTURE_CONTENT", "true")
+
+        with pytest.raises(ValueError):
+            with observe(ToolRun(tool_name="t")):
+                raise ValueError("secret-text")
+
+        span = exported.get("execute_tool")
+        assert span.attributes[Attr.OBSERVATION_LEVEL] == "ERROR"
+        assert (
+            span.attributes[Attr.OBSERVATION_STATUS_MESSAGE]
+            == "ValueError: secret-text"
+        )
         assert metadata(span, "error.type") == "ValueError"
 
-    def test_a_swallowed_error_exports_the_message_without_the_type_prefix(
-        self, exported
+    def test_a_swallowed_error_exports_only_its_type_without_capture(self, exported):
+        with observe(ToolRun(tool_name="t")) as run:
+            run.record_error(RuntimeError("secret-text"))
+
+        span = exported.get("execute_tool")
+        assert span.attributes[Attr.OBSERVATION_LEVEL] == "ERROR"
+        assert span.attributes[Attr.OBSERVATION_STATUS_MESSAGE] == "RuntimeError"
+        assert metadata(span, "error.type") == "RuntimeError"
+        assert "secret-text" not in everything_exported(span)
+
+    def test_a_swallowed_error_exports_the_message_with_capture(
+        self, exported, monkeypatch
     ):
+        monkeypatch.setenv("AGENT_PLATFORM_CAPTURE_CONTENT", "true")
+
         with observe(ToolRun(tool_name="t")) as run:
             run.record_error(RuntimeError("denied"))
 
@@ -192,6 +229,20 @@ class TestErrors:
         assert span.attributes[Attr.OBSERVATION_LEVEL] == "ERROR"
         assert span.attributes[Attr.OBSERVATION_STATUS_MESSAGE] == "denied"
         assert metadata(span, "error.type") == "RuntimeError"
+
+    def test_the_caller_still_receives_the_original_exception(self, exported):
+        original = ValueError("secret-text")
+
+        with pytest.raises(ValueError) as caught:
+            with observe(ToolRun(tool_name="t")):
+                raise original
+
+        assert caught.value is original
+
+    def test_cancellation_still_propagates(self, exported):
+        with pytest.raises(asyncio.CancelledError):
+            with observe(ToolRun(tool_name="t")):
+                raise asyncio.CancelledError()
 
 
 class TestPayloadContent:

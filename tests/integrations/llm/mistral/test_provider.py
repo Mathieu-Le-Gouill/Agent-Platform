@@ -1,7 +1,9 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import httpx
 import pytest
+from mistralai.models.mistralerror import MistralError
 from pydantic import BaseModel, SecretStr
 
 from agent_platform.agents.tools.base import Tool
@@ -314,6 +316,34 @@ class TestMistralLLMClient:
         assert client is mock_mistral.return_value
         _, kwargs = mock_mistral.call_args
         assert kwargs["timeout_ms"] == 30000
+
+    def test_client_defaults_to_a_120_second_timeout(self, mocker):
+        mock_mistral = mocker.patch(
+            "agent_platform.integrations.llm.mistral.provider.Mistral"
+        )
+        MistralLLM(_creds())._async_client(MistralGenerationConfig())
+        _, kwargs = mock_mistral.call_args
+        assert kwargs["timeout_ms"] == 120000
+
+    @staticmethod
+    def _status_error(status: int) -> MistralError:
+        response = httpx.Response(status, request=httpx.Request("POST", "http://x"))
+        return MistralError("boom", response)
+
+    @pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+    def test_a_client_error_is_not_transient(self, status):
+        assert MistralLLM(_creds())._is_transient(self._status_error(status)) is False
+
+    @pytest.mark.parametrize("status", [408, 409, 429, 500, 503])
+    def test_a_temporary_status_is_transient(self, status):
+        assert MistralLLM(_creds())._is_transient(self._status_error(status)) is True
+
+    def test_a_timeout_or_connection_error_is_transient(self):
+        provider = MistralLLM(_creds())
+
+        assert provider._is_transient(httpx.ReadTimeout("slow"))
+        assert provider._is_transient(httpx.ConnectError("down"))
+        assert provider._is_transient(ValueError("other")) is False
 
     def test_client_with_base_url(self, mocker):
         mock_mistral = mocker.patch(

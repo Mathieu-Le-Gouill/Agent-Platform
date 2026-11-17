@@ -1,10 +1,13 @@
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
+import anthropic
+import httpx
 import pytest
 from pydantic import BaseModel, SecretStr
 
 from agent_platform.agents.tools.base import Tool
+from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.interfaces.llm.batch import BatchRequest, BatchStatus
 from agent_platform.core.interfaces.llm.response import ResponseFormat
@@ -375,15 +378,65 @@ class TestAnthropicLLMConstruction:
         provider = AnthropicLLM(_creds())
         cfg = AnthropicGenerationConfig(max_retries=None)
         kwargs = provider._client_kwargs(cfg)
-        assert kwargs["max_retries"] == 3
-        assert "timeout" not in kwargs
+        assert kwargs["max_retries"] == 0
+        assert kwargs["timeout"] == 120.0
 
-    def test_client_kwargs_explicit_timeout_and_retries(self):
+    def test_client_kwargs_explicit_timeout(self):
         provider = AnthropicLLM(_creds())
         cfg = AnthropicGenerationConfig(timeout=30.0, max_retries=5)
         kwargs = provider._client_kwargs(cfg)
         assert kwargs["timeout"] == 30.0
-        assert kwargs["max_retries"] == 5
+        assert kwargs["max_retries"] == 0
+
+    def test_generate_clients_make_no_sdk_retries(self, mocker):
+        async_client = mocker.patch(
+            "agent_platform.integrations.llm.anthropic.provider.AsyncAnthropic"
+        )
+        sync_client = mocker.patch(
+            "agent_platform.integrations.llm.anthropic.provider.Anthropic"
+        )
+        provider = AnthropicLLM(_creds(), ClientOptions(max_retries=5))
+        cfg = AnthropicGenerationConfig()
+
+        provider._async_client(cfg)
+        provider._sync_client(cfg)
+
+        assert async_client.call_args.kwargs["max_retries"] == 0
+        assert sync_client.call_args.kwargs["max_retries"] == 0
+
+    def test_stream_client_keeps_the_configured_sdk_retries(self, mocker):
+        async_client = mocker.patch(
+            "agent_platform.integrations.llm.anthropic.provider.AsyncAnthropic"
+        )
+        provider = AnthropicLLM(_creds(), ClientOptions(max_retries=5))
+
+        provider._stream_client(AnthropicGenerationConfig())
+        assert async_client.call_args.kwargs["max_retries"] == 5
+
+        provider._stream_client(AnthropicGenerationConfig(max_retries=2))
+        assert async_client.call_args.kwargs["max_retries"] == 2
+        assert async_client.call_args.kwargs["timeout"] == 120.0
+
+    @staticmethod
+    def _status_error(status: int) -> anthropic.APIStatusError:
+        response = httpx.Response(status, request=httpx.Request("POST", "http://x"))
+        return anthropic.APIStatusError("boom", response=response, body=None)
+
+    @pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
+    def test_a_client_error_is_not_transient(self, status):
+        assert AnthropicLLM(_creds())._is_transient(self._status_error(status)) is False
+
+    @pytest.mark.parametrize("status", [408, 409, 429, 500, 529])
+    def test_a_temporary_status_is_transient(self, status):
+        assert AnthropicLLM(_creds())._is_transient(self._status_error(status)) is True
+
+    def test_a_timeout_or_connection_error_is_transient(self):
+        request = httpx.Request("POST", "http://x")
+        provider = AnthropicLLM(_creds())
+
+        assert provider._is_transient(anthropic.APITimeoutError(request=request))
+        assert provider._is_transient(anthropic.APIConnectionError(request=request))
+        assert provider._is_transient(ValueError("other")) is False
 
 
 class TestAnthropicLLMGenerate:

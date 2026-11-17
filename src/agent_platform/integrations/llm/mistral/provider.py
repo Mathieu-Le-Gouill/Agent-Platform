@@ -3,14 +3,15 @@ from __future__ import annotations
 from collections.abc import AsyncIterator
 from typing import TYPE_CHECKING, Any
 
+import httpx
 from mistralai import Mistral
 from mistralai.models import ChatCompletionResponse
+from mistralai.models.mistralerror import MistralError
 
 from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
-    resolve_timeout,
 )
 from agent_platform.core.errors import require_secret
 from agent_platform.core.interfaces.llm.response import (
@@ -23,7 +24,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import MistralCredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
 from agent_platform.integrations.llm.mistral.mappers import (
     from_native_response,
@@ -66,22 +67,28 @@ class MistralLLM(
             self._credentials.api_key,
             "Mistral API key is required but was not provided",
         )
-        kwargs: dict[str, Any] = {"api_key": api_key.get_secret_value()}
+        kwargs: dict[str, Any] = {
+            "api_key": api_key.get_secret_value(),
+            "timeout_ms": int(self._timeout(config) * 1000),
+        }
         if self._client_options.base_url:
             kwargs["server_url"] = self._client_options.base_url
-
-        timeout = resolve_timeout(config.timeout, self._client_options)
-        if timeout is not None:
-            kwargs["timeout_ms"] = int(timeout * 1000)
 
         # `config.max_retries`/`client_options.max_retries` are intentionally not wired
         # into the native SDK's `retry_config`: unlike OpenAI/Anthropic's simple
         # int attempt count, Mistral's RetryConfig is a time-based backoff
         # (initial_interval/max_interval/exponent/max_elapsed_time) with no
-        # attempt-count knob, so there's no faithful translation. The platform's
-        # own `@with_retry()` decorator on `agenerate` already provides equivalent
-        # attempt-count-based retry behavior.
+        # attempt-count knob, so there's no faithful translation. The platform
+        # retry in `NativeLLMProvider.generate`/`agenerate` provides the
+        # attempt-count-based retry instead.
         return Mistral(**kwargs)
+
+    def _is_transient(self, exc: Exception) -> bool:
+        if isinstance(exc, httpx.TransportError):
+            return True
+        if isinstance(exc, MistralError):
+            return is_transient_status(exc.status_code)
+        return super()._is_transient(exc)
 
     def _invoke_sync(
         self,
