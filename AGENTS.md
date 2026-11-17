@@ -74,11 +74,14 @@ uv run ruff check .                                     # lint
 uv run ruff format --check .                            # formatting
 ```
 
-`uv` only manages the venv, not the dependency source of truth: provider
-SDKs are still declared as `pyproject.toml` extras (see `README.md` Setup)
-and CI still installs via `pip install -e ".[dev]"`, so `uv run --extra dev
---extra <providers-you-need>` is the local equivalent, not a separate
-dependency system. No `uv.lock` is committed.
+Provider SDKs are declared as `pyproject.toml` extras (see `README.md`
+Setup); the committed `uv.lock` pins the version each one installs. Local
+`uv run`/`uv sync`, CI (`uv sync --locked --extra dev --extra all`) and the
+Docker image (`uv sync --locked` with the production extras) all install
+from it. `--locked` fails when `pyproject.toml` changed without a re-lock, so
+a version change is deliberate: `uv lock --upgrade-package <name>` (or
+`uv lock` after editing `pyproject.toml`), committed together with the
+`pyproject.toml` change.
 
 - Tests live in `tests/<mirror-of-src-path>`, generally one test file per
   source file (e.g. `agents/executor.py` → `tests/agents/test_executor.py`),

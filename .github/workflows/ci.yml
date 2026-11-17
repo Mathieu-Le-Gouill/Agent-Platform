@@ -28,9 +28,14 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.11.15"
 
-      - name: Install dependencies
-        run: uv pip install --system -e ".[dev,all]"
+      # --locked fails when pyproject.toml changed without a re-lock.
+      - name: Install dependencies from uv.lock
+        run: |
+          uv sync --locked --extra dev --extra all --python 3.11
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Lint with ruff
         run: ruff check .
@@ -62,6 +67,8 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.11.15"
 
       - name: Install FFmpeg shared libraries
         # torchcodec (pulled in by pyannote-audio 4.x, which uv only resolves on
@@ -69,8 +76,10 @@ jobs:
         # imports it eagerly. The runner image ships no FFmpeg runtime.
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
-      - name: Install dependencies
-        run: uv pip install --system -e ".[dev,all]"
+      - name: Install dependencies from uv.lock
+        run: |
+          uv sync --locked --extra dev --extra all --python ${{ matrix.python-version }}
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run tests
         run: pytest -v --cov=src/agent_platform --cov-report=term-missing --cov-report=xml
@@ -120,6 +129,8 @@ jobs:
 
       - name: Install uv
         uses: astral-sh/setup-uv@v3
+        with:
+          version: "0.11.15"
 
       - name: Install FFmpeg shared libraries
         # torchcodec (pulled in by pyannote-audio 4.x, which uv only resolves on
@@ -127,8 +138,10 @@ jobs:
         # imports it eagerly. The runner image ships no FFmpeg runtime.
         run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
 
-      - name: Install dependencies
-        run: uv pip install --system -e ".[dev,all]"
+      - name: Install dependencies from uv.lock
+        run: |
+          uv sync --locked --extra dev --extra all --python 3.11
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
 
       - name: Run golden eval
         env:

@@ -69,11 +69,11 @@ uv run --extra dev --extra llm-openai --extra vector-store-chroma pytest -v
 # Or grab every provider in a domain
 uv run --extra dev --extra llm pytest -v
 
-# Or everything (parity with the old monolithic install); use pip here, not uv, see note below
-pip install -e ".[dev,all]"
+# Or everything (parity with the old monolithic install), as CI runs it
+uv run --extra dev --extra all pytest -v
 ```
 
-Extras are named `<domain>-<provider>` (e.g. `stt-whisperx`, `ocr-tesseract`); see `pyproject.toml` for the full list. Requires Python 3.11. Some providers have system dependencies (Tesseract, CUDA for WhisperX). No `uv` installed? `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"` works the same, `uv` just removes the activation step.
+Extras are named `<domain>-<provider>` (e.g. `stt-whisperx`, `ocr-tesseract`); see `pyproject.toml` for the full list. Requires Python 3.11. Some providers have system dependencies (Tesseract, CUDA for WhisperX). No `uv` installed? `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"` also works, but ignores `uv.lock` and installs the newest versions `pyproject.toml` allows, so it can differ from CI and the Docker image.
 
 ## Development
 
