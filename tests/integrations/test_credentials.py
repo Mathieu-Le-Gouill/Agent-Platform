@@ -154,6 +154,15 @@ class TestAWSTextractCredentials:
         creds = AWSTextractCredentials()
         assert isinstance(creds, Credentials)
 
+    def test_secret_key_is_a_secret_hidden_from_repr(self, monkeypatch):
+        monkeypatch.setenv("AWS_SECRET_ACCESS_KEY", "s3cret-value")
+
+        creds = AWSTextractCredentials()
+
+        assert isinstance(creds.aws_secret_access_key, SecretStr)
+        assert creds.aws_secret_access_key.get_secret_value() == "s3cret-value"
+        assert "s3cret-value" not in repr(creds)
+
 
 class TestResolveCredentials:
     def test_returns_given_credentials_when_not_none(self):

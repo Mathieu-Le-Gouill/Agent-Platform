@@ -67,11 +67,31 @@ def _assemble_tool_calls(deltas: list[ToolCallDelta]) -> list[ToolCall]:
     calls = []
     for index in order:
         entry = assembled[index]
+        arguments: dict[str, Any] = {}
+        arguments_error: str | None = None
         try:
-            arguments = json.loads(entry["arguments"]) if entry["arguments"] else {}
-        except json.JSONDecodeError:
-            arguments = {}
-        calls.append(ToolCall(id=entry["id"], name=entry["name"], arguments=arguments))
+            decoded = json.loads(entry["arguments"]) if entry["arguments"] else {}
+        except json.JSONDecodeError as exc:
+            # `exc` describes the syntax error only, never the argument text.
+            arguments_error = str(exc)
+        else:
+            if isinstance(decoded, dict):
+                arguments = decoded
+            else:
+                arguments_error = "arguments must be a JSON object"
+        if arguments_error is not None:
+            logger.warning(
+                "Tool call '%s' streamed arguments that are not a JSON object",
+                entry["name"],
+            )
+        calls.append(
+            ToolCall(
+                id=entry["id"],
+                name=entry["name"],
+                arguments=arguments,
+                arguments_error=arguments_error,
+            )
+        )
     return calls
 
 

@@ -1,9 +1,11 @@
+import asyncio
 from typing import Any
 from uuid import uuid4
 
 import pytest
 
 from agent_platform.agents.conversation import ConversationAgent
+from agent_platform.agents.tools.errors import ToolRegistrationError
 from agent_platform.config.container import (
     build_agent,
     build_agent_async,
@@ -18,7 +20,7 @@ from agent_platform.core.interfaces.llm.fallback import FallbackLLMProvider
 from agent_platform.core.interfaces.mcp.base import BaseMCPClient
 from agent_platform.core.interfaces.tracing.noop import NoOpTracer
 from agent_platform.core.schemas.mcp import MCPToolSpec
-from agent_platform.core.schemas.message import Message, UserMessage
+from agent_platform.core.schemas.message import Message, ToolCall, UserMessage
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations import llm as llm_module
 from agent_platform.integrations.llm.anthropic.provider import AnthropicLLM
@@ -297,6 +299,89 @@ class TestBuildAgentAsync:
         assert clients == [client_a, client_b]
         assert client_a.connected is True
         assert client_b.connected is True
+
+    @pytest.mark.asyncio
+    async def test_failed_second_connect_closes_the_first_client(self, mocker):
+        client_a = _FakeMCPClient([])
+        client_b = _FakeMCPClient([])
+        client_b.connect = mocker.AsyncMock(side_effect=RuntimeError("no server"))
+        mocker.patch(
+            "agent_platform.config.container._build_mcp_client",
+            side_effect=[client_a, client_b],
+        )
+        settings = Settings(
+            _env_file=None, mcp_stdio_servers={"a": ["cmd-a"], "b": ["cmd-b"]}
+        )
+
+        with pytest.raises(RuntimeError, match="no server"):
+            await build_agent_async(settings)
+
+        assert client_a.closed is True
+        assert client_b.closed is False
+
+    @pytest.mark.asyncio
+    async def test_tool_name_clash_closes_every_started_client(self, mocker):
+        spec = MCPToolSpec(name="search_docs", description="Search", input_schema={})
+        client_a = _FakeMCPClient([spec])
+        client_b = _FakeMCPClient([spec])
+        mocker.patch(
+            "agent_platform.config.container._build_mcp_client",
+            side_effect=[client_a, client_b],
+        )
+        settings = Settings(
+            _env_file=None, mcp_stdio_servers={"a": ["cmd-a"], "b": ["cmd-b"]}
+        )
+
+        with pytest.raises(ToolRegistrationError):
+            await build_agent_async(settings)
+
+        assert client_a.closed is True
+        assert client_b.closed is True
+
+    @pytest.mark.asyncio
+    async def test_failing_close_does_not_mask_the_original_error(self, mocker):
+        client_a = _FakeMCPClient([])
+        client_a.aclose = mocker.AsyncMock(side_effect=OSError("close failed"))
+        client_b = _FakeMCPClient([])
+        client_b.connect = mocker.AsyncMock(side_effect=RuntimeError("no server"))
+        mocker.patch(
+            "agent_platform.config.container._build_mcp_client",
+            side_effect=[client_a, client_b],
+        )
+        settings = Settings(
+            _env_file=None, mcp_stdio_servers={"a": ["cmd-a"], "b": ["cmd-b"]}
+        )
+
+        with pytest.raises(RuntimeError, match="no server"):
+            await build_agent_async(settings)
+
+    @pytest.mark.asyncio
+    async def test_mcp_tools_are_registered_with_the_configured_timeout(self, mocker):
+        client = _FakeMCPClient(
+            [MCPToolSpec(name="slow", description="Slow", input_schema={})]
+        )
+        mocker.patch(
+            "agent_platform.config.container._build_mcp_client",
+            return_value=client,
+        )
+        settings = Settings(
+            _env_file=None,
+            mcp_stdio_servers={"docs": ["cmd"]},
+            mcp_tool_timeout=0.05,
+        )
+
+        agent, _ = await build_agent_async(settings)
+
+        async def hang(name: str, arguments: dict, config: Any = None) -> Any:
+            await asyncio.sleep(5)
+
+        client.call_tool = hang  # type: ignore[method-assign]
+        message = await agent.tool_registry.call_and_wrap(
+            ToolCall(id="c1", name="slow", arguments={})
+        )
+
+        assert message.result.is_error is True
+        assert "timed out after 0.05s" in message.result.content
 
 
 class TestBuildTracer:

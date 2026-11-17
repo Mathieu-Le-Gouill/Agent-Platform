@@ -27,6 +27,10 @@ class ToolCall(BaseModel, frozen=True):
     id: str
     name: str
     arguments: dict[str, Any]
+    # Set when the model's streamed argument text was not a JSON object;
+    # `arguments` is then `{}` and the registry rejects the call instead of
+    # running the tool with empty arguments.
+    arguments_error: str | None = None
 
 
 class ToolResult(BaseModel, frozen=True):

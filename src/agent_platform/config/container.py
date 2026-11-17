@@ -195,14 +195,30 @@ async def build_agent_async(
     agent = build_agent(settings)
 
     clients: list[BaseMCPClient] = []
-    for command in settings.mcp_stdio_servers.values():
-        client = await _build_mcp_client(command)
-        await client.connect()
-        clients.append(client)
-        for tool in await discover_mcp_tools(client):
-            agent.tool_registry.register(tool)
+    try:
+        for command in settings.mcp_stdio_servers.values():
+            client = await _build_mcp_client(command)
+            # A client whose own `connect()` raises cleans up after itself, so
+            # it joins `clients` only once connected.
+            await client.connect()
+            clients.append(client)
+            for tool in await discover_mcp_tools(client):
+                agent.tool_registry.register(tool, timeout=settings.mcp_tool_timeout)
+    except BaseException:
+        await _close_clients(clients)
+        raise
 
     return agent, clients
+
+
+async def _close_clients(clients: list[BaseMCPClient]) -> None:
+    """Close every client, logging (not raising) a failing `aclose()` so the
+    error that triggered the cleanup is the one the caller sees."""
+    for client in clients:
+        try:
+            await client.aclose()
+        except Exception:
+            logger.exception("Closing an MCP client failed during startup cleanup")
 
 
 __all__ = [

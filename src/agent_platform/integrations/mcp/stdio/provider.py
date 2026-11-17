@@ -31,11 +31,17 @@ class StdioMCPClient(BaseMCPClient[MCPClientConfig]):
 
     async def connect(self) -> None:
         exit_stack = AsyncExitStack()
-        read, write = await exit_stack.enter_async_context(
-            stdio_client(self._server_params)
-        )
-        session = await exit_stack.enter_async_context(ClientSession(read, write))
-        await session.initialize()
+        try:
+            read, write = await exit_stack.enter_async_context(
+                stdio_client(self._server_params)
+            )
+            session = await exit_stack.enter_async_context(ClientSession(read, write))
+            await session.initialize()
+        except BaseException:
+            # Stops the subprocess `stdio_client` launched; `aclose()` can't, as
+            # `_exit_stack` is only set once the handshake succeeds.
+            await exit_stack.aclose()
+            raise
         self._exit_stack = exit_stack
         self._session = session
 

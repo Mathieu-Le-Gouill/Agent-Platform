@@ -149,6 +149,10 @@ class ToolRegistry:
             ) from exc
 
     def _validate_arguments(self, tool: Tool, call: ToolCall) -> None:
+        if call.arguments_error is not None:
+            raise ToolCallValidationError(
+                f"Invalid JSON arguments for tool '{call.name}': {call.arguments_error}"
+            )
         if tool.input_schema is BaseModel:
             return
         try:

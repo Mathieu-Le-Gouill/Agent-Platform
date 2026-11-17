@@ -65,6 +65,22 @@ class TestSettings:
         with pytest.raises(ValidationError, match="api_max_conversations_per_key"):
             Settings(_env_file=None, api_max_conversations_per_key=0)
 
+    @pytest.mark.parametrize(
+        ("field", "value"),
+        [
+            ("llm_rate_limit", 0),
+            ("llm_rate_limit", -1),
+            ("llm_rate_limit_burst", 0.5),
+            ("mcp_tool_timeout", 0),
+        ],
+    )
+    def test_unusable_rate_limit_or_mcp_timeout_is_rejected(self, field, value):
+        with pytest.raises(ValidationError, match=field):
+            Settings(_env_file=None, **{field: value})
+
+    def test_mcp_tool_timeout_defaults_to_sixty_seconds(self):
+        assert Settings(_env_file=None).mcp_tool_timeout == 60.0
+
     def test_unknown_env_vars_are_ignored(self, monkeypatch):
         monkeypatch.setenv("AGENT_PLATFORM_SOME_UNKNOWN_FIELD", "value")
 

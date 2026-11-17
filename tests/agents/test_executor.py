@@ -389,6 +389,62 @@ class TestExecutorRunStreaming:
         )
         assert events[-1] == "Sunny"
 
+    @pytest.mark.asyncio
+    async def test_streamed_malformed_arguments_trigger_the_corrective_retry(
+        self, mock_llm
+    ):
+        from agent_platform.core.interfaces.llm.response import (
+            FinishReason,
+            StreamChunk,
+            ToolCallDelta,
+        )
+
+        runs: list[dict] = []
+
+        class _RecordingTool(Tool):
+            name = "recorder"
+            description = "Records its calls"
+            input_schema = BaseModel
+
+            async def run(self, **kwargs):
+                runs.append(kwargs)
+                return "ok"
+
+        broken = [
+            StreamChunk(
+                delta="",
+                tool_call_deltas=[
+                    ToolCallDelta(
+                        index=0, id="c1", name="recorder", arguments_delta="{not json"
+                    )
+                ],
+            ),
+            StreamChunk(delta="", finish_reason=FinishReason.TOOL_CALL),
+        ]
+        attempts = [broken, make_text_stream_chunks(["Done"])]
+        prompts: list = []
+
+        def stream(**kw):
+            prompts.append(list(kw["prompt"].messages))
+            return make_fake_stream(attempts.pop(0))
+
+        mock_llm.stream.side_effect = stream
+        registry = ToolRegistry()
+        registry.register(_RecordingTool())
+        ex = AgentExecutor(
+            Agent(name="recovering", llm=mock_llm, tool_registry=registry)
+        )
+
+        events = [e async for e in ex.run_streaming("Go")]
+
+        assert runs == []
+        assert events[-1] == "Done"
+        assert len(prompts) == 2
+        assert any(
+            isinstance(m, UserMessage) and "Invalid JSON arguments" in m.content
+            for m in prompts[1]
+        )
+
 
 class TestExecutorRunWithMessages:
     @pytest.mark.asyncio
@@ -549,7 +605,7 @@ class TestExecutorToolCallRecovery:
 
 
 class TestAssembleToolCalls:
-    def test_malformed_arguments_json_falls_back_to_empty_dict(self):
+    def test_malformed_arguments_json_is_flagged_not_swallowed(self):
         from agent_platform.agents.agent import _assemble_tool_calls
         from agent_platform.core.interfaces.llm.response import ToolCallDelta
 
@@ -565,6 +621,37 @@ class TestAssembleToolCalls:
         assert calls[0].id == "c1"
         assert calls[0].name == "get_weather"
         assert calls[0].arguments == {}
+        assert calls[0].arguments_error is not None
+
+    @pytest.mark.parametrize("text", ["[]", "null", '"x"', "3"])
+    def test_non_object_arguments_json_is_flagged(self, text):
+        from agent_platform.agents.agent import _assemble_tool_calls
+        from agent_platform.core.interfaces.llm.response import ToolCallDelta
+
+        deltas = [
+            ToolCallDelta(index=0, id="c1", name="get_weather", arguments_delta=text)
+        ]
+
+        (call,) = _assemble_tool_calls(deltas)
+
+        assert call.arguments == {}
+        assert call.arguments_error == "arguments must be a JSON object"
+
+    def test_valid_and_empty_arguments_have_no_error(self):
+        from agent_platform.agents.agent import _assemble_tool_calls
+        from agent_platform.core.interfaces.llm.response import ToolCallDelta
+
+        deltas = [
+            ToolCallDelta(index=0, id="c1", name="a", arguments_delta='{"x": 1}'),
+            ToolCallDelta(index=1, id="c2", name="b"),
+        ]
+
+        first, second = _assemble_tool_calls(deltas)
+
+        assert first.arguments == {"x": 1}
+        assert second.arguments == {}
+        assert first.arguments_error is None
+        assert second.arguments_error is None
 
 
 def _invoke_agent_span(recorded_spans):

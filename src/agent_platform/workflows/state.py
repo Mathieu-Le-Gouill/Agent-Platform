@@ -56,3 +56,6 @@ class WorkflowCheckpoint(BaseModel, Generic[StateT]):
 
     next_node: str
     state: StateT
+    # Nodes executed so far, so `max_steps` keeps counting across resumes.
+    # Defaults to 0 to keep checkpoints saved without it loadable.
+    steps: int = 0

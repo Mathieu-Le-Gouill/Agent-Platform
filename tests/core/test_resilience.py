@@ -1,6 +1,6 @@
 import pytest
 
-from agent_platform.core.errors import ProviderError
+from agent_platform.core.errors import ConfigError, ProviderError
 from agent_platform.core.resilience import CircuitBreaker, CircuitState, RateLimiter
 
 
@@ -206,3 +206,14 @@ class TestRateLimiter:
         await limiter.acquire(tokens=3.0)
 
         sleep.assert_not_called()
+
+    @pytest.mark.parametrize(
+        ("rate", "burst"),
+        [(0, None), (-1, None), (1.0, 0.5), (0.5, None)],
+    )
+    def test_unusable_rate_or_capacity_is_rejected(self, rate, burst):
+        with pytest.raises(ConfigError, match="rate|burst"):
+            RateLimiter(rate=rate, burst=burst)
+
+    def test_rate_below_one_with_a_burst_of_one_is_accepted(self):
+        RateLimiter(rate=0.5, burst=1)

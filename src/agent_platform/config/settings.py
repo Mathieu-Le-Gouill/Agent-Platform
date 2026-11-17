@@ -27,8 +27,10 @@ class Settings(BaseSettings):
     # RateLimiter), shared across all entries since the budget being protected is the
     # caller's total downstream traffic, not any one vendor's. None disables limiting.
     # Only takes effect when fallback_llm_models is non-empty (see build_llm_with_fallback).
-    llm_rate_limit: float | None = None
-    llm_rate_limit_burst: float | None = None
+    # `llm_rate_limit` is requests/second; `llm_rate_limit_burst` is the bucket
+    # size and must hold at least one request, or every call would wait forever.
+    llm_rate_limit: float | None = Field(default=None, gt=0)
+    llm_rate_limit_burst: float | None = Field(default=None, ge=1)
     # MCP servers to launch over stdio and register tools from, keyed by an
     # arbitrary name; each value is `[command, *args]` (the same shape as
     # Claude Desktop/VS Code's `mcpServers` config), e.g.
@@ -37,6 +39,9 @@ class Settings(BaseSettings):
     # config/container.py), since MCP discovery is async; the plain sync
     # `build_agent` ignores this setting.
     mcp_stdio_servers: dict[str, list[str]] = Field(default_factory=dict)
+    # Seconds one MCP tool call may run before it is cancelled and reported as a
+    # timeout, so a hung server cannot hold a request open.
+    mcp_tool_timeout: float = Field(default=60.0, gt=0)
     default_image_model: str = "dalle:dall-e-3"
     default_audio_model: str = "openai:whisper-1"
     agent_name: str = "assistant"

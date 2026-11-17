@@ -38,8 +38,8 @@ class AWSTextractCredentials(Credentials, frozen=True):
     aws_access_key_id: str | None = Field(
         default_factory=lambda: from_env("AWS_ACCESS_KEY_ID")
     )
-    aws_secret_access_key: str | None = Field(
-        default_factory=lambda: from_env("AWS_SECRET_ACCESS_KEY")
+    aws_secret_access_key: SecretStr | None = Field(
+        default_factory=lambda: secret_from_env("AWS_SECRET_ACCESS_KEY")
     )
 
 

@@ -206,6 +206,63 @@ class TestCheckpointingAndResume:
             async for _ in workflow.resume("missing-run", checkpointer):
                 pass
 
+    @pytest.mark.asyncio
+    async def test_resume_after_a_completed_run_yields_nothing(self):
+        workflow = _build_linear_graph().compile()
+        checkpointer = InMemoryCheckpointer()
+        async for _ in workflow.arun(
+            CounterState(), checkpointer=checkpointer, run_id="done"
+        ):
+            pass
+
+        states = [state async for state in workflow.resume("done", checkpointer)]
+
+        assert states == []
+
+    @pytest.mark.asyncio
+    async def test_resume_at_an_unknown_node_raises(self):
+        workflow = _build_linear_graph().compile()
+        checkpointer = InMemoryCheckpointer()
+        await checkpointer.save(
+            "bad", WorkflowCheckpoint(next_node="ghost", state=CounterState())
+        )
+
+        with pytest.raises(WorkflowExecutionError, match="ghost"):
+            async for _ in workflow.resume("bad", checkpointer):
+                pass
+
+    @pytest.mark.asyncio
+    async def test_max_steps_counts_across_resumes(self):
+        graph: WorkflowGraph[CounterState] = WorkflowGraph(CounterState)
+        graph.add_node("increment", _increment)
+        graph.set_entry_point("increment")
+        graph.add_edge("increment", "increment")
+        workflow = graph.compile(max_steps=3)
+        checkpointer = InMemoryCheckpointer()
+
+        # Interrupt the run after 2 steps.
+        seen = 0
+        async for _ in workflow.arun(
+            CounterState(), checkpointer=checkpointer, run_id="loop"
+        ):
+            seen += 1
+            if seen == 2:
+                break
+
+        resumed = 0
+        with pytest.raises(WorkflowExecutionError, match="max_steps"):
+            async for _ in workflow.resume("loop", checkpointer):
+                resumed += 1
+
+        assert resumed == 1
+
+    def test_checkpoint_saved_before_steps_existed_still_loads(self):
+        checkpoint = WorkflowCheckpoint[CounterState].model_validate(
+            {"next_node": "double", "state": {"count": 1}}
+        )
+
+        assert checkpoint.steps == 0
+
 
 class TestNodeTracing:
     async def test_each_node_records_its_step_and_successor(self, recorded_spans):

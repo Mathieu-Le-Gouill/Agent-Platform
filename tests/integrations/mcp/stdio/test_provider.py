@@ -107,3 +107,44 @@ class TestStdioMCPClient:
     @pytest.mark.asyncio
     async def test_aclose_without_connect_is_noop(self, client):
         await client.aclose()
+
+
+class TestConnectFailure:
+    @pytest.mark.asyncio
+    async def test_failed_initialize_exits_the_stdio_context(
+        self, monkeypatch, fake_session
+    ):
+        events: list[str] = []
+
+        @asynccontextmanager
+        async def fake_stdio_client(server_params):
+            events.append("started")
+            try:
+                yield ("read", "write")
+            finally:
+                events.append("stopped")
+
+        @asynccontextmanager
+        async def fake_client_session(read, write):
+            yield fake_session
+
+        async def failing_initialize() -> None:
+            raise RuntimeError("handshake failed")
+
+        fake_session.initialize = failing_initialize
+        monkeypatch.setattr(
+            "agent_platform.integrations.mcp.stdio.provider.stdio_client",
+            fake_stdio_client,
+        )
+        monkeypatch.setattr(
+            "agent_platform.integrations.mcp.stdio.provider.ClientSession",
+            fake_client_session,
+        )
+        client = StdioMCPClient(command="fake-server")
+
+        with pytest.raises(RuntimeError, match="handshake failed"):
+            await client.connect()
+
+        assert events == ["started", "stopped"]
+        assert client._exit_stack is None
+        assert client._session is None

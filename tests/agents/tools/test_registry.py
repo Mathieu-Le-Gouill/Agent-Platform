@@ -247,6 +247,66 @@ class TestToolRegistry:
         assert is_tool_validation_error(message) is False
 
 
+class _AllDefaultsInput(BaseModel):
+    limit: int = 10
+
+
+class _AllDefaultsTool(Tool):
+    name = "all_defaults"
+    description = "A tool whose fields all have defaults"
+    input_schema = _AllDefaultsInput
+
+    async def run(self, **kwargs):
+        return "ran"
+
+
+class TestArgumentsError:
+    @pytest.mark.asyncio
+    async def test_call_with_a_parse_error_is_not_run_even_if_defaults_would_pass(
+        self, registry
+    ):
+        tool = _AllDefaultsTool()
+        tool.run = AsyncMock()  # type: ignore[method-assign]
+        registry.register(tool)
+        call = ToolCall(
+            id="c1", name="all_defaults", arguments={}, arguments_error="bad token"
+        )
+
+        message = await registry.call_and_wrap(call)
+
+        tool.run.assert_not_awaited()  # type: ignore[attr-defined]
+        assert message.result.is_error is True
+        assert "Invalid JSON arguments for tool 'all_defaults': bad token" in (
+            message.result.content
+        )
+        assert is_tool_validation_error(message) is True
+
+    @pytest.mark.asyncio
+    async def test_schema_less_tool_also_rejects_a_parse_error(self, registry):
+        registry.register(_DummyTool())
+        call = ToolCall(
+            id="c2", name="dummy", arguments={}, arguments_error="bad token"
+        )
+
+        with pytest.raises(ToolCallValidationError, match="Invalid JSON arguments"):
+            await registry.resolve_call(call)
+
+    @pytest.mark.asyncio
+    async def test_streaming_path_tags_a_parse_error_as_validation_error(
+        self, registry
+    ):
+        registry.register(_StreamingTool())
+        call = ToolCall(
+            id="c3", name="streamer", arguments={}, arguments_error="bad token"
+        )
+
+        chunks = [chunk async for chunk in registry.call_and_stream(call)]
+
+        assert len(chunks) == 1
+        assert chunks[0].is_validation_error is True
+        assert "Invalid JSON arguments" in chunks[0].delta
+
+
 class TestCallAndWrap:
     @pytest.mark.asyncio
     async def test_cancelled_error_propagates(self, registry):

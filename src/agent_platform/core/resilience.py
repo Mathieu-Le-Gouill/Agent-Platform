@@ -7,7 +7,7 @@ from collections.abc import Awaitable, Callable
 from enum import StrEnum
 from typing import Any, TypeVar
 
-from agent_platform.core.errors import PlatformError, ProviderError
+from agent_platform.core.errors import ConfigError, PlatformError, ProviderError
 
 _T = TypeVar("_T")
 
@@ -106,11 +106,24 @@ class CircuitBreaker:
 
 
 class RateLimiter:
-    """Token-bucket limiter: `rate` tokens/second replenish up to `burst` capacity."""
+    """Token-bucket limiter: `rate` tokens/second replenish up to `burst` capacity.
+
+    Raises `ConfigError` when `rate <= 0` or the capacity (`burst`, else `rate`)
+    is below 1: a bucket that can never hold one token would make `acquire()`
+    wait forever.
+    """
 
     def __init__(self, *, rate: float, burst: float | None = None) -> None:
+        capacity = burst if burst is not None else rate
+        if rate <= 0:
+            raise ConfigError(f"rate must be greater than 0, got {rate}")
+        if capacity < 1:
+            raise ConfigError(
+                f"burst (default: rate) must be at least 1 so one token fits, "
+                f"got {capacity}"
+            )
         self._rate = rate
-        self._capacity = burst if burst is not None else rate
+        self._capacity = capacity
         self._tokens = self._capacity
         self._updated_at = time.monotonic()
         self._lock = asyncio.Lock()

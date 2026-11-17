@@ -44,10 +44,13 @@ class AWSTextractOCR(BaseOCR[AWSTextractConfig]):
 
         client = self._clients.get(cache_key)
         if client is None:
+            secret_key = self._credentials.aws_secret_access_key
             kwargs: dict[str, Any] = {
                 "region_name": region_name,
                 "aws_access_key_id": self._credentials.aws_access_key_id,
-                "aws_secret_access_key": self._credentials.aws_secret_access_key,
+                "aws_secret_access_key": (
+                    secret_key.get_secret_value() if secret_key is not None else None
+                ),
             }
             if self._client_options.base_url:
                 kwargs["endpoint_url"] = self._client_options.base_url

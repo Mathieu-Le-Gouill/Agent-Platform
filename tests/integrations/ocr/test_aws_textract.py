@@ -2,6 +2,7 @@ from unittest.mock import MagicMock
 from uuid import uuid4
 
 import pytest
+from pydantic import SecretStr
 
 pytest.importorskip("boto3")
 
@@ -135,6 +136,53 @@ async def test_client_default_config_sets_max_retries_only(mocker):
     assert boto_config.connect_timeout == 60
     assert boto_config.read_timeout == 60
     assert boto_config.retries["max_attempts"] == 3
+
+
+@pytest.mark.asyncio
+async def test_client_receives_the_secret_key_unwrapped(mocker):
+    mock_boto = mocker.patch(
+        "agent_platform.integrations.ocr.aws_textract.provider.boto3.client"
+    )
+    mock_client = MagicMock()
+    mock_client.detect_document_text.return_value = FAKE_TEXTRACT_RESPONSE
+    mock_boto.return_value = mock_client
+    ocr = AWSTextractOCR(
+        AWSTextractCredentials(
+            aws_access_key_id="AKIA-ID", aws_secret_access_key=SecretStr("s3cret")
+        )
+    )
+    mocker.patch(
+        "agent_platform.integrations.ocr.aws_textract.provider.load_bytes",
+        return_value=b"fake-bytes",
+    )
+
+    await ocr.extract("a.png")
+
+    _, kwargs = mock_boto.call_args
+    assert kwargs["aws_secret_access_key"] == "s3cret"
+    assert kwargs["aws_access_key_id"] == "AKIA-ID"
+
+
+@pytest.mark.asyncio
+async def test_client_gets_no_secret_key_when_none_is_set(mocker):
+    mock_boto = mocker.patch(
+        "agent_platform.integrations.ocr.aws_textract.provider.boto3.client"
+    )
+    mock_client = MagicMock()
+    mock_client.detect_document_text.return_value = FAKE_TEXTRACT_RESPONSE
+    mock_boto.return_value = mock_client
+    ocr = AWSTextractOCR(
+        AWSTextractCredentials(aws_access_key_id=None, aws_secret_access_key=None)
+    )
+    mocker.patch(
+        "agent_platform.integrations.ocr.aws_textract.provider.load_bytes",
+        return_value=b"fake-bytes",
+    )
+
+    await ocr.extract("a.png")
+
+    _, kwargs = mock_boto.call_args
+    assert kwargs["aws_secret_access_key"] is None
 
 
 @pytest.mark.asyncio

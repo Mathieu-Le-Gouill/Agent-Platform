@@ -397,7 +397,7 @@ requires-dist = [
     { name = "langchain-text-splitters", marker = "extra == 'chunking-markdown'", specifier = "~=1.0" },
     { name = "langchain-text-splitters", marker = "extra == 'chunking-recursive'", specifier = "~=1.0" },
     { name = "langfuse", marker = "extra == 'tracing'", specifier = "~=5.2" },
-    { name = "mcp", marker = "extra == 'tools-mcp'", specifier = ">=1.2" },
+    { name = "mcp", marker = "extra == 'tools-mcp'", specifier = ">=2.0,<3" },
     { name = "mistralai", marker = "extra == 'embeddings-mistral'", specifier = ">=1.12,<2" },
     { name = "mistralai", marker = "extra == 'llm-mistral'", specifier = ">=1.12,<2" },
     { name = "mistralai", marker = "extra == 'ocr-mistral'" },

@@ -204,8 +204,20 @@ class CompiledWorkflow(Generic[StateT]):
         if checkpoint is None:
             raise WorkflowExecutionError(f"no checkpoint found for run_id '{run_id}'")
 
+        if checkpoint.next_node == END:
+            return
+        if checkpoint.next_node not in self._nodes:
+            raise WorkflowExecutionError(
+                f"checkpoint for run_id '{run_id}' points to unknown node "
+                f"'{checkpoint.next_node}'"
+            )
+
         async for state in self._run_from(
-            checkpoint.next_node, checkpoint.state, checkpointer, run_id
+            checkpoint.next_node,
+            checkpoint.state,
+            checkpointer,
+            run_id,
+            steps=checkpoint.steps,
         ):
             yield state
 
@@ -215,9 +227,10 @@ class CompiledWorkflow(Generic[StateT]):
         state: StateT,
         checkpointer: Checkpointer[WorkflowCheckpoint[StateT]] | None,
         run_id: str | None,
+        *,
+        steps: int = 0,
     ) -> AsyncIterator[StateT]:
         current = start_node
-        steps = 0
         while True:
             steps += 1
             if steps > self._max_steps:
@@ -238,7 +251,8 @@ class CompiledWorkflow(Generic[StateT]):
             if checkpointer is not None:
                 assert run_id is not None
                 await checkpointer.save(
-                    run_id, WorkflowCheckpoint(next_node=next_node, state=state)
+                    run_id,
+                    WorkflowCheckpoint(next_node=next_node, state=state, steps=steps),
                 )
 
             yield state
