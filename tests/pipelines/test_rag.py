@@ -212,9 +212,35 @@ class TestQuery:
         )
         prompt, _config = mock_generator.arun.await_args.args[0]
         system_text = prompt.system_prompt()
-        assert "result 1" in system_text
-        assert "result 2" in system_text
-        assert prompt.last_user_message().text == "what is this?"
+        assert "result 1" not in system_text
+        assert "result 2" not in system_text
+        user_text = prompt.last_user_message().text
+        first = user_text.index('<document index="1">result 1</document>')
+        second = user_text.index('<document index="2">result 2</document>')
+        assert user_text.index("<documents>") < first < second
+        assert second < user_text.index("</documents>")
+        assert user_text.endswith("what is this?")
+
+    async def test_query_sends_empty_documents_wrapper_without_chunks(
+        self, mock_embedder, mock_vector_search, mock_reranker, mock_generator
+    ):
+        mock_reranker.arun = AsyncMock(return_value=[])
+        await query(
+            "what is this?",
+            mock_embedder,
+            mock_vector_search,
+            mock_reranker,
+            mock_generator,
+        )
+        prompt, _config = mock_generator.arun.await_args.args[0]
+        user_text = prompt.last_user_message().text
+        assert user_text.startswith("<documents>")
+        assert "<documents>\n</documents>" in user_text
+        assert "<document " not in user_text
+        assert user_text.endswith("what is this?")
+        system_text = prompt.system_prompt()
+        assert "<document" not in system_text
+        assert "reference documents" in system_text
 
     async def test_query_is_one_span_describing_the_retrieval(
         self,

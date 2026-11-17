@@ -18,4 +18,12 @@ CMD ["pytest", "-v"]
 
 FROM base AS production
 
-CMD ["platform"]
+# Extras for the default Settings models, plus Langfuse tracing.
+RUN pip install --no-cache-dir ".[api,llm-openai,image-dalle,stt-openai,tracing]"
+
+# Bind all interfaces inside the container only; the Settings default stays loopback.
+ENV AGENT_PLATFORM_API_HOST=0.0.0.0
+
+EXPOSE 8000
+
+CMD ["agent-platform-api"]

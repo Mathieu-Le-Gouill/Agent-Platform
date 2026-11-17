@@ -82,6 +82,29 @@ jobs:
           name: coverage-report
           path: coverage.xml
 
+  docker:
+    name: Production image
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Build production image
+        run: docker build --target production -t agent-platform:ci .
+
+      - name: Start the container and probe /health
+        run: |
+          # Dummy key, not a secret: the API refuses to start without one.
+          docker run -d --name ap-smoke -p 8000:8000 \
+            -e 'AGENT_PLATFORM_API_KEYS=["ci-smoke"]' agent-platform:ci
+          for _ in $(seq 1 30); do
+            if curl -fsS http://localhost:8000/health; then
+              exit 0
+            fi
+            sleep 1
+          done
+          docker logs ap-smoke
+          exit 1
+
   evals:
     name: Evals
     runs-on: ubuntu-latest

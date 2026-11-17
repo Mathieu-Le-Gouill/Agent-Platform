@@ -132,7 +132,8 @@ dependency system. No `uv.lock` is committed.
   same module.
 - CI (`.github/workflows/ci.yml`) runs `ruff check`, `ruff format --check`,
   `mypy src/`, `lint-imports`, and the pytest suite (with the coverage gate
-  above) on every push/PR to `main`, on Python 3.11 and 3.12. A change that
+  above) on every push/PR to `main`, on Python 3.11 and 3.12. A separate job
+  builds the production Docker image and probes `/health` on it. A change that
   fails any of these locally will fail CI the same way.
 - **Run the checks locally before committing/pushing, don't rely on CI to
   catch it first.** `pre-commit install` (see `README.md` Git hooks) wires
