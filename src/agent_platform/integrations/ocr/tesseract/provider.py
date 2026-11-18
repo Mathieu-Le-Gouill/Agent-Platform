@@ -1,7 +1,6 @@
 import asyncio
 from collections.abc import Sequence
 from pathlib import Path
-from urllib.request import urlopen
 from uuid import UUID, uuid4
 
 import pytesseract
@@ -9,10 +8,9 @@ from PIL import Image
 
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.integrations.ocr.sources import open_url
 from agent_platform.integrations.ocr.tesseract.config import TesseractConfig
 from agent_platform.integrations.ocr.tesseract.mappers import from_tesseract
-
-_FETCH_TIMEOUT_SECONDS = 10
 
 
 class TesseractOCR(BaseOCR[TesseractConfig]):
@@ -46,6 +44,6 @@ class TesseractOCR(BaseOCR[TesseractConfig]):
     @staticmethod
     def _load_image(source: str) -> Image.Image:
         if source.startswith("http://") or source.startswith("https://"):
-            with urlopen(source, timeout=_FETCH_TIMEOUT_SECONDS) as response:
+            with open_url(source) as response:
                 return Image.open(response).convert("RGB")
         return Image.open(Path(source)).convert("RGB")

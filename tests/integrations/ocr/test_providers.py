@@ -1,4 +1,5 @@
 from unittest.mock import MagicMock, mock_open
+from urllib.error import HTTPError
 
 import pytest
 
@@ -14,13 +15,13 @@ class TestOCRLoadBytes:
     def test_url_source(self, mocker):
         source = "https://example.com/image.jpg"
         fake_bytes = b"fake-image-bytes"
-        mock_urlopen = mocker.patch("agent_platform.integrations.ocr.sources.urlopen")
+        mock_open_url = mocker.patch("agent_platform.integrations.ocr.sources.open_url")
         mock_response = MagicMock()
         mock_response.read.return_value = fake_bytes
-        mock_urlopen.return_value.__enter__.return_value = mock_response
+        mock_open_url.return_value.__enter__.return_value = mock_response
         result = load_bytes(source)
         assert result == fake_bytes
-        mock_urlopen.assert_called_once_with(source, timeout=10)
+        mock_open_url.assert_called_once_with(source)
 
     def test_file_path(self, mocker):
         fake_bytes = b"fake-image-content"
@@ -31,21 +32,31 @@ class TestOCRLoadBytes:
 
 class TestTesseractLoadImage:
     def test_url_source(self, mocker):
-        mock_urlopen = mocker.patch(
-            "agent_platform.integrations.ocr.tesseract.provider.urlopen"
+        mock_open_url = mocker.patch(
+            "agent_platform.integrations.ocr.tesseract.provider.open_url"
         )
         MockImage = mocker.patch(
             "agent_platform.integrations.ocr.tesseract.provider.Image"
         )
         source = "https://example.com/image.png"
         mock_response = MagicMock()
-        mock_urlopen.return_value.__enter__.return_value = mock_response
+        mock_open_url.return_value.__enter__.return_value = mock_response
         MockImage.open.return_value.convert.return_value = "fake-rgb-image"
         result = TesseractOCR._load_image(source)
-        mock_urlopen.assert_called_once_with(source, timeout=10)
+        mock_open_url.assert_called_once_with(source)
         MockImage.open.assert_called_once_with(mock_response)
         MockImage.open.return_value.convert.assert_called_once_with("RGB")
         assert result == "fake-rgb-image"
+
+    def test_url_redirect_is_refused(self, http_server):
+        http_server.redirect("/image.png", 302, "/target")
+        http_server.ok("/target", b"target-bytes")
+
+        with pytest.raises(HTTPError) as excinfo:
+            TesseractOCR._load_image(http_server.url("/image.png"))
+
+        assert excinfo.value.code == 302
+        assert "/target" not in http_server.requested
 
     def test_file_path(self, mocker):
         MockPath = mocker.patch(
