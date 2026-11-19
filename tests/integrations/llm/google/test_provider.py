@@ -253,51 +253,37 @@ class TestToNativeConfig:
         assert native.thinking_config.thinking_budget == 100
 
     @pytest.mark.parametrize(
-        ("level", "budget"),
+        ("model", "level", "native_level"),
         [
-            ("none", 0),
-            ("minimal", 1024),
-            ("low", 1024),
-            ("medium", 2048),
-            ("high", 4096),
-            ("xhigh", 4096),
+            ("gemini-2.5-flash", "none", "LOW"),
+            ("gemini-2.5-flash", "medium", "MEDIUM"),
+            ("gemini-3-pro-preview", "medium", "HIGH"),
+            ("gemini-3-pro-preview", "minimal", "LOW"),
+            ("gemini-4-neon", "xhigh", "HIGH"),
+            ("gemini-4-neon", "minimal", "LOW"),
+            ("gemini-3.1-flash-lite-image", "low", "MINIMAL"),
+            ("gemini-3.1-flash-lite", "low", "LOW"),
+            ("gemini-3.1-pro-preview", "minimal", "LOW"),
+            ("gemini-3.8-flash", "none", "LOW"),
+            ("gemini-future-9", "none", "MINIMAL"),
+            ("gemini-future-9", "xhigh", "HIGH"),
+            ("gemini-future-9", "medium", "MEDIUM"),
         ],
     )
-    def test_generic_reasoning_effort_maps_to_a_budget(self, level, budget):
-        cfg = GoogleGenerationConfig(model="gemini-2.5-flash", reasoning_effort=level)
-        native = _to_native_config(cfg, None, None, lambda t: t)
-        assert native.thinking_config.thinking_budget == budget
-
-    @pytest.mark.parametrize(
-        ("level", "native_level"),
-        [
-            ("none", "MINIMAL"),
-            ("minimal", "MINIMAL"),
-            ("low", "LOW"),
-            ("medium", "MEDIUM"),
-            ("high", "HIGH"),
-            ("xhigh", "HIGH"),
-        ],
-    )
-    def test_gemini_3_gets_a_thinking_level_instead_of_a_budget(
-        self, level, native_level
+    def test_generic_reasoning_effort_maps_to_a_supported_thinking_level(
+        self, model, level, native_level
     ):
-        cfg = GoogleGenerationConfig(model="gemini-3-pro", reasoning_effort=level)
+        cfg = GoogleGenerationConfig(model=model, reasoning_effort=level)
         native = _to_native_config(cfg, None, None, lambda t: t)
         assert native.thinking_config.thinking_level.value == native_level
         assert native.thinking_config.thinking_budget is None
 
-    def test_a_nearby_level_mapping_is_logged(self, caplog):
-        cfg = GoogleGenerationConfig(model="gemini-2.5-flash", reasoning_effort="xhigh")
-        with caplog.at_level("DEBUG"):
-            _to_native_config(cfg, None, None, lambda t: t)
-        assert "mapped to Gemini thinking budget 4096" in caplog.text
-
-    def test_an_approximated_gemini_3_level_is_logged(self, caplog):
+    def test_a_clamped_level_is_logged(self, caplog):
         cfg = GoogleGenerationConfig(model="gemini-3-pro", reasoning_effort="xhigh")
         with caplog.at_level("DEBUG"):
             _to_native_config(cfg, None, None, lambda t: t)
-        assert "mapped to Gemini thinking level" in caplog.text
+        assert "'xhigh'" in caplog.text
+        assert "'high'" in caplog.text
 
     def test_provider_thinking_budget_wins_over_generic_reasoning_effort(self):
         cfg = GoogleGenerationConfig(

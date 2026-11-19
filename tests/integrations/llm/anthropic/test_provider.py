@@ -229,7 +229,53 @@ class TestToNativeParams:
         with caplog.at_level("DEBUG"):
             result = _to_native_params(cfg)
         assert result["output_config"] == {"effort": "low"}
-        assert "mapped to Anthropic effort 'low'" in caplog.text
+        assert f"'{level}'" in caplog.text
+        assert "'low'" in caplog.text
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "claude-haiku-4-5",
+            "claude-sonnet-4-5-20250929",
+            "claude-opus-4-1-20250805",
+            "claude-opus-4-20250514",
+            "claude-sonnet-4-20250514",
+            "claude-3-5-haiku-20241022",
+        ],
+    )
+    def test_model_without_effort_support_sends_no_effort_and_warns(
+        self, model, caplog
+    ):
+        cfg = AnthropicGenerationConfig(model=model, reasoning_effort="high")
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg)
+        assert "output_config" not in result
+        assert caplog.text.count("reasoning_effort is ignored") == 1
+        assert model in caplog.text
+
+    @pytest.mark.parametrize(
+        ("model", "level", "sent"),
+        [
+            ("claude-opus-4-6", "xhigh", "high"),
+            ("claude-opus-4-5-20251101", "xhigh", "high"),
+            ("claude-sonnet-4-6", "xhigh", "high"),
+            ("claude-opus-4-5-20251101", "none", "low"),
+            ("claude-opus-4-7", "xhigh", "xhigh"),
+            ("claude-future-9", "xhigh", "xhigh"),
+            ("Claude-Opus-4-6", "xhigh", "high"),
+        ],
+    )
+    def test_effort_is_clamped_to_the_levels_the_model_accepts(
+        self, model, level, sent
+    ):
+        cfg = AnthropicGenerationConfig(model=model, reasoning_effort=level)
+        assert _to_native_params(cfg)["output_config"] == {"effort": sent}
+
+    def test_provider_effort_is_sent_unchanged_on_any_model(self):
+        cfg = AnthropicGenerationConfig(model="claude-opus-4-6", effort="xhigh")
+        assert _to_native_params(cfg)["output_config"] == {"effort": "xhigh"}
+        cfg = AnthropicGenerationConfig(model="claude-haiku-4-5", effort="high")
+        assert _to_native_params(cfg)["output_config"] == {"effort": "high"}
 
     def test_provider_effort_wins_over_generic_reasoning_effort(self):
         cfg = AnthropicGenerationConfig(effort="max", reasoning_effort="low")

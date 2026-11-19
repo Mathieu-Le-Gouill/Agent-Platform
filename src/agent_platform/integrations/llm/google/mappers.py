@@ -25,7 +25,11 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
-from agent_platform.integrations.llm._generic_fields import warn_unsupported
+from agent_platform.integrations.llm._generic_fields import (
+    levels_for_model,
+    nearest_level,
+    warn_unsupported,
+)
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
 
 __all__ = [
@@ -38,26 +42,25 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-# Gemini 3 models are steered with `thinking_level`, not a token budget.
-_THINKING_LEVEL_MODEL_PREFIX = "gemini-3"
-_THINKING_LEVELS: dict[str, types.ThinkingLevel] = {
-    "none": types.ThinkingLevel.MINIMAL,
-    "minimal": types.ThinkingLevel.MINIMAL,
-    "low": types.ThinkingLevel.LOW,
-    "medium": types.ThinkingLevel.MEDIUM,
-    "high": types.ThinkingLevel.HIGH,
-    "xhigh": types.ThinkingLevel.HIGH,
+# `thinking_level` values each model accepts, by longest model-id prefix.
+# https://aistudio.google.com/docs/thinking (model table). The docs also list
+# `xhigh` for gemini-4-neon and gemini-4-hydrogen, but `types.ThinkingLevel`
+# in the installed google-genai has no such value, so those map `xhigh` to
+# `high`. A model matching no prefix gets the four levels the SDK can send.
+_LOW_TO_HIGH = frozenset({"low", "medium", "high"})
+_MINIMAL_TO_HIGH = frozenset({"minimal", "low", "medium", "high"})
+_THINKING_LEVELS: dict[str, frozenset[str]] = {
+    "gemini-4": _LOW_TO_HIGH,
+    "gemini-3.8-flash": _LOW_TO_HIGH,
+    "gemini-3.6-flash": _MINIMAL_TO_HIGH,
+    "gemini-3.5-flash-lite": _MINIMAL_TO_HIGH,
+    "gemini-3.1-flash-lite": _MINIMAL_TO_HIGH,
+    "gemini-3.1-flash-lite-image": frozenset({"minimal", "high"}),
+    "gemini-3.1-pro": _LOW_TO_HIGH,
+    "gemini-3-flash": _MINIMAL_TO_HIGH,
+    "gemini-3-pro": frozenset({"low", "high"}),
+    "gemini-2.5": _LOW_TO_HIGH,
 }
-_THINKING_BUDGETS: dict[str, int] = {
-    "none": 0,
-    "minimal": 1024,
-    "low": 1024,
-    "medium": 2048,
-    "high": 4096,
-    "xhigh": 4096,
-}
-# Levels that share a budget with a neighbour, so the mapping is approximate.
-_APPROXIMATED_BUDGET_LEVELS = frozenset({"minimal", "xhigh"})
 
 
 def block_to_native_part(block: ContentBlock) -> types.Part:
@@ -131,7 +134,8 @@ def to_native_contents(
 def _thinking_config(config: GoogleGenerationConfig) -> types.ThinkingConfig | None:
     """Returns the thinking config: the provider budget, else the generic level.
 
-    Gemini 3 models take a `thinking_level`; earlier ones take a token budget.
+    The generic level is clamped to the `thinking_level` values the model
+    accepts.
     """
     if config.thinking_budget is not None:
         return types.ThinkingConfig(
@@ -141,24 +145,12 @@ def _thinking_config(config: GoogleGenerationConfig) -> types.ThinkingConfig | N
     level = config.reasoning_effort
     if level is None:
         return None
-    if config.model.lower().startswith(_THINKING_LEVEL_MODEL_PREFIX):
-        native_level = _THINKING_LEVELS[level]
-        if native_level.value.lower() != level:
-            logger.debug(
-                "reasoning_effort %r mapped to Gemini thinking level %r",
-                level,
-                native_level.value,
-            )
-        return types.ThinkingConfig(
-            thinking_level=native_level, include_thoughts=config.include_thoughts
-        )
-    budget = _THINKING_BUDGETS[level]
-    if level in _APPROXIMATED_BUDGET_LEVELS:
-        logger.debug(
-            "reasoning_effort %r mapped to Gemini thinking budget %d", level, budget
-        )
+    supported = levels_for_model(config.model, _THINKING_LEVELS) or _MINIMAL_TO_HIGH
+    native_level = types.ThinkingLevel(
+        nearest_level("google", level, supported, config.model).upper()
+    )
     return types.ThinkingConfig(
-        thinking_budget=budget, include_thoughts=config.include_thoughts
+        thinking_level=native_level, include_thoughts=config.include_thoughts
     )
 
 

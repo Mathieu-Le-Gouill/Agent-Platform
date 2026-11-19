@@ -233,6 +233,40 @@ class TestToNativeParams:
         result = _to_native_params(cfg)
         assert result["reasoning_effort"] == "high"
 
+    def test_gpt6_is_a_reasoning_model(self):
+        cfg = OpenAIGenerationConfig(
+            model="gpt-6.2-astra", temperature=0.2, reasoning_effort="high"
+        )
+        result = _to_native_params(cfg)
+        assert "temperature" not in result
+        assert result["reasoning_effort"] == "high"
+
+    def test_gpt6_chat_is_not_a_reasoning_model(self):
+        cfg = OpenAIGenerationConfig(model="gpt-6-chat", temperature=0.2)
+        assert _to_native_params(cfg)["temperature"] == 0.2
+
+    @pytest.mark.parametrize(
+        ("model", "level", "sent"),
+        [
+            ("gpt-6.2-sol", "none", "low"),
+            ("gpt-6.1-sol", "high", "high"),
+            ("gpt-6.1-terra", "minimal", "low"),
+            ("gpt-6-luna", "none", "none"),
+            ("gpt-6-astra", "none", "minimal"),
+            ("gpt-6-astra", "xhigh", "xhigh"),
+            ("o3", "xhigh", "xhigh"),
+            ("gpt-5", "none", "none"),
+        ],
+    )
+    def test_reasoning_effort_is_clamped_to_the_levels_the_model_accepts(
+        self, model, level, sent, caplog
+    ):
+        cfg = OpenAIGenerationConfig(model=model, reasoning_effort=level)
+        with caplog.at_level("DEBUG"):
+            result = _to_native_params(cfg)
+        assert result["reasoning_effort"] == sent
+        assert (f"'{level}'" in caplog.text) == (sent != level)
+
     def test_reasoning_effort_dropped_with_a_warning_for_non_reasoning_model(
         self, caplog
     ):

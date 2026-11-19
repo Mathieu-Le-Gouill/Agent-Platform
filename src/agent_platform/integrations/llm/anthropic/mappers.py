@@ -27,6 +27,10 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
+from agent_platform.integrations.llm._generic_fields import (
+    levels_for_model,
+    nearest_level,
+)
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 
 __all__ = [
@@ -41,6 +45,29 @@ __all__ = [
 logger = logging.getLogger(__name__)
 
 _DEFAULT_MAX_TOKENS = 1024
+
+# `output_config.effort` support per model.
+# https://platform.claude.com/docs/en/build-with-claude/effort ("supportedModels"
+# and the `xhigh` row). Each prefix names one released model family, so a
+# future model id matches none and gets the requested level unchanged.
+_NO_EFFORT_MODEL_PREFIXES = (
+    "claude-3",
+    "claude-opus-4-0",
+    "claude-opus-4-1",
+    "claude-opus-4-2025",
+    "claude-sonnet-4-0",
+    "claude-sonnet-4-2025",
+    "claude-sonnet-4-5",
+    "claude-haiku-4-5",
+)
+_LEVELS_WITHOUT_XHIGH = frozenset({"low", "medium", "high"})
+_EFFORT_LEVELS: dict[str, frozenset[str]] = {
+    "claude-opus-4-6": _LEVELS_WITHOUT_XHIGH,
+    "claude-sonnet-4-6": _LEVELS_WITHOUT_XHIGH,
+    "claude-opus-4-5": _LEVELS_WITHOUT_XHIGH,
+    "claude-mythos-preview": _LEVELS_WITHOUT_XHIGH,
+}
+_DEFAULT_EFFORT_LEVELS = frozenset({"low", "medium", "high", "xhigh"})
 
 _BATCH_STATUS_MAP: dict[str, BatchStatus] = {
     "in_progress": BatchStatus.IN_PROGRESS,
@@ -134,14 +161,22 @@ def to_native_messages(prompt: Prompt) -> tuple[str | None, list[dict[str, Any]]
 
 
 def _effort(config: AnthropicGenerationConfig) -> str | None:
-    """Returns the `output_config.effort` value: the provider field, else the generic level."""
+    """Returns the `output_config.effort` value: the provider field, else the generic level.
+
+    The provider field is sent unchecked. The generic level is clamped to the
+    levels the model accepts; a model without effort support gets none.
+    """
     if config.effort is not None:
         return config.effort
     level = config.reasoning_effort
-    if level in ("none", "minimal"):
-        logger.debug("reasoning_effort %r mapped to Anthropic effort 'low'", level)
-        return "low"
-    return level
+    if level is None:
+        return None
+    model = config.model
+    if model.lower().startswith(_NO_EFFORT_MODEL_PREFIXES):
+        logger.warning("reasoning_effort is ignored: %r does not support effort", model)
+        return None
+    supported = levels_for_model(model, _EFFORT_LEVELS) or _DEFAULT_EFFORT_LEVELS
+    return nearest_level("anthropic", level, supported, model)
 
 
 def to_native_params(

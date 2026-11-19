@@ -27,6 +27,10 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
+from agent_platform.integrations.llm._generic_fields import (
+    levels_for_model,
+    nearest_level,
+)
 from agent_platform.integrations.llm._json_schema import json_schema_name
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 
@@ -43,9 +47,21 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-# Reasoning models (o-series, gpt-5 non-chat) reject non-default temperature/top_p
-# and only accept reasoning_effort on this family. https://platform.openai.com/docs/guides/reasoning
+# Reasoning models (o-series, gpt-5 and gpt-6 non-chat) reject non-default
+# temperature/top_p and only accept reasoning_effort on this family.
+# https://developers.openai.com/api/docs/guides/reasoning
 _REASONING_MODEL_PREFIXES = ("o1", "o3", "o4-mini")
+
+# `reasoning_effort` values each gpt-6 model accepts, by longest model-id prefix.
+# https://developers.openai.com/api/docs/models
+# Other reasoning models get the requested level unchanged.
+_EFFORT_LEVELS: dict[str, frozenset[str]] = {
+    "gpt-6.2": frozenset({"low", "medium", "high", "xhigh"}),
+    "gpt-6.1-sol": frozenset({"low", "medium", "high", "xhigh"}),
+    "gpt-6.1-terra": frozenset({"none", "low", "medium", "high", "xhigh"}),
+    "gpt-6-luna": frozenset({"none", "low", "medium", "high", "xhigh"}),
+    "gpt-6-astra": frozenset({"minimal", "low", "medium", "high", "xhigh"}),
+}
 
 _BATCH_STATUS_MAP: dict[str, BatchStatus] = {
     "validating": BatchStatus.PENDING,
@@ -131,7 +147,7 @@ def is_reasoning_model(model: str) -> bool:
     model_lower = model.lower()
     if model_lower.startswith(_REASONING_MODEL_PREFIXES):
         return True
-    return model_lower.startswith("gpt-5") and "chat" not in model_lower
+    return model_lower.startswith(("gpt-5", "gpt-6")) and "chat" not in model_lower
 
 
 def batch_job_from_native(batch: Any) -> BatchJob:
@@ -233,7 +249,14 @@ def to_native_params(
 
     if config.reasoning_effort is not None:
         if reasoning_model:
-            params["reasoning_effort"] = config.reasoning_effort
+            supported = levels_for_model(config.model, _EFFORT_LEVELS)
+            params["reasoning_effort"] = (
+                nearest_level(
+                    "openai", config.reasoning_effort, supported, config.model
+                )
+                if supported
+                else config.reasoning_effort
+            )
         else:
             logger.warning(
                 "reasoning_effort is ignored: %r is not an OpenAI reasoning model",
