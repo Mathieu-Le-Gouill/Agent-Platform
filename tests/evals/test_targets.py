@@ -1,34 +1,23 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
+from pydantic import BaseModel
 
+from agent_platform.agents.conversation import ConversationAgent
+from agent_platform.agents.tools.base import Tool
+from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     ToolCall,
-    ToolMessage,
-    ToolResult,
+    UserMessage,
 )
 from agent_platform.evals.schemas import EvalCase
 from agent_platform.evals.targets import (
     agent_executor_target,
     conversation_agent_target,
 )
-
-
-class _FakeConversationAgent:
-    def __init__(self, history_after: list) -> None:
-        self._history: list = []
-        self._history_after = history_after
-        self.chat_called_with: str | None = None
-
-    @property
-    def history(self) -> list:
-        return list(self._history)
-
-    async def chat(self, user_input: str) -> str:
-        self.chat_called_with = user_input
-        self._history = self._history_after
-        return "final text"
+from tests.helpers import make_fake_llm_response
 
 
 class TestAgentExecutorTarget:
@@ -68,17 +57,60 @@ class TestAgentExecutorTarget:
         assert output.tool_calls == []
 
 
+class _EchoTool(Tool):
+    name = "echo"
+    description = "Echoes the input"
+    input_schema = BaseModel
+
+    async def run(self, **kwargs):
+        return kwargs.get("text", "")
+
+
+def _user_texts(prompt) -> list[str]:
+    return [m.content for m in prompt.messages if isinstance(m, UserMessage)]
+
+
 class TestConversationAgentTarget:
     @pytest.mark.asyncio
-    async def test_extracts_new_tool_calls_from_history_diff(self):
-        history_after = [
-            ToolMessage(result=ToolResult(tool_call_id="1", name="search", content="x"))
-        ]
-        fake_agent = _FakeConversationAgent(history_after)
-        target = conversation_agent_target(fake_agent)
+    async def test_extracts_tool_calls_of_the_case(self, mock_llm):
+        responses = iter(
+            [
+                make_fake_llm_response(
+                    tool_calls=[{"id": "1", "name": "echo", "args": {"text": "x"}}]
+                ),
+                make_fake_llm_response(content="final text"),
+            ]
+        )
+        mock_llm.agenerate.side_effect = lambda **_: next(responses)
+        registry = ToolRegistry()
+        registry.register(_EchoTool())
+        agent = ConversationAgent(name="conv", llm=mock_llm, tool_registry=registry)
 
-        output = await target(EvalCase(id="c1", input="find stuff"))
+        output = await conversation_agent_target(agent)(
+            EvalCase(id="c1", input="find stuff")
+        )
 
         assert output.text == "final text"
-        assert output.tool_calls == ["search"]
-        assert fake_agent.chat_called_with == "find stuff"
+        assert output.tool_calls == ["echo"]
+
+    @pytest.mark.asyncio
+    async def test_concurrent_cases_do_not_share_history(self, mock_llm):
+        seen: list[list[str]] = []
+
+        async def generate(*, prompt, **_):
+            seen.append(_user_texts(prompt))
+            # Yield so both cases are in flight before either one finishes.
+            await asyncio.sleep(0)
+            return make_fake_llm_response(content="done")
+
+        mock_llm.agenerate.side_effect = generate
+        agent = ConversationAgent(name="conv", llm=mock_llm)
+        target = conversation_agent_target(agent)
+
+        await asyncio.gather(
+            target(EvalCase(id="a", input="question a")),
+            target(EvalCase(id="b", input="question b")),
+        )
+
+        assert sorted(seen) == [["question a"], ["question b"]]
+        assert agent.history == []

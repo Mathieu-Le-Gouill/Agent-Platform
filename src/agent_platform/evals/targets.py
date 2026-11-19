@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import Awaitable, Callable
+from uuid import uuid4
 
 from agent_platform.agents.conversation import ConversationAgent
 from agent_platform.agents.executor import AgentExecutor
@@ -31,13 +32,18 @@ def agent_executor_target(executor: AgentExecutor) -> EvalTarget:
 
 
 def conversation_agent_target(agent: ConversationAgent) -> EvalTarget:
+    """Returns a target that runs each case on its own fork of `agent`.
+
+    A fork starts with an empty history, so cases run concurrently by
+    `EvalRunner` never see each other's turns, and `agent` itself is untouched.
+    """
+
     async def _target(case: EvalCase) -> EvalOutput:
-        turns_before = len(agent.history)
-        text = await agent.chat(case.input)
-        new_messages = agent.history[turns_before:]
+        case_agent = agent.with_conversation(uuid4())
+        text = await case_agent.chat(case.input)
         tool_calls = [
             message.result.name
-            for message in new_messages
+            for message in case_agent.history
             if isinstance(message, ToolMessage)
         ]
         return EvalOutput(text=text, tool_calls=tool_calls)

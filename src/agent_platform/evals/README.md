@@ -72,8 +72,11 @@ pattern (`core/similarity.py::similarity_bounds`).
 An `EvalTarget` adapter turns whatever's under test into
 `Callable[[EvalCase], Awaitable[EvalOutput]]`. `agent_executor_target`
 wraps `AgentExecutor.run_with_messages` and captures the tool calls the
-agent actually made; `conversation_agent_target` wraps
-`ConversationAgent.chat` and diffs `.history` for the same. A pipeline
+agent actually made; `conversation_agent_target` runs each case on its own
+fork, `agent.with_conversation(uuid4())`, which starts with an empty history,
+and reads the tool calls from the fork's history. Concurrent cases never see
+each other's turns, and the original agent's history and token usage stay
+unchanged; history already on the agent is not part of a case. A pipeline
 target follows the same shape, no new abstraction needed.
 
 ## Worked Example: `conversation_tool_selection.jsonl`
