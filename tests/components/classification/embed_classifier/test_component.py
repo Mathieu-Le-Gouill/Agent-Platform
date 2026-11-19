@@ -7,9 +7,6 @@ from agent_platform.components.classification.embed_classifier.component import 
 from agent_platform.components.classification.embed_classifier.config import (
     EmbeddingClassifierConfig,
 )
-from agent_platform.components.classification.llm_classifier.config import (
-    LLMClassifierConfig,
-)
 from agent_platform.core.interfaces.classification.response import (
     ClassificationPrediction,
     ClassificationResponse,
@@ -22,7 +19,7 @@ from agent_platform.core.schemas.embedding import Embedding
 from agent_platform.core.schemas.score import Score
 
 
-def _make_component(similarity_result=None, llm_classifier=None):
+def _make_component(similarity_result=None):
     chunk = TextChunk(text="chunk")
 
     chunker = AsyncMock()
@@ -52,7 +49,6 @@ def _make_component(similarity_result=None, llm_classifier=None):
         chunker=chunker,
         embedder=embedder,
         similarity_scorer=similarity_scorer,
-        llm_classifier=llm_classifier,
     )
     return component, chunker, embedder, similarity_scorer
 
@@ -70,56 +66,6 @@ class TestEmbeddingClassifier:
         chunker.arun.assert_awaited_once_with(([docs[0]], None))
         assert embedder.arun.await_count == 2
         similarity_scorer.arun.assert_awaited_once()
-
-    async def test_llm_rerank_replaces_result_when_enabled(self):
-        llm_classifier = AsyncMock()
-        llm_classifier.arun = AsyncMock(
-            return_value=ClassificationResponse(
-                results=[
-                    ClassificationResult(
-                        predictions=[
-                            ClassificationPrediction(
-                                label="dog", score=Score(value=0.95)
-                            )
-                        ]
-                    )
-                ]
-            )
-        )
-        component, *_ = _make_component(llm_classifier=llm_classifier)
-        docs = [TextDocument(text="meow")]
-        config = EmbeddingClassifierConfig(
-            llm_rerank=True, llm_classifier_config=LLMClassifierConfig()
-        )
-
-        response = await component.arun(
-            EmbedClassifierInput(docs, ["cat", "dog"], config)
-        )
-
-        assert response.results[0].label == "dog"
-        llm_classifier.arun.assert_awaited_once()
-
-    async def test_llm_rerank_skipped_when_no_llm_classifier_config(self):
-        llm_classifier = AsyncMock()
-        component, *_ = _make_component(llm_classifier=llm_classifier)
-        docs = [TextDocument(text="meow")]
-        config = EmbeddingClassifierConfig(llm_rerank=True, llm_classifier_config=None)
-
-        response = await component.arun(EmbedClassifierInput(docs, ["cat"], config))
-
-        assert response.results[0].label == "cat"
-        llm_classifier.arun.assert_not_awaited()
-
-    async def test_llm_rerank_ignored_when_llm_classifier_not_injected(self):
-        component, *_ = _make_component(llm_classifier=None)
-        docs = [TextDocument(text="meow")]
-        config = EmbeddingClassifierConfig(
-            llm_rerank=True, llm_classifier_config=LLMClassifierConfig()
-        )
-
-        response = await component.arun(EmbedClassifierInput(docs, ["cat"], config))
-
-        assert response.results[0].label == "cat"
 
     async def test_multiple_documents_produce_multiple_results(self):
         chunk1 = TextChunk(text="chunk1")

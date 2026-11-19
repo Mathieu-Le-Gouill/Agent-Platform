@@ -38,7 +38,7 @@ from agent_platform.integrations.llm.google.mappers import (
     to_native_contents as _to_native_contents,
 )
 from agent_platform.integrations.llm.google.provider import GoogleLLM
-from tests.helpers import assert_custom_construction_stored, assert_default_construction
+from tests.helpers import assert_custom_construction_stored
 
 
 def _creds(key: str = "gm-test") -> GoogleCredentials:
@@ -73,8 +73,11 @@ def _response(parts, prompt_tokens=None, candidates_tokens=None, finish_reason="
 
 
 class TestGoogleLLMConstruction:
-    def test_default_credentials_and_config(self):
-        assert_default_construction(GoogleLLM, GoogleGenerationConfig)
+    def test_the_bound_model_and_options_resolve_into_the_provider_config(self):
+        provider = GoogleLLM(model="gemini-2.5-flash", options={"thinking_budget": 256})
+        cfg = provider._resolve(None)
+        assert isinstance(cfg, GoogleGenerationConfig)
+        assert (cfg.model, cfg.thinking_budget) == ("gemini-2.5-flash", 256)
 
     def test_custom_credentials_stored(self):
         assert_custom_construction_stored(GoogleLLM, _creds())
@@ -117,7 +120,7 @@ class TestGoogleLLMConstruction:
         assert GoogleLLM(_creds())._is_transient(error) is True
 
     def test_a_timeout_or_connection_error_is_transient(self):
-        provider = GoogleLLM(_creds())
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
 
         assert provider._is_transient(httpx.ReadTimeout("slow"))
         assert provider._is_transient(httpx.ConnectError("down"))
@@ -126,7 +129,7 @@ class TestGoogleLLMConstruction:
 
     def test_an_aiohttp_connection_error_is_transient(self):
         aiohttp = pytest.importorskip("aiohttp")
-        provider = GoogleLLM(_creds())
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
 
         assert provider._is_transient(aiohttp.ClientConnectionError("reset"))
         assert provider._is_transient(aiohttp.ServerDisconnectedError())
@@ -249,6 +252,78 @@ class TestToNativeConfig:
         native = _to_native_config(cfg, None, None, lambda t: t)
         assert native.thinking_config.thinking_budget == 100
 
+    @pytest.mark.parametrize(
+        ("level", "budget"),
+        [
+            ("none", 0),
+            ("minimal", 1024),
+            ("low", 1024),
+            ("medium", 2048),
+            ("high", 4096),
+            ("xhigh", 4096),
+        ],
+    )
+    def test_generic_reasoning_effort_maps_to_a_budget(self, level, budget):
+        cfg = GoogleGenerationConfig(model="gemini-2.5-flash", reasoning_effort=level)
+        native = _to_native_config(cfg, None, None, lambda t: t)
+        assert native.thinking_config.thinking_budget == budget
+
+    @pytest.mark.parametrize(
+        ("level", "native_level"),
+        [
+            ("none", "MINIMAL"),
+            ("minimal", "MINIMAL"),
+            ("low", "LOW"),
+            ("medium", "MEDIUM"),
+            ("high", "HIGH"),
+            ("xhigh", "HIGH"),
+        ],
+    )
+    def test_gemini_3_gets_a_thinking_level_instead_of_a_budget(
+        self, level, native_level
+    ):
+        cfg = GoogleGenerationConfig(model="gemini-3-pro", reasoning_effort=level)
+        native = _to_native_config(cfg, None, None, lambda t: t)
+        assert native.thinking_config.thinking_level.value == native_level
+        assert native.thinking_config.thinking_budget is None
+
+    def test_a_nearby_level_mapping_is_logged(self, caplog):
+        cfg = GoogleGenerationConfig(model="gemini-2.5-flash", reasoning_effort="xhigh")
+        with caplog.at_level("DEBUG"):
+            _to_native_config(cfg, None, None, lambda t: t)
+        assert "mapped to Gemini thinking budget 4096" in caplog.text
+
+    def test_an_approximated_gemini_3_level_is_logged(self, caplog):
+        cfg = GoogleGenerationConfig(model="gemini-3-pro", reasoning_effort="xhigh")
+        with caplog.at_level("DEBUG"):
+            _to_native_config(cfg, None, None, lambda t: t)
+        assert "mapped to Gemini thinking level" in caplog.text
+
+    def test_provider_thinking_budget_wins_over_generic_reasoning_effort(self):
+        cfg = GoogleGenerationConfig(
+            model="gemini-3-pro", thinking_budget=7, reasoning_effort="high"
+        )
+        native = _to_native_config(cfg, None, None, lambda t: t)
+        assert native.thinking_config.thinking_budget == 7
+        assert native.thinking_config.thinking_level is None
+
+    def test_no_thinking_config_by_default(self):
+        native = _to_native_config(GoogleGenerationConfig(), None, None, lambda t: t)
+        assert native.thinking_config is None
+
+    def test_parallel_tool_calls_with_tools_warns_and_is_not_sent(self, caplog):
+        cfg = GoogleGenerationConfig(parallel_tool_calls=False)
+        with caplog.at_level("WARNING"):
+            native = _to_native_config(cfg, None, [object()], lambda t: t)
+        assert "parallel_tool_calls is ignored" in caplog.text
+        assert native.tool_config is None
+
+    def test_parallel_tool_calls_without_tools_does_not_warn(self, caplog):
+        cfg = GoogleGenerationConfig(parallel_tool_calls=False)
+        with caplog.at_level("WARNING"):
+            _to_native_config(cfg, None, None, lambda t: t)
+        assert caplog.text == ""
+
 
 class TestFromNativeResponse:
     def test_extracts_text_and_tool_calls(self):
@@ -284,7 +359,7 @@ class TestGoogleLLMGenerate:
         mock_client_cls.return_value = mock_client
         mock_client.models.generate_content.return_value = _response([_part(text="ok")])
 
-        provider = GoogleLLM(_creds())
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
         result = provider.generate(prompt, tools=[_SchemaTool()])
 
@@ -302,7 +377,7 @@ class TestGoogleLLMGenerate:
             return_value=_response([_part(text="async hi")])
         )
 
-        provider = GoogleLLM(_creds())
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
         result = await provider.agenerate(prompt)
 
@@ -326,7 +401,7 @@ class TestGoogleLLMGenerate:
 
         mock_client.aio.models.generate_content = flaky
 
-        provider = GoogleLLM(_creds())
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
         result = await provider.agenerate(prompt)
 
@@ -345,7 +420,7 @@ class TestGoogleLLMGenerate:
 
         mock_client.aio.models.generate_content = always_fails
 
-        provider = GoogleLLM(_creds())
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
         with pytest.raises(ProviderError, match="LLM generation failed"):
             await provider.agenerate(prompt)
@@ -370,7 +445,7 @@ class TestGoogleLLMStream:
 
         mock_client.aio.models.generate_content_stream = AsyncMock(return_value=_gen())
 
-        provider = GoogleLLM(_creds())
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
         results = [c async for c in provider.stream(prompt)]
 
@@ -409,7 +484,7 @@ class TestGoogleLLMStream:
 
         mock_client.aio.models.generate_content_stream = AsyncMock(return_value=_gen())
 
-        provider = GoogleLLM(_creds())
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
         results = [c async for c in provider.stream(prompt, tools=[_SchemaTool()])]
 

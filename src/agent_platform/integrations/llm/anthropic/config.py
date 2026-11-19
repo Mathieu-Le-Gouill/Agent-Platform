@@ -6,22 +6,12 @@ from agent_platform.core.interfaces.llm.config import GenerationConfig
 
 
 class AnthropicGenerationConfig(GenerationConfig):
-    model: str = "claude-sonnet-4-6"
-    """Anthropic model identifier, e.g. "claude-sonnet-4-6" or "claude-opus-4-7"."""
-
-    thinking: bool = False
-    """Enable legacy manual extended thinking (`budget_tokens`-style). Deprecated
-    starting with the Claude 4.6 generation (incl. the default model above; still
-    accepted there) and rejected outright with a 400 starting at Claude 4.7+, in
-    favor of `effort`."""
-
-    thinking_budget: int | None = None
-    """Token budget for legacy `thinking`. Must be strictly less than the effective
-    `max_tokens`, or the API returns a 400."""
+    """Anthropic config. `model` is an Anthropic model id such as "claude-sonnet-4-6"."""
 
     effort: Literal["low", "medium", "high", "xhigh", "max"] | None = None
-    """Modern `output_config.effort` reasoning-depth control; preferred over `thinking`/
-    `thinking_budget` on current models."""
+    """`output_config.effort` reasoning-depth control. Wins over the generic
+    `reasoning_effort` when both are set; use it for `max`, which the generic
+    levels do not have."""
 
     cache_control: bool = False
     """Mark the last eligible content block as an ephemeral prompt-cache breakpoint."""

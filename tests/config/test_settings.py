@@ -51,6 +51,28 @@ class TestSettings:
         assert [k.get_secret_value() for k in settings.api_keys] == ["key-1", "key-2"]
         assert settings.api_max_conversations_per_key == 5
 
+    def test_llm_options_default_to_empty(self):
+        assert Settings(_env_file=None).llm_options == {}
+
+    def test_llm_options_parse_from_a_json_object(self, monkeypatch):
+        monkeypatch.setenv(
+            "AGENT_PLATFORM_LLM_OPTIONS",
+            '{"anthropic": {"effort": "high"}, "openai": {"seed": 3}}',
+        )
+
+        settings = Settings(_env_file=None)
+
+        assert settings.llm_options == {
+            "anthropic": {"effort": "high"},
+            "openai": {"seed": 3},
+        }
+
+    def test_llm_options_must_map_a_slug_to_an_object(self, monkeypatch):
+        monkeypatch.setenv("AGENT_PLATFORM_LLM_OPTIONS", '{"openai": 3}')
+
+        with pytest.raises(ValidationError):
+            Settings(_env_file=None)
+
     def test_api_keys_are_not_shown_in_repr(self):
         settings = Settings(_env_file=None, api_keys=["key-1"])
 

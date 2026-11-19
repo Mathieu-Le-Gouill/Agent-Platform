@@ -167,6 +167,23 @@ class TestToNativeParams:
         assert "temperature" not in result
         assert "extra_body" not in result
 
+    def test_unsupported_generic_fields_warn_and_are_not_sent(self, caplog):
+        cfg = HuggingFaceGenerationConfig(
+            reasoning_effort="low", parallel_tool_calls=True
+        )
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg, has_tools=True)
+        assert "reasoning_effort" not in result
+        assert "parallel_tool_calls" not in result
+        assert "reasoning_effort is ignored" in caplog.text
+        assert "parallel_tool_calls is ignored" in caplog.text
+
+    def test_parallel_tool_calls_without_tools_does_not_warn(self, caplog):
+        cfg = HuggingFaceGenerationConfig(parallel_tool_calls=True)
+        with caplog.at_level("WARNING"):
+            _to_native_params(cfg)
+        assert caplog.text == ""
+
     def test_temperature_zero_is_sent(self):
         # Regression: `if config.temperature:` used to drop an explicit 0.0.
         cfg = HuggingFaceGenerationConfig(temperature=0.0)
@@ -294,12 +311,17 @@ class TestHuggingFaceLLMConstruction:
         provider = HuggingFaceLLM(_creds("hf_123"))
         assert provider._credentials.api_key.get_secret_value() == "hf_123"
 
-    def test_default_config(self):
-        provider = HuggingFaceLLM()
-        cfg = provider._default_config()
+    def test_the_bound_model_and_options_resolve_into_the_provider_config(self):
+        provider = HuggingFaceLLM(
+            model="deepseek-ai/DeepSeek-R1-0528", options={"provider": "cerebras"}
+        )
+        cfg = provider._resolve(None)
         assert isinstance(cfg, HuggingFaceGenerationConfig)
-        assert cfg.repo_id == "deepseek-ai/DeepSeek-R1-0528"
-        assert cfg.provider == "auto"
+        assert cfg.model == "deepseek-ai/DeepSeek-R1-0528"
+        assert cfg.provider == "cerebras"
+
+    def test_the_provider_defaults_to_auto(self):
+        assert HuggingFaceLLM(model="m")._resolve(None).provider == "auto"
 
     def test_tool_to_schema(self):
         class _Input(BaseModel):
@@ -313,7 +335,7 @@ class TestHuggingFaceLLMConstruction:
             async def run(self, **kwargs):
                 return "ok"
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         schema = provider._tool_to_schema(_SchemaTool())
         assert schema["type"] == "function"
         assert schema["function"]["name"] == "test_tool"
@@ -321,15 +343,15 @@ class TestHuggingFaceLLMConstruction:
     def test_missing_credential_error(self):
         provider = HuggingFaceLLM()
         provider._credentials = HuggingFaceCredentials()
-        cfg = HuggingFaceGenerationConfig(repo_id="test/model")
+        cfg = HuggingFaceGenerationConfig(model="test/model")
         with pytest.raises(
             MissingCredentialError, match="Hugging Face Hub API token is required"
         ):
             provider._async_client(cfg)
 
     def test_client_kwargs(self, mocker):
-        provider = HuggingFaceLLM(_creds())
-        cfg = HuggingFaceGenerationConfig(repo_id="test/model", provider="cerebras")
+        provider = HuggingFaceLLM(_creds(), model="test/model")
+        cfg = HuggingFaceGenerationConfig(model="test/model", provider="cerebras")
         kwargs = provider._client_kwargs(cfg)
         assert kwargs["model"] == "test/model"
         assert kwargs["provider"] == "cerebras"
@@ -337,7 +359,7 @@ class TestHuggingFaceLLMConstruction:
         assert kwargs["timeout"] == 120.0
 
     def test_client_kwargs_explicit_timeout(self):
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         cfg = HuggingFaceGenerationConfig(timeout=30.0)
         kwargs = provider._client_kwargs(cfg)
         assert kwargs["timeout"] == 30.0
@@ -349,16 +371,16 @@ class TestHuggingFaceLLMConstruction:
 
     @pytest.mark.parametrize("status", [400, 401, 403, 404, 422])
     def test_a_client_error_is_not_transient(self, status):
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         assert provider._is_transient(self._status_error(status)) is False
 
     @pytest.mark.parametrize("status", [408, 409, 429, 500, 503])
     def test_a_temporary_status_is_transient(self, status):
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         assert provider._is_transient(self._status_error(status)) is True
 
     def test_a_timeout_or_connection_error_is_transient(self):
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
 
         assert provider._is_transient(InferenceTimeoutError("slow"))
         assert provider._is_transient(httpx.ConnectError("down"))
@@ -374,9 +396,9 @@ class TestHuggingFaceLLMGenerate:
         mock_client_cls.return_value = mock_client
         mock_client.chat_completion.return_value = _response("Sync hello")
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        config = HuggingFaceGenerationConfig(repo_id="test/model")
+        config = HuggingFaceGenerationConfig(model="test/model")
         result = provider.generate(prompt, config=config)
 
         assert result.message.content == "Sync hello"
@@ -401,9 +423,9 @@ class TestHuggingFaceLLMGenerate:
         mock_client_cls.return_value = mock_client
         mock_client.chat_completion.return_value = _response("ok")
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        config = HuggingFaceGenerationConfig(repo_id="test/model")
+        config = HuggingFaceGenerationConfig(model="test/model")
         provider.generate(prompt, config=config, tools=[_SchemaTool()])
 
         _, kwargs = mock_client.chat_completion.call_args
@@ -417,9 +439,9 @@ class TestHuggingFaceLLMGenerate:
         mock_client_cls.return_value = mock_client
         mock_client.chat_completion = AsyncMock(return_value=_response("Async hello"))
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        config = HuggingFaceGenerationConfig(repo_id="test/model")
+        config = HuggingFaceGenerationConfig(model="test/model")
         result = await provider.agenerate(prompt, config=config)
 
         assert result.message.content == "Async hello"
@@ -443,9 +465,9 @@ class TestHuggingFaceLLMGenerate:
         mock_client_cls.return_value = mock_client
         mock_client.chat_completion = AsyncMock(return_value=_response("ok"))
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        config = HuggingFaceGenerationConfig(repo_id="test/model")
+        config = HuggingFaceGenerationConfig(model="test/model")
         await provider.agenerate(prompt, config=config, tools=[_SchemaTool()])
 
         _, kwargs = mock_client.chat_completion.call_args
@@ -469,10 +491,10 @@ class TestHuggingFaceLLMGenerate:
 
         mock_client.chat_completion = flaky
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
         result = await provider.agenerate(
-            prompt, config=HuggingFaceGenerationConfig(repo_id="test/model")
+            prompt, config=HuggingFaceGenerationConfig(model="test/model")
         )
         assert calls["n"] == 2
         assert result.message.content == "ok"
@@ -489,11 +511,11 @@ class TestHuggingFaceLLMGenerate:
 
         mock_client.chat_completion = always_fails
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
         with pytest.raises(ProviderError, match="LLM generation failed"):
             await provider.agenerate(
-                prompt, config=HuggingFaceGenerationConfig(repo_id="test/model")
+                prompt, config=HuggingFaceGenerationConfig(model="test/model")
             )
 
 
@@ -534,9 +556,9 @@ class TestHuggingFaceLLMStream:
 
         mock_client.chat_completion = AsyncMock(return_value=_gen())
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        config = HuggingFaceGenerationConfig(repo_id="test/model")
+        config = HuggingFaceGenerationConfig(model="test/model")
         results = [c async for c in provider.stream(prompt, config=config)]
 
         assert results[0].delta == "Hello"
@@ -560,9 +582,9 @@ class TestHuggingFaceLLMStream:
 
         mock_client.chat_completion = AsyncMock(return_value=_gen())
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        config = HuggingFaceGenerationConfig(repo_id="test/model")
+        config = HuggingFaceGenerationConfig(model="test/model")
         results = [c async for c in provider.stream(prompt, config=config)]
 
         assert len(results) == 1
@@ -638,9 +660,9 @@ class TestHuggingFaceLLMStream:
 
         mock_client.chat_completion = AsyncMock(return_value=_gen())
 
-        provider = HuggingFaceLLM(_creds())
+        provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        config = HuggingFaceGenerationConfig(repo_id="test/model")
+        config = HuggingFaceGenerationConfig(model="test/model")
         results = [
             c
             async for c in provider.stream(prompt, config=config, tools=[_SchemaTool()])

@@ -4,16 +4,10 @@ from agent_platform.core.interfaces.llm.config import GenerationConfig
 
 
 class HuggingFaceGenerationConfig(GenerationConfig):
-    task: str = "text-generation"
-    """Inference task type; unused since the provider moved to the OpenAI-compatible
-    `InferenceClient.chat_completion` API, which has no task concept. Kept for
-    config backward-compatibility."""
-
-    repo_id: str = "deepseek-ai/DeepSeek-R1-0528"
-    """HuggingFace Hub model repository id to run inference against."""
+    # `model` is a HuggingFace Hub repository id such as "deepseek-ai/DeepSeek-R1-0528".
 
     provider: str = "auto"
-    """Inference provider for the repo_id model (e.g. "cerebras"); "auto" picks the
+    """Inference provider for the `model` repository (e.g. "cerebras"); "auto" picks the
     first available provider ordered by the huggingface.co/settings/inference-providers preference."""
 
     repetition_penalty: float | None = None

@@ -4,8 +4,7 @@ from agent_platform.core.interfaces.llm.config import GenerationConfig
 
 
 class OllamaGenerationConfig(GenerationConfig):
-    model: str = "llama3.2"
-    """Ollama model tag to run, e.g. "llama3.2" or "mistral"."""
+    # `model` is an Ollama model tag such as "llama3.2" or "mistral".
 
     repeat_penalty: float | None = None
     """Ollama-native repetition control: multiplicative, default 1.1, symmetric around

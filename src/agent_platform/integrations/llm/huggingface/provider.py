@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -13,6 +13,7 @@ from agent_platform.core.credentials import (
     resolve_credentials,
 )
 from agent_platform.core.errors import require_secret
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -46,17 +47,19 @@ class HuggingFaceLLM(
     ]
 ):
     _provider_name = "huggingface"
+    _config_cls = HuggingFaceGenerationConfig
 
     def __init__(
         self,
         credentials: HuggingFaceCredentials | None = None,
         client_options: ClientOptions | None = None,
+        *,
+        model: str = "",
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         self._credentials = resolve_credentials(credentials, HuggingFaceCredentials)
         self._client_options = resolve_client_options(client_options)
-
-    def _model_name(self, config: HuggingFaceGenerationConfig) -> str:
-        return config.repo_id
+        self._bind(model, options)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         return {
@@ -68,9 +71,6 @@ class HuggingFaceLLM(
             },
         }
 
-    def _default_config(self) -> HuggingFaceGenerationConfig:
-        return HuggingFaceGenerationConfig()
-
     def _client_kwargs(self, config: HuggingFaceGenerationConfig) -> dict[str, Any]:
         api_key = require_secret(
             self._credentials.api_key,
@@ -81,7 +81,7 @@ class HuggingFaceLLM(
         # knob. The platform retry in `NativeLLMProvider.generate`/`agenerate`
         # provides the attempt-count-based retry instead.
         return {
-            "model": config.repo_id,
+            "model": config.model,
             "provider": config.provider,
             "token": api_key.get_secret_value(),
             "timeout": self._timeout(config),
@@ -114,7 +114,7 @@ class HuggingFaceLLM(
         tools: list[Tool] | None,
     ) -> ChatCompletionOutput:
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
@@ -128,7 +128,7 @@ class HuggingFaceLLM(
         tools: list[Tool] | None,
     ) -> ChatCompletionOutput:
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
@@ -140,17 +140,17 @@ class HuggingFaceLLM(
     async def stream(
         self,
         prompt: Prompt,
-        config: HuggingFaceGenerationConfig | None = None,
+        config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        config = config or self._default_config()
-        client = self._async_client(config)
+        resolved = self._resolve(config)
+        client = self._async_client(resolved)
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(resolved, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with self._observe(config) as call:
+        with self._observe(resolved) as call:
             usage_totals = TokenUsage.zero()
             events = await client.chat_completion(
                 messages=messages, stream=True, **params

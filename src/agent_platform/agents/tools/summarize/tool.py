@@ -6,8 +6,10 @@ from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.agents.tools.safe_execution import safe_call
+from agent_platform.components.generation.llm_task.component import LLMTaskInput
+from agent_platform.components.generation.llm_task.summarize import summarize_task
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
-from agent_platform.core.schemas.message import Prompt
+from agent_platform.core.interfaces.llm.structured import StructuredOutputError
 
 
 class SummarizeInput(BaseModel):
@@ -28,14 +30,14 @@ class SummarizeTool(Tool):
 
     async def run(self, **kwargs: Any) -> str:
         validated = SummarizeInput(**kwargs)
-        system = "Summarize the following text concisely."
-        if validated.max_words:
-            system += f" Limit the summary to {validated.max_words} words."
+        task = summarize_task(self._llm, max_words=validated.max_words)
 
-        response = await safe_call(
-            self._llm.agenerate(Prompt.build(system=system, user=validated.text)),
-            "Summarization failed",
-        )
-        if response.message is None or not response.message.text:
-            raise ToolError("Summarization returned no content")
-        return response.message.text
+        async def summarize() -> str:
+            try:
+                result = await task.arun(LLMTaskInput(validated.text, None))
+            except StructuredOutputError as exc:
+                # Raised as a ToolError here so `safe_call` passes it through.
+                raise ToolError("Summarization returned no content") from exc
+            return result.output
+
+        return await safe_call(summarize(), "Summarization failed")

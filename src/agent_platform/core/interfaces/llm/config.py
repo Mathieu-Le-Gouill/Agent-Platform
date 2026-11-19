@@ -1,7 +1,11 @@
 from __future__ import annotations
 
+from typing import Literal
+
 from agent_platform.core.config import ModelConfig, RequestOptions
 from agent_platform.core.interfaces.llm.response import ResponseFormat
+
+ReasoningEffort = Literal["none", "minimal", "low", "medium", "high", "xhigh"]
 
 
 class GenerationConfig(RequestOptions, ModelConfig):
@@ -30,3 +34,10 @@ class GenerationConfig(RequestOptions, ModelConfig):
     response_format: ResponseFormat = ResponseFormat.TEXT
     # JSON Schema the output must conform to when response_format requests structured JSON.
     json_schema: dict | None = None
+    # Reasoning depth for models that support it; each provider maps the level
+    # to its nearest native one, or warns and skips it. None leaves the
+    # provider's default in place and sends nothing.
+    reasoning_effort: ReasoningEffort | None = None
+    # Whether the model may return several tool calls in one turn. None leaves
+    # the provider's default in place and sends nothing.
+    parallel_tool_calls: bool | None = None

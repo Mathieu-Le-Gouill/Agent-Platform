@@ -32,7 +32,9 @@ logger = logging.getLogger(__name__)
 _TRACING_DISABLED = "none"
 
 
-def build_provider(domain_module: ModuleType, provider_name: str) -> Any:
+def build_provider(
+    domain_module: ModuleType, provider_name: str, **init_kwargs: Any
+) -> Any:
     """Instantiate a provider class re-exported by an `integrations.<domain>` module.
 
     `provider_name` is resolved against that module's `PROVIDER_ALIASES` map first
@@ -41,6 +43,7 @@ def build_provider(domain_module: ModuleType, provider_name: str) -> Any:
     is the single source of truth for what providers exist, so no separate
     provider-name registry is kept here. Works for any domain module that follows
     that convention (see `integrations/README.md`), not just `llm`.
+    `init_kwargs` go to the provider's constructor.
     """
     aliases: dict[str, str] = getattr(domain_module, "PROVIDER_ALIASES", {})
     class_name = aliases.get(provider_name, provider_name)
@@ -50,7 +53,7 @@ def build_provider(domain_module: ModuleType, provider_name: str) -> Any:
         raise ConfigError(
             f"Unknown provider {provider_name!r} for {domain_module.__name__!r}"
         ) from exc
-    return provider_cls()
+    return provider_cls(**init_kwargs)
 
 
 def build_provider_from_model_string(
@@ -64,27 +67,67 @@ def build_provider_from_model_string(
     return build_provider(domain_module, provider_name), model
 
 
+def _validate_llm_options(
+    llm_module: ModuleType, llm_options: dict[str, dict[str, Any]]
+) -> None:
+    """Check every `llm_options` entry against its provider's config class.
+
+    Every entry is checked, whether the chain uses its provider or not, so a
+    typo fails at startup instead of when a fallback is first reached. Only
+    the slug and the field name appear in an error, never an option value.
+    """
+    aliases: dict[str, str] = llm_module.PROVIDER_ALIASES
+    for slug, options in llm_options.items():
+        if slug not in aliases:
+            raise ConfigError(
+                f"Unknown LLM provider {slug!r} in llm_options, "
+                f"expected one of {sorted(aliases)}"
+            )
+        getattr(llm_module, aliases[slug]).validate_options(options)
+
+
+def _build_llm_entry(
+    llm_module: ModuleType, model_string: str, llm_options: dict[str, dict[str, Any]]
+) -> tuple[Any, str]:
+    """Build one chain entry bound to its model and to its provider's `llm_options`."""
+    provider_name, model = parse_model_string(model_string)
+    class_name = llm_module.PROVIDER_ALIASES.get(provider_name, provider_name)
+    slug = next(
+        (s for s, name in llm_module.PROVIDER_ALIASES.items() if name == class_name),
+        provider_name,
+    )
+    provider = build_provider(
+        llm_module, provider_name, model=model, options=llm_options.get(slug)
+    )
+    return provider, model
+
+
 def build_llm_with_fallback(settings: Settings) -> tuple[Any, str]:
     """Resolve `settings.default_llm_model` (+ `fallback_llm_models`) into a
     single `BaseLLMProvider`.
 
-    With no fallbacks configured, returns the primary provider directly (the
-    common case stays a plain single-provider call, no wrapper overhead).
-    Otherwise wraps the chain in a `FallbackLLMProvider`, which owns retrying
-    the next entry when an earlier one's circuit breaker trips - callers see
-    one `BaseLLMProvider`, not the chain behind it.
+    Each provider is bound to its model string's model and to its
+    `settings.llm_options` entry. With no fallbacks configured, returns the
+    primary provider directly (the common case stays a plain single-provider
+    call, no wrapper overhead). Otherwise wraps the chain in a
+    `FallbackLLMProvider`, which owns retrying the next entry when an earlier
+    one's circuit breaker trips - callers see one `BaseLLMProvider`, not the
+    chain behind it.
     """
     import agent_platform.integrations.llm as llm_module
 
-    primary, primary_model = build_provider_from_model_string(
-        llm_module, settings.default_llm_model
+    _validate_llm_options(llm_module, settings.llm_options)
+    primary, primary_model = _build_llm_entry(
+        llm_module, settings.default_llm_model, settings.llm_options
     )
     if not settings.fallback_llm_models:
         return primary, primary_model
 
     entries = [FallbackEntry(provider=primary, model=primary_model)]
     for model_string in settings.fallback_llm_models:
-        provider, model = build_provider_from_model_string(llm_module, model_string)
+        provider, model = _build_llm_entry(
+            llm_module, model_string, settings.llm_options
+        )
         entries.append(FallbackEntry(provider=provider, model=model))
 
     rate_limiter = (

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -14,6 +14,7 @@ from agent_platform.core.credentials import (
     resolve_credentials,
     resolve_max_retries,
 )
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -45,14 +46,19 @@ class OllamaLLM(
     NativeLLMProvider[OllamaGenerationConfig, AsyncClient, Client, ChatResponse]
 ):
     _provider_name = "ollama"
+    _config_cls = OllamaGenerationConfig
 
     def __init__(
         self,
         credentials: OllamaCredentials | None = None,
         client_options: ClientOptions | None = None,
+        *,
+        model: str = "",
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         self._credentials = resolve_credentials(credentials, OllamaCredentials)
         self._client_options = resolve_client_options(client_options)
+        self._bind(model, options)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         return {
@@ -64,9 +70,6 @@ class OllamaLLM(
                 "required": [],
             },
         }
-
-    def _default_config(self) -> OllamaGenerationConfig:
-        return OllamaGenerationConfig()
 
     def _client_kwargs(self, config: OllamaGenerationConfig) -> dict[str, Any]:
         base_url = self._client_options.base_url or from_env(
@@ -118,7 +121,7 @@ class OllamaLLM(
         tools: list[Tool] | None,
     ) -> ChatResponse:
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
@@ -132,7 +135,7 @@ class OllamaLLM(
         tools: list[Tool] | None,
     ) -> ChatResponse:
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
@@ -144,20 +147,20 @@ class OllamaLLM(
     async def stream(
         self,
         prompt: Prompt,
-        config: OllamaGenerationConfig | None = None,
+        config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        config = config or self._default_config()
-        client = self._stream_client(config)
+        resolved = self._resolve(config)
+        client = self._stream_client(resolved)
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(resolved, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with self._observe(config) as call:
+        with self._observe(resolved) as call:
             usage_totals = TokenUsage.zero()
             events = await client.chat(
-                model=config.model, messages=messages, stream=True, **params
+                model=resolved.model, messages=messages, stream=True, **params
             )
             async for chunk in events:
                 delta = chunk.message.content if chunk.message else None

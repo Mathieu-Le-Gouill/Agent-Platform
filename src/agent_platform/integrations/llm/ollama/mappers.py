@@ -25,6 +25,7 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
+from agent_platform.integrations.llm._generic_fields import warn_unsupported
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 
 __all__ = [
@@ -94,7 +95,14 @@ def to_native_messages(prompt: Prompt) -> list[dict[str, Any]]:
     return result
 
 
-def to_native_params(config: OllamaGenerationConfig) -> dict[str, Any]:
+def to_native_params(
+    config: OllamaGenerationConfig, *, has_tools: bool = False
+) -> dict[str, Any]:
+    if config.reasoning_effort is not None:
+        warn_unsupported("ollama", "reasoning_effort")
+    if config.parallel_tool_calls is not None and has_tools:
+        warn_unsupported("ollama", "parallel_tool_calls")
+
     options: dict[str, Any] = {}
     if config.temperature is not None:
         options["temperature"] = config.temperature

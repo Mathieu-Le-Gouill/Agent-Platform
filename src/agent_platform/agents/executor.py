@@ -4,11 +4,13 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 
 from agent_platform.agents.agent import Agent
-from agent_platform.agents.errors import AgentMaxIterations, AgentRecoveryExhausted
+from agent_platform.agents.errors import AgentMaxIterations
 from agent_platform.agents.tools.base import ToolStreamChunk
 from agent_platform.agents.tools.registry import is_tool_validation_error
-from agent_platform.agents.validation import retry_once_on_invalid
+from agent_platform.core.errors import RecoveryExhausted
+from agent_platform.core.interfaces.llm.structured import StructuredOutputError
 from agent_platform.core.observability import AgentRun, observe
+from agent_platform.core.retry import retry_once_on_invalid
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     Message,
@@ -151,7 +153,11 @@ class AgentExecutor:
                         correct=lambda error: self._correct_tool_call(messages, error),
                         on_retry=trace.on_retry,
                     )
-                except AgentRecoveryExhausted as exc:
+                except StructuredOutputError:
+                    # Raised by a structured call inside the attempt, not by
+                    # this retry: its last_result is not a turn to record.
+                    raise
+                except RecoveryExhausted as exc:
                     failed_msg, failed_tool_messages = exc.last_result
                     trace.record_turn(failed_msg, failed_tool_messages)
                     trace.finish(EXIT_RECOVERY_EXHAUSTED)
@@ -213,7 +219,11 @@ class AgentExecutor:
                         correct=lambda error: self._correct_tool_call(messages, error),
                         on_retry=trace.on_retry,
                     )
-                except AgentRecoveryExhausted as exc:
+                except StructuredOutputError:
+                    # Raised by a structured call inside the attempt, not by
+                    # this retry: its last_result is not a turn to record.
+                    raise
+                except RecoveryExhausted as exc:
                     failed_msg, failed_tool_messages = exc.last_result
                     trace.record_turn(failed_msg, failed_tool_messages)
                     trace.finish(EXIT_RECOVERY_EXHAUSTED)

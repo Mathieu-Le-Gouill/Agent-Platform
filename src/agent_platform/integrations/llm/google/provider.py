@@ -1,8 +1,8 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING
+from collections.abc import AsyncIterator, Mapping
+from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
 import httpx
@@ -25,6 +25,7 @@ from agent_platform.core.credentials import (
     resolve_credentials,
 )
 from agent_platform.core.errors import require_secret
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -57,14 +58,19 @@ class GoogleLLM(
 ):
     _provider_name = "google"
     _missing_api_key_message = "Google API key is required but was not provided"
+    _config_cls = GoogleGenerationConfig
 
     def __init__(
         self,
         credentials: GoogleCredentials | None = None,
         client_options: ClientOptions | None = None,
+        *,
+        model: str = "",
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         self._credentials = resolve_credentials(credentials, GoogleCredentials)
         self._client_options = resolve_client_options(client_options)
+        self._bind(model, options)
 
     def _tool_to_schema(self, tool: Tool) -> types.Tool:
         return types.Tool(
@@ -76,9 +82,6 @@ class GoogleLLM(
                 )
             ]
         )
-
-    def _default_config(self) -> GoogleGenerationConfig:
-        return GoogleGenerationConfig()
 
     def _client(self, config: GoogleGenerationConfig) -> genai.Client:
         api_key = require_secret(
@@ -146,18 +149,18 @@ class GoogleLLM(
     async def stream(
         self,
         prompt: Prompt,
-        config: GoogleGenerationConfig | None = None,
+        config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        config = config or self._default_config()
-        client = self._async_client(config)
+        resolved = self._resolve(config)
+        client = self._async_client(resolved)
         system, contents = to_native_contents(prompt)
-        native_config = to_native_config(config, system, tools, self._tool_to_schema)
+        native_config = to_native_config(resolved, system, tools, self._tool_to_schema)
 
-        with self._observe(config) as call:
+        with self._observe(resolved) as call:
             usage_totals = TokenUsage.zero()
             events = await client.aio.models.generate_content_stream(
-                model=config.model,
+                model=resolved.model,
                 contents=contents,
                 config=native_config,
             )

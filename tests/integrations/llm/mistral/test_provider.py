@@ -206,19 +206,33 @@ class TestToNativeParams:
             "json_schema": {"schema": schema, "name": "response", "strict": True},
         }
 
-    def test_response_format_json_schema_custom_name_and_strict(self):
-        schema = {"type": "object"}
+    def test_response_format_json_schema_is_strict_and_named_from_the_title(self):
+        schema = {"type": "object", "title": "My Schema"}
         cfg = MistralGenerationConfig(
-            response_format=ResponseFormat.JSON_SCHEMA,
-            json_schema=schema,
-            json_schema_name="my_schema",
-            json_schema_strict=False,
+            response_format=ResponseFormat.JSON_SCHEMA, json_schema=schema
         )
         result = _to_native_params(cfg)
         assert result["response_format"] == {
             "type": "json_schema",
-            "json_schema": {"schema": schema, "name": "my_schema", "strict": False},
+            "json_schema": {"schema": schema, "name": "MySchema", "strict": True},
         }
+
+    def test_generic_reasoning_effort_warns_and_is_not_sent(self, caplog):
+        cfg = MistralGenerationConfig(reasoning_effort="high")
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg)
+        assert result == {}
+        assert "reasoning_effort is ignored" in caplog.text
+
+    @pytest.mark.parametrize("value", [True, False])
+    def test_parallel_tool_calls_with_tools(self, value):
+        cfg = MistralGenerationConfig(parallel_tool_calls=value)
+        result = _to_native_params(cfg, has_tools=True)
+        assert result["parallel_tool_calls"] is value
+
+    def test_parallel_tool_calls_without_tools_is_not_sent(self):
+        cfg = MistralGenerationConfig(parallel_tool_calls=True)
+        assert "parallel_tool_calls" not in _to_native_params(cfg)
 
     def test_json_schema_missing_raises(self):
         cfg = MistralGenerationConfig(
@@ -274,11 +288,11 @@ class TestMistralLLMConstruction:
         provider = MistralLLM(_creds("mist-123"))
         assert provider._credentials.api_key.get_secret_value() == "mist-123"
 
-    def test_default_config(self):
-        provider = MistralLLM()
-        cfg = provider._default_config()
+    def test_the_bound_model_and_options_resolve_into_the_provider_config(self):
+        provider = MistralLLM(model="mistral-medium-latest", options={"seed": 4})
+        cfg = provider._resolve(None)
         assert isinstance(cfg, MistralGenerationConfig)
-        assert cfg.model == "mistral-medium-latest"
+        assert (cfg.model, cfg.seed) == ("mistral-medium-latest", 4)
 
     def test_tool_to_schema(self):
         class _Input(BaseModel):

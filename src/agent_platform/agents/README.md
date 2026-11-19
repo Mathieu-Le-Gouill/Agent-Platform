@@ -33,11 +33,13 @@ Each tool lives in its own `tools/<name>/tool.py`, one directory per tool, match
 | Component | File | What It Does |
 |---|---|---|
 | `Agent` | `agent.py` | Holds `system_prompt`, `tool_registry`, `llm`, optional `guardrails: list[Guardrail]` and `response_schema: type[BaseModel]`; `think()` → `AssistantMessage` (runs guardrails around generation, then validates `response_schema` with one corrective retry via `validation.retry_once_on_invalid` when there are no tool calls); `think_stream()` → `AsyncIterator[StreamChunk]` (same tool-list/config setup as `think()`, raw: no guardrail/schema wrapping); `think_from_stream()` → `(AssistantMessage, list[str])` (consumes `think_stream()` under the same guardrails and `response_schema` retry as `think()`, and returns the deltas of the accepted attempt, or the final text alone when a guardrail short-circuited or rewrote it); `act()` → `list[ToolMessage]` (runs tool calls concurrently via `asyncio.gather`, order-preserving); `act_stream()` propagates a tool call's validation-error tag onto the `ToolMessage` it reconstructs from stream chunks; `step()` = think + act |
-| `AgentExecutor` | `executor.py` | think-act loop with `max_iterations` guard; `run(user_input)` and `run_with_messages(messages)`; each round is wrapped in `validation.retry_once_on_invalid` so a `ToolCallValidationError` (tagged via `tools.registry.is_tool_validation_error`) triggers one corrective retry before giving up; `run_streaming(user_input)` calls `Agent.think_from_stream()` (so guardrails and `response_schema` apply as on `run()`) and yields its text deltas interleaved with `act_stream()` tool events; each attempt of the corrective retry buffers its own events and only the kept attempt's are yielded. Fragmented `ToolCallDelta`s are reassembled into `ToolCall`s by `_assemble_tool_calls()` in `agent.py` |
+| `AgentExecutor` | `executor.py` | think-act loop with `max_iterations` guard; `run(user_input)` and `run_with_messages(messages)`; each round is wrapped in `core.retry.retry_once_on_invalid` so a `ToolCallValidationError` (tagged via `tools.registry.is_tool_validation_error`) triggers one corrective retry before giving up; `run_streaming(user_input)` calls `Agent.think_from_stream()` (so guardrails and `response_schema` apply as on `run()`) and yields its text deltas interleaved with `act_stream()` tool events; each attempt of the corrective retry buffers its own events and only the kept attempt's are yielded. Fragmented `ToolCallDelta`s are reassembled into `ToolCall`s by `_assemble_tool_calls()` in `agent.py` |
 | `ConversationAgent` | `conversation.py` | Extends `Agent` with persistent `_history`, `chat()`, pluggable `context_strategy: ContextStrategy | None` for history trimming, optional `checkpointer: Checkpointer[list[Message]] | None` (saves history after every `chat()` turn); `ConversationAgent.resume(conversation_id, checkpointer, ...)` classmethod reconstructs an agent's history from a checkpointer |
 | `ContextStrategy` | `context.py` | Protocol: `trim(history) -> history`. `TurnCountStrategy(max_turns)` is the original built-in implementation, `ConversationAgent(max_history_turns=N)` is sugar for `context_strategy=TurnCountStrategy(N)` (passing both raises `ValueError`). `TokenBudgetStrategy(max_tokens, count_tokens)` drops oldest whole turns until under budget, given an injected token-counting callable (always keeps at least the most recent turn). `SummarizingStrategy(llm, max_turns=...)` behaves like `TurnCountStrategy` but folds dropped turns into a `SystemMessage` summary via the injected `BaseLLMProvider`'s synchronous `generate()` (not `agenerate()`), so `trim()` stays synchronous and the `ContextStrategy` protocol/`ConversationAgent` need no changes. |
 | `Guardrail` | `guardrails.py` | `Guardrail = Middleware[GuardrailContext]` (Phase 1's `core/middleware.py` primitive, parameterized over `GuardrailContext(messages)`); `Agent(guardrails=[...])` runs them through a `MiddlewarePipeline` wrapping generation (`before` can short-circuit with a canned `AssistantMessage`, `after` can inspect/reject the real one). `OutputNotEmptyGuardrail` is the shipped example: raises `AgentGuardrailError` if the final answer has no text and no tool calls. Policy is opt-in, not baked in. Guardrails also run on `run_streaming()` (through `think_from_stream()`), so a blocked answer raises before any text is yielded. |
-| `retry_once_on_invalid` | `validation.py` | Shared "run, check, corrective-retry-once, else give up" helper (`attempt`/`check`/`correct` callables) used by both malformed tool-call recovery (`AgentExecutor`) and `response_schema` validation (`Agent.think()`); raises `AgentRecoveryExhausted` (carrying the failing `last_result`) if the retried attempt is still invalid. |
+| `retry_once_on_invalid` | `core/retry.py` | Shared "run, check, corrective-retry-once, else give up" helper (`attempt`/`check`/`correct` callables) used by malformed tool-call recovery (`AgentExecutor`), `response_schema` validation (`Agent.think()`) and `core/interfaces/llm/structured.py`; raises `RecoveryExhausted` (`core/errors.py`, carrying the failing `last_result`) if the retried attempt is still invalid. |
+
+`Agent` builds its `response_schema` config, validation and correction message with `schema_config`, `schema_error` and `schema_correction` from `core/interfaces/llm/structured.py`. Its `model` defaults to `""`: the provider's bound model then applies.
 
 ### Error Types (`agents/errors.py`)
 
@@ -46,7 +48,6 @@ AgentError
 ├── AgentThinkError        (LLM generation failed)
 ├── AgentActError          (tool execution failed at agent level)
 ├── AgentMaxIterations     (loop exceeded max_iterations)
-├── AgentRecoveryExhausted (one corrective retry still failed; carries `last_result`)
 └── AgentGuardrailError    (raised by a concrete Guardrail, e.g. OutputNotEmptyGuardrail)
 ```
 
@@ -141,7 +142,7 @@ and can proceed in parallel.
   `ToolCallValidationError`-tagged `ToolMessage` (via
   `tools.registry.is_tool_validation_error`) and retries `think()`+`act()`
   once with corrective feedback appended to the conversation, via the shared
-  `validation.retry_once_on_invalid` helper, before giving up and returning
+  `core.retry.retry_once_on_invalid` helper, before giving up and returning
   the error like any other failed tool call. `run_streaming()` applies the
   same recovery.
 - New this phase, not originally scoped but built on the same primitives:
@@ -238,7 +239,7 @@ above landed.
     `agent.iterations` against `.max_iterations`, the
     `.exit_reason` (`stop`, `max_iterations`, `recovery_exhausted`, or the
     exception's type name), whether tool-call recovery fired
-    (`.recovery_attempted`, notified by `validation.py`'s `on_retry` callback),
+    (`.recovery_attempted`, notified by `retry_once_on_invalid`'s `on_retry` callback),
     and how many tool calls the model requested versus how many actually ran.
   - `execute_tool` (`tools/registry.py`), a `ToolRun` recording the tool's
     name, call id, kind and source, which is what makes an MCP tool

@@ -66,19 +66,15 @@ components/
 │   ├── embed_classifier/              # Embedding-based classifier
 │   │   ├── component.py
 │   │   └── config.py
-│   ├── llm_classifier/                # LLM-based classifier with pluggable strategies
-│   │   ├── component.py
-│   │   ├── config.py
-│   │   └── strategies/
-│   │       ├── zero_shot.py
-│   │       ├── few_shot.py
-│   │       ├── sentiment.py
-│   │       └── text_classification.py
 │   └── similarity_scorer/
 │       └── component.py               # Chunks × label vectors → ClassificationResult (pure logic)
 └── generation/
-    └── generator/
-        └── component.py               # (Prompt, config) → LLMResponse (wraps BaseLLMProvider)
+    ├── generator/
+    │   └── component.py               # (Prompt, config) → LLMResponse (wraps BaseLLMProvider)
+    └── llm_task/
+        ├── component.py               # LLMTask[T]: (text, config) → StructuredResult[T], one instruction + one output type
+        ├── classify.py                # classify_task(): labels as a JSON-schema enum, single or multi label, few-shot examples
+        └── summarize.py               # summarize_task(): text → summary
 ```
 
 ## Component Patterns
@@ -107,7 +103,7 @@ class Embedder(Component[EmbedderInput[EmbedConfigT], EmbeddingResponse]):
         return await self._backend.aembed_document(chunks, config)
 ```
 
-Every component in this directory follows this shape: `Chunker`, `Embedder`, `Generator`, `Loader`, `Reranker`, `VectorSearch`, `SemanticChunker`, `ContextualChunker`, `LLMClassifier`, `OCR`, `SpeechToText`, `Dataset`. `EmbeddingClassifier` and `SimilarityScorer` already took config per call (they compose other components rather than wrap a single backend) and needed no change.
+Every component in this directory follows this shape: `Chunker`, `Embedder`, `Generator`, `Loader`, `Reranker`, `VectorSearch`, `SemanticChunker`, `ContextualChunker`, `LLMTask`, `OCR`, `SpeechToText`, `Dataset`. `EmbeddingClassifier` and `SimilarityScorer` already took config per call (they compose other components rather than wrap a single backend) and needed no change.
 
 Locking config into `__init__` ties one component instance to one config, when the whole point of constructor injection is to reuse the same instance with a different config each call, the same reason integration providers never store config on `self` either.
 

@@ -11,7 +11,7 @@ core/
 ├── base.py           # Entity (UUID mixin), Timestamped
 ├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains), RequestOptions (ProviderConfig subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs)
 ├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
-├── retry.py          # retry_async()/retry_sync() per-call retry and the with_retry() decorator: exponential backoff, honors PlatformError.retryable
+├── retry.py          # retry_async()/retry_sync() per-call retry and the with_retry() decorator: exponential backoff, honors PlatformError.retryable; retry_once_on_invalid(): run, check, corrective retry once, else RecoveryExhausted
 ├── resilience.py     # CircuitBreaker (open/half-open/closed state machine), RateLimiter (token bucket)
 ├── middleware.py     # Middleware protocol + MiddlewarePipeline: generic pre/post hooks around a typed operation
 ├── persistence.py    # Checkpointer[StateT] protocol + InMemoryCheckpointer
@@ -73,9 +73,11 @@ interfaces/<domain>/
 
 `interfaces/llm/` has one file beyond that fixed pattern: `fallback.py`'s `FallbackLLMProvider` (+ `FallbackEntry`), a `BaseLLMProvider` implementation that tries an ordered list of other `BaseLLMProvider`s, one `CircuitBreaker` per entry, falling through to the next on every failure, though only a retryable one counts against that entry's circuit (see `resilience.py` below). It belongs here rather than in `integrations/` because it composes the ABC generically and imports no vendor SDK, same rule as everything else in `interfaces/`.
 
+`interfaces/llm/structured.py` holds `generate_structured(llm, prompt, output_type, config)`: it asks for the JSON schema of a `BaseModel` (or plain text for `str`), validates the answer, and re-asks once through `retry_once_on_invalid`. It returns a `StructuredResult` (`output`, `usage` summed over every attempt, `response` of the accepted attempt) or raises `StructuredOutputError`. `Agent` reuses its `schema_config`, `schema_error` and `schema_correction` functions; `components/generation/llm_task/` builds on it.
+
 An interface ABC **never imports from `integrations/`**, **never imports from `components/`**, and **never imports from `pipelines/`**. It may only use `core/schemas/`, `core/config.py`, `core/errors.py`, and `core/credentials.py`. Every domain's `config.py` defines a `<Domain>Config` that extends `core/config.py`'s `ProviderConfig`, the shared base for all provider configs. Domains whose providers are parameterized by a model id (llm, embeddings, reranking, speech, image_generation) extend `ModelConfig` instead, which adds `model: str` on top of `ProviderConfig`; domains without a model concept (loader, chunking, clustering, vad, ocr, translation, classification, vector_store, dataset) extend `ProviderConfig` directly.
 
-**Where a field belongs:** put it on the shared `<Domain>Config` only if almost every provider in the domain actually uses it. If just one or two do, it belongs on that provider's own `config.py` instead (e.g. `max_samples` lives on `SileroVadConfig`, not `VADConfig`, since only Silero needs it). Fields no provider uses get deleted, not kept around. One exception: a field a cross-cutting caller sets regardless of backend (`OCRConfig.min_confidence`) can stay on the shared config even if a specific provider ignores it.
+**Where a field belongs:** put it on the shared `<Domain>Config` only if almost every provider in the domain actually uses it. If just one or two do, it belongs on that provider's own `config.py` instead (e.g. `max_samples` lives on `SileroVadConfig`, not `VADConfig`, since only Silero needs it). Fields no provider uses get deleted, not kept around. One exception: a field a cross-cutting caller sets regardless of backend (`OCRConfig.min_confidence`) can stay on the shared config even if a specific provider ignores it. `GenerationConfig.reasoning_effort` and `parallel_tool_calls` use this exception: callers set them whatever the provider, and a provider without the control warns and skips the field.
 
 **Defaults across providers:** don't hardcode one vendor's default onto the shared config, since other vendors often default differently for the same knob. Use `None` for "unset" and forward the field conditionally (`if config.x is not None`), so an untouched field lets each provider's own default apply (see `GenerationConfig.temperature`).
 
@@ -94,6 +96,8 @@ PlatformError
 ├── NotFoundError
 ├── ValidationError
 ├── MissingCredentialError
+├── RecoveryExhausted          (one corrective retry still failed; carries `last_result`)
+│   └── StructuredOutputError  (`interfaces/llm/structured.py`; adds summed `usage`)
 ├── LLMError
 │   ├── LLMGenerationError
 │   ├── LLMTimeoutError

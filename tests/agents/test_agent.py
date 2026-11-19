@@ -1,5 +1,5 @@
 import asyncio
-from unittest.mock import MagicMock
+from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import BaseModel
@@ -17,6 +17,7 @@ from agent_platform.core.interfaces.llm.response import (
     ResponseFormat,
     StreamChunk,
 )
+from agent_platform.core.interfaces.llm.structured import StructuredOutputError
 from agent_platform.core.observability import AgentRun, observe
 from agent_platform.core.schemas.message import (
     AssistantMessage,
@@ -26,6 +27,7 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.token_usage import TokenUsageAggregator
+from agent_platform.integrations.llm.openai.provider import OpenAILLM
 from tests.helpers import (
     make_fake_llm_response,
     make_fake_stream,
@@ -546,6 +548,19 @@ class _Answer(BaseModel):
     value: int
 
 
+class _RaisingGuardrail:
+    """Output guardrail whose own structured call failed."""
+
+    def __init__(self, error: Exception) -> None:
+        self._error = error
+
+    async def before(self, ctx):
+        return None
+
+    async def after(self, ctx, result):
+        raise self._error
+
+
 class TestAgentResponseSchema:
     @pytest.mark.asyncio
     async def test_no_schema_returns_text_unvalidated(self, mock_llm):
@@ -638,6 +653,25 @@ class TestAgentResponseSchema:
         config = mock_llm.agenerate.call_args[1]["config"]
         assert config.response_format is ResponseFormat.JSON_SCHEMA
         assert config.json_schema == _Answer.model_json_schema()
+
+    @pytest.mark.asyncio
+    async def test_an_agent_without_a_model_sends_the_providers_bound_model(
+        self, mocker
+    ):
+        llm = OpenAILLM(model="m")
+        invoke = mocker.patch.object(
+            llm, "_invoke_async", new=AsyncMock(return_value=object())
+        )
+        mocker.patch.object(llm, "_async_client", return_value=object())
+        mocker.patch.object(
+            llm, "_from_native", return_value=make_fake_llm_response("ok")
+        )
+        agent = Agent(name="bound", llm=llm)
+
+        await agent.think([UserMessage(content="Hi")])
+
+        sent_config = invoke.call_args.args[2]
+        assert sent_config.model == "m"
 
     @pytest.mark.asyncio
     async def test_does_not_override_explicit_response_format(self, mock_llm):
@@ -821,6 +855,24 @@ class TestAgentThinkFromStream:
         assert aggregator.total_for("structured") == TokenUsage(
             input_tokens=8, output_tokens=2
         )
+
+    @pytest.mark.asyncio
+    async def test_a_guardrail_structured_failure_propagates(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response('{"value": 1}')
+        failure = StructuredOutputError(
+            "nested", last_result=make_fake_llm_response(""), usage=TokenUsage.zero()
+        )
+        agent = Agent(
+            name="structured",
+            llm=mock_llm,
+            response_schema=_Answer,
+            guardrails=[_RaisingGuardrail(failure)],
+        )
+
+        with pytest.raises(StructuredOutputError) as raised:
+            await agent.think([UserMessage(content="Hi")])
+
+        assert raised.value is failure
 
     @pytest.mark.asyncio
     async def test_schema_failure_twice_returns_the_last_attempt(self, mock_llm):

@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import json
+import logging
 from typing import Any
 
 from openai.types.chat import ChatCompletion
@@ -26,6 +27,7 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
+from agent_platform.integrations.llm._json_schema import json_schema_name
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 
 __all__ = [
@@ -38,6 +40,8 @@ __all__ = [
     "to_native_messages",
     "to_native_params",
 ]
+
+logger = logging.getLogger(__name__)
 
 # Reasoning models (o-series, gpt-5 non-chat) reject non-default temperature/top_p
 # and only accept reasoning_effort on this family. https://platform.openai.com/docs/guides/reasoning
@@ -205,7 +209,9 @@ def to_native_messages(prompt: Prompt) -> list[dict[str, Any]]:
     return result
 
 
-def to_native_params(config: OpenAIGenerationConfig) -> dict[str, Any]:
+def to_native_params(
+    config: OpenAIGenerationConfig, *, has_tools: bool = False
+) -> dict[str, Any]:
     reasoning_model = is_reasoning_model(config.model)
 
     params: dict[str, Any] = {}
@@ -225,9 +231,15 @@ def to_native_params(config: OpenAIGenerationConfig) -> dict[str, Any]:
     if config.presence_penalty is not None:
         params["presence_penalty"] = config.presence_penalty
 
-    if config.reasoning_effort is not None and reasoning_model:
-        params["reasoning_effort"] = config.reasoning_effort
-    if not config.parallel_tool_calls:
+    if config.reasoning_effort is not None:
+        if reasoning_model:
+            params["reasoning_effort"] = config.reasoning_effort
+        else:
+            logger.warning(
+                "reasoning_effort is ignored: %r is not an OpenAI reasoning model",
+                config.model,
+            )
+    if config.parallel_tool_calls is not None and has_tools:
         params["parallel_tool_calls"] = config.parallel_tool_calls
 
     match config.response_format:
@@ -238,13 +250,13 @@ def to_native_params(config: OpenAIGenerationConfig) -> dict[str, Any]:
                 raise ValueError(
                     "json_schema is required for JSON_SCHEMA response format"
                 )
-            strict_schema = (
-                strict_json_schema(config.json_schema) if config.strict else None
-            )
+            # Strict mode is always requested; a schema it cannot express is
+            # sent non-strict instead.
+            strict_schema = strict_json_schema(config.json_schema)
             params["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "response",
+                    "name": json_schema_name(config.json_schema),
                     "schema": strict_schema or config.json_schema,
                     "strict": strict_schema is not None,
                 },

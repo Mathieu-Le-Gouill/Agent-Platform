@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import base64
+import logging
 from typing import Any
 
 from anthropic.types import Message
@@ -37,11 +38,9 @@ __all__ = [
     "to_native_params",
 ]
 
+logger = logging.getLogger(__name__)
+
 _DEFAULT_MAX_TOKENS = 1024
-_DEFAULT_THINKING_BUDGET = 5000
-# Higher fallback so the default thinking_budget stays comfortably below
-# max_tokens (Anthropic requires budget_tokens < max_tokens or the request 400s).
-_DEFAULT_MAX_TOKENS_WITH_THINKING = 8192
 
 _BATCH_STATUS_MAP: dict[str, BatchStatus] = {
     "in_progress": BatchStatus.IN_PROGRESS,
@@ -134,7 +133,20 @@ def to_native_messages(prompt: Prompt) -> tuple[str | None, list[dict[str, Any]]
     return ("\n\n".join(system_parts) if system_parts else None, messages)
 
 
-def to_native_params(config: AnthropicGenerationConfig) -> dict[str, Any]:
+def _effort(config: AnthropicGenerationConfig) -> str | None:
+    """Returns the `output_config.effort` value: the provider field, else the generic level."""
+    if config.effort is not None:
+        return config.effort
+    level = config.reasoning_effort
+    if level in ("none", "minimal"):
+        logger.debug("reasoning_effort %r mapped to Anthropic effort 'low'", level)
+        return "low"
+    return level
+
+
+def to_native_params(
+    config: AnthropicGenerationConfig, *, has_tools: bool = False
+) -> dict[str, Any]:
     params: dict[str, Any] = {}
     if config.temperature is not None:
         params["temperature"] = config.temperature
@@ -144,32 +156,17 @@ def to_native_params(config: AnthropicGenerationConfig) -> dict[str, Any]:
         params["top_k"] = config.top_k
     if config.stop_sequences:
         params["stop_sequences"] = config.stop_sequences
+    params["max_tokens"] = config.max_tokens or _DEFAULT_MAX_TOKENS
+    if config.parallel_tool_calls is not None and has_tools:
+        params["tool_choice"] = {
+            "type": "auto",
+            "disable_parallel_tool_use": not config.parallel_tool_calls,
+        }
 
     output_config: dict[str, Any] = {}
-
-    if config.effort is not None:
-        # Modern effort control supersedes manual thinking_budget management;
-        # skip the legacy `thinking` payload entirely when set.
-        params["max_tokens"] = config.max_tokens or _DEFAULT_MAX_TOKENS
-        output_config["effort"] = config.effort
-    elif config.thinking:
-        budget_tokens = config.thinking_budget or _DEFAULT_THINKING_BUDGET
-        if config.max_tokens is not None:
-            max_tokens = config.max_tokens
-            if budget_tokens >= max_tokens:
-                budget_tokens = max(1, max_tokens - 1024)
-        else:
-            # No explicit max_tokens: size it to comfortably fit the (possibly
-            # user-supplied) budget rather than clamping the user's budget down
-            # to an unrelated fixed default.
-            max_tokens = max(_DEFAULT_MAX_TOKENS_WITH_THINKING, budget_tokens + 1024)
-        params["max_tokens"] = max_tokens
-        params["thinking"] = {
-            "type": "enabled",
-            "budget_tokens": budget_tokens,
-        }
-    else:
-        params["max_tokens"] = config.max_tokens or _DEFAULT_MAX_TOKENS
+    effort = _effort(config)
+    if effort is not None:
+        output_config["effort"] = effort
 
     if config.cache_control:
         # Native top-level cache_control param on messages.create, no more

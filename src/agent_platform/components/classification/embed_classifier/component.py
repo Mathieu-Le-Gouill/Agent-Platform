@@ -7,10 +7,6 @@ from agent_platform.components.chunking.chunker.component import Chunker, Chunke
 from agent_platform.components.classification.embed_classifier.config import (
     EmbeddingClassifierConfig,
 )
-from agent_platform.components.classification.llm_classifier.component import (
-    LLMClassifier,
-    LLMClassifierInput,
-)
 from agent_platform.components.classification.similarity_scorer.component import (
     SimilarityConfig,
     SimilarityInput,
@@ -46,12 +42,10 @@ class EmbeddingClassifier(
         chunker: Chunker,
         embedder: Embedder[EmbedConfigT],
         similarity_scorer: SimilarityScorer,
-        llm_classifier: LLMClassifier | None = None,
     ) -> None:
         self._chunker = chunker
         self._embedder = embedder
         self._similarity_scorer = similarity_scorer
-        self._llm_classifier = llm_classifier
 
     async def arun(self, input: EmbedClassifierInput) -> ClassificationResponse:
         items, candidate_labels, config = input
@@ -93,17 +87,6 @@ class EmbeddingClassifier(
             )
             sim_input = SimilarityInput(doc_chunk_vecs, label_vectors, sim_config)
             result = await self._similarity_scorer.arun(sim_input)
-
-            if config.llm_rerank and self._llm_classifier is not None:
-                llm_cfg = config.llm_classifier_config
-                if llm_cfg is not None:
-                    rerank_input = LLMClassifierInput(
-                        [items[doc_idx]], candidate_labels, llm_cfg
-                    )
-                    rerank_response = await self._llm_classifier.arun(rerank_input)
-                    if rerank_response.results:
-                        result = rerank_response.results[0]
-
             results.append(result)
 
         return ClassificationResponse(results=results)

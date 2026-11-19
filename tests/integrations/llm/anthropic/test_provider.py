@@ -212,25 +212,6 @@ class TestToNativeParams:
         assert result["top_k"] == 40
         assert result["stop_sequences"] == ["stop1"]
 
-    def test_thinking(self):
-        cfg = AnthropicGenerationConfig(thinking=True)
-        result = _to_native_params(cfg)
-        assert result["max_tokens"] == 8192
-        assert result["thinking"] == {"type": "enabled", "budget_tokens": 5000}
-        assert result["thinking"]["budget_tokens"] < result["max_tokens"]
-
-    def test_thinking_with_budget(self):
-        cfg = AnthropicGenerationConfig(thinking=True, thinking_budget=10000)
-        result = _to_native_params(cfg)
-        assert result["thinking"]["budget_tokens"] == 10000
-        assert result["thinking"]["budget_tokens"] < result["max_tokens"]
-
-    def test_thinking_budget_exceeds_explicit_max_tokens(self):
-        cfg = AnthropicGenerationConfig(thinking=True, max_tokens=1024)
-        result = _to_native_params(cfg)
-        assert result["max_tokens"] == 1024
-        assert result["thinking"]["budget_tokens"] < result["max_tokens"]
-
     def test_effort(self):
         cfg = AnthropicGenerationConfig(effort="high")
         result = _to_native_params(cfg)
@@ -238,11 +219,37 @@ class TestToNativeParams:
         assert "thinking" not in result
         assert result["max_tokens"] == 1024
 
-    def test_effort_takes_precedence_over_thinking(self):
-        cfg = AnthropicGenerationConfig(effort="max", thinking=True)
-        result = _to_native_params(cfg)
-        assert result["output_config"] == {"effort": "max"}
-        assert "thinking" not in result
+    def test_generic_reasoning_effort_maps_to_effort(self):
+        cfg = AnthropicGenerationConfig(reasoning_effort="medium")
+        assert _to_native_params(cfg)["output_config"] == {"effort": "medium"}
+
+    @pytest.mark.parametrize("level", ["none", "minimal"])
+    def test_lowest_generic_levels_map_to_low_and_log(self, level, caplog):
+        cfg = AnthropicGenerationConfig(reasoning_effort=level)
+        with caplog.at_level("DEBUG"):
+            result = _to_native_params(cfg)
+        assert result["output_config"] == {"effort": "low"}
+        assert "mapped to Anthropic effort 'low'" in caplog.text
+
+    def test_provider_effort_wins_over_generic_reasoning_effort(self):
+        cfg = AnthropicGenerationConfig(effort="max", reasoning_effort="low")
+        assert _to_native_params(cfg)["output_config"] == {"effort": "max"}
+
+    def test_no_effort_is_sent_by_default(self):
+        assert "output_config" not in _to_native_params(AnthropicGenerationConfig())
+
+    @pytest.mark.parametrize("value", [True, False])
+    def test_parallel_tool_calls_with_tools(self, value):
+        cfg = AnthropicGenerationConfig(parallel_tool_calls=value)
+        result = _to_native_params(cfg, has_tools=True)
+        assert result["tool_choice"] == {
+            "type": "auto",
+            "disable_parallel_tool_use": not value,
+        }
+
+    def test_parallel_tool_calls_without_tools_is_not_sent(self):
+        cfg = AnthropicGenerationConfig(parallel_tool_calls=False)
+        assert "tool_choice" not in _to_native_params(cfg)
 
     def test_cache_control(self):
         cfg = AnthropicGenerationConfig(cache_control=True)
@@ -340,11 +347,11 @@ class TestAnthropicLLMConstruction:
         provider = AnthropicLLM(_creds("sk-ant-123"))
         assert provider._credentials.api_key.get_secret_value() == "sk-ant-123"
 
-    def test_default_config(self):
-        provider = AnthropicLLM()
-        cfg = provider._default_config()
+    def test_the_bound_model_and_options_resolve_into_the_provider_config(self):
+        provider = AnthropicLLM(model="claude-sonnet-4-6", options={"effort": "high"})
+        cfg = provider._resolve(None)
         assert isinstance(cfg, AnthropicGenerationConfig)
-        assert cfg.model == "claude-sonnet-4-6"
+        assert (cfg.model, cfg.effort) == ("claude-sonnet-4-6", "high")
 
     def test_tool_to_schema(self):
         class _Input(BaseModel):
@@ -732,7 +739,7 @@ class TestAnthropicLLMBatch:
             )
         )
 
-        provider = AnthropicLLM(_creds())
+        provider = AnthropicLLM(_creds(), model="claude-sonnet-4-6")
         requests = [
             BatchRequest(
                 custom_id="r1", prompt=Prompt(messages=[UserMessage(content="Hi")])

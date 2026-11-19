@@ -5,15 +5,15 @@ import functools
 import logging
 import random
 import time
-from collections.abc import Callable, Coroutine
+from collections.abc import Awaitable, Callable, Coroutine
 from typing import Any, TypeVar
 
-from agent_platform.core.errors import PlatformError
+from agent_platform.core.errors import PlatformError, RecoveryExhausted
 
 _AsyncFunc = TypeVar("_AsyncFunc", bound=Callable[..., Coroutine[Any, Any, Any]])
 _T = TypeVar("_T")
 
-__all__ = ["retry_async", "retry_sync", "with_retry"]
+__all__ = ["retry_async", "retry_once_on_invalid", "retry_sync", "with_retry"]
 
 
 def _next_delay(
@@ -135,3 +135,36 @@ def with_retry(
         return wrapper  # type: ignore[return-value]
 
     return decorate
+
+
+async def retry_once_on_invalid(
+    *,
+    attempt: Callable[[], Awaitable[_T]],
+    check: Callable[[_T], str | None],
+    correct: Callable[[str], Awaitable[None]],
+    on_retry: Callable[[], None] | None = None,
+) -> _T:
+    """Run `attempt`, and if `check` reports an error, `correct` it once and retry.
+
+    `check` returns `None` for a valid result, or an error description otherwise.
+    `correct` receives that description and should apply whatever corrective
+    action (e.g. append feedback to a message list) `attempt` will read on its
+    second call. Raises `RecoveryExhausted` (carrying the failing result as
+    `last_result`) if the retried attempt is still invalid. `on_retry` is
+    notified when a retry happens, so a caller can observe recovery without
+    inspecting the results itself.
+    """
+    result = await attempt()
+    error = check(result)
+    if error is None:
+        return result
+
+    if on_retry is not None:
+        on_retry()
+    await correct(error)
+
+    result = await attempt()
+    error = check(result)
+    if error is not None:
+        raise RecoveryExhausted(error, last_result=result)
+    return result

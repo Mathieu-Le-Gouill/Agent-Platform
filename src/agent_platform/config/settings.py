@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
+from typing import Any
 
 from pydantic import Field, SecretStr, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -31,6 +32,12 @@ class Settings(BaseSettings):
     # size and must hold at least one request, or every call would wait forever.
     llm_rate_limit: float | None = Field(default=None, gt=0)
     llm_rate_limit_burst: float | None = Field(default=None, ge=1)
+    # Provider-only generation options, keyed by LLM provider slug, as a JSON
+    # object in the environment, e.g. {"anthropic": {"cache_control": true}}.
+    # Each entry is validated against its provider's config class when the
+    # agent is built (see config/container.py::build_llm_with_fallback). The
+    # model never goes here: it comes from the "<provider>:<model>" strings.
+    llm_options: dict[str, dict[str, Any]] = Field(default_factory=dict)
     # MCP servers to launch over stdio and register tools from, keyed by an
     # arbitrary name; each value is `[command, *args]` (the same shape as
     # Claude Desktop/VS Code's `mcpServers` config), e.g.

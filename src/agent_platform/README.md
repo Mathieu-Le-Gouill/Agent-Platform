@@ -35,7 +35,7 @@ Near-zero external dependencies. Everything here is pure Python, `pydantic`, `ab
 |---|---|
 | `core/base.py` | `Entity` (UUID mixin), `Timestamped` |
 | `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends; `ModelConfig`, a `ProviderConfig` subclass adding `model: str` for model-backed domains (llm, embeddings, reranking, speech, image_generation); `RequestOptions`, a `ProviderConfig` subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs alongside `ModelConfig` (currently `llm`, `embeddings`, `moderation`) |
-| `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `LLMError`, `AgentError`, `ToolError` |
+| `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `RecoveryExhausted`, `LLMError`, `AgentError`, `ToolError` |
 | `core/credentials.py` | `Credentials` (secrets only, e.g. `api_key`), `ClientOptions` (non-secret construction-time transport settings: `base_url`, `timeout`, `max_retries`) |
 | `core/interfaces/tracing/` | Backend-agnostic tracing contract: `BaseTracer`, the `Span` protocol (`set_attribute()`, `record_error()`, `trace_id`, `span_id`), and the `NoOpTracer`/`NoOpSpan` default |
 | `core/observability/` | What call sites use: typed `Observation`s describing what the platform observed in its own vocabulary (`observations.py`: `LLMCall`, `ToolRun`, `AgentRun`, `GuardrailCheck`, `WorkflowNode`, `PipelineRun`, ...), the `Fact` annotation and `flatten()` that derive span attributes and payload policy from them (`facts.py`), the `observe()`/`emit()`/`current()` runtime, the tracer registry, opt-in payload capture, and `@traced`. No backend name appears here: `integrations/tracing/langfuse/mapping.py` maps the platform's vocabulary onto Langfuse fields |
@@ -79,7 +79,7 @@ Each domain's `integrations/<domain>/__init__.py` re-exports its provider classe
 
 ### `components/`: Composable Units
 
-`Component[InputT, OutputT]` ABC with `async def arun(input) -> OutputT`. See `components/README.md`.
+`Component[InputT, OutputT]` ABC with `async def arun(input) -> OutputT`. `generation/llm_task/` holds `LLMTask[T]`, one prompt plus an output type that runs on any LLM provider, with `classify_task` and `summarize_task` as presets. See `components/README.md`.
 
 ### `pipelines/`: Orchestration Flows
 

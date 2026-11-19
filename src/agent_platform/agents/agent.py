@@ -7,9 +7,8 @@ from collections.abc import AsyncIterator, Awaitable, Callable
 from typing import Any
 
 from pydantic import BaseModel
-from pydantic import ValidationError as PydanticValidationError
 
-from agent_platform.agents.errors import AgentRecoveryExhausted, AgentThinkError
+from agent_platform.agents.errors import AgentThinkError
 from agent_platform.agents.guardrails import (
     Guardrail,
     GuardrailContext,
@@ -20,8 +19,8 @@ from agent_platform.agents.tools.registry import (
     TOOL_CALL_VALIDATION_ERROR_KEY,
     ToolRegistry,
 )
-from agent_platform.agents.validation import retry_once_on_invalid
 from agent_platform.core.cost import CostEstimator
+from agent_platform.core.errors import RecoveryExhausted
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
@@ -29,8 +28,15 @@ from agent_platform.core.interfaces.llm.response import (
     StreamChunk,
     ToolCallDelta,
 )
+from agent_platform.core.interfaces.llm.structured import (
+    StructuredOutputError,
+    schema_config,
+    schema_correction,
+    schema_error,
+)
 from agent_platform.core.middleware import MiddlewarePipeline
 from agent_platform.core.observability import ModelCost, emit
+from agent_platform.core.retry import retry_once_on_invalid
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     Message,
@@ -38,7 +44,6 @@ from agent_platform.core.schemas.message import (
     ToolCall,
     ToolMessage,
     ToolResult,
-    UserMessage,
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.core.token_usage import TokenUsageAggregator
@@ -103,7 +108,7 @@ class Agent:
         llm: BaseLLMProvider,
         tool_registry: ToolRegistry | None = None,
         system_prompt: str | None = None,
-        model: str = "default",
+        model: str = "",
         generation_config: GenerationConfig | None = None,
         guardrails: list[Guardrail] | None = None,
         response_schema: type[BaseModel] | None = None,
@@ -171,18 +176,14 @@ class Agent:
 
     def _build_generation_config(self) -> GenerationConfig:
         config = self._generation_config or GenerationConfig()
-        if not config.model:
+        # An empty model leaves the choice to the model the provider is bound to.
+        if not config.model and self._model:
             config = config.model_copy(update={"model": self._model})
         if (
             self._response_schema is not None
             and config.response_format is ResponseFormat.TEXT
         ):
-            config = config.model_copy(
-                update={
-                    "response_format": ResponseFormat.JSON_SCHEMA,
-                    "json_schema": self._response_schema.model_json_schema(),
-                }
-            )
+            config = schema_config(config, self._response_schema)
         return config
 
     def _build_call_args(
@@ -264,11 +265,7 @@ class Agent:
     def _check_response_schema(self, assistant_msg: AssistantMessage) -> str | None:
         if assistant_msg.tool_calls or self._response_schema is None:
             return None
-        try:
-            self._response_schema.model_validate_json(assistant_msg.text)
-        except PydanticValidationError as exc:
-            return str(exc)
-        return None
+        return schema_error(self._response_schema, assistant_msg.text)
 
     async def think(self, messages: list[Message]) -> AssistantMessage:
         return await self._think_checked(messages, self._generate)
@@ -317,13 +314,7 @@ class Agent:
             working_messages = [
                 *messages,
                 last_msg,
-                UserMessage(
-                    content=(
-                        "Your previous response did not match the required JSON "
-                        f"schema: {error}. Respond again with valid JSON only, "
-                        "matching the schema exactly."
-                    )
-                ),
+                schema_correction(error),
             ]
 
         try:
@@ -332,7 +323,11 @@ class Agent:
                 check=self._check_response_schema,
                 correct=correct,
             )
-        except AgentRecoveryExhausted as exc:
+        except StructuredOutputError:
+            # Raised by a structured call inside the attempt (a guardrail, say),
+            # not by this retry: its last_result is not an AssistantMessage.
+            raise
+        except RecoveryExhausted as exc:
             result: AssistantMessage = exc.last_result
             return result
 

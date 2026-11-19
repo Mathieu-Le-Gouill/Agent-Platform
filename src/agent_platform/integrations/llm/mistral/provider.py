@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -14,6 +14,7 @@ from agent_platform.core.credentials import (
     resolve_credentials,
 )
 from agent_platform.core.errors import require_secret
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -40,14 +41,19 @@ class MistralLLM(
     NativeLLMProvider[MistralGenerationConfig, Mistral, Mistral, ChatCompletionResponse]
 ):
     _provider_name = "mistral"
+    _config_cls = MistralGenerationConfig
 
     def __init__(
         self,
         credentials: MistralCredentials | None = None,
         client_options: ClientOptions | None = None,
+        *,
+        model: str = "",
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         self._credentials = resolve_credentials(credentials, MistralCredentials)
         self._client_options = resolve_client_options(client_options)
+        self._bind(model, options)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         return {
@@ -58,9 +64,6 @@ class MistralLLM(
                 "parameters": model_schema(tool.input_schema),
             },
         }
-
-    def _default_config(self) -> MistralGenerationConfig:
-        return MistralGenerationConfig()
 
     def _async_client(self, config: MistralGenerationConfig) -> Mistral:
         api_key = require_secret(
@@ -98,7 +101,7 @@ class MistralLLM(
         tools: list[Tool] | None,
     ) -> ChatCompletionResponse:
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
@@ -116,7 +119,7 @@ class MistralLLM(
         tools: list[Tool] | None,
     ) -> ChatCompletionResponse:
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
@@ -132,20 +135,20 @@ class MistralLLM(
     async def stream(
         self,
         prompt: Prompt,
-        config: MistralGenerationConfig | None = None,
+        config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        config = config or self._default_config()
-        client = self._async_client(config)
+        resolved = self._resolve(config)
+        client = self._async_client(resolved)
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(resolved, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with self._observe(config) as call:
+        with self._observe(resolved) as call:
             usage_totals = TokenUsage.zero()
             events = await client.chat.stream_async(
-                model=config.model,
+                model=resolved.model,
                 messages=messages,  # type: ignore[arg-type]
                 **params,
             )

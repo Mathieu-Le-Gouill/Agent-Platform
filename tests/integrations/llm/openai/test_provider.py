@@ -233,19 +233,34 @@ class TestToNativeParams:
         result = _to_native_params(cfg)
         assert result["reasoning_effort"] == "high"
 
-    def test_reasoning_effort_dropped_for_non_reasoning_model(self):
+    def test_reasoning_effort_dropped_with_a_warning_for_non_reasoning_model(
+        self, caplog
+    ):
         cfg = OpenAIGenerationConfig(model="gpt-4.1", reasoning_effort="high")
-        result = _to_native_params(cfg)
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg)
         assert "reasoning_effort" not in result
+        assert caplog.text.count("reasoning_effort is ignored") == 1
 
-    def test_parallel_tool_calls_false(self):
+    def test_reasoning_effort_unset_sends_nothing_and_does_not_warn(self, caplog):
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(OpenAIGenerationConfig(model="o3"))
+        assert "reasoning_effort" not in result
+        assert caplog.text == ""
+
+    @pytest.mark.parametrize("value", [True, False])
+    def test_parallel_tool_calls_with_tools(self, value):
+        cfg = OpenAIGenerationConfig(parallel_tool_calls=value)
+        result = _to_native_params(cfg, has_tools=True)
+        assert result["parallel_tool_calls"] is value
+
+    def test_parallel_tool_calls_without_tools_is_not_sent(self):
         cfg = OpenAIGenerationConfig(parallel_tool_calls=False)
-        result = _to_native_params(cfg)
-        assert result["parallel_tool_calls"] is False
+        assert "parallel_tool_calls" not in _to_native_params(cfg)
 
     def test_parallel_tool_calls_default_omitted(self):
         cfg = OpenAIGenerationConfig()
-        result = _to_native_params(cfg)
+        result = _to_native_params(cfg, has_tools=True)
         assert "parallel_tool_calls" not in result
 
     def test_response_format_json(self):
@@ -286,19 +301,21 @@ class TestToNativeParams:
 
         result = _to_native_params(cfg)
 
-        assert cfg.strict is True
         assert result["response_format"]["json_schema"]["strict"] is False
         assert result["response_format"]["json_schema"]["schema"] == schema
 
-    def test_response_format_json_schema_strict_false(self):
-        schema = {"type": "object"}
+    def test_response_format_json_schema_name_comes_from_the_title(self):
+        schema = {
+            "title": "My Label!",
+            "type": "object",
+            "properties": {"name": {"type": "string"}},
+            "required": ["name"],
+        }
         cfg = OpenAIGenerationConfig(
-            response_format=ResponseFormat.JSON_SCHEMA,
-            json_schema=schema,
-            strict=False,
+            response_format=ResponseFormat.JSON_SCHEMA, json_schema=schema
         )
         result = _to_native_params(cfg)
-        assert result["response_format"]["json_schema"]["strict"] is False
+        assert result["response_format"]["json_schema"]["name"] == "MyLabel"
 
     def test_json_schema_missing_raises(self):
         cfg = OpenAIGenerationConfig(
@@ -421,11 +438,11 @@ class TestOpenAILLMConstruction:
         provider = OpenAILLM(_creds("sk-123"))
         assert provider._credentials.api_key.get_secret_value() == "sk-123"
 
-    def test_default_config(self):
-        provider = OpenAILLM()
-        cfg = provider._default_config()
+    def test_the_bound_model_and_options_resolve_into_the_provider_config(self):
+        provider = OpenAILLM(model="gpt-4.1", options={"temperature": 0.3})
+        cfg = provider._resolve(None)
         assert isinstance(cfg, OpenAIGenerationConfig)
-        assert cfg.model == "gpt-4.1"
+        assert (cfg.model, cfg.temperature) == ("gpt-4.1", 0.3)
 
     def test_tool_to_schema(self):
         class _Input(BaseModel):
@@ -899,7 +916,7 @@ class TestOpenAILLMBatch:
             )
         )
 
-        provider = OpenAILLM(_creds())
+        provider = OpenAILLM(_creds(), model="gpt-4.1")
         requests = [
             BatchRequest(
                 custom_id="r1", prompt=Prompt(messages=[UserMessage(content="Hi")])

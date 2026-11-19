@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from typing import TYPE_CHECKING, Any, cast
 
 import anthropic
@@ -20,6 +20,7 @@ from agent_platform.core.interfaces.llm.batch import (
     BatchRequest,
     BatchResult,
 )
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -51,14 +52,19 @@ class AnthropicLLM(
 ):
     _provider_name = "anthropic"
     _missing_api_key_message = "Anthropic API key is required but was not provided"
+    _config_cls = AnthropicGenerationConfig
 
     def __init__(
         self,
         credentials: AnthropicCredentials | None = None,
         client_options: ClientOptions | None = None,
+        *,
+        model: str = "",
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         self._credentials = resolve_credentials(credentials, AnthropicCredentials)
         self._client_options = resolve_client_options(client_options)
+        self._bind(model, options)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         return {
@@ -66,9 +72,6 @@ class AnthropicLLM(
             "description": tool.description,
             "input_schema": model_schema(tool.input_schema),
         }
-
-    def _default_config(self) -> AnthropicGenerationConfig:
-        return AnthropicGenerationConfig()
 
     def _client_kwargs(
         self, config: AnthropicGenerationConfig, *, sdk_retries: int = 0
@@ -117,7 +120,7 @@ class AnthropicLLM(
         tools: list[Tool] | None,
     ) -> Message:
         system, messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if system:
             params["system"] = system
         if tools:
@@ -137,7 +140,7 @@ class AnthropicLLM(
         tools: list[Tool] | None,
     ) -> Message:
         system, messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if system:
             params["system"] = system
         if tools:
@@ -155,24 +158,24 @@ class AnthropicLLM(
     async def stream(
         self,
         prompt: Prompt,
-        config: AnthropicGenerationConfig | None = None,
+        config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        config = config or self._default_config()
-        client = self._stream_client(config)
+        resolved = self._resolve(config)
+        client = self._stream_client(resolved)
         system, messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(resolved, has_tools=bool(tools))
         if system:
             params["system"] = system
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with self._observe(config) as call:
+        with self._observe(resolved) as call:
             usage_totals = TokenUsage.zero()
             events = cast(
                 "AsyncStream[RawMessageStreamEvent]",
                 await client.messages.create(
-                    model=config.model,
+                    model=resolved.model,
                     messages=messages,  # type: ignore[arg-type]
                     stream=True,
                     **params,
@@ -239,12 +242,11 @@ class AnthropicLLM(
     @error_logged(re_raise=ProviderError, message="Batch submission failed")
     @with_retry()
     async def submit_batch(self, requests: list[BatchRequest]) -> BatchJob:
-        config = self._default_config()
-        client = self._async_client(config)
+        client = self._async_client(self._resolve(None, require_model=False))
 
         batch_requests = []
         for req in requests:
-            req_config = cast(AnthropicGenerationConfig, req.config or config)
+            req_config = self._resolve(req.config)
             system, messages = to_native_messages(req.prompt)
             params = to_native_params(req_config)
             if system:
@@ -269,7 +271,7 @@ class AnthropicLLM(
     @error_logged(re_raise=ProviderError, message="Batch status check failed")
     @with_retry()
     async def get_batch_status(self, batch_id: str) -> BatchJob:
-        client = self._async_client(self._default_config())
+        client = self._async_client(self._resolve(None, require_model=False))
         with observe(
             LLMBatch(stage="status", provider=self._provider_name, batch_id=batch_id)
         ):
@@ -279,7 +281,7 @@ class AnthropicLLM(
     @error_logged(re_raise=ProviderError, message="Batch result retrieval failed")
     @with_retry()
     async def fetch_batch_results(self, batch_id: str) -> list[BatchResult]:
-        client = self._async_client(self._default_config())
+        client = self._async_client(self._resolve(None, require_model=False))
         with observe(
             LLMBatch(stage="results", provider=self._provider_name, batch_id=batch_id)
         ):

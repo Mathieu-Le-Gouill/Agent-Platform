@@ -4,14 +4,11 @@ from agent_platform.core.interfaces.llm.config import GenerationConfig
 
 
 class MistralGenerationConfig(GenerationConfig):
-    model: str = "mistral-medium-latest"
-    """Mistral model identifier, e.g. "mistral-medium-latest" or "mistral-large-latest"."""
+    """Mistral config. `model` is a Mistral model id such as "mistral-medium-latest".
 
-    json_schema_name: str = "response"
-    """Name reported for the JSON_SCHEMA response format."""
-
-    json_schema_strict: bool = True
-    """Enforce strict JSON Schema conformance for the JSON_SCHEMA response format."""
+    The generic fields cover everything the adapter sends, so this class adds no
+    field of its own.
+    """
 
 
 """

@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
@@ -21,6 +21,7 @@ from agent_platform.core.interfaces.llm.batch import (
     BatchRequest,
     BatchResult,
 )
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
     LLMResponse,
@@ -53,14 +54,19 @@ class OpenAILLM(
 ):
     _provider_name = "openai"
     _missing_api_key_message = "OPENAI API key is required but was not provided"
+    _config_cls = OpenAIGenerationConfig
 
     def __init__(
         self,
         credentials: OpenAICredentials | None = None,
         client_options: ClientOptions | None = None,
+        *,
+        model: str = "",
+        options: Mapping[str, Any] | None = None,
     ) -> None:
         self._credentials = resolve_credentials(credentials, OpenAICredentials)
         self._client_options = resolve_client_options(client_options)
+        self._bind(model, options)
 
     def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
         parameters = model_schema(tool.input_schema)
@@ -74,9 +80,6 @@ class OpenAILLM(
                 "strict": strict_parameters is not None,
             },
         }
-
-    def _default_config(self) -> OpenAIGenerationConfig:
-        return OpenAIGenerationConfig()
 
     def _client_kwargs(
         self, config: OpenAIGenerationConfig, *, sdk_retries: int = 0
@@ -125,7 +128,7 @@ class OpenAILLM(
         tools: list[Tool] | None,
     ) -> ChatCompletion:
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
@@ -143,7 +146,7 @@ class OpenAILLM(
         tools: list[Tool] | None,
     ) -> ChatCompletion:
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(config, has_tools=bool(tools))
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
@@ -159,23 +162,23 @@ class OpenAILLM(
     async def stream(
         self,
         prompt: Prompt,
-        config: OpenAIGenerationConfig | None = None,
+        config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]:
-        config = config or self._default_config()
-        client = self._stream_client(config)
+        resolved = self._resolve(config)
+        client = self._stream_client(resolved)
         messages = to_native_messages(prompt)
-        params = to_native_params(config)
+        params = to_native_params(resolved, has_tools=bool(tools))
         params["stream_options"] = {"include_usage": True}
         if tools:
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
-        with self._observe(config) as call:
+        with self._observe(resolved) as call:
             usage_totals = TokenUsage.zero()
             events = cast(
                 "AsyncStream[ChatCompletionChunk]",
                 await client.chat.completions.create(
-                    model=config.model,
+                    model=resolved.model,
                     messages=messages,  # type: ignore[arg-type]
                     stream=True,
                     **params,
@@ -217,12 +220,11 @@ class OpenAILLM(
     @error_logged(re_raise=ProviderError, message="Batch submission failed")
     @with_retry()
     async def submit_batch(self, requests: list[BatchRequest]) -> BatchJob:
-        config = self._default_config()
-        client = self._async_client(config)
+        client = self._async_client(self._resolve(None, require_model=False))
 
         lines: list[str] = []
         for req in requests:
-            req_config = cast(OpenAIGenerationConfig, req.config or config)
+            req_config = self._resolve(req.config)
             body = {
                 "model": req_config.model,
                 "messages": to_native_messages(req.prompt),
@@ -254,7 +256,7 @@ class OpenAILLM(
     @error_logged(re_raise=ProviderError, message="Batch status check failed")
     @with_retry()
     async def get_batch_status(self, batch_id: str) -> BatchJob:
-        client = self._async_client(self._default_config())
+        client = self._async_client(self._resolve(None, require_model=False))
         with observe(
             LLMBatch(stage="status", provider=self._provider_name, batch_id=batch_id)
         ):
@@ -264,7 +266,7 @@ class OpenAILLM(
     @error_logged(re_raise=ProviderError, message="Batch result retrieval failed")
     @with_retry()
     async def fetch_batch_results(self, batch_id: str) -> list[BatchResult]:
-        client = self._async_client(self._default_config())
+        client = self._async_client(self._resolve(None, require_model=False))
         with observe(
             LLMBatch(stage="results", provider=self._provider_name, batch_id=batch_id)
         ):

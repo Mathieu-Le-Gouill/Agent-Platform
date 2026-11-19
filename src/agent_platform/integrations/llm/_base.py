@@ -2,9 +2,12 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Mapping
 from contextlib import AbstractContextManager
-from typing import TYPE_CHECKING, ClassVar, Generic, TypeVar, cast
+from types import MappingProxyType
+from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
+
+from pydantic import ValidationError
 
 from agent_platform.core.credentials import (
     ClientOptions,
@@ -12,8 +15,9 @@ from agent_platform.core.credentials import (
     resolve_max_retries,
     resolve_timeout,
 )
-from agent_platform.core.errors import PlatformError, ProviderError
+from agent_platform.core.errors import ConfigError, PlatformError, ProviderError
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider, GenerationConfigT
+from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
 from agent_platform.core.observability import LLMCall, observe
 from agent_platform.core.retry import retry_async, retry_sync
@@ -70,12 +74,85 @@ class NativeLLMProvider(
 
     _provider_name: ClassVar[str]
     _missing_api_key_message: ClassVar[str] = "API key is required but was not provided"
+    # The provider's own config class. Typed as the base class because a
+    # `ClassVar` cannot hold a type variable; `_resolve` casts back.
+    _config_cls: ClassVar[type[GenerationConfig]]
 
     _credentials: Credentials
     _client_options: ClientOptions
+    # The model and the provider-only options this instance is bound to. They
+    # are the lowest layers of every call's config (see `_resolve`).
+    _model: str = ""
+    _options: Mapping[str, Any] = MappingProxyType({})
 
-    @abstractmethod
-    def _default_config(self) -> GenerationConfigT: ...
+    def _bind(self, model: str, options: Mapping[str, Any] | None) -> None:
+        """Bind the instance to `model` and to provider-only `options`.
+
+        Raises `ConfigError` naming the field, never its value, because
+        options may hold sensitive values.
+        """
+        self._model = model
+        self._options = MappingProxyType(self.validate_options(options or {}))
+
+    @classmethod
+    def validate_options(cls, options: Mapping[str, Any]) -> dict[str, Any]:
+        """Return a copy of `options` once it is valid for this provider's config class.
+
+        Raises `ConfigError` naming the bad field, never its value, because
+        options may hold sensitive values.
+        """
+        fields = cls._config_cls.model_fields
+        for key in options:
+            if key == "model":
+                raise ConfigError(
+                    f"{cls._provider_name} LLM option 'model' is not allowed: "
+                    "the model comes from the model string"
+                )
+            if key not in fields:
+                raise ConfigError(f"Unknown {cls._provider_name} LLM option {key!r}")
+        try:
+            cls._config_cls.model_validate(dict(options))
+        except ValidationError as exc:
+            # Raised `from None`: the pydantic error text echoes the input value.
+            bad_fields = sorted({".".join(map(str, e["loc"])) for e in exc.errors()})
+            raise ConfigError(
+                f"Invalid {cls._provider_name} LLM option(s): {', '.join(bad_fields)}"
+            ) from None
+        return dict(options)
+
+    def _resolve(
+        self, config: GenerationConfig | None, *, require_model: bool = True
+    ) -> GenerationConfigT:
+        """Return the provider's config for one call, from three layers.
+
+        In order: the bound model, the bound options, then the fields the call
+        config sets explicitly to a non-`None` value (an empty `model` counts
+        as unset). A config of another provider class (a
+        `FallbackLLMProvider` may forward one) only contributes the fields of
+        the base `GenerationConfig`.
+        """
+        config_cls = self._config_cls
+        merged: dict[str, Any] = {}
+        if self._model:
+            merged["model"] = self._model
+        merged.update(self._options)
+        if config is not None:
+            readable = (
+                config_cls.model_fields
+                if isinstance(config, config_cls)
+                else GenerationConfig.model_fields
+            )
+            for name in config.model_fields_set & readable.keys():
+                value = getattr(config, name)
+                if value is None or (name == "model" and not value):
+                    continue
+                merged[name] = value
+        if require_model and not merged.get("model"):
+            raise ConfigError(
+                f"No model set for {self._provider_name}: use a "
+                "'<provider>:<model>' string or set `model` in the config"
+            )
+        return cast(GenerationConfigT, config_cls(**merged))
 
     def _model_name(self, config: GenerationConfigT) -> str:
         return config.model
@@ -147,16 +224,16 @@ class NativeLLMProvider(
     def generate(
         self,
         prompt: Prompt,
-        config: GenerationConfigT | None = None,
+        config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> LLMResponse:
-        config = config or self._default_config()
+        resolved = self._resolve(config)
 
         def attempt() -> LLMResponse:
-            return self._attempt_sync(prompt, config, tools)
+            return self._attempt_sync(prompt, resolved, tools)
 
         try:
-            return retry_sync(attempt, max_attempts=self._max_attempts(config))
+            return retry_sync(attempt, max_attempts=self._max_attempts(resolved))
         except Exception:
             _logger.exception(
                 "LLM generation failed in %s.generate", type(self).__qualname__
@@ -166,16 +243,16 @@ class NativeLLMProvider(
     async def agenerate(
         self,
         prompt: Prompt,
-        config: GenerationConfigT | None = None,
+        config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> LLMResponse:
-        config = config or self._default_config()
+        resolved = self._resolve(config)
 
         async def attempt() -> LLMResponse:
-            return await self._attempt_async(prompt, config, tools)
+            return await self._attempt_async(prompt, resolved, tools)
 
         try:
-            return await retry_async(attempt, max_attempts=self._max_attempts(config))
+            return await retry_async(attempt, max_attempts=self._max_attempts(resolved))
         except Exception:
             _logger.exception(
                 "LLM generation failed in %s.agenerate", type(self).__qualname__
@@ -240,6 +317,6 @@ class NativeLLMProvider(
     def stream(
         self,
         prompt: Prompt,
-        config: GenerationConfigT | None = None,
+        config: GenerationConfig | None = None,
         tools: list[Tool] | None = None,
     ) -> AsyncIterator[StreamChunk]: ...

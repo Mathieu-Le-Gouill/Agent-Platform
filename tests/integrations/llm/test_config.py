@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
@@ -31,6 +34,12 @@ class TestGenerationConfig:
         assert cfg.max_retries is None
         assert cfg.response_format == ResponseFormat.TEXT
         assert cfg.json_schema is None
+        assert cfg.reasoning_effort is None
+        assert cfg.parallel_tool_calls is None
+
+    def test_reasoning_effort_rejects_an_unknown_level(self):
+        with pytest.raises(ValidationError):
+            GenerationConfig(reasoning_effort="extreme")
 
     def test_construction(self):
         cfg = GenerationConfig(
@@ -65,20 +74,14 @@ class TestAnthropicGenerationConfig:
     def test_defaults(self):
         cfg = AnthropicGenerationConfig()
         assert cfg.temperature is None
-        assert cfg.thinking is False
-        assert cfg.thinking_budget is None
+        assert cfg.model == ""
         assert cfg.effort is None
         assert cfg.cache_control is False
+        assert "thinking" not in AnthropicGenerationConfig.model_fields
+        assert "thinking_budget" not in AnthropicGenerationConfig.model_fields
 
     def test_construction(self):
-        cfg = AnthropicGenerationConfig(
-            thinking=True,
-            thinking_budget=10000,
-            cache_control=True,
-            effort="high",
-        )
-        assert cfg.thinking is True
-        assert cfg.thinking_budget == 10000
+        cfg = AnthropicGenerationConfig(cache_control=True, effort="high")
         assert cfg.cache_control is True
         assert cfg.effort == "high"
 
@@ -87,43 +90,48 @@ class TestOpenAIGenerationConfig:
     def test_defaults(self):
         cfg = OpenAIGenerationConfig()
         assert cfg.temperature is None
+        assert cfg.model == ""
         assert cfg.reasoning_effort is None
-        assert cfg.parallel_tool_calls is True
-        assert cfg.strict is True
+        assert cfg.parallel_tool_calls is None
+
+    def test_the_generic_fields_are_the_only_ones(self):
+        assert set(OpenAIGenerationConfig.model_fields) == set(
+            GenerationConfig.model_fields
+        )
 
     def test_construction(self):
-        cfg = OpenAIGenerationConfig(
-            reasoning_effort="high",
-            parallel_tool_calls=False,
-            strict=False,
-        )
+        cfg = OpenAIGenerationConfig(reasoning_effort="high", parallel_tool_calls=False)
         assert cfg.reasoning_effort == "high"
         assert cfg.parallel_tool_calls is False
-        assert cfg.strict is False
 
 
 class TestMistralGenerationConfig:
     def test_defaults(self):
         cfg = MistralGenerationConfig()
-        assert cfg.model == "mistral-medium-latest"
-        assert cfg.json_schema_name == "response"
-        assert cfg.json_schema_strict is True
+        assert cfg.model == ""
+        assert set(MistralGenerationConfig.model_fields) == set(
+            GenerationConfig.model_fields
+        )
 
     def test_construction(self):
-        cfg = MistralGenerationConfig(
-            json_schema_name="custom",
-            json_schema_strict=False,
-        )
-        assert cfg.json_schema_name == "custom"
-        assert cfg.json_schema_strict is False
+        cfg = MistralGenerationConfig(model="mistral-large-latest")
+        assert cfg.model == "mistral-large-latest"
 
 
 class TestHuggingFaceGenerationConfig:
     def test_defaults(self):
         cfg = HuggingFaceGenerationConfig()
         assert cfg.provider == "auto"
-        assert cfg.task == "text-generation"
-        assert cfg.repo_id == "deepseek-ai/DeepSeek-R1-0528"
+        assert cfg.model == ""
+        assert set(HuggingFaceGenerationConfig.model_fields) - set(
+            GenerationConfig.model_fields
+        ) == {
+            "provider",
+            "repetition_penalty",
+            "do_sample",
+            "typical_p",
+            "return_full_text",
+        }
         assert cfg.repetition_penalty is None
         assert cfg.do_sample is None
         assert cfg.typical_p is None

@@ -187,6 +187,20 @@ class TestToNativeParams:
         result = _to_native_params(cfg)
         assert result == {"options": {}}
 
+    def test_unsupported_generic_fields_warn_and_are_not_sent(self, caplog):
+        cfg = OllamaGenerationConfig(reasoning_effort="low", parallel_tool_calls=True)
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg, has_tools=True)
+        assert result == {"options": {}}
+        assert "reasoning_effort is ignored" in caplog.text
+        assert "parallel_tool_calls is ignored" in caplog.text
+
+    def test_parallel_tool_calls_without_tools_does_not_warn(self, caplog):
+        cfg = OllamaGenerationConfig(parallel_tool_calls=True)
+        with caplog.at_level("WARNING"):
+            _to_native_params(cfg)
+        assert caplog.text == ""
+
     def test_with_fields(self):
         cfg = OllamaGenerationConfig(
             temperature=0.5,
@@ -297,11 +311,11 @@ class TestOllamaLLMConstruction:
         provider = OllamaLLM(OllamaCredentials())
         assert hasattr(provider, "_credentials")
 
-    def test_default_config(self):
-        provider = OllamaLLM()
-        cfg = provider._default_config()
+    def test_the_bound_model_and_options_resolve_into_the_provider_config(self):
+        provider = OllamaLLM(model="llama3.2", options={"seed": 4})
+        cfg = provider._resolve(None)
         assert isinstance(cfg, OllamaGenerationConfig)
-        assert cfg.model == "llama3.2"
+        assert (cfg.model, cfg.seed) == ("llama3.2", 4)
 
     def test_tool_to_schema(self):
         class _Input(BaseModel):

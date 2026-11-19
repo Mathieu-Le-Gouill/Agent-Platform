@@ -165,8 +165,104 @@ class TestBuildLlmWithFallback:
         assert isinstance(llm, FallbackLLMProvider)
         assert llm._rate_limiter is not None
 
+    def test_the_model_and_the_options_reach_the_provider(self):
+        settings = Settings(
+            _env_file=None,
+            default_llm_model="openai:gpt-4o-mini",
+            llm_options={"openai": {"temperature": 0.3}},
+        )
+
+        llm, _ = build_llm_with_fallback(settings)
+
+        resolved = llm._resolve(None)
+        assert (resolved.model, resolved.temperature) == ("gpt-4o-mini", 0.3)
+
+    def test_options_are_found_when_the_provider_is_named_by_class(self):
+        settings = Settings(
+            _env_file=None,
+            default_llm_model="OpenAILLM:gpt-4o-mini",
+            llm_options={"openai": {"temperature": 0.3}},
+        )
+
+        llm, _ = build_llm_with_fallback(settings)
+
+        assert llm._resolve(None).temperature == 0.3
+
+    def test_each_fallback_entry_gets_its_own_model_and_options(self):
+        settings = Settings(
+            _env_file=None,
+            default_llm_model="openai:gpt-4o-mini",
+            fallback_llm_models=["anthropic:claude-sonnet-4-5"],
+            llm_options={
+                "openai": {"temperature": 0.1},
+                "anthropic": {"effort": "high"},
+            },
+        )
+
+        llm, _ = build_llm_with_fallback(settings)
+
+        openai_cfg = llm._entries[0].provider._resolve(None)
+        anthropic_cfg = llm._entries[1].provider._resolve(None)
+        assert (openai_cfg.model, openai_cfg.temperature) == ("gpt-4o-mini", 0.1)
+        assert (anthropic_cfg.model, anthropic_cfg.effort) == (
+            "claude-sonnet-4-5",
+            "high",
+        )
+        assert not hasattr(openai_cfg, "effort")
+        assert anthropic_cfg.temperature is None
+
+    def test_no_options_leave_the_provider_unconfigured(self):
+        llm, _ = build_llm_with_fallback(Settings(_env_file=None))
+
+        assert llm._resolve(None).temperature is None
+
+    def test_a_bad_option_key_fails_at_build_agent(self):
+        settings = Settings(_env_file=None, llm_options={"openai": {"nope": 1}})
+
+        with pytest.raises(ConfigError, match="nope"):
+            build_agent(settings)
+
+    def test_the_model_cannot_be_an_option(self):
+        settings = Settings(_env_file=None, llm_options={"openai": {"model": "x"}})
+
+        with pytest.raises(ConfigError, match="model"):
+            build_agent(settings)
+
+    def test_an_unknown_provider_slug_fails_at_build_agent(self):
+        settings = Settings(_env_file=None, llm_options={"nope": {"a": 1}})
+
+        with pytest.raises(ConfigError, match="nope"):
+            build_agent(settings)
+
+    def test_an_entry_for_a_provider_outside_the_chain_is_still_validated(self):
+        settings = Settings(
+            _env_file=None,
+            default_llm_model="openai:gpt-4o-mini",
+            llm_options={"anthropic": {"nope": 1}},
+        )
+
+        with pytest.raises(ConfigError, match="nope"):
+            build_llm_with_fallback(settings)
+
+    def test_an_error_names_the_field_and_never_the_value(self):
+        settings = Settings(
+            _env_file=None,
+            llm_options={"openai": {"temperature": "s3cret-value"}},
+        )
+
+        with pytest.raises(ConfigError) as caught:
+            build_llm_with_fallback(settings)
+
+        assert "temperature" in str(caught.value)
+        assert "s3cret-value" not in str(caught.value)
+
 
 class TestBuildProvider:
+    def test_init_kwargs_reach_the_constructor(self):
+        provider = build_provider(llm_module, "openai", model="gpt-4o")
+
+        assert provider._model == "gpt-4o"
+
     def test_instantiates_provider_by_alias(self):
         provider = build_provider(llm_module, "openai")
 

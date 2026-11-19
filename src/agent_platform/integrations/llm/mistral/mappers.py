@@ -26,6 +26,8 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
+from agent_platform.integrations.llm._generic_fields import warn_unsupported
+from agent_platform.integrations.llm._json_schema import json_schema_name
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
 
 __all__ = [
@@ -102,8 +104,14 @@ def to_native_messages(prompt: Prompt) -> list[dict[str, Any]]:
     return result
 
 
-def to_native_params(config: MistralGenerationConfig) -> dict[str, Any]:
+def to_native_params(
+    config: MistralGenerationConfig, *, has_tools: bool = False
+) -> dict[str, Any]:
     params: dict[str, Any] = {}
+    if config.reasoning_effort is not None:
+        warn_unsupported("mistral", "reasoning_effort")
+    if config.parallel_tool_calls is not None and has_tools:
+        params["parallel_tool_calls"] = config.parallel_tool_calls
     if config.temperature is not None:
         params["temperature"] = config.temperature
     if config.max_tokens is not None:
@@ -132,8 +140,8 @@ def to_native_params(config: MistralGenerationConfig) -> dict[str, Any]:
                 "type": "json_schema",
                 "json_schema": {
                     "schema": config.json_schema,
-                    "name": config.json_schema_name,
-                    "strict": config.json_schema_strict,
+                    "name": json_schema_name(config.json_schema),
+                    "strict": True,
                 },
             }
 

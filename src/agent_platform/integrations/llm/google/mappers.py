@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import logging
 from typing import Any
 from uuid import uuid4
 
@@ -24,6 +25,7 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
+from agent_platform.integrations.llm._generic_fields import warn_unsupported
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
 
 __all__ = [
@@ -33,6 +35,29 @@ __all__ = [
     "to_native_config",
     "to_native_contents",
 ]
+
+logger = logging.getLogger(__name__)
+
+# Gemini 3 models are steered with `thinking_level`, not a token budget.
+_THINKING_LEVEL_MODEL_PREFIX = "gemini-3"
+_THINKING_LEVELS: dict[str, types.ThinkingLevel] = {
+    "none": types.ThinkingLevel.MINIMAL,
+    "minimal": types.ThinkingLevel.MINIMAL,
+    "low": types.ThinkingLevel.LOW,
+    "medium": types.ThinkingLevel.MEDIUM,
+    "high": types.ThinkingLevel.HIGH,
+    "xhigh": types.ThinkingLevel.HIGH,
+}
+_THINKING_BUDGETS: dict[str, int] = {
+    "none": 0,
+    "minimal": 1024,
+    "low": 1024,
+    "medium": 2048,
+    "high": 4096,
+    "xhigh": 4096,
+}
+# Levels that share a budget with a neighbour, so the mapping is approximate.
+_APPROXIMATED_BUDGET_LEVELS = frozenset({"minimal", "xhigh"})
 
 
 def block_to_native_part(block: ContentBlock) -> types.Part:
@@ -103,6 +128,40 @@ def to_native_contents(
     return ("\n\n".join(system_parts) if system_parts else None, contents)
 
 
+def _thinking_config(config: GoogleGenerationConfig) -> types.ThinkingConfig | None:
+    """Returns the thinking config: the provider budget, else the generic level.
+
+    Gemini 3 models take a `thinking_level`; earlier ones take a token budget.
+    """
+    if config.thinking_budget is not None:
+        return types.ThinkingConfig(
+            thinking_budget=config.thinking_budget,
+            include_thoughts=config.include_thoughts,
+        )
+    level = config.reasoning_effort
+    if level is None:
+        return None
+    if config.model.lower().startswith(_THINKING_LEVEL_MODEL_PREFIX):
+        native_level = _THINKING_LEVELS[level]
+        if native_level.value.lower() != level:
+            logger.debug(
+                "reasoning_effort %r mapped to Gemini thinking level %r",
+                level,
+                native_level.value,
+            )
+        return types.ThinkingConfig(
+            thinking_level=native_level, include_thoughts=config.include_thoughts
+        )
+    budget = _THINKING_BUDGETS[level]
+    if level in _APPROXIMATED_BUDGET_LEVELS:
+        logger.debug(
+            "reasoning_effort %r mapped to Gemini thinking budget %d", level, budget
+        )
+    return types.ThinkingConfig(
+        thinking_budget=budget, include_thoughts=config.include_thoughts
+    )
+
+
 def to_native_config(
     config: GoogleGenerationConfig,
     system: str | None,
@@ -130,11 +189,11 @@ def to_native_config(
         kwargs["system_instruction"] = system
     if tools:
         kwargs["tools"] = [tool_to_schema(t) for t in tools]
-    if config.thinking_budget is not None:
-        kwargs["thinking_config"] = types.ThinkingConfig(
-            thinking_budget=config.thinking_budget,
-            include_thoughts=config.include_thoughts,
-        )
+        if config.parallel_tool_calls is not None:
+            warn_unsupported("google", "parallel_tool_calls")
+    thinking = _thinking_config(config)
+    if thinking is not None:
+        kwargs["thinking_config"] = thinking
 
     match config.response_format:
         case ResponseFormat.TEXT:

@@ -1,7 +1,12 @@
 import pytest
 
-from agent_platform.core.errors import ProviderError
-from agent_platform.core.retry import retry_async, retry_sync, with_retry
+from agent_platform.core.errors import ProviderError, RecoveryExhausted
+from agent_platform.core.retry import (
+    retry_async,
+    retry_once_on_invalid,
+    retry_sync,
+    with_retry,
+)
 
 
 class TestWithRetry:
@@ -195,3 +200,71 @@ class TestRetrySync:
     def test_rejects_fewer_than_one_attempt(self):
         with pytest.raises(ValueError, match="max_attempts"):
             retry_sync(_Flaky(0, ValueError()).sync, max_attempts=0)
+
+
+class TestRetryOnceOnInvalid:
+    @pytest.mark.asyncio
+    async def test_valid_first_attempt_returns_without_retry(self):
+        calls = 0
+
+        async def attempt():
+            nonlocal calls
+            calls += 1
+            return "ok"
+
+        async def correct(error):
+            raise AssertionError("correct should not be called")
+
+        result = await retry_once_on_invalid(
+            attempt=attempt, check=lambda r: None, correct=correct
+        )
+
+        assert result == "ok"
+        assert calls == 1
+
+    @pytest.mark.asyncio
+    async def test_invalid_then_valid_retries_once(self):
+        calls = 0
+        corrected = []
+        retries = []
+
+        async def attempt():
+            nonlocal calls
+            calls += 1
+            return "bad" if calls == 1 else "good"
+
+        async def correct(error):
+            corrected.append(error)
+
+        result = await retry_once_on_invalid(
+            attempt=attempt,
+            check=lambda r: None if r == "good" else "was bad",
+            correct=correct,
+            on_retry=lambda: retries.append(True),
+        )
+
+        assert result == "good"
+        assert calls == 2
+        assert corrected == ["was bad"]
+        assert retries == [True]
+
+    @pytest.mark.asyncio
+    async def test_invalid_twice_raises_recovery_exhausted(self):
+        calls = 0
+
+        async def attempt():
+            nonlocal calls
+            calls += 1
+            return "bad"
+
+        async def correct(error):
+            pass
+
+        with pytest.raises(RecoveryExhausted) as exc_info:
+            await retry_once_on_invalid(
+                attempt=attempt, check=lambda r: "still bad", correct=correct
+            )
+
+        assert calls == 2
+        assert exc_info.value.last_result == "bad"
+        assert "still bad" in str(exc_info.value)

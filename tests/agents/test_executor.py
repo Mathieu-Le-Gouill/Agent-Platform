@@ -10,10 +10,12 @@ from agent_platform.agents.errors import (
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.base import Tool, ToolStreamChunk
 from agent_platform.agents.tools.registry import ToolRegistry
+from agent_platform.core.interfaces.llm.structured import StructuredOutputError
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     UserMessage,
 )
+from agent_platform.core.schemas.token import TokenUsage
 from tests.helpers import (
     make_fake_llm_response,
     make_fake_stream,
@@ -51,9 +53,53 @@ class _RewritingGuardrail:
         return AssistantMessage(content="[redacted]")
 
 
+class _StructuredFailureGuardrail:
+    """Output guardrail whose own structured call failed."""
+
+    def __init__(self) -> None:
+        self.error = StructuredOutputError(
+            "nested",
+            last_result=make_fake_llm_response(""),
+            usage=TokenUsage.zero(),
+        )
+
+    async def before(self, ctx):
+        return None
+
+    async def after(self, ctx, result):
+        raise self.error
+
+
 @pytest.fixture
 def agent(mock_llm):
     return Agent(name="test", llm=mock_llm)
+
+
+class TestExecutorNestedStructuredFailure:
+    @pytest.mark.asyncio
+    async def test_run_propagates_it(self, mock_llm):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="Hello")
+        guardrail = _StructuredFailureGuardrail()
+        ex = AgentExecutor(Agent(name="test", llm=mock_llm, guardrails=[guardrail]))
+
+        with pytest.raises(StructuredOutputError) as raised:
+            await ex.run("Hi")
+
+        assert raised.value is guardrail.error
+
+    @pytest.mark.asyncio
+    async def test_run_streaming_propagates_it(self, mock_llm):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            make_text_stream_chunks(["Hello"])
+        )
+        guardrail = _StructuredFailureGuardrail()
+        ex = AgentExecutor(Agent(name="test", llm=mock_llm, guardrails=[guardrail]))
+
+        with pytest.raises(StructuredOutputError) as raised:
+            async for _ in ex.run_streaming("Hi"):
+                pass
+
+        assert raised.value is guardrail.error
 
 
 class TestExecutorConstruction:

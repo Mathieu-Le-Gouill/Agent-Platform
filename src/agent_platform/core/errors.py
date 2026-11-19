@@ -19,6 +19,7 @@ __all__ = [
     "NotFoundError",
     "ValidationError",
     "MissingCredentialError",
+    "RecoveryExhausted",
     # Utilities
     "require_secret",
     "error_logged",
@@ -59,6 +60,14 @@ class ValidationError(PlatformError):
 
 class MissingCredentialError(PlatformError):
     pass
+
+
+class RecoveryExhausted(PlatformError):
+    """Raised when a single corrective retry still produces an invalid result."""
+
+    def __init__(self, message: str = "", *, last_result: Any = None) -> None:
+        super().__init__(message)
+        self.last_result = last_result
 
 
 # --- Utilities ---

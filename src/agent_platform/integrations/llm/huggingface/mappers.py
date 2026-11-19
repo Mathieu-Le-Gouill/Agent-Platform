@@ -26,6 +26,7 @@ from agent_platform.core.schemas.message import (
 )
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
+from agent_platform.integrations.llm._generic_fields import warn_unsupported
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
@@ -102,7 +103,14 @@ def to_native_messages(prompt: Prompt) -> list[dict[str, Any]]:
     return result
 
 
-def to_native_params(config: HuggingFaceGenerationConfig) -> dict[str, Any]:
+def to_native_params(
+    config: HuggingFaceGenerationConfig, *, has_tools: bool = False
+) -> dict[str, Any]:
+    if config.reasoning_effort is not None:
+        warn_unsupported("huggingface", "reasoning_effort")
+    if config.parallel_tool_calls is not None and has_tools:
+        warn_unsupported("huggingface", "parallel_tool_calls")
+
     params: dict[str, Any] = {}
     if config.temperature is not None:
         params["temperature"] = config.temperature
