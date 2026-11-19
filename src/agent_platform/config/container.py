@@ -83,7 +83,18 @@ def _validate_llm_options(
                 f"Unknown LLM provider {slug!r} in llm_options, "
                 f"expected one of {sorted(aliases)}"
             )
-        getattr(llm_module, aliases[slug]).validate_options(options)
+        try:
+            provider_cls = getattr(llm_module, aliases[slug])
+        except ImportError as exc:
+            raise _missing_llm_extra(slug) from exc
+        provider_cls.validate_options(options)
+
+
+def _missing_llm_extra(slug: str) -> ConfigError:
+    # Every LLM extra in pyproject.toml is named `llm-<slug>`.
+    return ConfigError(
+        f"LLM provider {slug!r} is not installed: install the 'llm-{slug}' extra"
+    )
 
 
 def _build_llm_entry(
@@ -96,9 +107,12 @@ def _build_llm_entry(
         (s for s, name in llm_module.PROVIDER_ALIASES.items() if name == class_name),
         provider_name,
     )
-    provider = build_provider(
-        llm_module, provider_name, model=model, options=llm_options.get(slug)
-    )
+    try:
+        provider = build_provider(
+            llm_module, provider_name, model=model, options=llm_options.get(slug)
+        )
+    except ImportError as exc:
+        raise _missing_llm_extra(slug) from exc
     return provider, model
 
 

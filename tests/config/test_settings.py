@@ -1,7 +1,10 @@
+import traceback
+
 import pytest
 from pydantic import ValidationError
 
 from agent_platform.config.settings import Settings, get_settings
+from agent_platform.core.errors import ConfigError
 
 
 class TestSettings:
@@ -112,9 +115,53 @@ class TestSettings:
 
 
 class TestGetSettings:
+    @pytest.fixture
+    def isolated_env(self, monkeypatch, tmp_path):
+        monkeypatch.chdir(tmp_path)
+        get_settings.cache_clear()
+        yield monkeypatch
+        get_settings.cache_clear()
+
     def test_returns_cached_instance(self):
         get_settings.cache_clear()
         try:
             assert get_settings() is get_settings()
         finally:
             get_settings.cache_clear()
+
+    def test_a_malformed_setting_names_the_field_and_never_the_value(
+        self, isolated_env
+    ):
+        isolated_env.setenv(
+            "AGENT_PLATFORM_LLM_OPTIONS", '{"openai": "sk-test-secret"}'
+        )
+        isolated_env.setenv("AGENT_PLATFORM_LLM_RATE_LIMIT", "-98765")
+
+        with pytest.raises(ConfigError) as caught:
+            get_settings()
+
+        message = str(caught.value)
+        printed = "".join(traceback.format_exception(caught.value))
+        assert "llm_options.openai" in message
+        assert "llm_rate_limit" in message
+        assert caught.value.__context__ is None
+        for value in ("sk-test-secret", "-98765"):
+            assert value not in message
+            assert value not in printed
+
+    def test_invalid_json_names_the_field(self, isolated_env):
+        isolated_env.setenv("AGENT_PLATFORM_LLM_OPTIONS", "{not json")
+
+        with pytest.raises(ConfigError, match="llm_options") as caught:
+            get_settings()
+
+        assert "not json" not in "".join(traceback.format_exception(caught.value))
+
+    def test_a_failure_is_not_cached(self, isolated_env):
+        isolated_env.setenv("AGENT_PLATFORM_LLM_RATE_LIMIT", "-1")
+        with pytest.raises(ConfigError):
+            get_settings()
+
+        isolated_env.delenv("AGENT_PLATFORM_LLM_RATE_LIMIT")
+
+        assert get_settings().llm_rate_limit is None

@@ -256,6 +256,38 @@ class TestBuildLlmWithFallback:
         assert "temperature" in str(caught.value)
         assert "s3cret-value" not in str(caught.value)
 
+    @pytest.fixture
+    def without_anthropic_sdk(self, monkeypatch):
+        resolve = llm_module.__getattr__
+
+        def missing_anthropic(name: str) -> Any:
+            if name == "AnthropicLLM":
+                raise ImportError("No module named 'anthropic'")
+            return resolve(name)
+
+        monkeypatch.setattr(llm_module, "__getattr__", missing_anthropic)
+
+    @pytest.mark.usefixtures("without_anthropic_sdk")
+    @pytest.mark.parametrize(
+        "settings_kwargs",
+        [
+            {"llm_options": {"anthropic": {"effort": "high"}}},
+            {"fallback_llm_models": ["anthropic:claude-sonnet-4-6"]},
+        ],
+        ids=["options_entry", "chain_entry"],
+    )
+    def test_a_missing_llm_extra_names_the_extra_to_install(self, settings_kwargs):
+        settings = Settings(
+            _env_file=None, default_llm_model="openai:gpt-4o-mini", **settings_kwargs
+        )
+
+        with pytest.raises(ConfigError) as caught:
+            build_llm_with_fallback(settings)
+
+        assert "'anthropic'" in str(caught.value)
+        assert "llm-anthropic" in str(caught.value)
+        assert isinstance(caught.value.__cause__, ImportError)
+
 
 class TestBuildProvider:
     def test_init_kwargs_reach_the_constructor(self):

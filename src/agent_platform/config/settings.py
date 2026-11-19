@@ -3,8 +3,10 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Any
 
-from pydantic import Field, SecretStr, field_validator
-from pydantic_settings import BaseSettings, SettingsConfigDict
+from pydantic import Field, SecretStr, ValidationError, field_validator
+from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
+
+from agent_platform.core.errors import ConfigError
 
 
 class Settings(BaseSettings):
@@ -87,7 +89,29 @@ class Settings(BaseSettings):
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    """Return the process-wide settings, read once from the environment and `.env`.
+
+    Raises `ConfigError` when a setting is malformed. The message names each
+    bad field and its rule, never the input value, since a value may be a key.
+    A failure is not cached, so the next call reads the environment again.
+    """
+    try:
+        return Settings()
+    except ValidationError as exc:
+        message = _describe_validation_errors(exc)
+    except SettingsError as exc:
+        # Names the field and the source, never the value.
+        message = str(exc)
+    # Raised outside the `except` blocks so no context is attached: the
+    # original exception holds the input value and would print it.
+    raise ConfigError(f"Invalid settings: {message}")
+
+
+def _describe_validation_errors(exc: ValidationError) -> str:
+    return "; ".join(
+        f"{'.'.join(str(part) for part in error['loc'])}: {error['msg']}"
+        for error in exc.errors(include_input=False, include_url=False)
+    )
 
 
 __all__ = ["Settings", "get_settings"]
