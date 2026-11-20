@@ -139,7 +139,7 @@ def to_native_params(
             params["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
-                    "schema": config.json_schema,
+                    "schema": _closed_schema(config.json_schema),
                     "name": json_schema_name(config.json_schema),
                     "strict": True,
                 },
@@ -147,6 +147,25 @@ def to_native_params(
 
     params.update(config.extra_params)
     return params
+
+
+def _closed_schema(node: Any) -> Any:
+    """Return a copy of a JSON schema with `additionalProperties: false` on every object.
+
+    Mistral's strict mode expects closed objects: its SDK helper
+    `mistralai.extra.response_format_from_pydantic_model` applies the same
+    rule. Unlike OpenAI's strict mode, fields with a default stay optional,
+    so `required` is left as is. An object that already sets
+    `additionalProperties` (a `dict[str, X]` field) keeps its value schema.
+    """
+    if isinstance(node, dict):
+        closed = {key: _closed_schema(value) for key, value in node.items()}
+        if closed.get("type") == "object":
+            closed.setdefault("additionalProperties", False)
+        return closed
+    if isinstance(node, list):
+        return [_closed_schema(value) for value in node]
+    return node
 
 
 def from_native_response(response: ChatCompletionResponse, model: str) -> LLMResponse:

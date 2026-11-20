@@ -203,7 +203,11 @@ class TestToNativeParams:
         result = _to_native_params(cfg)
         assert result["response_format"] == {
             "type": "json_schema",
-            "json_schema": {"schema": schema, "name": "response", "strict": True},
+            "json_schema": {
+                "schema": {"type": "object", "additionalProperties": False},
+                "name": "response",
+                "strict": True,
+            },
         }
 
     def test_response_format_json_schema_is_strict_and_named_from_the_title(self):
@@ -212,10 +216,32 @@ class TestToNativeParams:
             response_format=ResponseFormat.JSON_SCHEMA, json_schema=schema
         )
         result = _to_native_params(cfg)
-        assert result["response_format"] == {
-            "type": "json_schema",
-            "json_schema": {"schema": schema, "name": "MySchema", "strict": True},
+        assert result["response_format"]["json_schema"]["name"] == "MySchema"
+        assert result["response_format"]["json_schema"]["strict"] is True
+
+    def test_strict_schema_closes_every_object_and_keeps_optional_fields(self):
+        class Item(BaseModel):
+            label: str
+
+        class Answer(BaseModel):
+            items: list[Item]
+            counts: dict[str, int]
+            note: str | None = None
+
+        schema = Answer.model_json_schema()
+        cfg = MistralGenerationConfig(
+            response_format=ResponseFormat.JSON_SCHEMA, json_schema=schema
+        )
+
+        sent = _to_native_params(cfg)["response_format"]["json_schema"]["schema"]
+
+        assert sent["additionalProperties"] is False
+        assert sent["$defs"]["Item"]["additionalProperties"] is False
+        assert sent["properties"]["counts"]["additionalProperties"] == {
+            "type": "integer"
         }
+        assert sent["required"] == ["items", "counts"]
+        assert "additionalProperties" not in schema
 
     def test_generic_reasoning_effort_warns_and_is_not_sent(self, caplog):
         cfg = MistralGenerationConfig(reasoning_effort="high")
