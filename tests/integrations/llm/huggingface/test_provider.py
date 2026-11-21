@@ -513,10 +513,11 @@ class TestHuggingFaceLLMGenerate:
 
         provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        with pytest.raises(ProviderError, match="LLM generation failed"):
+        with pytest.raises(ProviderError) as caught:
             await provider.agenerate(
                 prompt, config=HuggingFaceGenerationConfig(model="test/model")
             )
+        assert caught.value.code == "provider_unavailable"
 
 
 class TestHuggingFaceLLMStream:

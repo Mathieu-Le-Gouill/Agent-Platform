@@ -1,15 +1,21 @@
 import asyncio
+import logging
 from unittest.mock import AsyncMock, MagicMock
 
 import pytest
 from pydantic import BaseModel
 
 from agent_platform.agents.agent import Agent
-from agent_platform.agents.errors import AgentGuardrailError, AgentThinkError
+from agent_platform.agents.errors import (
+    AgentGuardrailError,
+    AgentRecoveryExhausted,
+    AgentThinkError,
+)
 from agent_platform.agents.guardrails import OutputNotEmptyGuardrail
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry, is_tool_validation_error
 from agent_platform.core.cost import ModelPricing, StaticPricingTable
+from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     FinishReason,
@@ -233,8 +239,32 @@ class TestAgentThink:
     @pytest.mark.asyncio
     async def test_think_llm_error_wrapped(self, agent, mock_llm):
         mock_llm.agenerate.side_effect = RuntimeError("LLM crashed")
-        with pytest.raises(AgentThinkError, match="LLM generation failed"):
+        with pytest.raises(AgentThinkError) as caught:
             await agent.think([UserMessage(content="Hi")])
+        assert caught.value.code == "llm_error"
+        assert "LLM crashed" not in str(caught.value)
+
+    @pytest.mark.asyncio
+    async def test_think_keeps_the_provider_errors_contract(self, agent, mock_llm):
+        provider_error = ProviderError(
+            "vendor text", code="llm_rate_limited", retryable=True, retry_after=3
+        )
+        mock_llm.agenerate.side_effect = provider_error
+        with pytest.raises(AgentThinkError) as caught:
+            await agent.think([UserMessage(content="Hi")])
+        assert caught.value.code == "llm_rate_limited"
+        assert caught.value.retryable is True
+        assert caught.value.retry_after == 3
+        assert caught.value.__cause__ is provider_error
+        assert "vendor text" not in str(caught.value)
+
+    @pytest.mark.asyncio
+    async def test_a_failed_llm_call_logs_no_traceback(self, agent, mock_llm, caplog):
+        mock_llm.agenerate.side_effect = RuntimeError("LLM crashed")
+        with caplog.at_level(logging.DEBUG):
+            with pytest.raises(AgentThinkError):
+                await agent.think([UserMessage(content="Hi")])
+        assert [r for r in caplog.records if r.exc_info] == []
 
     @pytest.mark.asyncio
     async def test_think_none_message_raises(self, agent, mock_llm):
@@ -597,13 +627,16 @@ class TestAgentResponseSchema:
         assert call_count == 2
 
     @pytest.mark.asyncio
-    async def test_invalid_json_twice_gives_up_with_last_result(self, mock_llm):
+    async def test_invalid_json_twice_raises_recovery_exhausted(self, mock_llm):
         mock_llm.agenerate.return_value = make_fake_llm_response(
             content="still not json"
         )
         agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
-        result = await agent.think([UserMessage(content="Hi")])
-        assert result.text == "still not json"
+        with pytest.raises(AgentRecoveryExhausted) as caught:
+            await agent.think([UserMessage(content="Hi")])
+        assert caught.value.code == "agent_recovery_exhausted"
+        assert caught.value.last_message is not None
+        assert caught.value.last_message.text == "still not json"
         assert mock_llm.agenerate.await_count == 2
 
     @pytest.mark.asyncio
@@ -682,7 +715,8 @@ class TestAgentResponseSchema:
             response_schema=_Answer,
             generation_config=GenerationConfig(response_format=ResponseFormat.JSON),
         )
-        await agent.think([UserMessage(content="Hi")])
+        with pytest.raises(AgentRecoveryExhausted):
+            await agent.think([UserMessage(content="Hi")])
         config = mock_llm.agenerate.call_args[1]["config"]
         assert config.response_format is ResponseFormat.JSON
         assert config.json_schema is None
@@ -706,9 +740,23 @@ class TestAgentThinkStream:
 
         mock_llm.stream.side_effect = boom
         agent = Agent(name="streamer", llm=mock_llm)
-        with pytest.raises(AgentThinkError, match="LLM streaming failed"):
+        with pytest.raises(AgentThinkError) as caught:
             async for _ in agent.think_stream([UserMessage(content="Hi")]):
                 pass
+        assert caught.value.code == "llm_error"
+
+    @pytest.mark.asyncio
+    async def test_think_stream_keeps_the_provider_errors_contract(self, mock_llm):
+        def boom(**kwargs):
+            raise ProviderError("vendor text", code="llm_timeout", retryable=True)
+
+        mock_llm.stream.side_effect = boom
+        agent = Agent(name="streamer", llm=mock_llm)
+        with pytest.raises(AgentThinkError) as caught:
+            async for _ in agent.think_stream([UserMessage(content="Hi")]):
+                pass
+        assert caught.value.code == "llm_timeout"
+        assert caught.value.retryable is True
 
     @pytest.mark.asyncio
     async def test_think_stream_cancelled_error_propagates(self, mock_llm):
@@ -875,16 +923,17 @@ class TestAgentThinkFromStream:
         assert raised.value is failure
 
     @pytest.mark.asyncio
-    async def test_schema_failure_twice_returns_the_last_attempt(self, mock_llm):
+    async def test_schema_failure_twice_raises_recovery_exhausted(self, mock_llm):
         mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
             make_text_stream_chunks(["still ", "bad"])
         )
         agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
 
-        message, deltas = await agent.think_from_stream([UserMessage(content="Hi")])
+        with pytest.raises(AgentRecoveryExhausted) as caught:
+            await agent.think_from_stream([UserMessage(content="Hi")])
 
-        assert message.text == "still bad"
-        assert deltas == ["still ", "bad"]
+        assert caught.value.last_message is not None
+        assert caught.value.last_message.text == "still bad"
         assert mock_llm.stream.call_count == 2
 
 

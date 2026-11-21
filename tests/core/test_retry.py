@@ -2,6 +2,7 @@ import pytest
 
 from agent_platform.core.errors import ProviderError, RecoveryExhausted
 from agent_platform.core.retry import (
+    MAX_RETRY_AFTER_SECONDS,
     retry_async,
     retry_once_on_invalid,
     retry_sync,
@@ -156,6 +157,42 @@ class TestRetryAsync:
     async def test_rejects_fewer_than_one_attempt(self):
         with pytest.raises(ValueError, match="max_attempts"):
             await retry_async(_Flaky(0, ValueError()).asynchronous, max_attempts=0)
+
+
+class TestRetryAfter:
+    @pytest.mark.asyncio
+    async def test_waits_at_least_the_requested_delay(self, mocker):
+        sleep = mocker.patch("agent_platform.core.retry.asyncio.sleep")
+        flaky = _Flaky(
+            failures=1, error=ProviderError("slow", retryable=True, retry_after=5)
+        )
+
+        await retry_async(flaky.asynchronous, max_attempts=2, base_delay=0.001)
+
+        (waited,) = (call.args[0] for call in sleep.call_args_list)
+        assert waited >= 5
+
+    @pytest.mark.asyncio
+    async def test_caps_the_requested_delay(self, mocker):
+        sleep = mocker.patch("agent_platform.core.retry.asyncio.sleep")
+        flaky = _Flaky(
+            failures=1, error=ProviderError("slow", retryable=True, retry_after=120)
+        )
+
+        await retry_async(flaky.asynchronous, max_attempts=2, base_delay=0.001)
+
+        (waited,) = (call.args[0] for call in sleep.call_args_list)
+        assert MAX_RETRY_AFTER_SECONDS <= waited <= MAX_RETRY_AFTER_SECONDS * 1.25
+
+    def test_the_sync_retry_waits_the_requested_delay_too(self, mocker):
+        sleep = mocker.patch("agent_platform.core.retry.time.sleep")
+        flaky = _Flaky(
+            failures=1, error=ProviderError("slow", retryable=True, retry_after=5)
+        )
+
+        retry_sync(flaky.sync, max_attempts=2, base_delay=0.001)
+
+        assert sleep.call_args.args[0] >= 5
 
 
 class TestRetrySync:

@@ -34,7 +34,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import OpenAICredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
+from agent_platform.integrations.llm._base import NativeLLMProvider, parse_retry_after
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 from agent_platform.integrations.llm.openai.mappers import (
     batch_job_from_native,
@@ -54,6 +54,7 @@ class OpenAILLM(
 ):
     _provider_name = "openai"
     _missing_api_key_message = "OPENAI API key is required but was not provided"
+    _api_key_env = "OPENAI_API_KEY"
     _config_cls = OpenAIGenerationConfig
 
     def __init__(
@@ -116,9 +117,32 @@ class OpenAILLM(
         # `APITimeoutError` is a subclass of `APIConnectionError`.
         if isinstance(exc, openai.APIConnectionError):
             return True
-        if isinstance(exc, openai.APIStatusError):
-            return is_transient_status(exc.status_code)
         return super()._is_transient(exc)
+
+    def _status_code(self, exc: Exception) -> int | None:
+        if isinstance(exc, openai.APIStatusError):
+            return exc.status_code
+        return None
+
+    def _retry_after(self, exc: Exception) -> float | None:
+        if isinstance(exc, openai.APIStatusError):
+            return parse_retry_after(exc.response.headers.get("retry-after"))
+        return None
+
+    def _error_kinds(self, exc: Exception) -> frozenset[str]:
+        # An error event inside a stream is a bare `APIError` built from the
+        # event's body, so its kind is all there is to classify it by.
+        if isinstance(exc, openai.APIError):
+            return frozenset(k for k in (exc.type, exc.code) if isinstance(k, str))
+        return frozenset()
+
+    def _is_context_window(self, exc: Exception) -> bool:
+        return (
+            isinstance(exc, openai.APIError) and exc.code == "context_length_exceeded"
+        )
+
+    def _is_timeout(self, exc: Exception) -> bool:
+        return isinstance(exc, openai.APITimeoutError) or super()._is_timeout(exc)
 
     def _invoke_sync(
         self,
@@ -159,7 +183,7 @@ class OpenAILLM(
     def _from_native(self, response: ChatCompletion, model: str) -> LLMResponse:
         return from_native_response(response, model)
 
-    async def stream(
+    async def _stream(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,

@@ -8,7 +8,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
-from agent_platform.agents.errors import AgentThinkError
+from agent_platform.agents.errors import AgentRecoveryExhausted, AgentThinkError
 from agent_platform.agents.guardrails import (
     Guardrail,
     GuardrailContext,
@@ -20,7 +20,7 @@ from agent_platform.agents.tools.registry import (
     ToolRegistry,
 )
 from agent_platform.core.cost import CostEstimator
-from agent_platform.core.errors import RecoveryExhausted
+from agent_platform.core.errors import PlatformError, RecoveryExhausted
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
@@ -206,8 +206,7 @@ class Agent:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.exception("LLM generation failed in agent '%s'", self._name)
-            raise AgentThinkError(f"LLM generation failed: {exc}") from exc
+            raise self._think_error(exc) from exc
 
         if response.message is None:
             raise AgentThinkError("LLM returned empty response")
@@ -215,6 +214,23 @@ class Agent:
         self._record_usage(response.usage)
 
         return response.message
+
+    def _think_error(self, cause: Exception) -> AgentThinkError:
+        """Return the error for a failed LLM call, carrying the cause's contract.
+
+        The message never repeats the cause's text, which may echo the prompt;
+        the cause stays reachable through `__cause__`. No traceback is logged:
+        the layer that finally handles the error logs it once.
+        """
+        message = f"LLM call failed in agent '{self._name}'"
+        if isinstance(cause, PlatformError):
+            return AgentThinkError(
+                message,
+                code=cause.code,
+                retryable=cause.retryable,
+                retry_after=cause.retry_after,
+            )
+        return AgentThinkError(message, code="llm_error")
 
     def _record_usage(self, usage: TokenUsage) -> None:
         """Aggregate `usage`, and price it onto the enclosing span when possible.
@@ -328,8 +344,10 @@ class Agent:
             # not by this retry: its last_result is not an AssistantMessage.
             raise
         except RecoveryExhausted as exc:
-            result: AssistantMessage = exc.last_result
-            return result
+            raise AgentRecoveryExhausted(
+                f"Agent '{self._name}' could not produce a valid response",
+                last_message=exc.last_result,
+            ) from exc
 
     async def think_stream(self, messages: list[Message]) -> AsyncIterator[StreamChunk]:
         prompt, config, tools = self._build_call_args(messages)
@@ -344,8 +362,7 @@ class Agent:
         except asyncio.CancelledError:
             raise
         except Exception as exc:
-            logger.exception("LLM streaming failed in agent '%s'", self._name)
-            raise AgentThinkError(f"LLM streaming failed: {exc}") from exc
+            raise self._think_error(exc) from exc
 
     async def act(self, assistant_message: AssistantMessage) -> list[ToolMessage]:
         return list(

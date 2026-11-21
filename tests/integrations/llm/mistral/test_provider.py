@@ -525,10 +525,11 @@ class TestMistralLLMGenerate:
 
         provider = MistralLLM(_creds())
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        with pytest.raises(ProviderError, match="LLM generation failed"):
+        with pytest.raises(ProviderError) as caught:
             await provider.agenerate(
                 prompt, config=MistralGenerationConfig(model="mistral-medium-latest")
             )
+        assert caught.value.code == "provider_unavailable"
 
 
 class TestMistralLLMStream:

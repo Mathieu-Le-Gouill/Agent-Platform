@@ -408,8 +408,9 @@ class TestGoogleLLMGenerate:
 
         provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        with pytest.raises(ProviderError, match="LLM generation failed"):
+        with pytest.raises(ProviderError) as caught:
             await provider.agenerate(prompt)
+        assert caught.value.code == "provider_unavailable"
 
 
 class TestGoogleLLMStream:

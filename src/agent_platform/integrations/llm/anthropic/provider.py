@@ -33,7 +33,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import AnthropicCredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
+from agent_platform.integrations.llm._base import NativeLLMProvider, parse_retry_after
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 from agent_platform.integrations.llm.anthropic.mappers import (
     batch_job_from_native,
@@ -52,6 +52,7 @@ class AnthropicLLM(
 ):
     _provider_name = "anthropic"
     _missing_api_key_message = "Anthropic API key is required but was not provided"
+    _api_key_env = "ANTHROPIC_API_KEY"
     _config_cls = AnthropicGenerationConfig
 
     def __init__(
@@ -108,9 +109,35 @@ class AnthropicLLM(
         # `APITimeoutError` is a subclass of `APIConnectionError`.
         if isinstance(exc, anthropic.APIConnectionError):
             return True
-        if isinstance(exc, anthropic.APIStatusError):
-            return is_transient_status(exc.status_code)
         return super()._is_transient(exc)
+
+    def _status_code(self, exc: Exception) -> int | None:
+        if isinstance(exc, anthropic.APIStatusError):
+            return exc.status_code
+        return None
+
+    def _retry_after(self, exc: Exception) -> float | None:
+        if isinstance(exc, anthropic.APIStatusError):
+            return parse_retry_after(exc.response.headers.get("retry-after"))
+        return None
+
+    def _error_kinds(self, exc: Exception) -> frozenset[str]:
+        # An error event inside a stream is an `APIStatusError` built with the
+        # stream's own 200 response, so its status says nothing: the kind in
+        # the event's body does.
+        if isinstance(exc, anthropic.APIStatusError) and exc.type is not None:
+            return frozenset({exc.type})
+        return frozenset()
+
+    def _is_context_window(self, exc: Exception) -> bool:
+        return (
+            isinstance(exc, anthropic.APIStatusError)
+            and exc.status_code == 400
+            and "prompt is too long" in exc.message.lower()
+        )
+
+    def _is_timeout(self, exc: Exception) -> bool:
+        return isinstance(exc, anthropic.APITimeoutError) or super()._is_timeout(exc)
 
     def _invoke_sync(
         self,
@@ -155,7 +182,7 @@ class AnthropicLLM(
     def _from_native(self, response: Message, model: str) -> LLMResponse:
         return from_native_response(response, model)
 
-    async def stream(
+    async def _stream(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,

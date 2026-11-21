@@ -13,7 +13,17 @@ from agent_platform.core.errors import PlatformError, RecoveryExhausted
 _AsyncFunc = TypeVar("_AsyncFunc", bound=Callable[..., Coroutine[Any, Any, Any]])
 _T = TypeVar("_T")
 
-__all__ = ["retry_async", "retry_once_on_invalid", "retry_sync", "with_retry"]
+__all__ = [
+    "MAX_RETRY_AFTER_SECONDS",
+    "retry_async",
+    "retry_once_on_invalid",
+    "retry_sync",
+    "with_retry",
+]
+
+# Longest wait a service's `retry_after` can impose on one retry. A longer
+# request is not honoured in full: a caller should not block for minutes.
+MAX_RETRY_AFTER_SECONDS = 30.0
 
 
 def _next_delay(
@@ -27,14 +37,19 @@ def _next_delay(
 
     An explicitly non-retryable `PlatformError` and the last attempt both give
     up. The delay doubles per attempt up to `max_delay`, with up to 25 % jitter
-    so concurrent callers do not retry in lockstep.
+    so concurrent callers do not retry in lockstep. A `PlatformError` that
+    carries `retry_after` raises the delay to that value, capped at
+    `MAX_RETRY_AFTER_SECONDS`.
     """
     if isinstance(exc, PlatformError) and not exc.retryable:
         return None
     if attempt == max_attempts:
         return None
     delay = min(max_delay, base_delay * 2 ** (attempt - 1))
-    return delay * (1 + random.random() * 0.25)
+    delay *= 1 + random.random() * 0.25
+    if isinstance(exc, PlatformError) and exc.retry_after is not None:
+        delay = max(delay, min(exc.retry_after, MAX_RETRY_AFTER_SECONDS))
+    return delay
 
 
 def _log_retry(

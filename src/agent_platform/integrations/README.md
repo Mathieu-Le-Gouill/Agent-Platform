@@ -80,6 +80,22 @@ class OpenAILLMProvider(BaseLLMProvider[OpenAIGenerationConfig]):
     async def stream(self, prompt, model, config) -> AsyncIterator[StreamChunk]: ...
 ```
 
+### LLM error contract
+
+`NativeLLMProvider` translates every vendor failure into a `ProviderError` with a stable `code`. `generate`, `agenerate` and `stream` raise only these (plus `ConfigError` for a bad config, `MissingCredentialError` for a missing key, and `asyncio.CancelledError`, which is never translated). `stream` translates a failure before or after the first chunk.
+
+| code | error type | `retryable` |
+|---|---|---|
+| `llm_context_window` | `LLMContextWindowError` | no |
+| `llm_rate_limited` | `LLMRateLimitError`, with `retry_after` when the vendor sent `Retry-After` | yes |
+| `llm_timeout` | `LLMTimeoutError` | yes |
+| `provider_unavailable` | `ProviderError` (5xx, 408, 409, connection error, a vendor error event such as `overloaded_error`) | yes |
+| `provider_bad_request` | `ProviderError` (any other failure) | no |
+
+`retryable` says the same call may succeed later: `retry_async`/`retry_sync` stop at once on `False`, and a `CircuitBreaker` only counts retryable errors. `retry_after` is the seconds the vendor asked to wait; the retry loop waits at least that long, capped at 30 s.
+
+A new LLM provider implements the abstract `_stream` (not `stream`, which the base wraps to translate errors) and, where its SDK differs from the defaults, the hooks `_status_code`, `_retry_after`, `_error_kinds`, `_is_context_window`, `_is_timeout` and `_is_transient`. It sets `_api_key_env` to the name of its key's env var, or leaves it `None` when it needs no key; `build_llm_with_fallback` warns at startup when that key is missing.
+
 ### LLM config rules
 
 - Every `llm` provider takes `model` and `options` beside `credentials` and `client_options`. `model` is the model the provider is bound to, taken from the `"<provider>:<model>"` string. No provider config has a default model.

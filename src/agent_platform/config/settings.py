@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from functools import lru_cache
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, SecretStr, ValidationError, field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict, SettingsError
@@ -55,11 +55,11 @@ class Settings(BaseSettings):
     default_audio_model: str = "openai:whisper-1"
     agent_name: str = "assistant"
     agent_system_prompt: str | None = None
-    max_iterations: int = 10
+    max_iterations: int = Field(default=10, ge=1)
     # Most recent user turns an agent keeps in a conversation's history; older
     # turns are dropped so a long conversation stays within the model's context.
     max_history_turns: int = Field(default=20, ge=1)
-    log_level: str = "INFO"
+    log_level: Literal["DEBUG", "INFO", "WARNING", "ERROR", "CRITICAL"] = "INFO"
     # Tracing backend slug resolved against integrations/tracing's
     # PROVIDER_ALIASES by config/container.py::build_tracer, or "none" to
     # disable tracing outright. The default Langfuse backend is itself a safe
@@ -78,6 +78,11 @@ class Settings(BaseSettings):
     # Conversations each key may hold in memory; creating one more evicts the
     # key's least recently used conversation.
     api_max_conversations_per_key: int = Field(default=100, ge=1)
+
+    @field_validator("log_level", mode="before")
+    @classmethod
+    def _upper_case_log_level(cls, level: Any) -> Any:
+        return level.upper() if isinstance(level, str) else level
 
     @field_validator("api_keys")
     @classmethod

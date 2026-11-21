@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from typing import Any
 from uuid import uuid4
 
@@ -289,6 +290,69 @@ class TestBuildLlmWithFallback:
         assert isinstance(caught.value.__cause__, ImportError)
 
 
+class TestMissingApiKeyWarning:
+    @pytest.fixture(autouse=True)
+    def _no_keys(self, monkeypatch):
+        for name in ("OPENAI_API_KEY", "ANTHROPIC_API_KEY"):
+            monkeypatch.delenv(name, raising=False)
+
+    @staticmethod
+    def _warnings(caplog) -> list[str]:
+        return [
+            r.getMessage()
+            for r in caplog.records
+            if r.name == "agent_platform.config.container"
+            and r.levelno == logging.WARNING
+        ]
+
+    def test_a_keyless_openai_chain_warns_and_still_builds(self, caplog):
+        settings = Settings(_env_file=None, default_llm_model="openai:gpt-4o-mini")
+
+        with caplog.at_level(logging.WARNING):
+            llm, model = build_llm_with_fallback(settings)
+
+        assert isinstance(llm, OpenAILLM)
+        assert model == "gpt-4o-mini"
+        (message,) = self._warnings(caplog)
+        assert "OPENAI_API_KEY" in message
+        assert message == (
+            "openai API key is missing: set OPENAI_API_KEY; LLM calls will fail"
+        )
+
+    def test_each_keyless_entry_of_a_chain_warns_once(self, caplog):
+        settings = Settings(
+            _env_file=None,
+            default_llm_model="openai:gpt-4o-mini",
+            fallback_llm_models=["anthropic:claude-sonnet-4-6", "ollama:llama3.2"],
+        )
+
+        with caplog.at_level(logging.WARNING):
+            build_llm_with_fallback(settings)
+
+        messages = self._warnings(caplog)
+        assert len(messages) == 2
+        assert "OPENAI_API_KEY" in messages[0]
+        assert "ANTHROPIC_API_KEY" in messages[1]
+
+    def test_a_present_key_does_not_warn_and_is_never_logged(self, caplog, monkeypatch):
+        monkeypatch.setenv("OPENAI_API_KEY", "sk-test-s3cret")
+        settings = Settings(_env_file=None, default_llm_model="openai:gpt-4o-mini")
+
+        with caplog.at_level(logging.DEBUG):
+            build_llm_with_fallback(settings)
+
+        assert self._warnings(caplog) == []
+        assert "sk-test-s3cret" not in caplog.text
+
+    def test_a_keyless_provider_never_warns(self, caplog):
+        settings = Settings(_env_file=None, default_llm_model="ollama:llama3.2")
+
+        with caplog.at_level(logging.WARNING):
+            build_llm_with_fallback(settings)
+
+        assert self._warnings(caplog) == []
+
+
 class TestBuildProvider:
     def test_init_kwargs_reach_the_constructor(self):
         provider = build_provider(llm_module, "openai", model="gpt-4o")
@@ -326,6 +390,32 @@ class TestBuildProviderFromModelString:
     def test_unknown_provider_raises_config_error(self):
         with pytest.raises(ConfigError):
             build_provider_from_model_string(llm_module, "does-not-exist:gpt-4o-mini")
+
+    def test_a_missing_extra_names_the_domain_and_the_provider(self, mocker):
+        import agent_platform.integrations.image_generation as image_module
+
+        mocker.patch(
+            "agent_platform.config.container.build_provider",
+            side_effect=ImportError("No module named 'openai'"),
+        )
+
+        with pytest.raises(ConfigError) as caught:
+            build_provider_from_model_string(image_module, "dalle:dall-e-3")
+
+        assert "dalle" in str(caught.value)
+        assert image_module.__name__ in str(caught.value)
+        assert isinstance(caught.value.__cause__, ImportError)
+
+    def test_build_agent_fails_with_a_config_error_when_an_image_extra_is_missing(
+        self, mocker
+    ):
+        mocker.patch(
+            "agent_platform.config.container.build_provider",
+            side_effect=[OpenAILLM(), ImportError("No module named 'openai'")],
+        )
+
+        with pytest.raises(ConfigError, match="dalle"):
+            build_agent(Settings(_env_file=None))
 
 
 class TestBuildMCPClient:

@@ -36,7 +36,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import GoogleCredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
+from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
 from agent_platform.integrations.llm.google.mappers import (
     from_native_response,
@@ -58,6 +58,8 @@ class GoogleLLM(
 ):
     _provider_name = "google"
     _missing_api_key_message = "Google API key is required but was not provided"
+    # The first of the names `GoogleCredentials` reads.
+    _api_key_env = "GOOGLE_API_KEY"
     _config_cls = GoogleGenerationConfig
 
     def __init__(
@@ -99,9 +101,15 @@ class GoogleLLM(
             exc, _AIOHTTP_CONNECTION_ERROR
         ):
             return True
-        if isinstance(exc, genai_errors.APIError):
-            return is_transient_status(exc.code)
         return super()._is_transient(exc)
+
+    def _status_code(self, exc: Exception) -> int | None:
+        if isinstance(exc, genai_errors.APIError):
+            return exc.code
+        return None
+
+    def _is_timeout(self, exc: Exception) -> bool:
+        return isinstance(exc, httpx.TimeoutException) or super()._is_timeout(exc)
 
     def _async_client(self, config: GoogleGenerationConfig) -> genai.Client:
         # Single client class, no sync/async split (like Mistral): async calls
@@ -146,7 +154,7 @@ class GoogleLLM(
     ) -> LLMResponse:
         return from_native_response(response, model)
 
-    async def stream(
+    async def _stream(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,

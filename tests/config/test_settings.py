@@ -149,6 +149,29 @@ class TestGetSettings:
             assert value not in message
             assert value not in printed
 
+    @pytest.mark.parametrize(
+        ("variable", "value", "field"),
+        [
+            ("AGENT_PLATFORM_MAX_ITERATIONS", "0", "max_iterations"),
+            ("AGENT_PLATFORM_LOG_LEVEL", "loud", "log_level"),
+        ],
+    )
+    def test_a_bad_value_raises_a_config_error_naming_the_field(
+        self, isolated_env, variable, value, field
+    ):
+        isolated_env.setenv(variable, value)
+
+        with pytest.raises(ConfigError, match=field) as caught:
+            get_settings()
+
+        assert value not in str(caught.value)
+
+    @pytest.mark.parametrize("value", ["info", "Warning", "DEBUG"])
+    def test_a_log_level_is_accepted_in_any_case(self, isolated_env, value):
+        isolated_env.setenv("AGENT_PLATFORM_LOG_LEVEL", value)
+
+        assert get_settings().log_level == value.upper()
+
     def test_invalid_json_names_the_field(self, isolated_env):
         isolated_env.setenv("AGENT_PLATFORM_LLM_OPTIONS", "{not json")
 

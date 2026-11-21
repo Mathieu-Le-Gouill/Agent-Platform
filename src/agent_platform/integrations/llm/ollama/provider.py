@@ -25,7 +25,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import OllamaCredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
+from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.ollama.mappers import (
     from_native_response,
@@ -109,9 +109,15 @@ class OllamaLLM(
     def _is_transient(self, exc: Exception) -> bool:
         if isinstance(exc, httpx.TransportError):
             return True
-        if isinstance(exc, ResponseError):
-            return is_transient_status(exc.status_code)
         return super()._is_transient(exc)
+
+    def _status_code(self, exc: Exception) -> int | None:
+        if isinstance(exc, ResponseError):
+            return exc.status_code
+        return None
+
+    def _is_timeout(self, exc: Exception) -> bool:
+        return isinstance(exc, httpx.TimeoutException) or super()._is_timeout(exc)
 
     def _invoke_sync(
         self,
@@ -144,7 +150,7 @@ class OllamaLLM(
     def _from_native(self, response: ChatResponse, model: str) -> LLMResponse:
         return from_native_response(response, model)
 
-    async def stream(
+    async def _stream(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,

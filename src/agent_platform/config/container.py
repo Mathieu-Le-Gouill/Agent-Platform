@@ -64,7 +64,14 @@ def build_provider_from_model_string(
     See `config.model_string.parse_model_string` for the string format.
     """
     provider_name, model = parse_model_string(model_string)
-    return build_provider(domain_module, provider_name), model
+    try:
+        provider = build_provider(domain_module, provider_name)
+    except ImportError as exc:
+        raise ConfigError(
+            f"Provider {provider_name!r} for {domain_module.__name__!r} is not "
+            "installed: install the extra that provides it"
+        ) from exc
+    return provider, model
 
 
 def _validate_llm_options(
@@ -113,6 +120,13 @@ def _build_llm_entry(
         )
     except ImportError as exc:
         raise _missing_llm_extra(slug) from exc
+    missing_key_env = provider.missing_api_key_env()
+    if missing_key_env is not None:
+        logger.warning(
+            "%s API key is missing: set %s; LLM calls will fail",
+            slug,
+            missing_key_env,
+        )
     return provider, model
 
 

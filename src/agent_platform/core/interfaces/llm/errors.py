@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from agent_platform.core.errors import PlatformError
+from agent_platform.core.errors import ProviderError
 
 __all__ = [
     "LLMError",
@@ -11,7 +11,7 @@ __all__ = [
 ]
 
 
-class LLMError(PlatformError):
+class LLMError(ProviderError):
     pass
 
 

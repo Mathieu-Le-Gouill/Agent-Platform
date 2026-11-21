@@ -92,24 +92,26 @@ All Pydantic v2 models live here. They are the currency passed between layers, a
 ```
 PlatformError
 ├── ProviderError
+│   └── LLMError                (`interfaces/llm/errors.py`)
+│       ├── LLMGenerationError
+│       ├── LLMTimeoutError
+│       ├── LLMRateLimitError
+│       └── LLMContextWindowError
 ├── ConfigError
 ├── NotFoundError
 ├── ValidationError
 ├── MissingCredentialError
 ├── RecoveryExhausted          (one corrective retry still failed; carries `last_result`)
 │   └── StructuredOutputError  (`interfaces/llm/structured.py`; adds summed `usage`)
-├── LLMError
-│   ├── LLMGenerationError
-│   ├── LLMTimeoutError
-│   └── LLMRateLimitError
 ├── AgentError
 │   ├── AgentThinkError
 │   ├── AgentActError
-│   └── AgentMaxIterations
+│   ├── AgentMaxIterations
+│   └── AgentRecoveryExhausted  (not a `RecoveryExhausted`; see `agents/README.md`)
 └── ToolError
 ```
 
-Every error carries `code`, `retryable`, and `context` fields. `retry.py` holds the retry loop in two per-call functions, `retry_async(attempt_once, max_attempts=...)` and `retry_sync(...)` (exponential backoff with jitter, `retry_on` configurable; the sync one sleeps with `time.sleep`), and the `with_retry()` decorator delegates to the async one. They check this flag: if a caught exception is a `PlatformError` with `retryable=False`, it re-raises immediately instead of burning through retry attempts. For most `@with_retry()` call sites in `integrations/`, which sit *inside* an outer `@error_logged(re_raise=ProviderError)`, the decorator only sees the raw underlying SDK exception, so the flag-check is a no-op there. The `llm` providers are the exception: `NativeLLMProvider.generate`/`agenerate` classify each vendor error as temporary or not inside one attempt (`ProviderError(retryable=...)`) and run the attempts through `retry_sync`/`retry_async`, so a bad request fails after one call and `retryable` is honored.
+Every error carries `code`, `retryable`, `retry_after` and `context` fields. `retry_after` is the number of seconds the failing service asked callers to wait (from a `Retry-After` header), or `None`; `retry_async`/`retry_sync` wait at least that long, capped at `MAX_RETRY_AFTER_SECONDS` (30 s). `retry.py` holds the retry loop in two per-call functions, `retry_async(attempt_once, max_attempts=...)` and `retry_sync(...)` (exponential backoff with jitter, `retry_on` configurable; the sync one sleeps with `time.sleep`), and the `with_retry()` decorator delegates to the async one. They check this flag: if a caught exception is a `PlatformError` with `retryable=False`, it re-raises immediately instead of burning through retry attempts. For most `@with_retry()` call sites in `integrations/`, which sit *inside* an outer `@error_logged(re_raise=ProviderError)`, the decorator only sees the raw underlying SDK exception, so the flag-check is a no-op there. The `llm` providers are the exception: `NativeLLMProvider.generate`/`agenerate` classify each vendor error as temporary or not inside one attempt (`ProviderError(retryable=...)`) and run the attempts through `retry_sync`/`retry_async`, so a bad request fails after one call and `retryable` is honored.
 
 ### `interfaces/tracing/`: The Backend Contract
 

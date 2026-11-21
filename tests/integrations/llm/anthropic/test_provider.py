@@ -632,10 +632,11 @@ class TestAnthropicLLMGenerate:
 
         provider = AnthropicLLM(_creds())
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        with pytest.raises(ProviderError, match="LLM generation failed"):
+        with pytest.raises(ProviderError) as caught:
             await provider.agenerate(
                 prompt, config=AnthropicGenerationConfig(model="claude-sonnet-4-6")
             )
+        assert caught.value.code == "provider_unavailable"
 
 
 class TestAnthropicLLMStream:

@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
 from typing import TYPE_CHECKING
 
-from agent_platform.core.errors import ProviderError
+from agent_platform.core.errors import PlatformError, ProviderError
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
@@ -15,6 +15,27 @@ if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
 
 __all__ = ["FallbackEntry", "FallbackLLMProvider"]
+
+
+def _all_failed(last_exc: Exception | None) -> ProviderError:
+    """Build the error raised when no entry of the chain could answer.
+
+    It keeps the last failure's `code`, `retryable` and `retry_after`, so the
+    caller still learns why (a rate limit, a timeout) instead of a generic
+    failure. With no failure to copy (every circuit is open) or a failure that
+    carries no contract, the chain is reported as unavailable.
+    """
+    message = "All providers in the fallback chain failed"
+    if isinstance(last_exc, PlatformError):
+        return ProviderError(
+            message,
+            code=last_exc.code,
+            retryable=last_exc.retryable,
+            retry_after=last_exc.retry_after,
+        )
+    return ProviderError(
+        message, code="provider_unavailable", retryable=last_exc is None
+    )
 
 
 @dataclass(frozen=True)
@@ -78,9 +99,7 @@ class FallbackLLMProvider(BaseLLMProvider):
             except Exception as exc:  # noqa: BLE001 - any provider failure falls through
                 last_exc = exc
                 continue
-        raise ProviderError(
-            "All providers in the fallback chain failed", retryable=False
-        ) from last_exc
+        raise _all_failed(last_exc) from last_exc
 
     async def agenerate(
         self,
@@ -104,9 +123,7 @@ class FallbackLLMProvider(BaseLLMProvider):
             except Exception as exc:  # noqa: BLE001
                 last_exc = exc
                 continue
-        raise ProviderError(
-            "All providers in the fallback chain failed", retryable=False
-        ) from last_exc
+        raise _all_failed(last_exc) from last_exc
 
     async def stream(
         self,
@@ -140,6 +157,4 @@ class FallbackLLMProvider(BaseLLMProvider):
                 continue
             circuit.record_success()
             return
-        raise ProviderError(
-            "All providers in the fallback chain failed", retryable=False
-        ) from last_exc
+        raise _all_failed(last_exc) from last_exc

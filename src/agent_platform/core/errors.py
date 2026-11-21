@@ -28,16 +28,25 @@ __all__ = [
 
 
 class PlatformError(Exception):
+    """Base of every error the platform raises on purpose.
+
+    `code` is a stable machine-readable name for the failure. `retryable` says
+    whether the same call may succeed later. `retry_after` is the number of
+    seconds the failing service asked callers to wait before the next try.
+    """
+
     def __init__(
         self,
         message: str = "",
         *,
         code: str | None = None,
         retryable: bool = False,
+        retry_after: float | None = None,
         context: dict[str, Any] | None = None,
     ) -> None:
         self.code = code
         self.retryable = retryable
+        self.retry_after = retry_after
         self.context = context or {}
         super().__init__(message)
 

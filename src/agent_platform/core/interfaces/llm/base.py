@@ -30,7 +30,8 @@ class BaseLLMProvider(ABC, Generic[GenerationConfigT]):
         prompt: Prompt,
         config: GenerationConfigT | None = None,
         tools: list[Tool] | None = None,
-    ) -> LLMResponse: ...
+    ) -> LLMResponse:
+        """Generate a response; failures raise typed errors (see `integrations/README.md`)."""
 
     @abstractmethod
     def stream(
@@ -38,4 +39,5 @@ class BaseLLMProvider(ABC, Generic[GenerationConfigT]):
         prompt: Prompt,
         config: GenerationConfigT | None = None,
         tools: list[Tool] | None = None,
-    ) -> AsyncIterator[StreamChunk]: ...
+    ) -> AsyncIterator[StreamChunk]:
+        """Stream a response; failures raise typed errors (see `integrations/README.md`)."""

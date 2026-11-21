@@ -45,9 +45,10 @@ Each tool lives in its own `tools/<name>/tool.py`, one directory per tool, match
 
 ```
 AgentError
-├── AgentThinkError        (LLM generation failed)
+├── AgentThinkError        (LLM call failed; carries the provider error's code/retryable/retry_after, or code "llm_error")
 ├── AgentActError          (tool execution failed at agent level)
-├── AgentMaxIterations     (loop exceeded max_iterations)
+├── AgentMaxIterations     (loop exceeded max_iterations; code "agent_max_iterations")
+├── AgentRecoveryExhausted (the corrective retry of a tool call or a response schema still failed; code "agent_recovery_exhausted"; `last_message` holds the invalid answer. Not a `core.errors.RecoveryExhausted`, so the executor's own `except RecoveryExhausted` never catches it)
 └── AgentGuardrailError    (raised by a concrete Guardrail, e.g. OutputNotEmptyGuardrail)
 ```
 
@@ -142,9 +143,10 @@ and can proceed in parallel.
   `ToolCallValidationError`-tagged `ToolMessage` (via
   `tools.registry.is_tool_validation_error`) and retries `think()`+`act()`
   once with corrective feedback appended to the conversation, via the shared
-  `core.retry.retry_once_on_invalid` helper, before giving up and returning
-  the error like any other failed tool call. `run_streaming()` applies the
-  same recovery.
+  `core.retry.retry_once_on_invalid` helper, before giving up and raising
+  `AgentRecoveryExhausted`. `run_streaming()` applies the same recovery and
+  yields nothing from the failed attempt. A `response_schema` retry that still
+  fails raises the same error from `Agent`.
 - New this phase, not originally scoped but built on the same primitives:
   `response_schema` on `Agent` (structured final-answer validation, reusing
   `retry_once_on_invalid`), `Guardrail`s (`guardrails.py`, built on Phase 1's

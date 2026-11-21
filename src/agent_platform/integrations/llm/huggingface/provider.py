@@ -24,7 +24,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import HuggingFaceCredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider, is_transient_status
+from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
@@ -47,6 +47,7 @@ class HuggingFaceLLM(
     ]
 ):
     _provider_name = "huggingface"
+    _api_key_env = "HF_TOKEN"
     _config_cls = HuggingFaceGenerationConfig
 
     def __init__(
@@ -91,12 +92,16 @@ class HuggingFaceLLM(
         # `InferenceTimeoutError` is a builtin `TimeoutError`, which the base rule covers.
         if isinstance(exc, httpx.TransportError):
             return True
-        if isinstance(exc, HfHubHTTPError):
-            # `response` is optional from huggingface_hub 2.x on.
-            return exc.response is not None and is_transient_status(
-                exc.response.status_code
-            )
         return super()._is_transient(exc)
+
+    def _status_code(self, exc: Exception) -> int | None:
+        # `response` is optional from huggingface_hub 2.x on.
+        if isinstance(exc, HfHubHTTPError) and exc.response is not None:
+            return exc.response.status_code
+        return None
+
+    def _is_timeout(self, exc: Exception) -> bool:
+        return isinstance(exc, httpx.TimeoutException) or super()._is_timeout(exc)
 
     def _async_client(
         self, config: HuggingFaceGenerationConfig
@@ -137,7 +142,7 @@ class HuggingFaceLLM(
     def _from_native(self, response: ChatCompletionOutput, model: str) -> LLMResponse:
         return from_native_response(response, model)
 
-    async def stream(
+    async def _stream(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,

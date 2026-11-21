@@ -4,7 +4,7 @@ from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 
 from agent_platform.agents.agent import Agent
-from agent_platform.agents.errors import AgentMaxIterations
+from agent_platform.agents.errors import AgentMaxIterations, AgentRecoveryExhausted
 from agent_platform.agents.tools.base import ToolStreamChunk
 from agent_platform.agents.tools.registry import is_tool_validation_error
 from agent_platform.core.errors import RecoveryExhausted
@@ -83,6 +83,11 @@ def _traced_loop(
         trace = _LoopTrace(run)
         try:
             yield trace
+        except AgentRecoveryExhausted:
+            # The agent's schema retry raised it inside an attempt: same exit
+            # reason as the tool-call retry the executor handles itself.
+            trace.finish(EXIT_RECOVERY_EXHAUSTED)
+            raise
         except Exception as exc:
             # An unexpected failure still ends the loop, and is worth counting
             # as its own exit reason next to the deliberate ones.
@@ -128,6 +133,14 @@ class AgentExecutor:
         messages.extend(tool_messages)
         return assistant_msg, tool_messages
 
+    def _recovery_exhausted(
+        self, last_message: AssistantMessage
+    ) -> AgentRecoveryExhausted:
+        return AgentRecoveryExhausted(
+            f"Agent '{self._agent.name}' could not produce a valid tool call",
+            last_message=last_message,
+        )
+
     async def _correct_tool_call(self, messages: list[Message], error: str) -> None:
         messages.append(
             UserMessage(
@@ -161,7 +174,7 @@ class AgentExecutor:
                     failed_msg, failed_tool_messages = exc.last_result
                     trace.record_turn(failed_msg, failed_tool_messages)
                     trace.finish(EXIT_RECOVERY_EXHAUSTED)
-                    return failed_msg.text, messages
+                    raise self._recovery_exhausted(failed_msg) from exc
 
                 trace.record_turn(assistant_msg, tool_messages)
                 if not assistant_msg.tool_calls:
@@ -227,9 +240,7 @@ class AgentExecutor:
                     failed_msg, failed_tool_messages = exc.last_result
                     trace.record_turn(failed_msg, failed_tool_messages)
                     trace.finish(EXIT_RECOVERY_EXHAUSTED)
-                    for event in sink:
-                        yield event
-                    return
+                    raise self._recovery_exhausted(failed_msg) from exc
 
                 trace.record_turn(assistant_msg, tool_messages)
                 for event in sink:

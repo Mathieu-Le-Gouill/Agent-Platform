@@ -5,6 +5,7 @@ from agent_platform.agents.agent import Agent
 from agent_platform.agents.errors import (
     AgentGuardrailError,
     AgentMaxIterations,
+    AgentRecoveryExhausted,
     AgentThinkError,
 )
 from agent_platform.agents.executor import AgentExecutor
@@ -206,9 +207,12 @@ class TestExecutorRun:
         agent = Agent(name="loopy", llm=mock_llm, tool_registry=registry)
         ex = AgentExecutor(agent, max_iterations=3)
 
-        with pytest.raises(AgentMaxIterations, match="exceeded max iterations"):
+        with pytest.raises(
+            AgentMaxIterations, match="exceeded max iterations"
+        ) as caught:
             await ex.run("Weather?")
 
+        assert caught.value.code == "agent_max_iterations"
         assert mock_llm.agenerate.await_count == 3
 
     @pytest.mark.asyncio
@@ -217,8 +221,9 @@ class TestExecutorRun:
         agent = Agent(name="test", llm=mock_llm)
         ex = AgentExecutor(agent)
 
-        with pytest.raises(AgentThinkError, match="LLM generation failed"):
+        with pytest.raises(AgentThinkError) as caught:
             await ex.run("Hi")
+        assert caught.value.code == "llm_error"
 
     @pytest.mark.asyncio
     async def test_multiple_tool_calls_in_one_round(self, mock_llm):
@@ -338,7 +343,7 @@ class TestExecutorRunStreaming:
                 pass
 
     @pytest.mark.asyncio
-    async def test_repeated_bad_calls_give_up_without_raising(self, mock_llm):
+    async def test_repeated_bad_calls_raise_without_yielding_events(self, mock_llm):
         mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
             make_tool_call_stream_chunks(
                 [{"id": "c1", "name": "strict_weather", "args": {}}]
@@ -349,12 +354,12 @@ class TestExecutorRunStreaming:
         agent = Agent(name="stuck-streamer", llm=mock_llm, tool_registry=registry)
         ex = AgentExecutor(agent)
 
-        events = [e async for e in ex.run_streaming("Weather?")]
+        events: list = []
+        with pytest.raises(AgentRecoveryExhausted):
+            async for event in ex.run_streaming("Weather?"):
+                events.append(event)
 
-        tool_events = [e for e in events if isinstance(e, ToolStreamChunk)]
-        assert len(tool_events) == 1
-        assert all(e.is_validation_error for e in tool_events)
-        assert not any(isinstance(e, str) for e in events)
+        assert events == []
 
     @pytest.mark.asyncio
     async def test_blocking_output_guardrail_raises_without_yielding_text(
@@ -600,7 +605,7 @@ class TestExecutorToolCallRecovery:
         assert call_count == 3
 
     @pytest.mark.asyncio
-    async def test_repeated_bad_calls_still_fail_after_one_retry(self, mock_llm):
+    async def test_repeated_bad_calls_raise_after_one_retry(self, mock_llm):
         mock_llm.agenerate.return_value = make_fake_llm_response(
             content="", tool_calls=[{"id": "c1", "name": "strict_weather", "args": {}}]
         )
@@ -609,14 +614,67 @@ class TestExecutorToolCallRecovery:
         agent = Agent(name="stuck", llm=mock_llm, tool_registry=registry)
         ex = AgentExecutor(agent)
 
-        result, messages = await ex.run_with_messages(
-            [UserMessage(content="Weather in Paris?")]
-        )
+        for run in (
+            lambda: ex.run("Weather in Paris?"),
+            lambda: ex.run_with_messages([UserMessage(content="Weather in Paris?")]),
+        ):
+            mock_llm.agenerate.reset_mock()
+            with pytest.raises(AgentRecoveryExhausted) as caught:
+                await run()
 
-        assert mock_llm.agenerate.await_count == 2
-        assert any(
-            isinstance(m, UserMessage) and "invalid" in m.content for m in messages
+            assert mock_llm.agenerate.await_count == 2
+            first, retry = (
+                call.kwargs["prompt"].messages
+                for call in mock_llm.agenerate.call_args_list
+            )
+            assert not any("invalid" in str(m.content) for m in first)
+            assert any(
+                isinstance(m, UserMessage) and "invalid" in m.content for m in retry
+            )
+            assert caught.value.code == "agent_recovery_exhausted"
+            assert caught.value.last_message is not None
+            assert caught.value.last_message.tool_calls
+
+    @pytest.mark.asyncio
+    async def test_streamed_repeated_bad_calls_raise_without_the_failed_text(
+        self, mock_llm
+    ):
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
+            [
+                *make_text_stream_chunks(["draft "])[:-1],
+                *make_tool_call_stream_chunks(
+                    [{"id": "c1", "name": "strict_weather", "args": {}}]
+                ),
+            ]
         )
+        registry = ToolRegistry()
+        registry.register(_StrictWeatherTool())
+        ex = AgentExecutor(Agent(name="stuck", llm=mock_llm, tool_registry=registry))
+        events: list = []
+
+        with pytest.raises(AgentRecoveryExhausted):
+            async for event in ex.run_streaming("Weather in Paris?"):
+                events.append(event)
+
+        assert events == []
+        assert mock_llm.stream.call_count == 2
+
+    @pytest.mark.asyncio
+    async def test_the_schema_recovery_error_of_the_agent_propagates_unchanged(
+        self, mock_llm, recorded_spans
+    ):
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="not json")
+        agent = Agent(name="structured", llm=mock_llm, response_schema=_Answer)
+        ex = AgentExecutor(agent)
+
+        with pytest.raises(AgentRecoveryExhausted) as caught:
+            await ex.run("Hi")
+
+        assert caught.value.last_message is not None
+        assert caught.value.last_message.text == "not json"
+        assert mock_llm.agenerate.await_count == 2
+        span = _invoke_agent_span(recorded_spans)
+        assert span.attributes["agent.exit_reason"] == "recovery_exhausted"
 
     @pytest.mark.asyncio
     async def test_well_formed_calls_unaffected(self, mock_llm):
@@ -782,7 +840,8 @@ class TestExecutorLoopObservability:
         registry.register(_StrictWeatherTool())
         ex = AgentExecutor(Agent(name="test", llm=mock_llm, tool_registry=registry))
 
-        await ex.run("Weather?")
+        with pytest.raises(AgentRecoveryExhausted):
+            await ex.run("Weather?")
 
         span = _invoke_agent_span(recorded_spans)
         assert span.attributes["agent.exit_reason"] == "recovery_exhausted"

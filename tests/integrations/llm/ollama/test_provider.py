@@ -531,10 +531,11 @@ class TestOllamaLLMGenerate:
 
         provider = OllamaLLM()
         prompt = Prompt(messages=[UserMessage(content="Hi")])
-        with pytest.raises(ProviderError, match="LLM generation failed"):
+        with pytest.raises(ProviderError) as caught:
             await provider.agenerate(
                 prompt, config=OllamaGenerationConfig(model="llama3.2")
             )
+        assert caught.value.code == "provider_unavailable"
 
 
 class TestOllamaLLMStream:
