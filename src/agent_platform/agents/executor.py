@@ -7,6 +7,7 @@ from contextlib import contextmanager
 from agent_platform.agents.agent import Agent
 from agent_platform.agents.errors import AgentMaxIterations, AgentRecoveryExhausted
 from agent_platform.agents.tools.base import ToolStreamChunk
+from agent_platform.agents.tools.call_context import bind_idempotency_keys
 from agent_platform.agents.tools.registry import is_tool_validation_error
 from agent_platform.core.errors import RecoveryExhausted
 from agent_platform.core.interfaces.llm.structured import StructuredOutputError
@@ -41,17 +42,20 @@ def _call_signature(call: ToolCall) -> tuple[str, str]:
     return call.name, json.dumps(call.arguments, sort_keys=True, default=str)
 
 
-class _SucceededCalls:
-    """The tool calls of the last attempt that succeeded, for the corrective retry.
+class _PreviousAttempt:
+    """The tool calls of the attempt before the corrective retry.
 
     When the model re-emits a call with the same name and arguments after a
-    correction, its earlier result is reused instead of running the tool a
-    second time: a tool with a side effect must not run twice for one intent.
-    Each stored result is reused at most once.
+    correction, the retry must not look like a new intent to a tool with a
+    side effect: a call that succeeded has its result reused instead of
+    running again, and a call that failed runs again under the failed call's
+    idempotency key, so the tool can recognise work it may have started.
+    Each stored result and each failed call's key is used at most once.
     """
 
     def __init__(self) -> None:
         self._results: list[tuple[tuple[str, str], ToolMessage]] = []
+        self._failed: list[tuple[tuple[str, str], str]] = []
 
     def take(self, call: ToolCall) -> ToolMessage | None:
         """Return the stored result for `call`, re-labelled with its id.
@@ -71,14 +75,35 @@ class _SucceededCalls:
                 )
         return None
 
+    def keys_for(self, calls: list[ToolCall]) -> dict[str, str]:
+        """Map the id of each call in `calls` that repeats a failed call to
+        that failed call's id, the idempotency key it must run under."""
+        keys: dict[str, str] = {}
+        for call in calls:
+            if call.arguments_error is not None:
+                continue
+            signature = _call_signature(call)
+            for index, (failed_signature, failed_id) in enumerate(self._failed):
+                if failed_signature == signature:
+                    del self._failed[index]
+                    keys[call.id] = failed_id
+                    break
+        return keys
+
     def remember(
         self, assistant_msg: AssistantMessage, tool_messages: list[ToolMessage]
     ) -> None:
-        """Replace the stored results with the successes of the attempt just run."""
+        """Replace what is stored with the outcome of the attempt just run."""
+        pairs = list(zip(assistant_msg.tool_calls, tool_messages))
         self._results = [
             (_call_signature(call), message)
-            for call, message in zip(assistant_msg.tool_calls, tool_messages)
+            for call, message in pairs
             if not message.result.is_error
+        ]
+        self._failed = [
+            (_call_signature(call), call.id)
+            for call, message in pairs
+            if message.result.is_error and call.arguments_error is None
         ]
 
 
@@ -184,37 +209,39 @@ class AgentExecutor:
         return result
 
     async def _think_and_act(
-        self, messages: list[Message], succeeded: _SucceededCalls
+        self, messages: list[Message], previous: _PreviousAttempt
     ) -> _ThinkActResult:
         assistant_msg = await self._agent.think(messages)
         messages.append(assistant_msg)
         if not assistant_msg.tool_calls:
             return assistant_msg, []
-        tool_messages = await self._act(assistant_msg, succeeded)
+        tool_messages = await self._act(assistant_msg, previous)
         messages.extend(tool_messages)
-        succeeded.remember(assistant_msg, tool_messages)
+        previous.remember(assistant_msg, tool_messages)
         return assistant_msg, tool_messages
 
     async def _act(
-        self, assistant_msg: AssistantMessage, succeeded: _SucceededCalls
+        self, assistant_msg: AssistantMessage, previous: _PreviousAttempt
     ) -> list[ToolMessage]:
         """Run the calls of `assistant_msg`, except those that already succeeded
-        in the attempt before the corrective retry; results keep the call order."""
-        reused = [succeeded.take(call) for call in assistant_msg.tool_calls]
+        in the attempt before the corrective retry, repeated failed calls under
+        their earlier key; results keep the call order."""
+        reused = [previous.take(call) for call in assistant_msg.tool_calls]
         pending = [
             call
             for call, stored in zip(assistant_msg.tool_calls, reused)
             if stored is None
         ]
-        if len(pending) == len(reused):
-            return await self._agent.act(assistant_msg)
-        fresh = iter(
-            await self._agent.act(
-                assistant_msg.model_copy(update={"tool_calls": pending})
+        with bind_idempotency_keys(previous.keys_for(pending)):
+            if len(pending) == len(reused):
+                return await self._agent.act(assistant_msg)
+            fresh = iter(
+                await self._agent.act(
+                    assistant_msg.model_copy(update={"tool_calls": pending})
+                )
+                if pending
+                else []
             )
-            if pending
-            else []
-        )
         return [stored if stored is not None else next(fresh) for stored in reused]
 
     def _recovery_exhausted(
@@ -243,10 +270,10 @@ class AgentExecutor:
         ) as trace:
             for _ in range(self._max_iterations):
                 trace.start_iteration()
-                succeeded = _SucceededCalls()
+                previous = _PreviousAttempt()
                 try:
                     assistant_msg, tool_messages = await retry_once_on_invalid(
-                        attempt=lambda: self._think_and_act(messages, succeeded),
+                        attempt=lambda: self._think_and_act(messages, previous),
                         check=_tool_call_error,
                         correct=lambda error: self._correct_tool_call(messages, error),
                         on_retry=trace.on_retry,
@@ -276,7 +303,7 @@ class AgentExecutor:
         self,
         messages: list[Message],
         sink: list[ToolStreamChunk | str],
-        succeeded: _SucceededCalls,
+        previous: _PreviousAttempt,
     ) -> _ThinkActResult:
         assistant_msg, deltas = await self._agent.think_from_stream(messages)
         sink.extend(deltas)
@@ -287,7 +314,7 @@ class AgentExecutor:
 
         tool_messages: list[ToolMessage] = []
         for call in assistant_msg.tool_calls:
-            stored = succeeded.take(call)
+            stored = previous.take(call)
             if stored is not None:
                 sink.append(
                     ToolStreamChunk(
@@ -299,15 +326,18 @@ class AgentExecutor:
                 tool_messages.append(stored)
                 messages.append(stored)
                 continue
-            async for event in self._agent.act_stream(
-                assistant_msg.model_copy(update={"tool_calls": [call]})
-            ):
-                if isinstance(event, ToolMessage):
-                    tool_messages.append(event)
-                    messages.append(event)
-                else:
-                    sink.append(event)
-        succeeded.remember(assistant_msg, tool_messages)
+            # Bound here, in this coroutine, and not around a yield to the
+            # caller, so the reset runs in the context that set it.
+            with bind_idempotency_keys(previous.keys_for([call])):
+                async for event in self._agent.act_stream(
+                    assistant_msg.model_copy(update={"tool_calls": [call]})
+                ):
+                    if isinstance(event, ToolMessage):
+                        tool_messages.append(event)
+                        messages.append(event)
+                    else:
+                        sink.append(event)
+        previous.remember(assistant_msg, tool_messages)
         return assistant_msg, tool_messages
 
     async def run_streaming(
@@ -322,13 +352,13 @@ class AgentExecutor:
                 # Each attempt fills its own buffer, so only the attempt kept
                 # after the corrective retry reaches the client.
                 sink: list[ToolStreamChunk | str] = []
-                succeeded = _SucceededCalls()
+                previous = _PreviousAttempt()
                 trace.start_iteration()
 
                 async def attempt() -> _ThinkActResult:
                     nonlocal sink
                     sink = []
-                    return await self._stream_think_and_act(messages, sink, succeeded)
+                    return await self._stream_think_and_act(messages, sink, previous)
 
                 try:
                     assistant_msg, tool_messages = await retry_once_on_invalid(

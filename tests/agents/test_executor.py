@@ -9,6 +9,7 @@ from agent_platform.agents.errors import (
     AgentThinkError,
 )
 from agent_platform.agents.executor import AgentExecutor
+from agent_platform.agents.tools import current_tool_call
 from agent_platform.agents.tools.base import Tool, ToolStreamChunk
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.core.interfaces.llm.structured import StructuredOutputError
@@ -967,6 +968,170 @@ class TestExecutorCorrectiveRetryReuse:
         span = _invoke_agent_span(recorded_spans)
         assert span.attributes["agent.tool_calls_requested"] == 2
         assert span.attributes["agent.tool_calls_executed"] == 2
+
+
+class _KeyedTool(Tool):
+    """Records the idempotency key of each run; its first `failures` runs raise."""
+
+    name = "keyed"
+    description = "Records its idempotency key"
+    input_schema = BaseModel
+
+    def __init__(self, failures: int = 1) -> None:
+        self.keys: list[str | None] = []
+        self._failures = failures
+
+    async def run(self, **kwargs):
+        context = current_tool_call()
+        self.keys.append(context.idempotency_key if context else None)
+        if len(self.keys) <= self._failures:
+            raise RuntimeError("timed out after the side effect started")
+        return "ok"
+
+
+def _keyed_registry(failures: int = 1) -> tuple[ToolRegistry, _KeyedTool]:
+    keyed = _KeyedTool(failures)
+    registry, _ = _recovery_registry()
+    registry.register(keyed)
+    return registry, keyed
+
+
+_KEYED_CALL = {"name": "keyed", "args": {"to": "bob"}}
+_CORRECTED_CALL = {**_INVALID_CALL, "args": {"location": "Paris"}}
+
+
+class TestExecutorCorrectiveRetryKeys:
+    @pytest.mark.asyncio
+    async def test_a_failed_call_reemitted_unchanged_keeps_its_first_key(
+        self, mock_llm
+    ):
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "a1", **_KEYED_CALL}, {"id": "a2", **_INVALID_CALL}],
+            ),
+            make_fake_llm_response(
+                content="",
+                tool_calls=[
+                    {"id": "b1", **_KEYED_CALL},
+                    {"id": "b2", **_CORRECTED_CALL},
+                ],
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, keyed = _keyed_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        answer, history = await ex.run_with_messages([UserMessage(content="go")])
+
+        assert answer == "done"
+        assert keyed.keys == ["a1", "a1"]
+        retried = [
+            m.result
+            for m in history
+            if m.role == "tool" and m.result.name == "keyed" and not m.result.is_error
+        ]
+        assert [r.tool_call_id for r in retried] == ["b1"]
+        assert current_tool_call() is None
+
+    @pytest.mark.asyncio
+    async def test_streaming_keeps_the_first_key_of_a_failed_call(self, mock_llm):
+        attempts = [
+            make_tool_call_stream_chunks(
+                [{"id": "a1", **_KEYED_CALL}, {"id": "a2", **_INVALID_CALL}]
+            ),
+            make_tool_call_stream_chunks(
+                [{"id": "b1", **_KEYED_CALL}, {"id": "b2", **_CORRECTED_CALL}]
+            ),
+            make_text_stream_chunks(["done"]),
+        ]
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(attempts.pop(0))
+        registry, keyed = _keyed_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        events = [e async for e in ex.run_streaming("go")]
+
+        assert events[-1] == "done"
+        assert keyed.keys == ["a1", "a1"]
+        finals = [e for e in events if isinstance(e, ToolStreamChunk) and e.is_final]
+        assert "b1" in [f.tool_call_id for f in finals]
+        assert current_tool_call() is None
+
+    @pytest.mark.asyncio
+    async def test_a_changed_or_new_call_gets_its_own_key(self, mock_llm):
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "a1", **_KEYED_CALL}, {"id": "a2", **_INVALID_CALL}],
+            ),
+            make_fake_llm_response(
+                content="",
+                tool_calls=[
+                    {"id": "b1", "name": "keyed", "args": {"to": "alice"}},
+                    {"id": "b2", **_CORRECTED_CALL},
+                    {"id": "b3", "name": "keyed", "args": {"to": "carol"}},
+                ],
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, keyed = _keyed_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        await ex.run("go")
+
+        assert keyed.keys[0] == "a1"
+        assert sorted(keyed.keys[1:]) == ["b1", "b3"]
+
+    @pytest.mark.asyncio
+    async def test_identical_failed_calls_map_one_to_one_to_their_keys(self, mock_llm):
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[
+                    {"id": "a1", **_KEYED_CALL},
+                    {"id": "a2", **_KEYED_CALL},
+                    {"id": "a3", **_INVALID_CALL},
+                ],
+            ),
+            make_fake_llm_response(
+                content="",
+                tool_calls=[
+                    {"id": "b1", **_KEYED_CALL},
+                    {"id": "b2", **_KEYED_CALL},
+                    {"id": "b3", **_CORRECTED_CALL},
+                ],
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, keyed = _keyed_registry(failures=2)
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        await ex.run("go")
+
+        assert sorted(keyed.keys[:2]) == ["a1", "a2"]
+        assert sorted(keyed.keys[2:]) == ["a1", "a2"]
+
+    @pytest.mark.asyncio
+    async def test_outside_the_corrective_retry_keys_are_the_call_ids(self, mock_llm):
+        responses = [
+            make_fake_llm_response(
+                content="", tool_calls=[{"id": "a1", **_KEYED_CALL}]
+            ),
+            make_fake_llm_response(
+                content="", tool_calls=[{"id": "c1", **_KEYED_CALL}]
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, keyed = _keyed_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        await ex.run("go")
+
+        assert keyed.keys == ["a1", "c1"]
 
 
 class TestAssembleToolCalls:

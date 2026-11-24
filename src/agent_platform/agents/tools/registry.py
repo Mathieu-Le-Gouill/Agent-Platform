@@ -12,7 +12,11 @@ from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
 from agent_platform.agents.tools.base import Tool, ToolStreamChunk
-from agent_platform.agents.tools.call_context import ToolCallContext, bind_tool_call
+from agent_platform.agents.tools.call_context import (
+    ToolCallContext,
+    bind_tool_call,
+    idempotency_key_for,
+)
 from agent_platform.agents.tools.errors import (
     ToolCallValidationError,
     ToolNotFoundError,
@@ -71,7 +75,9 @@ def _serialize_result(raw: Any, max_chars: int | None) -> str:
 
 
 def _call_context(call: ToolCall) -> ToolCallContext:
-    return ToolCallContext(tool_name=call.name, idempotency_key=call.id)
+    return ToolCallContext(
+        tool_name=call.name, idempotency_key=idempotency_key_for(call.id)
+    )
 
 
 async def _astream_in_call_context(tool: Tool, call: ToolCall) -> AsyncIterator[str]:
