@@ -267,6 +267,23 @@ above landed.
   `AgentExecutor`, not `ConversationAgent`): it does not read from or append
   to a `ConversationAgent`'s persistent history the way `/chat` does.
 
+## Idempotent Tools and Partial History
+
+A tool that has a side effect (sends an email, writes a record, starts a billed job) must be idempotent on `current_tool_call().idempotency_key`. `ToolRegistry` sets `ToolCallContext(tool_name, idempotency_key)` (`tools/call_context.py`, exported from `agents.tools`) around `tool.run` and around each advance of `tool.astream`; `current_tool_call()` returns it, or `None` outside a registry call.
+
+```python
+async def run(self, **kwargs: Any) -> Any:
+    ctx = current_tool_call()
+    key = ctx.idempotency_key if ctx else None
+    return await safe_call(self._backend.send, MyInput(**kwargs), idempotency_key=key)
+```
+
+- Inside an agent the key is the model's call id. It is the same for the call in the corrective retry of a round, but not across a workflow resume of an `agent_node`: the model is asked again and issues new call ids.
+- Inside a workflow `tool_node` the key is `run_id:node:step[:branch]:n` and survives `resume` (see `workflows/README.md`). `run_id` must be unique per run, or two runs share keys.
+- Corrective retry: when a malformed tool call triggers the one corrective retry, a retried call with the same name and canonical-JSON arguments as a call that succeeded (`is_error=False`) in the failed attempt reuses that result under its new call id instead of running again. Each stored result is reused at most once; tool messages keep the assistant message's call order; `run_streaming` emits one final chunk for a reused call.
+- Partial history: `AgentExecutor.run_in_place(messages, *, conversation_id=None)` appends the turn's messages to the given list as they happen (`run_with_messages` still works on a copy). When `ConversationAgent.chat` fails, history keeps the completed tool calls and their results, drops a trailing assistant message whose tool calls have no results, saves that history to the checkpointer (a save failure is logged, not raised) and re-raises the original error. On cancellation it only drops the dangling message and re-raises. A caller that resent the same message after a failed `chat` and relied on a clean history now sees the earlier user message and tool results; the next user message follows a tool message.
+- `safe_call`/`safe_stream` set `ToolError.retryable` from a `PlatformError` cause, else `False`.
+
 ## Adding a New Tool
 
 1. Create `agents/tools/<name>.py`
@@ -274,6 +291,7 @@ above landed.
 3. Implement the `Tool` protocol: set `name`, `description`, `input_schema`; implement `async run(**kwargs) -> Any`
 4. Wrap provider calls with `safe_call()` from `safe_execution.py` so errors surface as `ToolError`
 5. Register with `ToolRegistry` at construction time
+6. If the tool has a side effect, make it idempotent on `current_tool_call().idempotency_key` (see above)
 
 ```python
 class MyTool:
