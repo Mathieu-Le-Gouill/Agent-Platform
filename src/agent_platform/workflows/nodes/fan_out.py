@@ -5,7 +5,7 @@ from collections.abc import Callable, Sequence
 from typing import TypeVar
 
 from agent_platform.core.observability import WorkflowNode, observe
-from agent_platform.workflows.graph import NodeFn
+from agent_platform.workflows.graph import NodeFn, bind_step, current_step
 from agent_platform.workflows.state import WorkflowState
 
 __all__ = ["fan_out"]
@@ -28,9 +28,16 @@ def fan_out(
     """
 
     async def node(state: StateT) -> StateT:
+        parent = current_step()
+
         async def run_branch(name: str, branch: NodeFn[StateT]) -> StateT:
             with observe(WorkflowNode(node=name)):
-                return await branch(state)
+                if parent is None:
+                    return await branch(state)
+                # A context of its own per branch: the branches share this
+                # node's run and step, so the name tells their tool calls apart.
+                with bind_step(parent.for_branch(name)):
+                    return await branch(state)
 
         results = await asyncio.gather(
             *(run_branch(name, branch) for name, branch in branches)

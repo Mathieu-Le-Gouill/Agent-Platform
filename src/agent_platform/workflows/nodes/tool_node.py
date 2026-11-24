@@ -7,7 +7,7 @@ from uuid import uuid4
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.core.schemas.message import ToolCall, ToolMessage
-from agent_platform.workflows.graph import NodeFn
+from agent_platform.workflows.graph import NodeFn, current_step
 from agent_platform.workflows.state import WorkflowState
 
 __all__ = ["tool_node"]
@@ -30,12 +30,20 @@ def tool_node(
     validation/timeout/error-wrapping (`resolve_call`/`call_and_wrap`) a tool
     gets inside `Agent.act()` applies here too, instead of calling
     `tool.run()` directly and re-implementing that handling.
+
+    When the run has a `run_id`, the call id (the tool's idempotency key) is
+    `run_id:node:step[:branch]:n`, the same on `resume`, so a tool can skip work
+    a crashed run already did. Without one it is random.
     """
     registry = ToolRegistry(max_result_chars=None)
     registry.register(tool)
 
     async def node(state: StateT) -> StateT:
-        call = ToolCall(id=str(uuid4()), name=tool.name, arguments=input_fn(state))
+        step = current_step()
+        call_id = (step.next_tool_call_id() if step is not None else None) or str(
+            uuid4()
+        )
+        call = ToolCall(id=call_id, name=tool.name, arguments=input_fn(state))
         message = await registry.call_and_wrap(call)
         return output_fn(state, message)
 

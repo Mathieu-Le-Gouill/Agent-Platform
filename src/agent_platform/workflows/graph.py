@@ -1,6 +1,9 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Awaitable, Callable
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
+from contextlib import contextmanager
+from contextvars import ContextVar
+from dataclasses import dataclass, field
 from typing import Generic, TypeVar
 
 from agent_platform.core.observability import WorkflowNode, observe
@@ -15,11 +18,73 @@ __all__ = [
     "END",
     "NodeFn",
     "Router",
+    "StepContext",
     "WorkflowGraph",
     "CompiledWorkflow",
+    "bind_step",
+    "current_step",
 ]
 
 StateT = TypeVar("StateT", bound=WorkflowState)
+
+
+@dataclass
+class StepContext:
+    """Where a running node sits in its run, for naming the tool calls it makes.
+
+    `run_id`, `node` and `step` are the same on a first run and on `resume`,
+    and the call counter restarts with each node run, so a node that is re-run
+    after a crash builds the same call ids in the same order. `branch` is set
+    inside a `fan_out`, so concurrent branches calling the same tool get
+    different ids. Each branch has its own context, and so its own counter.
+    """
+
+    run_id: str | None
+    node: str
+    step: int
+    branch: str | None = None
+    _calls: int = field(default=0, repr=False)
+
+    def next_tool_call_id(self) -> str | None:
+        """Return the id for the next tool call of this node run.
+
+        `None` when the run has no `run_id`: the caller then picks a random id.
+        """
+        if self.run_id is None:
+            return None
+        self._calls += 1
+        parts = [self.run_id, self.node, str(self.step)]
+        if self.branch is not None:
+            parts.append(self.branch)
+        parts.append(str(self._calls))
+        return ":".join(parts)
+
+    def for_branch(self, name: str) -> StepContext:
+        """Return a fresh context for one `fan_out` branch, named after `name`
+        (appended to the enclosing branch when fan-outs nest)."""
+        branch = name if self.branch is None else f"{self.branch}:{name}"
+        return StepContext(self.run_id, self.node, self.step, branch)
+
+
+_current_step: ContextVar[StepContext | None] = ContextVar(
+    "current_workflow_step", default=None
+)
+
+
+def current_step() -> StepContext | None:
+    """Return the context of the node being run, or `None` outside a run."""
+    return _current_step.get()
+
+
+@contextmanager
+def bind_step(context: StepContext) -> Iterator[None]:
+    """Make `context` the current step for the duration of the block."""
+    token = _current_step.set(context)
+    try:
+        yield
+    finally:
+        _current_step.reset(token)
+
 
 #: Sentinel edge target marking the end of a run. Not a real node name, so it
 #: can never collide with one (`WorkflowGraph.add_node` rejects it).
@@ -184,6 +249,10 @@ class CompiledWorkflow(Generic[StateT]):
         If `checkpointer` is given, `run_id` must be too: the state (and
         which node runs next) is saved after each step, keyed by `run_id`, so
         `resume(run_id, checkpointer)` can continue an interrupted run.
+
+        `run_id` must be unique per run: it seeds the idempotency key of each
+        `tool_node` call (see `StepContext`), so two runs sharing one would
+        share keys and a tool would treat the second run's call as a repeat.
         """
         if checkpointer is not None and run_id is None:
             raise WorkflowExecutionError("run_id is required when checkpointer is set")
@@ -241,7 +310,10 @@ class CompiledWorkflow(Generic[StateT]):
 
             node_fn = self._nodes[current]
             with observe(WorkflowNode(node=current, step=steps)) as node:
-                state = await node_fn(state)
+                # Bound only around the node call, so the consumer of this
+                # generator never sees it between two nodes.
+                with bind_step(StepContext(run_id, current, steps)):
+                    state = await node_fn(state)
                 # Resolved inside the span so the trace shows where the run
                 # went next, and which branch a router chose to send it there.
                 next_node, route = self._next_node(current, state)
