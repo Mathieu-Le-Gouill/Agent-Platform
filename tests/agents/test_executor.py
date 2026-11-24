@@ -1191,6 +1191,93 @@ class TestExecutorCorrectiveRetryKeys:
         assert sorted(keyed.keys[2:]) == ["a1", "a2"]
 
     @pytest.mark.asyncio
+    async def test_a_new_call_owning_the_failed_id_does_not_share_its_key(
+        self, mock_llm
+    ):
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "a1", **_KEYED_CALL}, {"id": "a2", **_INVALID_CALL}],
+            ),
+            make_fake_llm_response(
+                content="",
+                tool_calls=[
+                    {"id": "a1", "name": "keyed", "args": {"to": "carol"}},
+                    {"id": "b2", **_KEYED_CALL},
+                    {"id": "b3", **_CORRECTED_CALL},
+                ],
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, keyed = _keyed_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        assert await ex.run("go") == "done"
+
+        assert sorted(keyed.keys[1:]) == ["a1", "b2"]
+
+    @pytest.mark.asyncio
+    async def test_streaming_a_new_call_owning_the_failed_id_does_not_share_its_key(
+        self, mock_llm
+    ):
+        attempts = [
+            make_tool_call_stream_chunks(
+                [{"id": "a1", **_KEYED_CALL}, {"id": "a2", **_INVALID_CALL}]
+            ),
+            make_tool_call_stream_chunks(
+                [
+                    {"id": "a1", "name": "keyed", "args": {"to": "carol"}},
+                    {"id": "b2", **_KEYED_CALL},
+                    {"id": "b3", **_CORRECTED_CALL},
+                ]
+            ),
+            make_text_stream_chunks(["done"]),
+        ]
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(attempts.pop(0))
+        registry, keyed = _keyed_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        events = [e async for e in ex.run_streaming("go")]
+
+        assert events[-1] == "done"
+        assert keyed.keys[1:] == ["a1", "b2"]
+
+    @pytest.mark.asyncio
+    async def test_a_malformed_call_leaves_no_key_for_the_retry(self, mock_llm):
+        from agent_platform.core.interfaces.llm.response import (
+            FinishReason,
+            StreamChunk,
+            ToolCallDelta,
+        )
+
+        first = [
+            StreamChunk(
+                delta="",
+                tool_call_deltas=[
+                    ToolCallDelta(
+                        index=0, id="a1", name="keyed", arguments_delta="{not json"
+                    ),
+                    ToolCallDelta(index=1, id="a2", name="keyed", arguments_delta="{}"),
+                ],
+            ),
+            StreamChunk(delta="", finish_reason=FinishReason.TOOL_CALL),
+        ]
+        attempts = [
+            first,
+            make_tool_call_stream_chunks([{"id": "b1", "name": "keyed", "args": {}}]),
+            make_text_stream_chunks(["done"]),
+        ]
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(attempts.pop(0))
+        registry, keyed = _keyed_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        events = [e async for e in ex.run_streaming("go")]
+
+        assert events[-1] == "done"
+        assert keyed.keys == ["a2", "a2"]
+
+    @pytest.mark.asyncio
     async def test_outside_the_corrective_retry_keys_are_the_call_ids(self, mock_llm):
         responses = [
             make_fake_llm_response(

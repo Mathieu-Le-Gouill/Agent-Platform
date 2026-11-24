@@ -16,7 +16,9 @@ class ToolCallContext:
     `idempotency_key` identifies one tool call. Inside an agent it is the id the
     model gave the call; when the corrective retry re-emits a call that failed,
     unchanged, the retried call keeps the failed call's key (a call that
-    succeeded is not run again, and a changed or new call gets its own id).
+    succeeded is not run again, and a changed or new call gets its own id; when
+    the failed call's id is the own id of another call in the retry, the
+    retried call gets its own id too, so no two calls share a key).
     Under a workflow `tool_node` it is built from the run, node and step, so a
     resumed run keeps it; a resumed `agent_node` still gets new keys. A tool with a side effect deduplicates on it.
     """

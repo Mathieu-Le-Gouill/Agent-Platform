@@ -77,7 +77,13 @@ class _PreviousAttempt:
 
     def keys_for(self, calls: list[ToolCall]) -> dict[str, str]:
         """Map the id of each call in `calls` that repeats a failed call to
-        that failed call's id, the idempotency key it must run under."""
+        that failed call's id, the idempotency key it must run under.
+
+        A failed id that is also the own id of a call in `calls` is not
+        bound: two calls would then share one key, and a tool deduplicating
+        on it would skip one. The repeating call keeps its own id instead.
+        """
+        own_ids = {call.id for call in calls}
         keys: dict[str, str] = {}
         for call in calls:
             if call.arguments_error is not None:
@@ -86,7 +92,8 @@ class _PreviousAttempt:
             for index, (failed_signature, failed_id) in enumerate(self._failed):
                 if failed_signature == signature:
                     del self._failed[index]
-                    keys[call.id] = failed_id
+                    if failed_id not in own_ids:
+                        keys[call.id] = failed_id
                     break
         return keys
 
@@ -312,9 +319,18 @@ class AgentExecutor:
         if not assistant_msg.tool_calls:
             return assistant_msg, []
 
+        reused = [previous.take(call) for call in assistant_msg.tool_calls]
+        # Computed over all the calls that will run, so a failed call's key
+        # is never also the own id of another one of them.
+        keys = previous.keys_for(
+            [
+                call
+                for call, stored in zip(assistant_msg.tool_calls, reused)
+                if stored is None
+            ]
+        )
         tool_messages: list[ToolMessage] = []
-        for call in assistant_msg.tool_calls:
-            stored = previous.take(call)
+        for call, stored in zip(assistant_msg.tool_calls, reused):
             if stored is not None:
                 sink.append(
                     ToolStreamChunk(
@@ -328,7 +344,7 @@ class AgentExecutor:
                 continue
             # Bound here, in this coroutine, and not around a yield to the
             # caller, so the reset runs in the context that set it.
-            with bind_idempotency_keys(previous.keys_for([call])):
+            with bind_idempotency_keys(keys):
                 async for event in self._agent.act_stream(
                     assistant_msg.model_copy(update={"tool_calls": [call]})
                 ):
