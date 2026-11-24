@@ -1,3 +1,4 @@
+import asyncio
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -6,6 +7,7 @@ from pydantic import BaseModel
 
 from agent_platform.agents.context import TurnCountStrategy
 from agent_platform.agents.conversation import ConversationAgent
+from agent_platform.agents.errors import AgentMaxIterations, AgentThinkError
 from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.registry import ToolRegistry
 from agent_platform.core.persistence import InMemoryCheckpointer
@@ -552,3 +554,120 @@ class TestConversationTracing:
 
         (span,) = recorded_spans.get_finished_spans()
         assert span.attributes["conversation.id"] == str(agent.conversation_id)
+
+
+class _HangingTool(Tool):
+    name = "hang"
+    description = "Never returns"
+    input_schema = BaseModel
+
+    def __init__(self) -> None:
+        self.started = asyncio.Event()
+
+    async def run(self, **kwargs):
+        self.started.set()
+        await asyncio.Event().wait()
+
+
+def _tool_call_response(call_id: str = "c1", name: str = "echo"):
+    return make_fake_llm_response(
+        content="",
+        tool_calls=[{"id": call_id, "name": name, "args": {"text": "hello"}}],
+    )
+
+
+def _roles(messages) -> list[str]:
+    return [str(m.role) for m in messages]
+
+
+class TestConversationFailedTurn:
+    @pytest.mark.asyncio
+    async def test_an_llm_error_keeps_the_completed_tool_round(
+        self, mock_llm, registry
+    ):
+        responses = [_tool_call_response(), RuntimeError("boom")]
+
+        async def gen(**kwargs):
+            response = responses.pop(0)
+            if isinstance(response, Exception):
+                raise response
+            return response
+
+        mock_llm.agenerate.side_effect = gen
+        checkpointer = InMemoryCheckpointer()
+        agent = ConversationAgent(
+            name="conv",
+            llm=mock_llm,
+            tool_registry=registry,
+            checkpointer=checkpointer,
+        )
+
+        with pytest.raises(AgentThinkError):
+            await agent.chat("Say hello")
+
+        expected = ["user", "assistant", "tool"]
+        assert _roles(agent.history) == expected
+        saved = await checkpointer.load(str(agent.conversation_id))
+        assert _roles(saved) == expected
+
+        mock_llm.agenerate.side_effect = None
+        mock_llm.agenerate.return_value = make_fake_llm_response(content="fine")
+        await agent.chat("Again")
+
+        sent = mock_llm.agenerate.call_args.kwargs["prompt"].messages
+        assert _roles(sent) == ["user", "assistant", "tool", "user"]
+
+    @pytest.mark.asyncio
+    async def test_max_iterations_keeps_the_tool_rounds(self, mock_llm, registry):
+        mock_llm.agenerate.side_effect = lambda **kw: _tool_call_response()
+        checkpointer = InMemoryCheckpointer()
+        agent = ConversationAgent(
+            name="conv",
+            llm=mock_llm,
+            tool_registry=registry,
+            max_iterations=1,
+            checkpointer=checkpointer,
+        )
+
+        with pytest.raises(AgentMaxIterations):
+            await agent.chat("Loop")
+
+        expected = ["user", "assistant", "tool"]
+        assert _roles(agent.history) == expected
+        saved = await checkpointer.load(str(agent.conversation_id))
+        assert _roles(saved) == expected
+
+    @pytest.mark.asyncio
+    async def test_a_cancelled_act_leaves_no_tool_call_without_results(self, mock_llm):
+        hanging = _HangingTool()
+        registry = ToolRegistry()
+        registry.register(hanging)
+        mock_llm.agenerate.side_effect = lambda **kw: _tool_call_response(name="hang")
+        checkpointer = InMemoryCheckpointer()
+        agent = ConversationAgent(
+            name="conv",
+            llm=mock_llm,
+            tool_registry=registry,
+            checkpointer=checkpointer,
+        )
+
+        task = asyncio.create_task(agent.chat("Wait"))
+        await asyncio.wait_for(hanging.started.wait(), timeout=1)
+        task.cancel()
+        with pytest.raises(asyncio.CancelledError):
+            await task
+
+        assert _roles(agent.history) == ["user"]
+        assert await checkpointer.load(str(agent.conversation_id)) is None
+
+    @pytest.mark.asyncio
+    async def test_a_failing_save_does_not_replace_the_original_error(self, mock_llm):
+        mock_llm.agenerate.side_effect = RuntimeError("boom")
+        checkpointer = MagicMock()
+        checkpointer.save = AsyncMock(side_effect=OSError("disk full"))
+        agent = ConversationAgent(name="conv", llm=mock_llm, checkpointer=checkpointer)
+
+        with pytest.raises(AgentThinkError):
+            await agent.chat("Hi")
+
+        checkpointer.save.assert_awaited_once()

@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import asyncio
+import logging
 from uuid import UUID, uuid4
 
 from agent_platform.agents.agent import Agent
@@ -11,10 +13,22 @@ from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.persistence import Checkpointer
 from agent_platform.core.schemas.message import (
+    AssistantMessage,
     Message,
     UserMessage,
 )
 from agent_platform.core.token_usage import TokenUsageAggregator
+
+_logger = logging.getLogger(__name__)
+
+
+def _without_dangling_tool_call(messages: list[Message]) -> list[Message]:
+    """Return `messages` without a trailing assistant message that asks for
+    tool calls: being last, its calls have no results."""
+    if messages and isinstance(messages[-1], AssistantMessage):
+        if messages[-1].tool_calls:
+            return messages[:-1]
+    return messages
 
 
 class ConversationAgent(Agent):
@@ -76,12 +90,30 @@ class ConversationAgent(Agent):
         self._history.append(UserMessage(content=content))
 
     async def chat(self, user_input: str) -> str:
+        """Answer `user_input` and keep the turn in the history.
+
+        When the turn fails, the tool calls that already ran stay in the
+        history, with their results, so sending the message again does not
+        run them again. A tool call whose results never arrived is dropped,
+        since a provider rejects a call without a result. The original error
+        still propagates.
+        """
         self.add_user_message(user_input)
 
-        result, accumulated = await self._executor.run_with_messages(
-            list(self._history), conversation_id=str(self._conversation_id)
-        )
-        self._history = accumulated
+        working = list(self._history)
+        try:
+            result = await self._executor.run_in_place(
+                working, conversation_id=str(self._conversation_id)
+            )
+        except asyncio.CancelledError:
+            self._history = _without_dangling_tool_call(working)
+            raise
+        except Exception:
+            self._history = _without_dangling_tool_call(working)
+            await self._persist_after_failure()
+            raise
+
+        self._history = working
         await self._truncate_history()
 
         if self._checkpointer is not None:
@@ -90,6 +122,21 @@ class ConversationAgent(Agent):
             )
 
         return result
+
+    async def _persist_after_failure(self) -> None:
+        """Trim and save the history of a failed turn; a failure here is logged
+        so it never replaces the error the turn failed with."""
+        try:
+            await self._truncate_history()
+            if self._checkpointer is not None:
+                await self._checkpointer.save(
+                    str(self._conversation_id), list(self._history)
+                )
+        except Exception:
+            _logger.exception(
+                "Could not save the history of failed conversation '%s'",
+                self._conversation_id,
+            )
 
     async def _truncate_history(self) -> None:
         if self._context_strategy is None:

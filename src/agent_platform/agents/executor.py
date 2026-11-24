@@ -165,6 +165,18 @@ class AgentExecutor:
     ) -> tuple[str, list[Message]]:
         return await self._execute(list(messages), conversation_id=conversation_id)
 
+    async def run_in_place(
+        self, messages: list[Message], *, conversation_id: str | None = None
+    ) -> str:
+        """Run the loop on `messages` itself and return the final answer text.
+
+        Each message of the turn is appended to `messages` as it happens and
+        stays there when the loop raises, so a caller can keep the tool calls
+        that already ran.
+        """
+        result, _ = await self._execute(messages, conversation_id=conversation_id)
+        return result
+
     async def _think_and_act(
         self, messages: list[Message], succeeded: _SucceededCalls
     ) -> _ThinkActResult:
