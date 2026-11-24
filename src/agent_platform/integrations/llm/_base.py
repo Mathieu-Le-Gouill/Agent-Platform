@@ -4,8 +4,6 @@ import logging
 from abc import abstractmethod
 from collections.abc import AsyncIterator, Mapping
 from contextlib import AbstractContextManager
-from datetime import UTC, datetime
-from email.utils import parsedate_to_datetime
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
 
@@ -30,6 +28,7 @@ from agent_platform.core.observability import LLMCall, observe
 from agent_platform.core.retry import retry_async, retry_sync
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
+from agent_platform.integrations.sdk_errors import is_transient_status
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
@@ -41,41 +40,10 @@ _logger = logging.getLogger(__name__)
 # platform retry would otherwise wait on it forever.
 DEFAULT_LLM_TIMEOUT_SECONDS = 120.0
 
-_TRANSIENT_STATUS_CODES = frozenset({408, 409, 429})
-
-
 # Error kinds a vendor reports inside a stream that is already open (HTTP 200),
 # where no status code is left to classify the failure by.
 _TRANSIENT_ERROR_KINDS = frozenset({"overloaded_error", "api_error", "server_error"})
 _RATE_LIMIT_ERROR_KINDS = frozenset({"rate_limit_error"})
-
-
-def is_transient_status(status_code: int | None) -> bool:
-    """Whether an HTTP status marks a temporary failure: a timeout, a conflict, a rate limit or a server error."""
-    return status_code is not None and (
-        status_code in _TRANSIENT_STATUS_CODES or status_code >= 500
-    )
-
-
-def parse_retry_after(value: str | None) -> float | None:
-    """Return the seconds a `Retry-After` header value asks to wait.
-
-    The value is a number of seconds or an HTTP date (RFC 9110 section 10.2.3);
-    a date in the past gives `0.0`. Returns `None` when `value` is missing or
-    is neither form.
-    """
-    if value is None:
-        return None
-    text = value.strip()
-    if text.isascii() and text.isdigit():
-        return float(text)
-    try:
-        when = parsedate_to_datetime(text)
-    except (TypeError, ValueError):
-        return None
-    if when.tzinfo is None:
-        when = when.replace(tzinfo=UTC)
-    return max(0.0, (when - datetime.now(UTC)).total_seconds())
 
 
 # The async client (e.g. `AsyncOpenAI`), used by `agenerate`/`_invoke_async`.

@@ -130,15 +130,38 @@ def with_retry(
     base_delay: float = 0.5,
     max_delay: float = 8.0,
     retry_on: tuple[type[Exception], ...] = (Exception,),
+    translate: Callable[[Exception], Exception] | None = None,
 ) -> Callable[[_AsyncFunc], _AsyncFunc]:
+    """Retry the decorated coroutine function as `retry_async` does.
+
+    With `translate`, each failed attempt's exception is translated first, so
+    the retry decision reads the translated error (for example a `PlatformError`
+    with `retryable=False` stops at once). A new error is raised `from` the
+    original; one `translate` returns unchanged is re-raised as it is.
+    `asyncio.CancelledError` is never translated.
+    """
+
     def decorate(func: _AsyncFunc) -> _AsyncFunc:
         @functools.wraps(func)
         async def wrapper(*args: Any, **kwargs: Any) -> Any:
+            call = functools.partial(func, *args, **kwargs)
+            if translate is not None:
+
+                async def call_translated() -> Any:
+                    try:
+                        return await call()
+                    except Exception as exc:
+                        translated = translate(exc)
+                        if translated is exc:
+                            raise
+                        raise translated from exc
+
+                run: Callable[[], Coroutine[Any, Any, Any]] = call_translated
+            else:
+                run = call
             # Carries the decorated function's module and name, which the
             # retry log lines use.
-            attempt_once = functools.update_wrapper(
-                functools.partial(func, *args, **kwargs), func
-            )
+            attempt_once = functools.update_wrapper(run, func)
             return await retry_async(
                 attempt_once,
                 max_attempts=max_attempts,

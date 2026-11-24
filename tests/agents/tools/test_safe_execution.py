@@ -3,6 +3,7 @@ from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.agents.tools.safe_execution import safe_call, safe_stream
+from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas import model_schema
 
 # ---------------------------------------------------------------------------
@@ -42,6 +43,50 @@ class TestSafeCall:
 
         with pytest.raises(ToolError, match="Provider execution failed"):
             await safe_call(raises())
+
+
+class TestRetryableFromCause:
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("retryable", [True, False])
+    async def test_safe_call_keeps_platform_cause_retryable(self, retryable):
+        async def raises():
+            raise ProviderError("cause", retryable=retryable)
+
+        with pytest.raises(ToolError) as info:
+            await safe_call(raises())
+        assert info.value.retryable is retryable
+
+    @pytest.mark.asyncio
+    async def test_safe_call_non_platform_cause_not_retryable(self):
+        async def raises():
+            raise ValueError("bug")
+
+        with pytest.raises(ToolError) as info:
+            await safe_call(raises())
+        assert info.value.retryable is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize("retryable", [True, False])
+    async def test_safe_stream_keeps_platform_cause_retryable(self, retryable):
+        async def gen():
+            raise ProviderError("cause", retryable=retryable)
+            yield  # pragma: no cover
+
+        with pytest.raises(ToolError) as info:
+            async for _ in safe_stream(gen()):
+                pass
+        assert info.value.retryable is retryable
+
+    @pytest.mark.asyncio
+    async def test_safe_stream_non_platform_cause_not_retryable(self):
+        async def gen():
+            raise ValueError("bug")
+            yield  # pragma: no cover
+
+        with pytest.raises(ToolError) as info:
+            async for _ in safe_stream(gen()):
+                pass
+        assert info.value.retryable is False
 
 
 class TestSafeStream:

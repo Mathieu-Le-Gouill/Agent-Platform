@@ -36,11 +36,13 @@ from agent_platform.integrations.credentials import (
 from agent_platform.integrations.llm._base import (
     DEFAULT_LLM_TIMEOUT_SECONDS,
     NativeLLMProvider,
-    is_transient_status,
-    parse_retry_after,
 )
 from agent_platform.integrations.llm.anthropic.provider import AnthropicLLM
 from agent_platform.integrations.llm.openai.provider import OpenAILLM
+from agent_platform.integrations.sdk_errors import (
+    is_transient_status,
+    parse_retry_after,
+)
 from tests.helpers import make_fake_llm_response
 
 _BASE_LOGGER = "agent_platform.integrations.llm._base"

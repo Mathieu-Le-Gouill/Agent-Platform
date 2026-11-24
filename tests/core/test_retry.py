@@ -87,6 +87,73 @@ class TestWithRetry:
         assert calls["n"] == 3
 
 
+def _translate_by_message(exc: Exception) -> Exception:
+    if isinstance(exc, ProviderError):
+        return exc
+    return ProviderError(str(exc), retryable=str(exc) == "transient")
+
+
+class TestWithRetryTranslate:
+    @pytest.mark.asyncio
+    async def test_a_permanent_translation_stops_at_once(self):
+        calls = {"n": 0}
+
+        @with_retry(max_attempts=3, base_delay=0.001, translate=_translate_by_message)
+        async def fails():
+            calls["n"] += 1
+            raise ValueError("permanent")
+
+        with pytest.raises(ProviderError) as caught:
+            await fails()
+        assert calls["n"] == 1
+        assert isinstance(caught.value.__cause__, ValueError)
+
+    @pytest.mark.asyncio
+    async def test_a_transient_translation_retries(self):
+        calls = {"n": 0}
+
+        @with_retry(
+            max_attempts=3,
+            base_delay=0.001,
+            max_delay=0.001,
+            translate=_translate_by_message,
+        )
+        async def fails():
+            calls["n"] += 1
+            raise ValueError("transient")
+
+        with pytest.raises(ProviderError):
+            await fails()
+        assert calls["n"] == 3
+
+    @pytest.mark.asyncio
+    async def test_a_passed_through_error_keeps_its_own_cause(self):
+        original_cause = KeyError("root")
+
+        @with_retry(max_attempts=3, base_delay=0.001, translate=_translate_by_message)
+        async def fails():
+            raise ProviderError("already", retryable=False) from original_cause
+
+        with pytest.raises(ProviderError) as caught:
+            await fails()
+        assert caught.value.__cause__ is original_cause
+
+    @pytest.mark.asyncio
+    async def test_cancellation_is_not_translated(self):
+        import asyncio
+
+        calls = {"n": 0}
+
+        @with_retry(max_attempts=3, base_delay=0.001, translate=_translate_by_message)
+        async def cancelled():
+            calls["n"] += 1
+            raise asyncio.CancelledError
+
+        with pytest.raises(asyncio.CancelledError):
+            await cancelled()
+        assert calls["n"] == 1
+
+
 class _Flaky:
     """Fails `failures` times with `error`, then returns "ok"."""
 

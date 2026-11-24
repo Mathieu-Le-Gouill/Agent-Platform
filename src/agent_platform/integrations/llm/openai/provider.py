@@ -34,7 +34,7 @@ from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import OpenAICredentials
-from agent_platform.integrations.llm._base import NativeLLMProvider, parse_retry_after
+from agent_platform.integrations.llm._base import NativeLLMProvider
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 from agent_platform.integrations.llm.openai.mappers import (
     batch_job_from_native,
@@ -43,6 +43,7 @@ from agent_platform.integrations.llm.openai.mappers import (
     to_native_messages,
     to_native_params,
 )
+from agent_platform.integrations.sdk_errors import parse_retry_after
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
