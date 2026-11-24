@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import json
 from collections.abc import AsyncIterator, Mapping
 from typing import TYPE_CHECKING, Any, cast
@@ -43,10 +44,22 @@ from agent_platform.integrations.llm.openai.mappers import (
     to_native_messages,
     to_native_params,
 )
-from agent_platform.integrations.sdk_errors import parse_retry_after
+from agent_platform.integrations.sdk_errors import (
+    parse_retry_after,
+    translate_sdk_error,
+)
 
 if TYPE_CHECKING:
     from agent_platform.agents.tools.base import Tool
+
+_BATCH_STATUS_ERROR = "Batch status check failed"
+_BATCH_RESULTS_ERROR = "Batch result retrieval failed"
+_translate_batch_status = functools.partial(
+    translate_sdk_error, operation=_BATCH_STATUS_ERROR
+)
+_translate_batch_results = functools.partial(
+    translate_sdk_error, operation=_BATCH_RESULTS_ERROR
+)
 
 
 class OpenAILLM(
@@ -242,8 +255,9 @@ class OpenAILLM(
             self._record_usage(call, usage_totals)
             yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
 
+    # Not retried: a failure after the request left may mean the batch was
+    # created and will be billed, and a second submission would run it twice.
     @error_logged(re_raise=ProviderError, message="Batch submission failed")
-    @with_retry()
     async def submit_batch(self, requests: list[BatchRequest]) -> BatchJob:
         client = self._async_client(self._resolve(None, require_model=False))
 
@@ -278,8 +292,8 @@ class OpenAILLM(
             )
             return batch_job_from_native(batch)
 
-    @error_logged(re_raise=ProviderError, message="Batch status check failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_BATCH_STATUS_ERROR)
+    @with_retry(translate=_translate_batch_status)
     async def get_batch_status(self, batch_id: str) -> BatchJob:
         client = self._async_client(self._resolve(None, require_model=False))
         with observe(
@@ -288,8 +302,8 @@ class OpenAILLM(
             batch = await client.batches.retrieve(batch_id)
             return batch_job_from_native(batch)
 
-    @error_logged(re_raise=ProviderError, message="Batch result retrieval failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_BATCH_RESULTS_ERROR)
+    @with_retry(translate=_translate_batch_results)
     async def fetch_batch_results(self, batch_id: str) -> list[BatchResult]:
         client = self._async_client(self._resolve(None, require_model=False))
         with observe(

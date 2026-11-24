@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from typing import Any
 from uuid import UUID
 
@@ -17,11 +18,15 @@ from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import PineconeCredentials
+from agent_platform.integrations.sdk_errors import translate_sdk_error
 from agent_platform.integrations.vector_store.pinecone.config import PineconeConfig
 from agent_platform.integrations.vector_store.pinecone.mappers import (
     chunk_to_metadata,
     match_to_chunk,
 )
+
+_SEARCH_ERROR = "Vector store search failed"
+_translate = functools.partial(translate_sdk_error, operation=_SEARCH_ERROR)
 
 
 class PineconeStore(BaseVectorStore[PineconeConfig]):
@@ -50,16 +55,27 @@ class PineconeStore(BaseVectorStore[PineconeConfig]):
         timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout"] = timeout
-        # `client_options.max_retries` is intentionally not wired here:
-        # `PineconeAsyncio`'s `retry_config` takes a `RetryConfig` object, not
-        # a simple int, so there's no faithful translation from the shared
-        # int-based knob.
         return kwargs
+
+    def _new_client(self, config: PineconeConfig) -> PineconeAsyncio:
+        pc = PineconeAsyncio(**self._client_kwargs(config))
+        # The platform's `with_retry` is the only retry layer. The client
+        # retries 5 times by default and only reads a `retries` option from
+        # its OpenAPI configuration, which has no public setter. The option's
+        # type comes from `aiohttp_retry`, which `pinecone[asyncio]` installs:
+        # without it the client cannot send a request and raises its own error
+        # that names the extra, so there is nothing to turn off.
+        try:
+            from pinecone.openapi_support.retry_aiohttp import JitterRetry
+        except ImportError:
+            return pc
+        pc._openapi_config.retries = JitterRetry(attempts=1)
+        return pc
 
     async def _resolve_host(self, config: PineconeConfig) -> str:
         if config.host is not None:
             return config.host
-        async with PineconeAsyncio(**self._client_kwargs(config)) as pc:
+        async with self._new_client(config) as pc:
             index_model = await pc.describe_index(config.collection_name)
             if index_model.host is None:
                 raise RuntimeError(
@@ -69,8 +85,7 @@ class PineconeStore(BaseVectorStore[PineconeConfig]):
 
     async def _index(self, config: PineconeConfig) -> Any:
         host = await self._resolve_host(config)
-        pc = PineconeAsyncio(**self._client_kwargs(config))
-        return pc.IndexAsyncio(host=host)
+        return self._new_client(config).IndexAsyncio(host=host)
 
     async def add(
         self,
@@ -114,8 +129,8 @@ class PineconeStore(BaseVectorStore[PineconeConfig]):
         results = await self.search_with_scores(query_vector, k, config, filter)
         return [chunk for chunk, _ in results]
 
-    @error_logged(re_raise=ProviderError, message="Vector store search failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_SEARCH_ERROR)
+    @with_retry(translate=_translate)
     async def search_with_scores(
         self,
         query_vector: list[float],

@@ -16,12 +16,20 @@ from agent_platform.core.errors import ProviderError, require_secret
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
 from agent_platform.integrations.credentials import DeepLCredentials
-from agent_platform.integrations.translation._base import NativeTranslator
+from agent_platform.integrations.translation._base import (
+    NativeTranslator,
+    translated_errors,
+)
 from agent_platform.integrations.translation.deepl.config import DeepLConfig
 
 _DEEPL_TARGETS: dict[Language, str] = {
     Language.EN: "EN-US",
 }
+
+# The platform's `with_retry` is the only retry layer. This setting is a
+# module-level global of the DeepL SDK, so it applies to every DeepL client in
+# the process, not only this provider's.
+deepl.http_client.max_network_retries = 0
 
 
 class DeepLTranslator(NativeTranslator[DeepLConfig, deepl.Translator]):
@@ -59,6 +67,7 @@ class DeepLTranslator(NativeTranslator[DeepLConfig, deepl.Translator]):
                 ) from exc
         return self._client_cache
 
+    @translated_errors
     def _invoke(
         self,
         client: deepl.Translator,
@@ -86,15 +95,12 @@ class DeepLTranslator(NativeTranslator[DeepLConfig, deepl.Translator]):
         if config.tag_handling is not None:
             extra_kwargs["tag_handling"] = config.tag_handling
 
-        try:
-            raw = client.translate_text(
-                content.text,
-                target_lang=target_lang,
-                source_lang=source_lang,
-                **extra_kwargs,
-            )
-        except deepl.DeepLException as exc:
-            raise ProviderError(f"DeepL translation failed: {exc}") from exc
+        raw = client.translate_text(
+            content.text,
+            target_lang=target_lang,
+            source_lang=source_lang,
+            **extra_kwargs,
+        )
 
         result: TextResult = raw[0] if isinstance(raw, list) else raw
 

@@ -188,7 +188,7 @@ class TestAzureTranslator:
 
 
 class TestAzureTranslatorClient:
-    def test_default_endpoint_and_max_retries(self, mocker):
+    def test_default_endpoint_and_no_sdk_retries(self, mocker):
         mock_client_cls = mocker.patch(
             "agent_platform.integrations.translation.azure.provider.TextTranslationClient"
         )
@@ -197,7 +197,7 @@ class TestAzureTranslatorClient:
 
         _, kwargs = mock_client_cls.call_args
         assert kwargs["endpoint"] == "https://api.cognitive.microsofttranslator.com"
-        assert kwargs["retry_total"] == 3
+        assert kwargs["retry_total"] == 0
         assert "connection_timeout" not in kwargs
         assert "read_timeout" not in kwargs
 
@@ -209,7 +209,7 @@ class TestAzureTranslatorClient:
         translator._client(AzureTranslatorConfig(timeout=15.0, max_retries=5))
 
         _, kwargs = mock_client_cls.call_args
-        assert kwargs["retry_total"] == 5
+        assert kwargs["retry_total"] == 0
         assert kwargs["connection_timeout"] == 15.0
         assert kwargs["read_timeout"] == 15.0
 
@@ -227,6 +227,6 @@ class TestAzureTranslatorClient:
 
         _, kwargs = mock_client_cls.call_args
         assert kwargs["endpoint"] == "https://custom.endpoint"
-        assert kwargs["retry_total"] == 7
+        assert kwargs["retry_total"] == 0
         assert kwargs["connection_timeout"] == 60.0
         assert kwargs["read_timeout"] == 60.0

@@ -7,11 +7,13 @@ from agent_platform.core.credentials import (
     resolve_client_options,
     resolve_credentials,
 )
-from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
 from agent_platform.integrations.credentials import GoogleTranslateCredentials
-from agent_platform.integrations.translation._base import NativeTranslator
+from agent_platform.integrations.translation._base import (
+    NativeTranslator,
+    translated_errors,
+)
 from agent_platform.integrations.translation.google_translate.config import (
     GoogleTranslateConfig,
 )
@@ -51,6 +53,7 @@ class GoogleTranslator(
             )
         return google_translate.Client(client_options=client_options or None)
 
+    @translated_errors
     def _invoke(
         self,
         client: google_translate.Client,
@@ -66,16 +69,13 @@ class GoogleTranslator(
         if config.model is not None:
             extra_kwargs["model"] = config.model
 
-        try:
-            result = client.translate(
-                content.text,
-                target_language=target_lang,
-                source_language=source_lang,
-                format_=config.format,
-                **extra_kwargs,
-            )
-        except Exception as exc:
-            raise ProviderError(f"Google Translate failed: {exc}") from exc
+        result = client.translate(
+            content.text,
+            target_language=target_lang,
+            source_language=source_lang,
+            format_=config.format,
+            **extra_kwargs,
+        )
 
         return TextChunk(
             text=result["translatedText"],

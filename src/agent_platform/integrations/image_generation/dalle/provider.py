@@ -1,15 +1,15 @@
 from __future__ import annotations
 
 import base64
+import functools
 from typing import Any
 
-from openai import AsyncOpenAI
+from openai import APIConnectionError, AsyncOpenAI
 
 from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
-    resolve_max_retries,
     resolve_timeout,
 )
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
@@ -25,6 +25,24 @@ from agent_platform.integrations.image_generation.dalle.mappers import (
     validate_n,
     validate_size,
 )
+from agent_platform.integrations.sdk_errors import translate_sdk_error
+
+_ERROR_MESSAGE = "Image generation failed"
+
+# A generation that fails after the request left may have been done and billed,
+# so only a status that means the service rejected the request before working
+# on it is retried: a rate limit or an unavailable service.
+_translate = functools.partial(
+    translate_sdk_error,
+    operation=_ERROR_MESSAGE,
+    transient_types=(APIConnectionError,),
+    retry_statuses=frozenset({429, 503}),
+)
+
+# Applied when neither `DalleConfig.timeout` nor `ClientOptions.timeout` is
+# set. `gpt-image-1` can take more than two minutes, and the SDK's own default
+# of 10 minutes would hold the retry loop too long on a stuck request.
+DEFAULT_IMAGE_TIMEOUT_SECONDS = 300.0
 
 _MODEL_MAP: dict[str, str] = {
     "dall-e-2": "dall-e-2",
@@ -52,17 +70,17 @@ class DallEImageGenerator(BaseImageGenerator[DalleConfig]):
         kwargs: dict[str, Any] = {
             "api_key": api_key.get_secret_value(),
             "base_url": self._client_options.base_url,
-            "max_retries": resolve_max_retries(
-                config.max_retries, self._client_options
-            ),
+            # The platform's `with_retry` is the only retry layer.
+            "max_retries": 0,
         }
         timeout = resolve_timeout(config.timeout, self._client_options)
-        if timeout is not None:
-            kwargs["timeout"] = timeout
+        kwargs["timeout"] = (
+            timeout if timeout is not None else DEFAULT_IMAGE_TIMEOUT_SECONDS
+        )
         return kwargs
 
-    @error_logged(re_raise=ProviderError, message="Image generation failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def generate(
         self,
         prompt: str,
@@ -111,8 +129,8 @@ class DallEImageGenerator(BaseImageGenerator[DalleConfig]):
             ),
         )
 
-    @error_logged(re_raise=ProviderError, message="Image generation failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def generate_many(
         self,
         prompt: str,

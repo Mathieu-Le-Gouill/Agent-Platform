@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 from collections.abc import Awaitable, Callable
 from typing import Any
 from uuid import UUID
@@ -15,11 +16,15 @@ from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import ChromaCredentials
+from agent_platform.integrations.sdk_errors import translate_sdk_error
 from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
 from agent_platform.integrations.vector_store.chroma.mappers import (
     chunk_to_metadata,
     row_to_chunk,
 )
+
+_SEARCH_ERROR = "Vector store search failed"
+_translate = functools.partial(translate_sdk_error, operation=_SEARCH_ERROR)
 
 
 class ChromaStore(BaseVectorStore[ChromaConfig]):
@@ -126,8 +131,8 @@ class ChromaStore(BaseVectorStore[ChromaConfig]):
         results = await self.search_with_scores(query_vector, k, config, filter)
         return [chunk for chunk, _ in results]
 
-    @error_logged(re_raise=ProviderError, message="Vector store search failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_SEARCH_ERROR)
+    @with_retry(translate=_translate)
     async def search_with_scores(
         self,
         query_vector: list[float],

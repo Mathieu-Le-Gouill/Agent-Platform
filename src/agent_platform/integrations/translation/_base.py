@@ -1,18 +1,47 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 from abc import abstractmethod
-from typing import Generic, TypeVar
+from collections.abc import Callable
+from typing import Any, Generic, TypeVar, cast
 
 from agent_platform.core.errors import ProviderError, error_logged
 from agent_platform.core.interfaces.translation.base import BaseTranslator, ConfigT
 from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
+from agent_platform.integrations.sdk_errors import translate_sdk_error
+
+_ERROR_MESSAGE = "Translation failed"
+_translate = functools.partial(translate_sdk_error, operation=_ERROR_MESSAGE)
 
 # The vendor's client object, however it's constructed (e.g. `deepl.Translator`,
 # `google_translate.Client`, `TextTranslationClient`).
 ClientT = TypeVar("ClientT")
+
+_Invoke = TypeVar("_Invoke", bound=Callable[..., Any])
+
+
+def translated_errors(invoke: _Invoke) -> _Invoke:
+    """Make a provider's `_invoke` raise a `ProviderError` for any failure.
+
+    The sync `translate` has no retry layer around it, so without this its
+    callers would get the raw SDK error. The error keeps the verdict made from
+    the SDK error (`retryable`, `code`), which `atranslate` retries on.
+    """
+
+    @functools.wraps(invoke)
+    def wrapper(*args: Any, **kwargs: Any) -> Any:
+        try:
+            return invoke(*args, **kwargs)
+        except Exception as exc:
+            translated = _translate(exc)
+            if translated is exc:
+                raise
+            raise translated from exc
+
+    return cast(_Invoke, wrapper)
 
 
 class NativeTranslator(BaseTranslator[ConfigT], Generic[ConfigT, ClientT]):
@@ -53,8 +82,8 @@ class NativeTranslator(BaseTranslator[ConfigT], Generic[ConfigT, ClientT]):
         client = self._client(config)
         return self._invoke(client, content, target, source, config)
 
-    @error_logged(re_raise=ProviderError, message="Translation failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def atranslate(
         self,
         content: TextChunk,

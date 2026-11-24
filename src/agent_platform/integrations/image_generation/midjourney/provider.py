@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from typing import Any
 
 import httpx
@@ -22,10 +23,22 @@ from agent_platform.integrations.image_generation.midjourney.config import (
 from agent_platform.integrations.image_generation.midjourney.mappers import (
     size_to_aspect,
 )
+from agent_platform.integrations.sdk_errors import translate_sdk_error
 from agent_platform.utils.env import from_env
 
 _DEFAULT_BASE_URL = "http://localhost:8080"
 _DEFAULT_TIMEOUT = 120
+
+_ERROR_MESSAGE = "Image generation failed"
+
+# The `/imagine` POST starts the billed job, so only a status that means the
+# proxy rejected the request before working on it is retried.
+_translate_imagine = functools.partial(
+    translate_sdk_error,
+    operation=_ERROR_MESSAGE,
+    retry_statuses=frozenset({429, 503}),
+)
+_translate_download = functools.partial(translate_sdk_error, operation=_ERROR_MESSAGE)
 
 
 class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
@@ -53,8 +66,21 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
             or _DEFAULT_BASE_URL
         )
 
-    @error_logged(re_raise=ProviderError, message="Image generation failed")
-    @with_retry()
+    @with_retry(translate=_translate_imagine)
+    async def _imagine(
+        self, client: httpx.AsyncClient, payload: dict[str, Any]
+    ) -> dict[str, Any]:
+        """POST the generation request, which starts the billed job, and return its JSON."""
+        response = await client.post(
+            f"{self._base_url()}/imagine",
+            json=payload,
+            headers={"Authorization": f"Bearer {self._api_key()}"},
+        )
+        response.raise_for_status()
+        data: dict[str, Any] = response.json()
+        return data
+
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
     async def generate(
         self,
         prompt: str,
@@ -74,13 +100,7 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
             resolve_timeout(config.timeout, self._client_options) or _DEFAULT_TIMEOUT
         )
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                f"{self._base_url()}/imagine",
-                json=payload,
-                headers={"Authorization": f"Bearer {self._api_key()}"},
-            )
-            response.raise_for_status()
-            data: dict[str, Any] = response.json()
+            data = await self._imagine(client, payload)
 
             image_url = data.get("image_url") or data.get("uri")
             if not image_url:
@@ -103,8 +123,7 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
             ),
         )
 
-    @error_logged(re_raise=ProviderError, message="Image generation failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
     async def generate_many(
         self,
         prompt: str,
@@ -126,13 +145,7 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
             resolve_timeout(config.timeout, self._client_options) or _DEFAULT_TIMEOUT
         )
         async with httpx.AsyncClient(timeout=timeout) as client:
-            response = await client.post(
-                f"{self._base_url()}/imagine",
-                json=payload,
-                headers={"Authorization": f"Bearer {self._api_key()}"},
-            )
-            response.raise_for_status()
-            data: dict[str, Any] = response.json()
+            data = await self._imagine(client, payload)
 
             image_urls: list[str] = data.get("image_urls") or [
                 data.get("image_url") or data.get("uri") or ""
@@ -162,7 +175,10 @@ class MidjourneyGenerator(BaseImageGenerator[MidjourneyConfig]):
                 )
         return documents
 
+    # Retried on its own: a download is idempotent, and a failed one must never
+    # send the generation request again.
     @staticmethod
+    @with_retry(translate=_translate_download)
     async def _fetch_image(client: httpx.AsyncClient, url: str) -> bytes:
         resp = await client.get(url)
         resp.raise_for_status()

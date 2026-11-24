@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from typing import Any
 from uuid import UUID
 
@@ -10,6 +11,11 @@ from weaviate.classes.query import Filter, MetadataQuery
 from weaviate.client import WeaviateAsyncClient
 from weaviate.collections.classes.data import DataObject
 from weaviate.collections.classes.filters import _Filters
+from weaviate.exceptions import (
+    WeaviateConnectionError,
+    WeaviateRetryError,
+    WeaviateTimeoutError,
+)
 
 from agent_platform.core.credentials import (
     ClientOptions,
@@ -23,6 +29,7 @@ from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import WeaviateCredentials
+from agent_platform.integrations.sdk_errors import translate_sdk_error
 from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
 from agent_platform.integrations.vector_store.weaviate.mappers import (
     chunk_to_properties,
@@ -31,6 +38,13 @@ from agent_platform.integrations.vector_store.weaviate.mappers import (
 from agent_platform.utils.env import from_env
 
 _DEFAULT_URL = "http://localhost:8080"
+
+_SEARCH_ERROR = "Vector store search failed"
+_translate = functools.partial(
+    translate_sdk_error,
+    operation=_SEARCH_ERROR,
+    transient_types=(WeaviateConnectionError, WeaviateTimeoutError, WeaviateRetryError),
+)
 
 
 def _parse_url(url: str) -> tuple[str, int, bool]:
@@ -72,8 +86,11 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
         self, config: WeaviateConfig
     ) -> weaviate.config.AdditionalConfig | None:
         timeout = resolve_timeout(config.timeout, self._client_options)
-        # No simple max_retries knob exists for weaviate-client's async
-        # connection helpers, so it stays unwired here.
+        # Known limit: weaviate-client 4.16 has no setting for its gRPC search
+        # retry (`grpc_search` hard-codes `_Retry(4)` on an UNAVAILABLE status),
+        # so a search that fails with it is retried by the SDK before the
+        # platform's `with_retry` sees the error. Its HTTP pool retries
+        # (`session_pool_max_retries`) do not touch the search.
         if timeout is None:
             return None
         return weaviate.config.AdditionalConfig(
@@ -159,8 +176,8 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
         finally:
             await client.close()
 
-    @error_logged(re_raise=ProviderError, message="Vector store search failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_SEARCH_ERROR)
+    @with_retry(translate=_translate)
     async def search(
         self,
         query_vector: list[float],
@@ -181,8 +198,8 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
         finally:
             await client.close()
 
-    @error_logged(re_raise=ProviderError, message="Vector store search failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_SEARCH_ERROR)
+    @with_retry(translate=_translate)
     async def search_with_scores(
         self,
         query_vector: list[float],

@@ -1,9 +1,11 @@
 from __future__ import annotations
 
+import functools
 from typing import Any
 from uuid import UUID
 
 from qdrant_client import AsyncQdrantClient, models
+from qdrant_client.common.client_exceptions import ResourceExhaustedResponse
 
 from agent_platform.core.credentials import (
     ClientOptions,
@@ -18,10 +20,26 @@ from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 from agent_platform.core.schemas.vector import SparseVector
 from agent_platform.integrations.credentials import QdrantCredentials
+from agent_platform.integrations.sdk_errors import translate_sdk_error
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
 from agent_platform.integrations.vector_store.qdrant.mappers import (
     chunk_to_payload,
     point_to_chunk,
+)
+
+_SEARCH_ERROR = "Vector store search failed"
+_HYBRID_SEARCH_ERROR = "Vector store hybrid search failed"
+
+# The client raises this, with no status, for a rate limit that carries a
+# `Retry-After` value.
+_TRANSIENT_TYPES = (ResourceExhaustedResponse,)
+_translate_search = functools.partial(
+    translate_sdk_error, operation=_SEARCH_ERROR, transient_types=_TRANSIENT_TYPES
+)
+_translate_hybrid_search = functools.partial(
+    translate_sdk_error,
+    operation=_HYBRID_SEARCH_ERROR,
+    transient_types=_TRANSIENT_TYPES,
 )
 
 
@@ -39,8 +57,8 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
 
     def _client(self, config: QdrantConfig) -> AsyncQdrantClient:
         timeout = resolve_timeout(config.timeout, self._client_options)
-        # No simple max_retries constructor kwarg confirmed for qdrant-client,
-        # so it stays unwired here.
+        # qdrant-client makes no retry of its own on a search, so the platform's
+        # `with_retry` is the only retry layer.
         return AsyncQdrantClient(
             url=config.url,
             api_key=self._credentials.api_key.get_secret_value()
@@ -100,8 +118,8 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         results = await self.search_with_scores(query_vector, k, config, filter)
         return [chunk for chunk, _ in results]
 
-    @error_logged(re_raise=ProviderError, message="Vector store search failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_SEARCH_ERROR)
+    @with_retry(translate=_translate_search)
     async def search_with_scores(
         self,
         query_vector: list[float],
@@ -150,8 +168,8 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         if points:
             await client.upsert(collection_name=config.collection_name, points=points)
 
-    @error_logged(re_raise=ProviderError, message="Vector store hybrid search failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_HYBRID_SEARCH_ERROR)
+    @with_retry(translate=_translate_hybrid_search)
     async def search_hybrid(
         self,
         query_vector: list[float],

@@ -8,14 +8,16 @@ from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
-    resolve_max_retries,
     resolve_timeout,
 )
-from agent_platform.core.errors import ProviderError, require_secret
+from agent_platform.core.errors import require_secret
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.enums import Language
 from agent_platform.integrations.credentials import AzureTranslatorCredentials
-from agent_platform.integrations.translation._base import NativeTranslator
+from agent_platform.integrations.translation._base import (
+    NativeTranslator,
+    translated_errors,
+)
 from agent_platform.integrations.translation.azure.config import AzureTranslatorConfig
 
 _DEFAULT_ENDPOINT = "https://api.cognitive.microsofttranslator.com"
@@ -38,11 +40,8 @@ class AzureTranslator(NativeTranslator[AzureTranslatorConfig, TextTranslationCli
             self._credentials.api_key, "Azure Translator API key is required"
         )
         credential = AzureKeyCredential(api_key.get_secret_value())
-        kwargs: dict[str, int | float] = {
-            "retry_total": resolve_max_retries(
-                config.max_retries, self._client_options
-            ),
-        }
+        # The platform's `with_retry` is the only retry layer.
+        kwargs: dict[str, int | float] = {"retry_total": 0}
         timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["connection_timeout"] = timeout
@@ -55,6 +54,7 @@ class AzureTranslator(NativeTranslator[AzureTranslatorConfig, TextTranslationCli
             **kwargs,  # type: ignore[arg-type]
         )
 
+    @translated_errors
     def _invoke(
         self,
         client: TextTranslationClient,
@@ -76,10 +76,7 @@ class AzureTranslator(NativeTranslator[AzureTranslatorConfig, TextTranslationCli
             text_type=config.text_type,
         )
 
-        try:
-            response = client.translate(body=[input_item])
-        except Exception as exc:
-            raise ProviderError(f"Azure Translator failed: {exc}") from exc
+        response = client.translate(body=[input_item])
 
         translation = response[0].translations[0]
         detected_lang = (
