@@ -1,4 +1,8 @@
 from agent_platform.agents.tools.base import Tool, ToolError, ToolStreamChunk
+from agent_platform.agents.tools.call_context import (
+    ToolCallContext,
+    current_tool_call,
+)
 from agent_platform.agents.tools.classify.tool import ClassifyInput, ClassifyTool
 from agent_platform.agents.tools.errors import (
     ToolCallValidationError,
@@ -31,6 +35,8 @@ __all__ = [
     "Tool",
     "ToolError",
     "ToolStreamChunk",
+    "ToolCallContext",
+    "current_tool_call",
     "ToolNotFoundError",
     "ToolRegistrationError",
     "ToolCallValidationError",

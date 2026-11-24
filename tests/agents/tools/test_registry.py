@@ -8,9 +8,11 @@ from pydantic import BaseModel
 
 from agent_platform.agents.tools import (
     Tool,
+    ToolCallContext,
     ToolCallValidationError,
     ToolError,
     ToolRegistry,
+    current_tool_call,
     is_tool_validation_error,
 )
 from agent_platform.agents.tools.errors import ToolTimeoutError
@@ -712,3 +714,83 @@ class TestToolCallObservability:
         (span,) = recorded_spans.get_finished_spans()
         assert "Paris" in span.attributes["tool.arguments.content"]
         assert span.attributes["tool.result.content"] == "weather for Paris"
+
+
+class _KeyTool(Tool):
+    name = "key_tool"
+    description = "Records the call context it runs under"
+    input_schema = BaseModel
+    supports_streaming = True
+
+    def __init__(self) -> None:
+        self.seen: list = []
+
+    async def run(self, **kwargs):
+        await asyncio.sleep(0)
+        self.seen.append(current_tool_call())
+        return "ok"
+
+    async def astream(self, **kwargs):
+        self.seen.append(current_tool_call())
+        yield "a"
+        await asyncio.sleep(0)
+        self.seen.append(current_tool_call())
+        yield "b"
+
+
+class TestToolCallContext:
+    @pytest.mark.asyncio
+    async def test_run_sees_the_call_id_as_key(self, registry):
+        tool = _KeyTool()
+        registry.register(tool)
+
+        await registry.call_and_wrap(ToolCall(id="c1", name="key_tool", arguments={}))
+
+        assert tool.seen == [
+            ToolCallContext(tool_name="key_tool", idempotency_key="c1")
+        ]
+
+    @pytest.mark.asyncio
+    async def test_run_sees_it_under_a_timeout(self, registry):
+        tool = _KeyTool()
+        registry.register(tool, timeout=5)
+
+        await registry.call_and_wrap(ToolCall(id="c1", name="key_tool", arguments={}))
+
+        assert [c.idempotency_key for c in tool.seen] == ["c1"]
+
+    @pytest.mark.asyncio
+    async def test_astream_sees_the_key_and_the_consumer_does_not(self, registry):
+        tool = _KeyTool()
+        registry.register(tool)
+        in_consumer = []
+
+        async for _chunk in registry.call_and_stream(
+            ToolCall(id="c1", name="key_tool", arguments={})
+        ):
+            in_consumer.append(current_tool_call())
+
+        assert [c.idempotency_key for c in tool.seen] == ["c1", "c1"]
+        assert in_consumer
+        assert all(c is None for c in in_consumer)
+
+    @pytest.mark.asyncio
+    async def test_gathered_calls_each_see_their_own_key(self, registry):
+        tool = _KeyTool()
+        registry.register(tool)
+
+        await asyncio.gather(
+            registry.call_and_wrap(ToolCall(id="c1", name="key_tool", arguments={})),
+            registry.call_and_wrap(ToolCall(id="c2", name="key_tool", arguments={})),
+        )
+
+        assert sorted(c.idempotency_key for c in tool.seen) == ["c1", "c2"]
+
+    @pytest.mark.asyncio
+    async def test_none_outside_the_registry_and_after_a_call(self, registry):
+        registry.register(_KeyTool())
+        assert current_tool_call() is None
+
+        await registry.call_and_wrap(ToolCall(id="c1", name="key_tool", arguments={}))
+
+        assert current_tool_call() is None

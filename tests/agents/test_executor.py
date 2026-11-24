@@ -708,6 +708,186 @@ class TestExecutorToolCallRecovery:
         assert call_count == 2
 
 
+class _CountingTool(Tool):
+    name = "counter"
+    description = "Counts how often it ran"
+    input_schema = BaseModel
+
+    def __init__(self) -> None:
+        self.runs = 0
+
+    async def run(self, **kwargs):
+        self.runs += 1
+        return {"run": self.runs, "args": kwargs}
+
+
+class _FlakyTool(Tool):
+    name = "flaky"
+    description = "Fails on its first run"
+    input_schema = BaseModel
+
+    def __init__(self) -> None:
+        self.runs = 0
+
+    async def run(self, **kwargs):
+        self.runs += 1
+        if self.runs == 1:
+            raise RuntimeError("boom")
+        return "ok"
+
+
+_VALID_CALL = {"name": "counter", "args": {"item": "a"}}
+_INVALID_CALL = {"name": "strict_weather", "args": {}}
+
+
+def _recovery_registry() -> tuple[ToolRegistry, _CountingTool]:
+    counting = _CountingTool()
+    registry = ToolRegistry()
+    registry.register(counting)
+    registry.register(_StrictWeatherTool())
+    return registry, counting
+
+
+class TestExecutorCorrectiveRetryReuse:
+    @pytest.mark.asyncio
+    async def test_a_reemitted_successful_call_does_not_run_again(self, mock_llm):
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "a1", **_VALID_CALL}, {"id": "a2", **_INVALID_CALL}],
+            ),
+            make_fake_llm_response(
+                content="",
+                tool_calls=[
+                    {"id": "b1", **_INVALID_CALL, "args": {"location": "Paris"}},
+                    {"id": "b2", **_VALID_CALL},
+                ],
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, counting = _recovery_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        answer, history = await ex.run_with_messages([UserMessage(content="go")])
+
+        assert answer == "done"
+        assert counting.runs == 1
+        kept_results = [
+            m.result
+            for m in history
+            if m.role == "tool" and m.result.tool_call_id[0] == "b"
+        ]
+        assert [r.tool_call_id for r in kept_results] == ["b1", "b2"]
+        assert [r.name for r in kept_results] == ["strict_weather", "counter"]
+        assert not any(r.is_error for r in kept_results)
+        assert '"run": 1' in kept_results[1].content
+
+    @pytest.mark.asyncio
+    async def test_a_call_that_failed_runs_again(self, mock_llm):
+        flaky_call = {"name": "flaky", "args": {}}
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "a1", **flaky_call}, {"id": "a2", **_INVALID_CALL}],
+            ),
+            make_fake_llm_response(
+                content="",
+                tool_calls=[
+                    {"id": "b1", **flaky_call},
+                    {"id": "b2", **_INVALID_CALL, "args": {"location": "Paris"}},
+                ],
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        flaky = _FlakyTool()
+        registry, _ = _recovery_registry()
+        registry.register(flaky)
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        await ex.run("go")
+
+        assert flaky.runs == 2
+
+    @pytest.mark.asyncio
+    async def test_a_changed_call_runs_again(self, mock_llm):
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "a1", **_VALID_CALL}, {"id": "a2", **_INVALID_CALL}],
+            ),
+            make_fake_llm_response(
+                content="",
+                tool_calls=[
+                    {"id": "b1", "name": "counter", "args": {"item": "other"}},
+                    {"id": "b2", **_INVALID_CALL, "args": {"location": "Paris"}},
+                ],
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, counting = _recovery_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        await ex.run("go")
+
+        assert counting.runs == 2
+
+    @pytest.mark.asyncio
+    async def test_streaming_reuses_the_call_and_emits_its_final_chunk(self, mock_llm):
+        attempts = [
+            make_tool_call_stream_chunks(
+                [{"id": "a1", **_VALID_CALL}, {"id": "a2", **_INVALID_CALL}]
+            ),
+            make_tool_call_stream_chunks(
+                [
+                    {"id": "b1", **_INVALID_CALL, "args": {"location": "Paris"}},
+                    {"id": "b2", **_VALID_CALL},
+                ]
+            ),
+            make_text_stream_chunks(["done"]),
+        ]
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(attempts.pop(0))
+        registry, counting = _recovery_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        events = [e async for e in ex.run_streaming("go")]
+
+        assert counting.runs == 1
+        finals = [e for e in events if isinstance(e, ToolStreamChunk) and e.is_final]
+        assert [f.tool_call_id for f in finals] == ["b1", "b2"]
+        assert '"run": 1' in finals[1].delta
+        assert not any(f.is_error for f in finals)
+        assert events[-1] == "done"
+
+    @pytest.mark.asyncio
+    async def test_the_trace_counts_the_reused_call(self, mock_llm, recorded_spans):
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "a1", **_VALID_CALL}, {"id": "a2", **_INVALID_CALL}],
+            ),
+            make_fake_llm_response(
+                content="",
+                tool_calls=[
+                    {"id": "b1", **_VALID_CALL},
+                    {"id": "b2", **_INVALID_CALL, "args": {"location": "Paris"}},
+                ],
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, _ = _recovery_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        await ex.run("go")
+
+        span = _invoke_agent_span(recorded_spans)
+        assert span.attributes["agent.tool_calls_requested"] == 2
+        assert span.attributes["agent.tool_calls_executed"] == 2
+
+
 class TestAssembleToolCalls:
     def test_malformed_arguments_json_is_flagged_not_swallowed(self):
         from agent_platform.agents.agent import _assemble_tool_calls

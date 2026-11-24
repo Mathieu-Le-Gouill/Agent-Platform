@@ -12,6 +12,7 @@ from pydantic import BaseModel
 from pydantic import ValidationError as PydanticValidationError
 
 from agent_platform.agents.tools.base import Tool, ToolStreamChunk
+from agent_platform.agents.tools.call_context import ToolCallContext, bind_tool_call
 from agent_platform.agents.tools.errors import (
     ToolCallValidationError,
     ToolNotFoundError,
@@ -67,6 +68,24 @@ def _serialize_result(raw: Any, max_chars: int | None) -> str:
             f"{content[:max_chars]}\n[truncated: result was {len(content)} characters]"
         )
     return content
+
+
+def _call_context(call: ToolCall) -> ToolCallContext:
+    return ToolCallContext(tool_name=call.name, idempotency_key=call.id)
+
+
+async def _astream_in_call_context(tool: Tool, call: ToolCall) -> AsyncIterator[str]:
+    """Yield the tool's deltas, with the call context bound only while the
+    tool's generator advances, so the consumer holding a delta never sees it."""
+    stream = aiter(tool.astream(**call.arguments))
+    context = _call_context(call)
+    while True:
+        try:
+            with bind_tool_call(context):
+                delta = await anext(stream)
+        except StopAsyncIteration:
+            return
+        yield delta
 
 
 class ToolRegistry:
@@ -139,14 +158,18 @@ class ToolRegistry:
         tool = self.get(call.name)
         self._validate_arguments(tool, call)
         timeout = self._timeouts.get(call.name)
-        if timeout is None:
-            return await tool.run(**call.arguments)
-        try:
-            return await asyncio.wait_for(tool.run(**call.arguments), timeout=timeout)
-        except TimeoutError as exc:
-            raise ToolTimeoutError(
-                f"Tool '{call.name}' timed out after {timeout}s"
-            ) from exc
+        # Bound before `wait_for` starts its task, which copies the context.
+        with bind_tool_call(_call_context(call)):
+            if timeout is None:
+                return await tool.run(**call.arguments)
+            try:
+                return await asyncio.wait_for(
+                    tool.run(**call.arguments), timeout=timeout
+                )
+            except TimeoutError as exc:
+                raise ToolTimeoutError(
+                    f"Tool '{call.name}' timed out after {timeout}s"
+                ) from exc
 
     def _validate_arguments(self, tool: Tool, call: ToolCall) -> None:
         if call.arguments_error is not None:
@@ -234,7 +257,7 @@ class ToolRegistry:
                 streamed: list[str] = []
                 try:
                     self._validate_arguments(tool, call)
-                    async for delta in tool.astream(**call.arguments):
+                    async for delta in _astream_in_call_context(tool, call):
                         streamed.append(delta)
                         yield ToolStreamChunk(tool_call_id=call.id, delta=delta)
                     yield ToolStreamChunk(tool_call_id=call.id, delta="", is_final=True)

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import json
 from collections.abc import AsyncIterator, Iterator
 from contextlib import contextmanager
 
@@ -14,6 +15,7 @@ from agent_platform.core.retry import retry_once_on_invalid
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     Message,
+    ToolCall,
     ToolMessage,
     UserMessage,
 )
@@ -33,6 +35,45 @@ def _tool_call_error(result: _ThinkActResult) -> str | None:
     if not bad:
         return None
     return "; ".join(tm.result.content for tm in bad)
+
+
+def _call_signature(call: ToolCall) -> tuple[str, str]:
+    return call.name, json.dumps(call.arguments, sort_keys=True, default=str)
+
+
+class _SucceededCalls:
+    """The tool calls of the last attempt that succeeded, for the corrective retry.
+
+    When the model re-emits a call with the same name and arguments after a
+    correction, its earlier result is reused instead of running the tool a
+    second time: a tool with a side effect must not run twice for one intent.
+    Each stored result is reused at most once.
+    """
+
+    def __init__(self) -> None:
+        self._results: list[tuple[tuple[str, str], ToolMessage]] = []
+
+    def take(self, call: ToolCall) -> ToolMessage | None:
+        """Return the stored result for `call`, re-labelled with its id."""
+        signature = _call_signature(call)
+        for index, (stored_signature, message) in enumerate(self._results):
+            if stored_signature == signature:
+                del self._results[index]
+                return ToolMessage(
+                    result=message.result.model_copy(update={"tool_call_id": call.id}),
+                    metadata=dict(message.metadata),
+                )
+        return None
+
+    def remember(
+        self, assistant_msg: AssistantMessage, tool_messages: list[ToolMessage]
+    ) -> None:
+        """Replace the stored results with the successes of the attempt just run."""
+        self._results = [
+            (_call_signature(call), message)
+            for call, message in zip(assistant_msg.tool_calls, tool_messages)
+            if not message.result.is_error
+        ]
 
 
 class _LoopTrace:
@@ -124,14 +165,39 @@ class AgentExecutor:
     ) -> tuple[str, list[Message]]:
         return await self._execute(list(messages), conversation_id=conversation_id)
 
-    async def _think_and_act(self, messages: list[Message]) -> _ThinkActResult:
+    async def _think_and_act(
+        self, messages: list[Message], succeeded: _SucceededCalls
+    ) -> _ThinkActResult:
         assistant_msg = await self._agent.think(messages)
         messages.append(assistant_msg)
         if not assistant_msg.tool_calls:
             return assistant_msg, []
-        tool_messages = await self._agent.act(assistant_msg)
+        tool_messages = await self._act(assistant_msg, succeeded)
         messages.extend(tool_messages)
+        succeeded.remember(assistant_msg, tool_messages)
         return assistant_msg, tool_messages
+
+    async def _act(
+        self, assistant_msg: AssistantMessage, succeeded: _SucceededCalls
+    ) -> list[ToolMessage]:
+        """Run the calls of `assistant_msg`, except those that already succeeded
+        in the attempt before the corrective retry; results keep the call order."""
+        reused = [succeeded.take(call) for call in assistant_msg.tool_calls]
+        pending = [
+            call
+            for call, stored in zip(assistant_msg.tool_calls, reused)
+            if stored is None
+        ]
+        if len(pending) == len(reused):
+            return await self._agent.act(assistant_msg)
+        fresh = iter(
+            await self._agent.act(
+                assistant_msg.model_copy(update={"tool_calls": pending})
+            )
+            if pending
+            else []
+        )
+        return [stored if stored is not None else next(fresh) for stored in reused]
 
     def _recovery_exhausted(
         self, last_message: AssistantMessage
@@ -159,9 +225,10 @@ class AgentExecutor:
         ) as trace:
             for _ in range(self._max_iterations):
                 trace.start_iteration()
+                succeeded = _SucceededCalls()
                 try:
                     assistant_msg, tool_messages = await retry_once_on_invalid(
-                        attempt=lambda: self._think_and_act(messages),
+                        attempt=lambda: self._think_and_act(messages, succeeded),
                         check=_tool_call_error,
                         correct=lambda error: self._correct_tool_call(messages, error),
                         on_retry=trace.on_retry,
@@ -188,7 +255,10 @@ class AgentExecutor:
             )
 
     async def _stream_think_and_act(
-        self, messages: list[Message], sink: list[ToolStreamChunk | str]
+        self,
+        messages: list[Message],
+        sink: list[ToolStreamChunk | str],
+        succeeded: _SucceededCalls,
     ) -> _ThinkActResult:
         assistant_msg, deltas = await self._agent.think_from_stream(messages)
         sink.extend(deltas)
@@ -198,12 +268,28 @@ class AgentExecutor:
             return assistant_msg, []
 
         tool_messages: list[ToolMessage] = []
-        async for event in self._agent.act_stream(assistant_msg):
-            if isinstance(event, ToolMessage):
-                tool_messages.append(event)
-                messages.append(event)
-            else:
-                sink.append(event)
+        for call in assistant_msg.tool_calls:
+            stored = succeeded.take(call)
+            if stored is not None:
+                sink.append(
+                    ToolStreamChunk(
+                        tool_call_id=call.id,
+                        delta=stored.result.content,
+                        is_final=True,
+                    )
+                )
+                tool_messages.append(stored)
+                messages.append(stored)
+                continue
+            async for event in self._agent.act_stream(
+                assistant_msg.model_copy(update={"tool_calls": [call]})
+            ):
+                if isinstance(event, ToolMessage):
+                    tool_messages.append(event)
+                    messages.append(event)
+                else:
+                    sink.append(event)
+        succeeded.remember(assistant_msg, tool_messages)
         return assistant_msg, tool_messages
 
     async def run_streaming(
@@ -218,12 +304,13 @@ class AgentExecutor:
                 # Each attempt fills its own buffer, so only the attempt kept
                 # after the corrective retry reaches the client.
                 sink: list[ToolStreamChunk | str] = []
+                succeeded = _SucceededCalls()
                 trace.start_iteration()
 
                 async def attempt() -> _ThinkActResult:
                     nonlocal sink
                     sink = []
-                    return await self._stream_think_and_act(messages, sink)
+                    return await self._stream_think_and_act(messages, sink, succeeded)
 
                 try:
                     assistant_msg, tool_messages = await retry_once_on_invalid(
