@@ -1036,6 +1036,82 @@ class TestExecutorCorrectiveRetryKeys:
         assert current_tool_call() is None
 
     @pytest.mark.asyncio
+    async def test_a_call_that_failed_validation_reemitted_unchanged_keeps_its_key(
+        self, mock_llm
+    ):
+        from agent_platform.agents.tools import ToolCallValidationError
+
+        class _RejectingOnceTool(_KeyedTool):
+            async def run(self, **kwargs):
+                context = current_tool_call()
+                self.keys.append(context.idempotency_key if context else None)
+                if len(self.keys) == 1:
+                    raise ToolCallValidationError("bad arguments")
+                return "ok"
+
+        rejecting = _RejectingOnceTool()
+        registry, _ = _recovery_registry()
+        registry.register(rejecting)
+        responses = [
+            make_fake_llm_response(
+                content="", tool_calls=[{"id": "a1", **_KEYED_CALL}]
+            ),
+            make_fake_llm_response(
+                content="", tool_calls=[{"id": "b1", **_KEYED_CALL}]
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        answer = await ex.run("go")
+
+        assert answer == "done"
+        assert rejecting.keys == ["a1", "a1"]
+
+    @pytest.mark.asyncio
+    async def test_a_malformed_call_does_not_take_a_failed_calls_key(self, mock_llm):
+        from agent_platform.core.interfaces.llm.response import (
+            FinishReason,
+            StreamChunk,
+            ToolCallDelta,
+        )
+
+        first = make_tool_call_stream_chunks(
+            [
+                {"id": "a1", "name": "keyed", "args": {}},
+                {"id": "a2", **_INVALID_CALL},
+            ]
+        )
+        second = [
+            StreamChunk(
+                delta="",
+                tool_call_deltas=[
+                    ToolCallDelta(
+                        index=0, id="b1", name="keyed", arguments_delta="{not json"
+                    ),
+                    ToolCallDelta(index=1, id="b2", name="keyed", arguments_delta="{}"),
+                    ToolCallDelta(
+                        index=2,
+                        id="b3",
+                        name="strict_weather",
+                        arguments_delta='{"location": "Paris"}',
+                    ),
+                ],
+            ),
+            StreamChunk(delta="", finish_reason=FinishReason.TOOL_CALL),
+        ]
+        attempts = [first, second, make_text_stream_chunks(["done"])]
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(attempts.pop(0))
+        registry, keyed = _keyed_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        with pytest.raises(AgentRecoveryExhausted):
+            [e async for e in ex.run_streaming("go")]
+
+        assert keyed.keys[-1] == "a1"
+
+    @pytest.mark.asyncio
     async def test_streaming_keeps_the_first_key_of_a_failed_call(self, mock_llm):
         attempts = [
             make_tool_call_stream_chunks(

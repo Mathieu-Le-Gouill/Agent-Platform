@@ -18,7 +18,7 @@ class ToolCallContext:
     unchanged, the retried call keeps the failed call's key (a call that
     succeeded is not run again, and a changed or new call gets its own id).
     Under a workflow `tool_node` it is built from the run, node and step, so a
-    resumed run keeps it. A tool with a side effect deduplicates on it.
+    resumed run keeps it; a resumed `agent_node` still gets new keys. A tool with a side effect deduplicates on it.
     """
 
     tool_name: str
