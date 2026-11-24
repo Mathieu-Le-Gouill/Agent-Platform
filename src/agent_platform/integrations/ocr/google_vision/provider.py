@@ -1,4 +1,5 @@
 import asyncio
+import functools
 from collections.abc import Sequence
 from typing import Any
 from uuid import UUID, uuid4
@@ -20,6 +21,10 @@ from agent_platform.integrations.credentials import (
 from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
 from agent_platform.integrations.ocr.google_vision.mappers import from_google_vision
 from agent_platform.integrations.ocr.sources import load_bytes
+from agent_platform.integrations.sdk_errors import translate_sdk_error
+
+_ERROR_MESSAGE = "OCR extraction failed"
+_translate = functools.partial(translate_sdk_error, operation=_ERROR_MESSAGE)
 
 
 class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
@@ -58,8 +63,8 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
                 )
         return self._client
 
-    @error_logged(re_raise=ProviderError, message="OCR extraction failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def extract(
         self,
         source: str,
@@ -74,7 +79,9 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
         document_bytes = await asyncio.to_thread(load_bytes, source)
         image = vision.Image(content=document_bytes)
 
-        kwargs: dict[str, Any] = {"image": image}
+        # `retry=None` turns off the RPC's own retry; the platform's
+        # `with_retry` is the only retry layer.
+        kwargs: dict[str, Any] = {"image": image, "retry": None}
         if config.language_hints:
             kwargs["image_context"] = {"language_hints": config.language_hints}
 

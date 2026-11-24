@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import asyncio
 import base64
+import functools
 from collections.abc import Sequence
 from pathlib import Path
 from typing import TYPE_CHECKING
@@ -28,6 +29,10 @@ from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.ocr.mistral.config import MistralOCRConfig
 from agent_platform.integrations.ocr.mistral.mappers import from_mistral
+from agent_platform.integrations.sdk_errors import translate_sdk_error
+
+_ERROR_MESSAGE = "OCR extraction failed"
+_translate = functools.partial(translate_sdk_error, operation=_ERROR_MESSAGE)
 
 _MIME_MAP = {
     "pdf": "application/pdf",
@@ -65,18 +70,13 @@ class MistralOCR(BaseOCR[MistralOCRConfig]):
             if timeout is not None:
                 kwargs["timeout_ms"] = int(timeout * 1000)
 
-            # `config.max_retries`/`client_options.max_retries` are intentionally not
-            # wired into the native SDK's `retry_config`: unlike OpenAI/Anthropic's
-            # simple int attempt count, Mistral's RetryConfig is a time-based backoff
-            # (initial_interval/max_interval/exponent/max_elapsed_time) with no
-            # attempt-count knob, so there's no faithful translation. The platform's
-            # own `@with_retry()` decorator on `extract` already provides equivalent
-            # attempt-count-based retry behavior.
+            # The SDK's `retry_config` is unset, so it makes no retry of its own;
+            # the platform's `with_retry` on `extract` is the only retry layer.
             self._client = Mistral(**kwargs)
         return self._client
 
-    @error_logged(re_raise=ProviderError, message="OCR extraction failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def extract(
         self,
         source: str,
@@ -114,9 +114,6 @@ class MistralOCR(BaseOCR[MistralOCRConfig]):
         if config.table_format is not None:
             kwargs["table_format"] = config.table_format
 
-        try:
-            response = await asyncio.to_thread(client.ocr.process, **kwargs)
-        except Exception as exc:
-            raise ProviderError(f"Mistral OCR failed: {exc}") from exc
+        response = await asyncio.to_thread(client.ocr.process, **kwargs)
 
         return from_mistral(response, doc_id, min_confidence=config.min_confidence)

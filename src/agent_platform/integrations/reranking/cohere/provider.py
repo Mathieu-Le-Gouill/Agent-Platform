@@ -8,7 +8,6 @@ from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
-    resolve_max_retries,
     resolve_timeout,
 )
 from agent_platform.core.errors import require_secret
@@ -38,9 +37,6 @@ class CohereRerankerProvider(
         kwargs: dict[str, Any] = {
             "api_key": api_key.get_secret_value(),
             "base_url": self._client_options.base_url,
-            "max_retries": resolve_max_retries(
-                config.max_retries, self._client_options
-            ),
         }
         timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
@@ -54,7 +50,9 @@ class CohereRerankerProvider(
         return cohere.Client(**self._client_kwargs(config))
 
     def _rerank_kwargs(self, config: CohereRerankerConfig) -> dict[str, Any]:
-        kwargs: dict[str, Any] = {}
+        # The Cohere client takes no retry setting at construction and retries
+        # twice by default; the platform's `with_retry` is the only retry layer.
+        kwargs: dict[str, Any] = {"request_options": {"max_retries": 0}}
         if config.max_chunks_per_doc is not None:
             kwargs["max_chunks_per_doc"] = config.max_chunks_per_doc
         return kwargs

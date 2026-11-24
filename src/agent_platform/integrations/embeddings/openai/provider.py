@@ -9,7 +9,6 @@ from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
-    resolve_max_retries,
     resolve_timeout,
 )
 from agent_platform.core.errors import require_secret
@@ -37,9 +36,8 @@ class OpenAIEmbeddingProvider(NativeEmbeddingProvider[OpenAIEmbeddingConfig]):
         )
         kwargs: dict[str, Any] = {
             "api_key": api_key.get_secret_value(),
-            "max_retries": resolve_max_retries(
-                config.max_retries, self._client_options
-            ),
+            # The platform's `with_retry` is the only retry layer.
+            "max_retries": 0,
         }
         if self._credentials.organization is not None:
             kwargs["organization"] = self._credentials.organization

@@ -1,13 +1,13 @@
 from __future__ import annotations
 
 import asyncio
+import functools
 from collections.abc import AsyncIterator
 
 from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
-    resolve_max_retries,
     resolve_timeout,
 )
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
@@ -16,11 +16,19 @@ from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.integrations.credentials import DeepgramCredentials
+from agent_platform.integrations.sdk_errors import translate_sdk_error
 from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
 from agent_platform.integrations.speech_to_text.deepgram.mappers import (
     parse_deepgram_result,
 )
 from agent_platform.integrations.speech_to_text.language import parse_language
+
+_ERROR_MESSAGE = "Speech-to-text failed"
+_translate = functools.partial(translate_sdk_error, operation=_ERROR_MESSAGE)
+
+# Applied when neither `DeepgramConfig.timeout` nor `ClientOptions.timeout` is
+# set. Long audio needs minutes, and the SDK's own default is 60 seconds.
+DEFAULT_STT_TIMEOUT_SECONDS = 300.0
 
 
 class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
@@ -45,21 +53,22 @@ class DeepgramSTT(BaseSpeechToText[DeepgramConfig]):
         from deepgram import AsyncDeepgramClient
 
         # `AsyncDeepgramClient`'s generated `BaseClient.__init__` (deepgram/base_client.py)
-        # takes plain `timeout: float | None` / `max_retries: int | None` kwargs with the
-        # same semantics as `ClientOptions`, so those two resolve cleanly. `base_url` does
-        # not: the SDK has no single base-URL kwarg, only an `environment:
+        # takes plain `timeout: float | None` / `max_retries: int | None` kwargs, so those
+        # two resolve cleanly (the platform's `with_retry` is the only retry layer, so
+        # the SDK makes none). `base_url` does not: the SDK has no single base-URL kwarg, only an `environment:
         # DeepgramClientEnvironment` object with 4 separate URLs (`base`/`production`/
         # `agent`/`agent_rest` for REST vs. websocket vs. the voice-agent endpoints), so a
         # single `ClientOptions.base_url` string has no faithful 1:1 translation. Left
         # unwired rather than guessing which of the 4 URLs it should populate.
+        timeout = resolve_timeout(config.timeout, self._client_options)
         return AsyncDeepgramClient(
             api_key=self._api_key(),
-            timeout=resolve_timeout(config.timeout, self._client_options),
-            max_retries=resolve_max_retries(config.max_retries, self._client_options),
+            timeout=timeout if timeout is not None else DEFAULT_STT_TIMEOUT_SECONDS,
+            max_retries=0,
         )
 
-    @error_logged(re_raise=ProviderError, message="Speech-to-text failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def transcribe(
         self, audio: AudioChunk, config: DeepgramConfig | None = None
     ) -> Transcript:

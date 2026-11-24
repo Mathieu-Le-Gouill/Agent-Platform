@@ -12,7 +12,10 @@ from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.speech_to_text.openai.config import (
     OpenAIWhisperConfig,
 )
-from agent_platform.integrations.speech_to_text.openai.provider import OpenAIWhisperSTT
+from agent_platform.integrations.speech_to_text.openai.provider import (
+    DEFAULT_STT_TIMEOUT_SECONDS,
+    OpenAIWhisperSTT,
+)
 
 
 def _make_audio() -> AudioChunk:
@@ -194,18 +197,18 @@ class TestOpenAIWhisperBuildClient:
         client = stt._build_client(OpenAIWhisperConfig())
         assert client is not None
 
-    def test_client_kwargs_default_max_retries(self):
+    def test_client_kwargs_default_timeout_and_sdk_retries_off(self):
         stt = OpenAIWhisperSTT(OpenAICredentials(api_key="secret"))
         kwargs = stt._client_kwargs(OpenAIWhisperConfig(max_retries=None))
-        assert kwargs["max_retries"] == 3
-        assert "timeout" not in kwargs
+        assert kwargs["max_retries"] == 0
+        assert kwargs["timeout"] == DEFAULT_STT_TIMEOUT_SECONDS == 300.0
 
-    def test_client_kwargs_explicit_timeout_and_retries(self):
+    def test_client_kwargs_explicit_timeout_keeps_sdk_retries_off(self):
         stt = OpenAIWhisperSTT(OpenAICredentials(api_key="secret"))
         cfg = OpenAIWhisperConfig(timeout=15.0, max_retries=5)
         kwargs = stt._client_kwargs(cfg)
         assert kwargs["timeout"] == 15.0
-        assert kwargs["max_retries"] == 5
+        assert kwargs["max_retries"] == 0
 
     def test_client_kwargs_client_options_fallback(self):
         from agent_platform.core.credentials import ClientOptions
@@ -216,7 +219,7 @@ class TestOpenAIWhisperBuildClient:
         )
         kwargs = stt._client_kwargs(OpenAIWhisperConfig())
         assert kwargs["timeout"] == 60.0
-        assert kwargs["max_retries"] == 7
+        assert kwargs["max_retries"] == 0
 
 
 class TestOpenAIWhisperTranscribeResponse:

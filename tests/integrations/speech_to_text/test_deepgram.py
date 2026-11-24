@@ -13,7 +13,10 @@ from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramC
 from agent_platform.integrations.speech_to_text.deepgram.mappers import (
     parse_deepgram_result as _parse_deepgram_result,
 )
-from agent_platform.integrations.speech_to_text.deepgram.provider import DeepgramSTT
+from agent_platform.integrations.speech_to_text.deepgram.provider import (
+    DEFAULT_STT_TIMEOUT_SECONDS,
+    DeepgramSTT,
+)
 from agent_platform.integrations.speech_to_text.language import (
     parse_language as _parse_language,
 )
@@ -161,21 +164,21 @@ class TestDeepgramApiKey:
 
 
 class TestDeepgramClientOptions:
-    def test_default_max_retries_and_no_timeout(self, mocker):
+    def test_default_timeout_and_sdk_retries_off(self, mocker):
         mock_client_cls = mocker.patch("deepgram.AsyncDeepgramClient", autospec=False)
         stt = DeepgramSTT(DeepgramCredentials(api_key="secret"))
         stt._build_client(DeepgramConfig(max_retries=None))
         _, kwargs = mock_client_cls.call_args
-        assert kwargs["max_retries"] == 3
-        assert kwargs["timeout"] is None
+        assert kwargs["max_retries"] == 0
+        assert kwargs["timeout"] == DEFAULT_STT_TIMEOUT_SECONDS == 300.0
 
-    def test_explicit_timeout_and_retries_forwarded(self, mocker):
+    def test_explicit_timeout_forwarded_and_sdk_retries_off(self, mocker):
         mock_client_cls = mocker.patch("deepgram.AsyncDeepgramClient", autospec=False)
         stt = DeepgramSTT(DeepgramCredentials(api_key="secret"))
         stt._build_client(DeepgramConfig(timeout=15.0, max_retries=5))
         _, kwargs = mock_client_cls.call_args
         assert kwargs["timeout"] == 15.0
-        assert kwargs["max_retries"] == 5
+        assert kwargs["max_retries"] == 0
 
     def test_client_options_fallback(self, mocker):
         from agent_platform.core.credentials import ClientOptions
@@ -188,7 +191,7 @@ class TestDeepgramClientOptions:
         stt._build_client(DeepgramConfig())
         _, kwargs = mock_client_cls.call_args
         assert kwargs["timeout"] == 60.0
-        assert kwargs["max_retries"] == 7
+        assert kwargs["max_retries"] == 0
 
 
 def _mock_response(channel_json: dict, language: str | None = "en"):

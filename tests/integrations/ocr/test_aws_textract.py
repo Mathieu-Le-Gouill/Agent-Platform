@@ -108,11 +108,11 @@ async def test_client_uses_endpoint_url_and_botocore_config(mocker):
     boto_config = kwargs["config"]
     assert boto_config.connect_timeout == 5.0
     assert boto_config.read_timeout == 5.0
-    assert boto_config.retries["max_attempts"] == 9
+    assert boto_config.retries["max_attempts"] == 0
 
 
 @pytest.mark.asyncio
-async def test_client_default_config_sets_max_retries_only(mocker):
+async def test_client_default_config_turns_sdk_retries_off(mocker):
     mock_boto = mocker.patch(
         "agent_platform.integrations.ocr.aws_textract.provider.boto3.client"
     )
@@ -135,7 +135,7 @@ async def test_client_default_config_sets_max_retries_only(mocker):
     # when we don't pass them, since resolve_timeout() returned None.
     assert boto_config.connect_timeout == 60
     assert boto_config.read_timeout == 60
-    assert boto_config.retries["max_attempts"] == 3
+    assert boto_config.retries["max_attempts"] == 0
 
 
 @pytest.mark.asyncio

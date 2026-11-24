@@ -29,18 +29,16 @@ def test_missing_credentials_raises_on_sync_client():
 
 
 class TestClientKwargs:
-    def test_default_max_retries(self):
+    def test_no_timeout_by_default(self):
         provider = _provider()
         kwargs = provider._client_kwargs(CohereRerankerConfig(max_retries=None))
-        assert kwargs["max_retries"] == 3
         assert "timeout" not in kwargs
 
-    def test_explicit_timeout_and_retries(self):
+    def test_explicit_timeout(self):
         provider = _provider()
         cfg = CohereRerankerConfig(timeout=15.0, max_retries=5)
         kwargs = provider._client_kwargs(cfg)
         assert kwargs["timeout"] == 15.0
-        assert kwargs["max_retries"] == 5
 
     def test_client_options_fallback(self):
         from agent_platform.core.credentials import ClientOptions
@@ -51,7 +49,6 @@ class TestClientKwargs:
         )
         kwargs = provider._client_kwargs(CohereRerankerConfig())
         assert kwargs["timeout"] == 60.0
-        assert kwargs["max_retries"] == 7
 
 
 class TestSync:

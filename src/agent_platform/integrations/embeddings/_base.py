@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from abc import abstractmethod
 from collections.abc import Sequence
 from typing import Generic
@@ -13,6 +14,10 @@ from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.embedding import Embedding
+from agent_platform.integrations.sdk_errors import translate_sdk_error
+
+_ERROR_MESSAGE = "Embedding generation failed"
+_translate = functools.partial(translate_sdk_error, operation=_ERROR_MESSAGE)
 
 
 class NativeEmbeddingProvider(
@@ -53,8 +58,8 @@ class NativeEmbeddingProvider(
         ]
         return EmbeddingResponse(embeddings=embeddings, model=config.model)
 
-    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def aembed_document(
         self,
         items: Sequence[TextChunk],
@@ -79,8 +84,8 @@ class NativeEmbeddingProvider(
             embeddings=[Embedding.from_list(vectors[0])], model=config.model
         )
 
-    @error_logged(re_raise=ProviderError, message="Embedding generation failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def aembed_query(
         self,
         query: str,

@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 import io
 from collections.abc import AsyncIterator
 from typing import Any
@@ -10,7 +11,6 @@ from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
-    resolve_max_retries,
     resolve_timeout,
 )
 from agent_platform.core.errors import ProviderError, error_logged, require_secret
@@ -19,9 +19,18 @@ from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript, Utterance
 from agent_platform.integrations.credentials import OpenAICredentials
+from agent_platform.integrations.sdk_errors import translate_sdk_error
 from agent_platform.integrations.speech_to_text._base import buffered_stream
 from agent_platform.integrations.speech_to_text.language import parse_language
 from agent_platform.integrations.speech_to_text.openai.config import OpenAIWhisperConfig
+
+_ERROR_MESSAGE = "Speech-to-text failed"
+_translate = functools.partial(translate_sdk_error, operation=_ERROR_MESSAGE)
+
+# Applied when neither `OpenAIWhisperConfig.timeout` nor `ClientOptions.timeout`
+# is set. Long audio needs minutes, and the SDK's own default of 10 minutes
+# would hold the retry loop too long on a stuck request.
+DEFAULT_STT_TIMEOUT_SECONDS = 300.0
 
 
 class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
@@ -43,20 +52,20 @@ class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
         kwargs: dict[str, Any] = {
             "api_key": api_key.get_secret_value(),
             "base_url": self._client_options.base_url,
-            "max_retries": resolve_max_retries(
-                config.max_retries, self._client_options
-            ),
+            # The platform's `with_retry` is the only retry layer.
+            "max_retries": 0,
         }
         timeout = resolve_timeout(config.timeout, self._client_options)
-        if timeout is not None:
-            kwargs["timeout"] = timeout
+        kwargs["timeout"] = (
+            timeout if timeout is not None else DEFAULT_STT_TIMEOUT_SECONDS
+        )
         return kwargs
 
     def _build_client(self, config: OpenAIWhisperConfig) -> AsyncOpenAI:
         return AsyncOpenAI(**self._client_kwargs(config))
 
-    @error_logged(re_raise=ProviderError, message="Speech-to-text failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def transcribe(
         self, audio: AudioChunk, config: OpenAIWhisperConfig | None = None
     ) -> Transcript:
@@ -84,10 +93,7 @@ class OpenAIWhisperSTT(BaseSpeechToText[OpenAIWhisperConfig]):
         if config.prompt:
             create_kwargs["prompt"] = config.prompt
 
-        try:
-            response = await client.audio.transcriptions.create(**create_kwargs)
-        except Exception as exc:
-            raise ProviderError(f"OpenAI Whisper transcription failed: {exc}") from exc
+        response = await client.audio.transcriptions.create(**create_kwargs)
 
         utterances: list[Utterance] = []
         if hasattr(response, "segments") and response.segments:

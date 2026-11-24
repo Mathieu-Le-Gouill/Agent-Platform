@@ -8,7 +8,6 @@ from agent_platform.core.credentials import (
     ClientOptions,
     resolve_client_options,
     resolve_credentials,
-    resolve_max_retries,
     resolve_timeout,
 )
 from agent_platform.integrations.credentials import VoyageCredentials
@@ -35,12 +34,8 @@ class VoyageRerankerProvider(
         if self._credentials.api_key is not None:
             kwargs["api_key"] = self._credentials.api_key.get_secret_value()
         kwargs["base_url"] = self._client_options.base_url
-        # voyageai's own SDK default for max_retries is 0 (not 3); resolve
-        # against ClientOptions so behavior stays consistent with the rest
-        # of the platform rather than inheriting voyage's unusually low default.
-        kwargs["max_retries"] = resolve_max_retries(
-            config.max_retries, self._client_options
-        )
+        # The platform's `with_retry` is the only retry layer.
+        kwargs["max_retries"] = 0
         timeout = resolve_timeout(config.timeout, self._client_options)
         if timeout is not None:
             kwargs["timeout"] = timeout

@@ -24,15 +24,15 @@ class TestClientKwargs:
     def test_default_max_retries(self):
         provider = _provider()
         kwargs = provider._client_kwargs(VoyageRerankerConfig(max_retries=None))
-        assert kwargs["max_retries"] == 3
+        assert kwargs["max_retries"] == 0
         assert "timeout" not in kwargs
 
-    def test_explicit_timeout_and_retries(self):
+    def test_explicit_timeout_keeps_sdk_retries_off(self):
         provider = _provider()
         cfg = VoyageRerankerConfig(timeout=15.0, max_retries=5)
         kwargs = provider._client_kwargs(cfg)
         assert kwargs["timeout"] == 15.0
-        assert kwargs["max_retries"] == 5
+        assert kwargs["max_retries"] == 0
 
     def test_client_options_fallback(self):
         from agent_platform.core.credentials import ClientOptions
@@ -43,7 +43,7 @@ class TestClientKwargs:
         )
         kwargs = provider._client_kwargs(VoyageRerankerConfig())
         assert kwargs["timeout"] == 60.0
-        assert kwargs["max_retries"] == 7
+        assert kwargs["max_retries"] == 0
 
 
 class TestSync:

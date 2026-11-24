@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from abc import abstractmethod
 from collections.abc import Sequence
 from typing import Generic, TypeVar, cast
@@ -9,6 +10,10 @@ from agent_platform.core.interfaces.reranking.base import BaseReranker, Reranker
 from agent_platform.core.retry import with_retry
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.reranking.scoring import apply_rerank_results
+from agent_platform.integrations.sdk_errors import translate_sdk_error
+
+_ERROR_MESSAGE = "Reranking failed"
+_translate = functools.partial(translate_sdk_error, operation=_ERROR_MESSAGE)
 
 # The async client (e.g. `AsyncClient`), used by `arerank`/`_invoke_async`.
 AsyncClientT = TypeVar("AsyncClientT")
@@ -97,8 +102,8 @@ class NativeReranker(
             score=self._result_score,
         )
 
-    @error_logged(re_raise=ProviderError, message="Reranking failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def arerank(
         self,
         query: str,

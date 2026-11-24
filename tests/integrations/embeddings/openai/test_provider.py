@@ -43,15 +43,15 @@ class TestOpenAIEmbeddingProviderClient:
         provider = OpenAIEmbeddingProvider(_creds())
         kwargs = provider._client_kwargs(OpenAIEmbeddingConfig())
         assert kwargs["api_key"] == "sk-test"
-        assert kwargs["max_retries"] == 3
+        assert kwargs["max_retries"] == 0
         assert "timeout" not in kwargs
 
-    def test_client_kwargs_explicit_timeout_and_retries(self):
+    def test_client_kwargs_explicit_timeout_keeps_sdk_retries_off(self):
         provider = OpenAIEmbeddingProvider(_creds())
         cfg = OpenAIEmbeddingConfig(timeout=15.0, max_retries=5)
         kwargs = provider._client_kwargs(cfg)
         assert kwargs["timeout"] == 15.0
-        assert kwargs["max_retries"] == 5
+        assert kwargs["max_retries"] == 0
 
     def test_client_kwargs_organization_included(self):
         creds = OpenAICredentials(api_key=SecretStr("sk-test"), organization="my-org")

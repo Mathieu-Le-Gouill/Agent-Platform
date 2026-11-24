@@ -45,15 +45,15 @@ class TestOpenAIModerationClient:
     def test_client_kwargs_default_max_retries(self):
         provider = OpenAIModeration(_creds())
         kwargs = provider._client_kwargs(OpenAIModerationConfig(max_retries=None))
-        assert kwargs["max_retries"] == 3
+        assert kwargs["max_retries"] == 0
         assert "timeout" not in kwargs
 
-    def test_client_kwargs_explicit_timeout_and_retries(self):
+    def test_client_kwargs_explicit_timeout_keeps_sdk_retries_off(self):
         provider = OpenAIModeration(_creds())
         cfg = OpenAIModerationConfig(timeout=15.0, max_retries=5)
         kwargs = provider._client_kwargs(cfg)
         assert kwargs["timeout"] == 15.0
-        assert kwargs["max_retries"] == 5
+        assert kwargs["max_retries"] == 0
 
     def test_client_kwargs_client_options_fallback(self):
         from agent_platform.core.credentials import ClientOptions
@@ -63,7 +63,7 @@ class TestOpenAIModerationClient:
         )
         kwargs = provider._client_kwargs(OpenAIModerationConfig())
         assert kwargs["timeout"] == 60.0
-        assert kwargs["max_retries"] == 7
+        assert kwargs["max_retries"] == 0
 
 
 class TestOpenAIModerationSync:

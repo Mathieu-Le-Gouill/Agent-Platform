@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import functools
 from abc import abstractmethod
 from typing import Generic, TypeVar, cast
 
@@ -8,6 +9,10 @@ from agent_platform.core.interfaces.moderation.base import BaseModerationProvide
 from agent_platform.core.interfaces.moderation.config import ModerationConfig
 from agent_platform.core.interfaces.moderation.response import ModerationResult
 from agent_platform.core.retry import with_retry
+from agent_platform.integrations.sdk_errors import translate_sdk_error
+
+_ERROR_MESSAGE = "Moderation request failed"
+_translate = functools.partial(translate_sdk_error, operation=_ERROR_MESSAGE)
 
 ConfigT = TypeVar("ConfigT", bound=ModerationConfig)
 # The async client (e.g. `AsyncOpenAI`), used by `amoderate`/`_invoke_async`.
@@ -58,8 +63,8 @@ class NativeModerationProvider(
         result = self._invoke_sync(client, text, config)
         return self._from_native(result)
 
-    @error_logged(re_raise=ProviderError, message="Moderation request failed")
-    @with_retry()
+    @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
+    @with_retry(translate=_translate)
     async def amoderate(
         self, text: str, config: ConfigT | None = None
     ) -> ModerationResult:
