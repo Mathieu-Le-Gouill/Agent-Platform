@@ -54,7 +54,13 @@ class _SucceededCalls:
         self._results: list[tuple[tuple[str, str], ToolMessage]] = []
 
     def take(self, call: ToolCall) -> ToolMessage | None:
-        """Return the stored result for `call`, re-labelled with its id."""
+        """Return the stored result for `call`, re-labelled with its id.
+
+        A call whose arguments did not parse never matches: its `arguments`
+        are an empty fallback, and reusing a result would hide the error.
+        """
+        if call.arguments_error is not None:
+            return None
         signature = _call_signature(call)
         for index, (stored_signature, message) in enumerate(self._results):
             if stored_signature == signature:

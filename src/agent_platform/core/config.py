@@ -21,8 +21,11 @@ class ModelConfig(ProviderConfig):
 
 class RequestOptions(ProviderConfig):
     # Per-call override of ClientOptions.timeout/max_retries (core/credentials.py);
-    # None means "use the client-level default", resolved via
-    # resolve_timeout()/resolve_max_retries(). Domain configs for network-bound
-    # providers mix this in alongside ModelConfig/ProviderConfig.
+    # None means "use the client-level default". `timeout` is resolved via
+    # resolve_timeout(). `max_retries` is resolved via resolve_max_retries()
+    # by LLM providers only; every other provider's SDK retries are off and
+    # the platform's `with_retry` is its only retry layer, so it ignores
+    # `max_retries`. Domain configs for network-bound providers mix this in
+    # alongside ModelConfig/ProviderConfig.
     timeout: float | None = None
     max_retries: int | None = None

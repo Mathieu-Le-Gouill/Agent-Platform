@@ -9,10 +9,10 @@ costs more than one call. A failed Midjourney download never sends the
 from __future__ import annotations
 
 import logging
+from typing import TYPE_CHECKING
 from unittest.mock import AsyncMock, MagicMock
 
 import httpx
-import openai
 import pytest
 from pydantic import SecretStr
 
@@ -22,16 +22,17 @@ from agent_platform.integrations.credentials import (
     OpenAICredentials,
 )
 from agent_platform.integrations.image_generation.dalle.config import DalleConfig
-from agent_platform.integrations.image_generation.dalle.provider import (
-    DEFAULT_IMAGE_TIMEOUT_SECONDS,
-    DallEImageGenerator,
-)
 from agent_platform.integrations.image_generation.midjourney.config import (
     MidjourneyConfig,
 )
 from agent_platform.integrations.image_generation.midjourney.provider import (
     MidjourneyGenerator,
 )
+
+if TYPE_CHECKING:
+    from agent_platform.integrations.image_generation.dalle.provider import (
+        DallEImageGenerator,
+    )
 
 _REQUEST = httpx.Request("POST", "https://vendor.test/v1")
 _OPERATION = "Image generation failed"
@@ -42,7 +43,8 @@ def _response(status: int) -> httpx.Response:
     return httpx.Response(status, request=_REQUEST)
 
 
-def _openai_status(status: int) -> openai.APIStatusError:
+def _openai_status(status: int) -> Exception:
+    openai = pytest.importorskip("openai")
     error_class = {
         429: openai.RateLimitError,
         500: openai.InternalServerError,
@@ -52,6 +54,11 @@ def _openai_status(status: int) -> openai.APIStatusError:
 
 
 def _dalle(mocker, error: Exception) -> tuple[DallEImageGenerator, AsyncMock]:
+    pytest.importorskip("openai")
+    from agent_platform.integrations.image_generation.dalle.provider import (
+        DallEImageGenerator,
+    )
+
     client_class = mocker.patch(f"{_DALLE_PROVIDER}.AsyncOpenAI")
     sdk_call = AsyncMock(side_effect=error)
     client_class.return_value.images.generate = sdk_call
@@ -84,7 +91,7 @@ class TestDallERetryRule:
         assert str(caught.value).startswith(_OPERATION)
 
     async def test_a_timeout_costs_one_call(self, mocker, no_retry_sleep):
-        timeout = openai.APITimeoutError(request=_REQUEST)
+        timeout = pytest.importorskip("openai").APITimeoutError(request=_REQUEST)
         generator, sdk_call = _dalle(mocker, timeout)
 
         with pytest.raises(ProviderError) as caught:
@@ -116,6 +123,12 @@ class TestDallERetryRule:
         assert not [r for r in caplog.records if "attempt" in r.getMessage()]
 
     def test_the_sdk_does_not_retry_and_has_a_300_second_default_timeout(self):
+        pytest.importorskip("openai")
+        from agent_platform.integrations.image_generation.dalle.provider import (
+            DEFAULT_IMAGE_TIMEOUT_SECONDS,
+            DallEImageGenerator,
+        )
+
         generator = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("sk-test")))
 
         kwargs = generator._client_kwargs(DalleConfig())
@@ -124,6 +137,11 @@ class TestDallERetryRule:
         assert kwargs["timeout"] == DEFAULT_IMAGE_TIMEOUT_SECONDS == 300.0
 
     def test_a_configured_timeout_wins_over_the_default(self):
+        pytest.importorskip("openai")
+        from agent_platform.integrations.image_generation.dalle.provider import (
+            DallEImageGenerator,
+        )
+
         generator = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("sk-test")))
 
         assert generator._client_kwargs(DalleConfig(timeout=12.0))["timeout"] == 12.0

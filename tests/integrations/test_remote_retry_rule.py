@@ -5,29 +5,21 @@ A 503 or a connection error costs 3 calls, a 400 costs 1 and raises a
 non-retryable `ProviderError` that names the operation. Each case raises its
 own SDK's real exception classes from the mocked SDK call. FAISS is local and
 exempt.
+
+Every SDK is optional, so each case imports its own lazily and is skipped when
+one of the SDKs it needs is missing.
 """
 
 from __future__ import annotations
 
+import importlib.util
 from collections.abc import Awaitable, Callable
 from dataclasses import dataclass
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import aiohttp
-import azure.core.exceptions
-import chromadb
-import chromadb.errors
-import deepl
-import google.api_core.exceptions
-import grpc
-import grpc.aio
 import httpx
-import pinecone.exceptions
 import pytest
-import requests
-import weaviate.exceptions
-from qdrant_client.http.exceptions import ResponseHandlingException, UnexpectedResponse
 
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas.chunk import TextChunk
@@ -41,19 +33,6 @@ from agent_platform.integrations.credentials import (
     QdrantCredentials,
     WeaviateCredentials,
 )
-from agent_platform.integrations.translation.azure.provider import AzureTranslator
-from agent_platform.integrations.translation.deepl.provider import DeepLTranslator
-from agent_platform.integrations.translation.google_translate.provider import (
-    GoogleTranslator,
-)
-from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
-from agent_platform.integrations.vector_store.chroma.provider import ChromaStore
-from agent_platform.integrations.vector_store.pinecone.config import PineconeConfig
-from agent_platform.integrations.vector_store.pinecone.provider import PineconeStore
-from agent_platform.integrations.vector_store.qdrant.provider import (
-    QdrantVectorStoreProvider,
-)
-from agent_platform.integrations.vector_store.weaviate.provider import WeaviateStore
 
 _REQUEST = httpx.Request("POST", "https://vendor.test/v1")
 _PROVIDER = "agent_platform.integrations"
@@ -64,6 +43,18 @@ _HYBRID_SEARCH = "Vector store hybrid search failed"
 
 _TEXT = TextChunk(text="Hello", metadata={})
 _VECTOR = [0.1, 0.2]
+
+
+def _installed(module: str) -> bool:
+    try:
+        return importlib.util.find_spec(module) is not None
+    except ImportError:
+        return False
+
+
+def _skip_unless_installed(*modules: str) -> pytest.MarkDecorator:
+    missing = [module for module in modules if not _installed(module)]
+    return pytest.mark.skipif(bool(missing), reason=f"{missing} not installed")
 
 
 def _raised_from(error: Exception, cause: Exception) -> Exception:
@@ -77,6 +68,8 @@ def _httpx_connection() -> Exception:
 
 
 def _azure_status(status: int) -> Exception:
+    import azure.core.exceptions
+
     response = MagicMock()
     response.status_code = status
     response.reason = "vendor said no"
@@ -84,20 +77,28 @@ def _azure_status(status: int) -> Exception:
 
 
 def _azure_connection() -> Exception:
+    import azure.core.exceptions
+
     return azure.core.exceptions.ServiceRequestError("connection refused")
 
 
 def _deepl_status(status: int) -> Exception:
+    import deepl
+
     return deepl.DeepLException(
         "vendor said no", should_retry=status == 503, http_status_code=status
     )
 
 
 def _deepl_connection() -> Exception:
+    import deepl
+
     return deepl.ConnectionException("Connection failed", should_retry=True)
 
 
 def _google_status(status: int) -> Exception:
+    import google.api_core.exceptions
+
     error_class = {
         400: google.api_core.exceptions.InvalidArgument,
         503: google.api_core.exceptions.ServiceUnavailable,
@@ -106,10 +107,14 @@ def _google_status(status: int) -> Exception:
 
 
 def _requests_connection() -> Exception:
+    import requests
+
     return requests.ConnectionError("connection refused")
 
 
 def _pinecone_status(status: int) -> Exception:
+    import pinecone.exceptions
+
     error_class = {
         400: pinecone.exceptions.PineconeApiException,
         503: pinecone.exceptions.ServiceException,
@@ -118,40 +123,74 @@ def _pinecone_status(status: int) -> Exception:
 
 
 def _aiohttp_connection() -> Exception:
+    import aiohttp
+
     return aiohttp.ClientConnectionError("connection refused")
 
 
 def _qdrant_status(status: int) -> Exception:
+    from qdrant_client.http.exceptions import UnexpectedResponse
+
     return UnexpectedResponse(status, "vendor said no", b"", httpx.Headers())
 
 
 def _qdrant_connection() -> Exception:
+    from qdrant_client.http.exceptions import ResponseHandlingException
+
     # The client raises this `from` the httpx transport error.
     return _raised_from(
         ResponseHandlingException(_httpx_connection()), _httpx_connection()
     )
 
 
-def _grpc_error(code: grpc.StatusCode) -> Exception:
-    return grpc.aio.AioRpcError(code, None, None, "vendor said no")
+def _qdrant_rate_limit() -> Exception:
+    from qdrant_client.common.client_exceptions import ResourceExhaustedResponse
+
+    # The client raises this, with no status, for a rate limit.
+    return ResourceExhaustedResponse("rate limited", 5)
+
+
+def _grpc_error(code_name: str) -> Exception:
+    import grpc
+    import grpc.aio
+
+    return grpc.aio.AioRpcError(
+        getattr(grpc.StatusCode, code_name), None, None, "vendor said no"
+    )
 
 
 def _weaviate_status(status: int) -> Exception:
-    code = {400: grpc.StatusCode.INVALID_ARGUMENT, 503: grpc.StatusCode.UNAVAILABLE}[
-        status
-    ]
+    import weaviate.exceptions
+
+    code_name = {400: "INVALID_ARGUMENT", 503: "UNAVAILABLE"}[status]
     # The client raises this `from` the gRPC error.
     return _raised_from(
         weaviate.exceptions.WeaviateQueryError("vendor said no", "GRPC search"),
-        _grpc_error(code),
+        _grpc_error(code_name),
     )
 
 
 def _weaviate_connection() -> Exception:
+    import weaviate.exceptions
+
     return weaviate.exceptions.WeaviateConnectionError("connection refused")
 
 
+def _weaviate_timeout() -> Exception:
+    import weaviate.exceptions
+
+    return weaviate.exceptions.WeaviateTimeoutError("timed out")
+
+
+def _weaviate_retry() -> Exception:
+    import weaviate.exceptions
+
+    return weaviate.exceptions.WeaviateRetryError("gave up", 3)
+
+
 def _chroma_status(status: int) -> Exception:
+    import chromadb.errors
+
     return {
         400: chromadb.errors.InvalidArgumentError,
         503: chromadb.errors.InternalError,
@@ -216,6 +255,8 @@ def _patch_weaviate(mocker: Any, error: Exception) -> Any:
 
 
 def _patch_chroma(mocker: Any, error: Exception) -> Any:
+    import chromadb.api
+
     client = MagicMock(spec=chromadb.api.AsyncClientAPI)
     collection = MagicMock()
     collection.query = AsyncMock(side_effect=error)
@@ -225,6 +266,8 @@ def _patch_chroma(mocker: Any, error: Exception) -> Any:
 
 
 async def _translate_azure() -> object:
+    from agent_platform.integrations.translation.azure.provider import AzureTranslator
+
     translator = AzureTranslator(
         AzureTranslatorCredentials(api_key="test-key", region="westus")
     )
@@ -232,16 +275,27 @@ async def _translate_azure() -> object:
 
 
 async def _translate_deepl() -> object:
+    from agent_platform.integrations.translation.deepl.provider import DeepLTranslator
+
     translator = DeepLTranslator(DeepLCredentials(auth_key="test-key"))
     return await translator.atranslate(_TEXT, target=Language.FR)
 
 
 async def _translate_google() -> object:
+    from agent_platform.integrations.translation.google_translate.provider import (
+        GoogleTranslator,
+    )
+
     translator = GoogleTranslator(GoogleTranslateCredentials())
     return await translator.atranslate(_TEXT, target=Language.FR)
 
 
 async def _search_pinecone() -> object:
+    from agent_platform.integrations.vector_store.pinecone.config import PineconeConfig
+    from agent_platform.integrations.vector_store.pinecone.provider import (
+        PineconeStore,
+    )
+
     store = PineconeStore(PineconeCredentials(api_key="secret"))
     return await store.search_with_scores(
         _VECTOR, config=PineconeConfig(host="idx.svc.pinecone.io")
@@ -249,12 +303,19 @@ async def _search_pinecone() -> object:
 
 
 async def _search_qdrant() -> object:
+    from agent_platform.integrations.vector_store.qdrant.provider import (
+        QdrantVectorStoreProvider,
+    )
+
     store = QdrantVectorStoreProvider(QdrantCredentials())
     return await store.search_with_scores(_VECTOR)
 
 
 async def _hybrid_search_qdrant() -> object:
     from agent_platform.core.schemas.vector import SparseVector
+    from agent_platform.integrations.vector_store.qdrant.provider import (
+        QdrantVectorStoreProvider,
+    )
 
     store = QdrantVectorStoreProvider(QdrantCredentials())
     return await store.search_hybrid(
@@ -263,16 +324,23 @@ async def _hybrid_search_qdrant() -> object:
 
 
 async def _search_weaviate() -> object:
+    from agent_platform.integrations.vector_store.weaviate.provider import WeaviateStore
+
     store = WeaviateStore(WeaviateCredentials(api_key=None))
     return await store.search_with_scores(_VECTOR)
 
 
 async def _plain_search_weaviate() -> object:
+    from agent_platform.integrations.vector_store.weaviate.provider import WeaviateStore
+
     store = WeaviateStore(WeaviateCredentials(api_key=None))
     return await store.search(_VECTOR)
 
 
 async def _search_chroma() -> object:
+    from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
+    from agent_platform.integrations.vector_store.chroma.provider import ChromaStore
+
     store = ChromaStore(ChromaCredentials())
     return await store.search_with_scores(_VECTOR, config=ChromaConfig())
 
@@ -280,15 +348,22 @@ async def _search_chroma() -> object:
 @dataclass(frozen=True)
 class Case:
     operation: str
+    # Modules the case imports; it is skipped when one is missing.
+    requires: tuple[str, ...]
     patch: Patch
     call: Call
     status_error: Callable[[int], Exception]
     connection_error: Callable[[], Exception]
 
 
+_AZURE = ("azure.core", "azure.ai.translation.text")
+_QDRANT = ("qdrant_client",)
+_WEAVIATE = ("weaviate", "grpc")
+
 CASES = {
     "azure-translation": Case(
         _TRANSLATION,
+        _AZURE,
         _patch_translate_method(
             f"{_PROVIDER}.translation.azure.provider.TextTranslationClient",
             "translate",
@@ -299,6 +374,7 @@ CASES = {
     ),
     "deepl-translation": Case(
         _TRANSLATION,
+        ("deepl",),
         _patch_translate_method(
             f"{_PROVIDER}.translation.deepl.provider.deepl.Translator",
             "translate_text",
@@ -309,6 +385,7 @@ CASES = {
     ),
     "google-translation": Case(
         _TRANSLATION,
+        ("google.cloud.translate_v2", "google.api_core", "requests"),
         _patch_google,
         _translate_google,
         _google_status,
@@ -316,6 +393,7 @@ CASES = {
     ),
     "pinecone-search": Case(
         _SEARCH,
+        ("pinecone", "aiohttp"),
         _patch_pinecone,
         _search_pinecone,
         _pinecone_status,
@@ -323,6 +401,7 @@ CASES = {
     ),
     "qdrant-search": Case(
         _SEARCH,
+        _QDRANT,
         _patch_qdrant_query,
         _search_qdrant,
         _qdrant_status,
@@ -330,6 +409,7 @@ CASES = {
     ),
     "qdrant-hybrid-search": Case(
         _HYBRID_SEARCH,
+        _QDRANT,
         _patch_qdrant_query,
         _hybrid_search_qdrant,
         _qdrant_status,
@@ -337,6 +417,7 @@ CASES = {
     ),
     "weaviate-search": Case(
         _SEARCH,
+        _WEAVIATE,
         _patch_weaviate,
         _plain_search_weaviate,
         _weaviate_status,
@@ -344,6 +425,7 @@ CASES = {
     ),
     "weaviate-search-with-scores": Case(
         _SEARCH,
+        _WEAVIATE,
         _patch_weaviate,
         _search_weaviate,
         _weaviate_status,
@@ -351,6 +433,7 @@ CASES = {
     ),
     "chroma-search": Case(
         _SEARCH,
+        ("chromadb",),
         _patch_chroma,
         _search_chroma,
         _chroma_status,
@@ -358,7 +441,13 @@ CASES = {
     ),
 }
 
-_case = pytest.mark.parametrize("case", CASES.values(), ids=CASES.keys())
+_case = pytest.mark.parametrize(
+    "case",
+    [
+        pytest.param(case, id=name, marks=_skip_unless_installed(*case.requires))
+        for name, case in CASES.items()
+    ],
+)
 
 
 @_case
@@ -399,8 +488,42 @@ async def test_a_400_costs_one_call_and_is_not_retryable(
     assert str(caught.value).startswith(case.operation)
 
 
+class TestTransientErrorsWithoutAStatus:
+    @_skip_unless_installed(*_QDRANT)
+    async def test_qdrant_rate_limit_costs_three_calls(self, mocker, no_retry_sleep):
+        sdk_call = _patch_qdrant_query(mocker, _qdrant_rate_limit())
+
+        with pytest.raises(ProviderError) as caught:
+            await _search_qdrant()
+
+        assert sdk_call.call_count == 3
+        assert caught.value.retryable is True
+        assert str(caught.value).startswith(_SEARCH)
+
+    @_skip_unless_installed(*_WEAVIATE)
+    @pytest.mark.parametrize(
+        "make_error", [_weaviate_timeout, _weaviate_retry], ids=["timeout", "retry"]
+    )
+    async def test_weaviate_timeout_and_retry_errors_cost_three_calls(
+        self, make_error, mocker, no_retry_sleep
+    ):
+        sdk_call = _patch_weaviate(mocker, make_error())
+
+        with pytest.raises(ProviderError) as caught:
+            await _plain_search_weaviate()
+
+        assert sdk_call.call_count == 3
+        assert caught.value.retryable is True
+        assert str(caught.value).startswith(_SEARCH)
+
+
 class TestTheSdkDoesNotRetry:
+    @_skip_unless_installed(*_AZURE)
     def test_azure_sets_retry_total_to_zero(self, mocker):
+        from agent_platform.integrations.translation.azure.provider import (
+            AzureTranslator,
+        )
+
         client_class = mocker.patch(
             f"{_PROVIDER}.translation.azure.provider.TextTranslationClient"
         )
@@ -412,12 +535,23 @@ class TestTheSdkDoesNotRetry:
 
         assert client_class.call_args.kwargs["retry_total"] == 0
 
+    @_skip_unless_installed("deepl")
     def test_deepl_sets_its_process_wide_retry_count_to_zero(self):
+        import deepl
+
         import agent_platform.integrations.translation.deepl.provider  # noqa: F401
 
         assert deepl.http_client.max_network_retries == 0
 
+    @_skip_unless_installed("pinecone", "aiohttp")
     async def test_pinecone_builds_every_client_with_a_single_attempt(self, mocker):
+        from agent_platform.integrations.vector_store.pinecone.config import (
+            PineconeConfig,
+        )
+        from agent_platform.integrations.vector_store.pinecone.provider import (
+            PineconeStore,
+        )
+
         attempts: list[int] = []
 
         class FakeJitterRetry:

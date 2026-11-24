@@ -1,4 +1,5 @@
 import asyncio
+import logging
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
@@ -661,13 +662,21 @@ class TestConversationFailedTurn:
         assert await checkpointer.load(str(agent.conversation_id)) is None
 
     @pytest.mark.asyncio
-    async def test_a_failing_save_does_not_replace_the_original_error(self, mock_llm):
+    async def test_a_failing_save_does_not_replace_the_original_error(
+        self, mock_llm, caplog
+    ):
         mock_llm.agenerate.side_effect = RuntimeError("boom")
         checkpointer = MagicMock()
         checkpointer.save = AsyncMock(side_effect=OSError("disk full"))
         agent = ConversationAgent(name="conv", llm=mock_llm, checkpointer=checkpointer)
 
-        with pytest.raises(AgentThinkError):
+        with caplog.at_level(logging.ERROR), pytest.raises(AgentThinkError):
             await agent.chat("Hi")
 
         checkpointer.save.assert_awaited_once()
+        failures = [
+            r for r in caplog.records if "Could not save the history" in r.getMessage()
+        ]
+        assert len(failures) == 1
+        assert failures[0].exc_info is not None
+        assert isinstance(failures[0].exc_info[1], OSError)

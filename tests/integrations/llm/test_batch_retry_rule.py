@@ -7,15 +7,14 @@ twice. Reading a batch is idempotent, so a 503 is retried.
 
 from __future__ import annotations
 
+import importlib.util
 from collections.abc import Callable
 from dataclasses import dataclass
 from types import SimpleNamespace
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
-import anthropic
 import httpx
-import openai
 import pytest
 from pydantic import SecretStr
 
@@ -26,8 +25,6 @@ from agent_platform.integrations.credentials import (
     AnthropicCredentials,
     OpenAICredentials,
 )
-from agent_platform.integrations.llm.anthropic.provider import AnthropicLLM
-from agent_platform.integrations.llm.openai.provider import OpenAILLM
 
 _REQUEST = httpx.Request("POST", "https://vendor.test/v1")
 _REQUESTS = [
@@ -40,23 +37,46 @@ def _response(status: int) -> httpx.Response:
 
 
 def _openai_503() -> Exception:
+    import openai
+
     return openai.InternalServerError(
         "vendor said no", response=_response(503), body=None
     )
 
 
 def _anthropic_503() -> Exception:
+    import anthropic
+
     return anthropic.InternalServerError(
         "vendor said no", response=_response(503), body=None
     )
 
 
 def _openai_timeout() -> Exception:
+    import openai
+
     return openai.APITimeoutError(request=_REQUEST)
 
 
 def _anthropic_timeout() -> Exception:
+    import anthropic
+
     return anthropic.APITimeoutError(request=_REQUEST)
+
+
+def _openai_provider() -> Any:
+    from agent_platform.integrations.llm.openai.provider import OpenAILLM
+
+    return OpenAILLM(OpenAICredentials(api_key=SecretStr("sk-test")), model="gpt-4.1")
+
+
+def _anthropic_provider() -> Any:
+    from agent_platform.integrations.llm.anthropic.provider import AnthropicLLM
+
+    return AnthropicLLM(
+        AnthropicCredentials(api_key=SecretStr("sk-ant-test")),
+        model="claude-sonnet-4-6",
+    )
 
 
 @dataclass(frozen=True)
@@ -92,9 +112,7 @@ def _patch_anthropic(mocker: Any) -> MagicMock:
 VENDORS = {
     "openai": Vendor(
         _patch_openai,
-        lambda: OpenAILLM(
-            OpenAICredentials(api_key=SecretStr("sk-test")), model="gpt-4.1"
-        ),
+        _openai_provider,
         lambda client: client.batches.create,
         lambda client: client.batches.retrieve,
         lambda client: client.batches.retrieve,
@@ -103,10 +121,7 @@ VENDORS = {
     ),
     "anthropic": Vendor(
         _patch_anthropic,
-        lambda: AnthropicLLM(
-            AnthropicCredentials(api_key=SecretStr("sk-ant-test")),
-            model="claude-sonnet-4-6",
-        ),
+        _anthropic_provider,
         lambda client: client.messages.batches.create,
         lambda client: client.messages.batches.retrieve,
         lambda client: client.messages.batches.results,
@@ -115,7 +130,20 @@ VENDORS = {
     ),
 }
 
-_vendor = pytest.mark.parametrize("vendor", VENDORS.values(), ids=VENDORS.keys())
+_vendor = pytest.mark.parametrize(
+    "vendor",
+    [
+        pytest.param(
+            vendor,
+            id=name,
+            marks=pytest.mark.skipif(
+                importlib.util.find_spec(name) is None,
+                reason=f"{name} is not installed",
+            ),
+        )
+        for name, vendor in VENDORS.items()
+    ],
+)
 
 
 @_vendor

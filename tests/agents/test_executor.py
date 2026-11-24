@@ -835,6 +835,87 @@ class TestExecutorCorrectiveRetryReuse:
         assert counting.runs == 2
 
     @pytest.mark.asyncio
+    async def test_each_stored_result_is_reused_at_most_once(self, mock_llm):
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "a1", **_VALID_CALL}, {"id": "a2", **_INVALID_CALL}],
+            ),
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "b1", **_VALID_CALL}, {"id": "b2", **_VALID_CALL}],
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, counting = _recovery_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        await ex.run("go")
+
+        assert counting.runs == 2
+
+    @pytest.mark.asyncio
+    async def test_every_call_reused_runs_no_tool(self, mock_llm):
+        responses = [
+            make_fake_llm_response(
+                content="",
+                tool_calls=[{"id": "a1", **_VALID_CALL}, {"id": "a2", **_INVALID_CALL}],
+            ),
+            make_fake_llm_response(
+                content="", tool_calls=[{"id": "b1", **_VALID_CALL}]
+            ),
+            make_fake_llm_response(content="done"),
+        ]
+        mock_llm.agenerate.side_effect = lambda **kw: responses.pop(0)
+        registry, counting = _recovery_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        answer, history = await ex.run_with_messages([UserMessage(content="go")])
+
+        assert answer == "done"
+        assert counting.runs == 1
+        (kept,) = [
+            m.result
+            for m in history
+            if m.role == "tool" and m.result.tool_call_id == "b1"
+        ]
+        assert kept.name == "counter"
+        assert not kept.is_error
+
+    @pytest.mark.asyncio
+    async def test_a_call_with_malformed_arguments_is_never_reused(self, mock_llm):
+        from agent_platform.core.interfaces.llm.response import (
+            FinishReason,
+            StreamChunk,
+            ToolCallDelta,
+        )
+
+        first = make_tool_call_stream_chunks(
+            [{"id": "a1", "name": "counter", "args": {}}, {"id": "a2", **_INVALID_CALL}]
+        )
+        second = [
+            StreamChunk(
+                delta="",
+                tool_call_deltas=[
+                    ToolCallDelta(
+                        index=0, id="b1", name="counter", arguments_delta="{not json"
+                    )
+                ],
+            ),
+            StreamChunk(delta="", finish_reason=FinishReason.TOOL_CALL),
+        ]
+        attempts = [first, second, make_text_stream_chunks(["done"])]
+        mock_llm.stream.side_effect = lambda **kw: make_fake_stream(attempts.pop(0))
+        registry, counting = _recovery_registry()
+        ex = AgentExecutor(Agent(name="a", llm=mock_llm, tool_registry=registry))
+
+        with pytest.raises(AgentRecoveryExhausted):
+            [e async for e in ex.run_streaming("go")]
+
+        assert counting.runs == 1
+
+    @pytest.mark.asyncio
     async def test_streaming_reuses_the_call_and_emits_its_final_chunk(self, mock_llm):
         attempts = [
             make_tool_call_stream_chunks(

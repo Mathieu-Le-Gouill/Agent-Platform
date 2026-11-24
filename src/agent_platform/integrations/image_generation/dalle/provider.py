@@ -4,7 +4,7 @@ import base64
 import functools
 from typing import Any
 
-from openai import APIConnectionError, AsyncOpenAI
+from openai import AsyncOpenAI
 
 from agent_platform.core.credentials import (
     ClientOptions,
@@ -35,7 +35,6 @@ _ERROR_MESSAGE = "Image generation failed"
 _translate = functools.partial(
     translate_sdk_error,
     operation=_ERROR_MESSAGE,
-    transient_types=(APIConnectionError,),
     retry_statuses=frozenset({429, 503}),
 )
 

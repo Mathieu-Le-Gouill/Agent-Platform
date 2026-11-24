@@ -30,8 +30,9 @@ from agent_platform.integrations.vector_store.qdrant.mappers import (
 _SEARCH_ERROR = "Vector store search failed"
 _HYBRID_SEARCH_ERROR = "Vector store hybrid search failed"
 
-# The client raises this, with no status, for a rate limit that carries a
-# `Retry-After` value.
+# The client raises this, with no status, for a rate limit. It is retried, but
+# the wait the server asked for (`retry_after_s`) is not honoured: the shared
+# classifier reads `Retry-After` only from `exc.response.headers`.
 _TRANSIENT_TYPES = (ResourceExhaustedResponse,)
 _translate_search = functools.partial(
     translate_sdk_error, operation=_SEARCH_ERROR, transient_types=_TRANSIENT_TYPES

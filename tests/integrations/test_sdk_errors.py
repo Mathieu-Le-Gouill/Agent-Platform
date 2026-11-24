@@ -1,10 +1,6 @@
 from __future__ import annotations
 
-import aiohttp
-import httpx
 import pytest
-import requests
-from azure.core.exceptions import ServiceRequestError
 
 from agent_platform.core.errors import PlatformError, ProviderError
 from agent_platform.integrations.sdk_errors import translate_sdk_error
@@ -75,24 +71,39 @@ class TestStatusSources:
 
 class TestConnectionErrors:
     @pytest.mark.parametrize(
-        "exc",
+        ("module", "build"),
         [
-            TimeoutError("slow"),
-            ConnectionResetError("reset"),
-            httpx.ConnectError("down"),
-            requests.ConnectionError("down"),
-            requests.Timeout("slow"),
-            aiohttp.ClientConnectionError("down"),
-            ServiceRequestError("down"),
+            pytest.param(None, lambda _: TimeoutError("slow"), id="timeout"),
+            pytest.param(None, lambda _: ConnectionResetError("reset"), id="reset"),
+            pytest.param("httpx", lambda m: m.ConnectError("down"), id="httpx-connect"),
+            pytest.param(
+                "requests", lambda m: m.ConnectionError("down"), id="requests-connect"
+            ),
+            pytest.param(
+                "requests", lambda m: m.Timeout("slow"), id="requests-timeout"
+            ),
+            pytest.param(
+                "aiohttp",
+                lambda m: m.ClientConnectionError("down"),
+                id="aiohttp-connect",
+            ),
+            pytest.param(
+                "azure.core.exceptions",
+                lambda m: m.ServiceRequestError("down"),
+                id="azure-request",
+            ),
         ],
     )
-    def test_each_connection_class_is_retryable(self, exc):
+    def test_each_connection_class_is_retryable(self, module, build):
+        exc = build(pytest.importorskip(module) if module else None)
+
         error = translate_sdk_error(exc)
 
         assert error.retryable is True
         assert error.code == "provider_unavailable"
 
     def test_a_chained_connection_error_is_found(self):
+        httpx = pytest.importorskip("httpx")
         try:
             try:
                 raise httpx.ConnectError("down")
