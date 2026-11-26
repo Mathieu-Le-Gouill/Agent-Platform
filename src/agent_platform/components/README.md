@@ -150,5 +150,5 @@ No `__init__.py`, callers import `components.<stage>.<name>.component` directly.
 - Configs are typed Pydantic models
 - Config always goes into the `arun()` input alongside the data as a `(data, config)` tuple, never into `__init__`, see "Where config lives" above
 - Errors are translated to `core/errors.py` types
-- Components may import from `core/`, `integrations/`, and `components/`, never from `pipelines/` or `agents/`
+- Components may import from `core/`, `integrations/`, `components/` and `utils/`, never from `pipelines/`, `agents/`, `workflows/` or `evals/`
 - Every component is a directory under a stage folder (`components/<stage>/<name>/component.py`), no flat-file components, matching `integrations/<domain>/<provider>/`'s layout

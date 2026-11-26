@@ -20,6 +20,11 @@ Before editing anything, follow this order:
 If a directory has no README, treat the parent directory's README as the
 active context and follow its conventions unless told otherwise.
 
+Vocabulary: root `GLOSSARY.md` defines the platform's domain terms
+(Document, Chunk, Provider, Component, Tool Call, Corrective Retry, Node,
+Checkpoint, ...). Name code, docs and messages with its terms, and check it
+when a word could mean two things.
+
 ## 1. Project overview
 
 `agent_platform` is an async-first Python library for building LLM agents and
@@ -43,7 +48,7 @@ Purpose only, enough to know which README to open next.
 | `src/agent_platform/integrations/` | Provider adapters per domain (llm, embeddings, vector_store, reranking, ocr, speech_to_text, translation, vad, chunking, clustering, loader, image_generation, classification, dataset, moderation, mcp, tracing), 17 domains | yes |
 | `src/agent_platform/components/` | Reusable processing units wrapping one or more integrations (`Chunker`, `Embedder`, `Reranker`, classifiers) | yes |
 | `src/agent_platform/pipelines/` | Multi-step orchestration flows composing components (ingestion, RAG, speech translation) | yes |
-| `src/agent_platform/agents/` | Top-level composition: `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, tools (incl. MCP), guardrails | yes |
+| `src/agent_platform/agents/` | Single-agent composition: `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, tools (incl. MCP), guardrails | yes |
 | `src/agent_platform/workflows/` | Multi-agent orchestration: in-house typed-state DAG (`WorkflowGraph`/`CompiledWorkflow`), `agent_node`/`tool_node`/`handoff_node`, pluggable checkpointing | yes |
 | `src/agent_platform/evals/` | Regression testing for agents/pipelines: `EvalCase`/`EvalDataset`/`EvalRunner`/`Scorer`/`EvalReport`, `agent-platform-eval` CLI | yes |
 | `src/agent_platform/audio/` | DSP utilities, resampling, waveform chunking, tensor/numpy/base64 conversion | no |
@@ -181,13 +186,21 @@ rather than guessing silently.
 
 ## 6. General rules
 
-- **Never import upward.** `core/` → nothing; `integrations/` → `core/`
-  only; `components/` → `integrations/` + `core/`; `pipelines/` →
-  `components/`; `agents/` → `pipelines/` + `components/`; `evals/` →
-  `agents/` + `pipelines/` + `components/` + `core/` (nothing imports
-  `evals/`). This is not just convention: `[tool.importlinter]` in
-  `pyproject.toml` enforces the layer order and that `core/` never imports
-  a sibling layer; run `lint-imports` to check, CI fails the same way.
+- **Never import upward.** The stack, bottom to top, is `core/` →
+  `integrations/` → `components/` → `pipelines/` → `agents/` →
+  `workflows/` → `evals/`. A layer may import any layer below it, skipping
+  some if it likes (`agents/` tools wrap `components/` directly), and never
+  one above it. Direction only constrains imports: every layer runs without
+  the ones above it, so a pipeline needs no agent, and `evals/` sits on top
+  because it may grade any of them. This is not just convention:
+  `[tool.importlinter]` in `pyproject.toml` enforces the layer order and
+  that `core/` never imports a sibling layer; run `lint-imports` to check,
+  CI fails the same way.
+- **Outside the stack** (no import-linter contract covers them):
+  `utils/` imports no other package and any layer may use it; `audio/`
+  builds on `core/` only and serves `integrations/` and up; `config/` and
+  `api/` are the composition root, wiring agents and providers together,
+  and no layer imports them.
 - **`core/` has no external deps** beyond `pydantic`, `abc`, `typing`,
   `uuid`, `datetime`. Observability is no exception: `core` defines
   `BaseTracer`/`Span` with no-op defaults, every backend lives in
@@ -221,3 +234,6 @@ rather than guessing silently.
   known issue, update the README in the same change. Skip this for changes
   that don't shift what the README describes (internal refactors, bug fixes
   that don't change behavior described there, test-only changes).
+- **Keep `GLOSSARY.md` in sync** when a change introduces, renames or
+  redefines a domain concept: one or two sentences on what the term is, plus
+  the synonyms to avoid.

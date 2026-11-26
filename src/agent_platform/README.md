@@ -3,27 +3,32 @@
 ## Layers
 
 ```
-┌──────────────────────────────────────────────────┐
-│  evals/      ← regression testing (EvalRunner,    │
-│                 EvalDataset, Scorer, evals/cli.py) │
-├──────────────────────────────────────────────────┤
-│  agents/         ← composition (Agent, Executor,  │
-│                     ConversationAgent, Tool ABC,  │
-│                     ToolRegistry, 7 tools + MCP)   │
-│  api/        ← FastAPI entrypoint (build_agent)   │
-│  workflows/  ← orchestration (WorkflowGraph, DAG,  │
-│                agent/tool/handoff nodes)          │
-├──────────────────────────────────────────────────┤
-│  pipelines/         ← orchestration               │
-│  (ingestion, speech_translation, rag)             │
-├──────────────────────────────────────────────────┤
-│  components/        ← reusable processing units   │
-├──────────────────────────────────────────────────┤
-│  integrations/      ← service adapters            │
-├──────────────────────────────────────────────────┤
-│  core/  audio/  utils/ ← foundation               │
-└──────────────────────────────────────────────────┘
+  outside the stack            the stack (bottom → top)
+┌────────────────────┐   ┌───────────────────────────────────────────────┐
+│ config/  api/      │   │ evals/        ← regression testing            │
+│ composition root:  │   │                 (EvalRunner, Scorer, cli.py)  │
+│ Settings, DI,      │   ├───────────────────────────────────────────────┤
+│ FastAPI app        │   │ workflows/    ← multi-agent orchestration     │
+│ (imported by no    │   │                 (WorkflowGraph, agent/tool/   │
+│ layer)             │   │                 handoff nodes, checkpoints)   │
+└────────────────────┘   ├───────────────────────────────────────────────┤
+                         │ agents/       ← single-agent composition      │
+                         │                 (Agent, Executor, Conversation│
+                         │                 Agent, ToolRegistry, tools)   │
+                         ├───────────────────────────────────────────────┤
+                         │ pipelines/    ← fixed multi-step flows        │
+                         │                 (ingestion, speech, rag)      │
+                         ├───────────────────────────────────────────────┤
+                         │ components/   ← reusable processing units     │
+                         ├───────────────────────────────────────────────┤
+                         │ integrations/ ← provider adapters             │
+                         ├───────────────────────────────────────────────┤
+                         │ core/         ← interfaces, schemas, errors   │
+                         └───────────────────────────────────────────────┘
+  foundation helpers: utils/ (imports nothing), audio/ (core only)
 ```
+
+A layer imports any layer below it and none above (enforced by `lint-imports`), so each layer works without the ones above it. `config/` and `api/` wire the stack together; `utils/` and `audio/` are usable from any layer that needs them (rules in `AGENTS.md` §6).
 
 ## Layer Details
 

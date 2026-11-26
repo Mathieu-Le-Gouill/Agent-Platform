@@ -3,7 +3,7 @@
 ## Design
 
 `workflows/` sits above `agents/` in the layer stack: `core` → `integrations`
-→ `components` → `pipelines` → `workflows` → `agents` → `evals` (see
+→ `components` → `pipelines` → `agents` → `workflows` → `evals` (see
 `agent_platform/README.md`'s layer map). It answers what none of the layers
 below it can: running more than one `Agent`/`Tool` as a single typed-state
 graph, with conditional branching, handoffs, and resumability, instead of one

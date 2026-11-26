@@ -1,6 +1,6 @@
 # Agents: Status & Roadmap
 
-The agents layer is the top-level composition: LLM reasoning, tool calls, and conversation state.
+The agents layer is single-agent composition: LLM reasoning, tool calls, and conversation state. Running several agents together is `workflows/`, the layer above.
 
 ```
 Agent = LLM (reasoning) + Tools (capabilities) + Executor (loop control)
@@ -159,7 +159,7 @@ and can proceed in parallel.
 
 Independent of Phases 2/4: closes the "every tool is hand-registered Python"
 gap without changing the `Tool` protocol itself, so anything already
-implementing `Tool` (including a future `workflows/` node) keeps working
+implementing `Tool` (including a `workflows/` node) keeps working
 unmodified.
 
 - Per-tool resilience: `ToolRegistry.register(tool, *, timeout=None,

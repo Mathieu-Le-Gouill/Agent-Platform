@@ -75,7 +75,7 @@ interfaces/<domain>/
 
 `interfaces/llm/structured.py` holds `generate_structured(llm, prompt, output_type, config)`: it asks for the JSON schema of a `BaseModel` (or plain text for `str`), validates the answer, and re-asks once through `retry_once_on_invalid`. It returns a `StructuredResult` (`output`, `usage` summed over every attempt, `response` of the accepted attempt) or raises `StructuredOutputError`. `Agent` reuses its `schema_config`, `schema_error` and `schema_correction` functions; `components/generation/llm_task/` builds on it.
 
-An interface ABC **never imports from `integrations/`**, **never imports from `components/`**, and **never imports from `pipelines/`**. It may only use `core/schemas/`, `core/config.py`, `core/errors.py`, and `core/credentials.py`. Every domain's `config.py` defines a `<Domain>Config` that extends `core/config.py`'s `ProviderConfig`, the shared base for all provider configs. Domains whose providers are parameterized by a model id (llm, embeddings, reranking, speech, image_generation) extend `ModelConfig` instead, which adds `model: str` on top of `ProviderConfig`; domains without a model concept (loader, chunking, clustering, vad, ocr, translation, classification, vector_store, dataset) extend `ProviderConfig` directly.
+An interface ABC **never imports from any layer above `core/`** (`integrations/` through `evals/`). It may only use `core/schemas/`, `core/config.py`, `core/errors.py`, and `core/credentials.py`. Every domain's `config.py` defines a `<Domain>Config` that extends `core/config.py`'s `ProviderConfig`, the shared base for all provider configs. Domains whose providers are parameterized by a model id (llm, embeddings, reranking, speech, image_generation) extend `ModelConfig` instead, which adds `model: str` on top of `ProviderConfig`; domains without a model concept (loader, chunking, clustering, vad, ocr, translation, classification, vector_store, dataset) extend `ProviderConfig` directly.
 
 **Where a field belongs:** put it on the shared `<Domain>Config` only if almost every provider in the domain actually uses it. If just one or two do, it belongs on that provider's own `config.py` instead (e.g. `max_samples` lives on `SileroVadConfig`, not `VADConfig`, since only Silero needs it). Fields no provider uses get deleted, not kept around. One exception: a field a cross-cutting caller sets regardless of backend (`OCRConfig.min_confidence`) can stay on the shared config even if a specific provider ignores it. `GenerationConfig.reasoning_effort` and `parallel_tool_calls` use this exception: callers set them whatever the provider, and a provider without the control warns and skips the field.
 
@@ -84,6 +84,8 @@ An interface ABC **never imports from `integrations/`**, **never imports from `c
 **Required parameters never live on config:** `config` is always optional (`config: ConfigT | None = None`) on every ABC method, so a caller can always omit it and get provider defaults. That means any value a call cannot proceed without (a path, a query string, the text to classify, the items to embed, …) must be its own positional/keyword parameter on the method, never a `Config` field, even a required one, since a required config field would force every caller to construct a config just to make an otherwise-optional-looking argument work (`BaseDatasetProvider.load(self, record_type, path, config=None)` puts `path` directly on the signature rather than inside `DatasetConfig`, for exactly this reason). Concretely: no `<Domain>Config` field is ever declared without a default; every field has a `None` or concrete default so the config stays fully optional as a whole.
 
 ### `schemas/`: Shared Data Structures
+
+What each content type means (Document vs Chunk, the four Documents, Transcript and Utterance) is defined in the root `GLOSSARY.md`; name new schemas with its terms.
 
 All Pydantic v2 models live here. They are the currency passed between layers, a component returns a schema type, a pipeline accepts one, a tool wraps one.
 
@@ -188,7 +190,7 @@ Sits alongside `retry.py` rather than replacing it: `with_retry()` retries a sin
 
 ### `persistence.py`: Checkpointing
 
-`Checkpointer[StateT]` is a `Protocol` with `async save(key, state) -> None` and `async load(key) -> StateT | None`. `InMemoryCheckpointer[StateT]` is the default implementation, a plain dict keyed by `key`. Generic over `StateT`, so it works for a `ConversationAgent` session or a future `workflows/` run state alike; a real backend (Redis, a DB table) implements the same protocol.
+`Checkpointer[StateT]` is a `Protocol` with `async save(key, state) -> None` and `async load(key) -> StateT | None`. `InMemoryCheckpointer[StateT]` is the default implementation, a plain dict keyed by `key`. Generic over `StateT`, so it works for a `ConversationAgent` session or a `workflows/` run alike; a real backend (Redis, a DB table) implements the same protocol.
 
 ### `token_usage.py`: Token Accounting
 
@@ -231,6 +233,6 @@ core/interfaces/<new_domain>/
 
 ## Constraints
 
-- **No imports from `integrations/`, `components/`, `pipelines/`, or `agents/`**
+- **No imports from `integrations/`, `components/`, `pipelines/`, `agents/`, `workflows/` or `evals/`**
 - **No external library imports** (no langchain, no openai, no opentelemetry, etc.), only `pydantic`, `abc`, `typing`, `uuid`, `datetime`
 - ABCs use `Generic` TypeVars for type safety where appropriate

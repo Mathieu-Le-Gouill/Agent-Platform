@@ -2,8 +2,10 @@
 
 ## Design
 
-`evals/` sits above `agents/` in the layer stack: `core` → `integrations` →
-`components` → `pipelines` → `agents` → `evals`. It answers a question none
+`evals/` is the top of the layer stack: `core` → `integrations` →
+`components` → `pipelines` → `agents` → `workflows` → `evals`. An
+`EvalTarget` is any async callable, so a pipeline or workflow can be graded
+without an agent; the shipped target helpers wrap agents. It answers a question none
 of the layers below it can: did a prompt, model, or agent-loop change
 regress behavior? Nothing here is a new provider surface, scorers inject
 existing `core/interfaces` ABCs (`BaseLLMProvider`, `BaseEmbeddingProvider`)

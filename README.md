@@ -5,20 +5,22 @@ A modular Python platform for building AI-powered conversational systems. Unifie
 ## Architecture
 
 ```
-Skills / Agents   (LLM + Tools → autonomous behavior)
-      ↓ uses
-Tools             (call Components or Pipelines)
+Evals          (grade agents, workflows or pipelines against datasets)
+      ↓ evaluates
+Workflows      (typed-state graphs of Agents and Tools, resumable)
+      ↓ orchestrates
+Agents         (LLM + Tools in a think-act loop; Tools wrap Components or Pipelines)
       ↓ calls
-Pipelines         (orchestrate multiple Components)
+Pipelines      (fixed sequences of Components)
       ↓ composes
-Components        (compose one or more Integrations)
+Components     (reusable units over one or more Integrations)
       ↓ composes
-Integrations      (concrete providers for Core interfaces)
+Integrations   (concrete providers for Core interfaces)
       ↓ implements
-Core              (interfaces + schemas, no external deps; no tracing SDK either)
+Core           (interfaces + schemas, no external deps; no tracing SDK either)
 ```
 
-Each layer may only import from layers below it. See `AGENTS.md` for full rules.
+Each layer may import any layer below it and none above, so each one also works on its own: a pipeline runs without an agent, and evals can grade a pipeline directly. `config/` and `api/` sit outside the stack and wire it together. See `AGENTS.md` for full rules.
 
 ## Directory Layout
 
@@ -29,12 +31,12 @@ src/agent_platform/
 ├── components/        # Reusable processing units composing integrations
 ├── pipelines/         # Multi-step orchestration flows
 ├── agents/            # LLM reasoning loop, tool registry, conversation management
+├── workflows/         # Multi-agent orchestration: typed-state graph, agent/tool/handoff nodes, checkpointing
 ├── evals/             # Regression testing: EvalRunner, EvalDataset, Scorer, agent-platform-eval CLI
 ├── audio/             # Audio I/O + DSP utilities
 ├── utils/             # Shared helpers
 ├── config/            # Settings (pydantic-settings), logging, DI container (build_agent, build_provider)
-├── api/               # FastAPI app, bearer-key auth, per-key /chat conversations, /health
-└── workflows/         # Orchestration engine (empty stub)
+└── api/               # FastAPI app, bearer-key auth, per-key /chat conversations, /health
 ```
 
 ## Integrations at a Glance
@@ -125,4 +127,4 @@ Follow [Conventional Commits](https://www.conventionalcommits.org/): `<type>: <s
 
 ## For Coding Agents
 
-Read `AGENTS.md` before making any changes. It documents the lookup protocol, layer rules, error hierarchy, testing conventions, and extension guidance.
+Read `AGENTS.md` before making any changes. It documents the lookup protocol, layer rules, error hierarchy, testing conventions, and extension guidance. `GLOSSARY.md` defines the domain vocabulary (Document, Provider, Component, Workflow, ...).

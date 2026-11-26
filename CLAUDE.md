@@ -6,10 +6,11 @@ Read `AGENTS.md` first - it is the primary authority for architecture, layer rul
 
 - **`src/agent_platform/README.md`** - layer map and known issues
 - **`src/agent_platform/<layer>/README.md`** - local patterns for that layer; read before touching it
+- **`GLOSSARY.md`** - domain terms (Document, Provider, Tool Call, Node, ...) and the synonyms to avoid
 
 ## Current state
 
-The platform is structurally complete at the integration, component, pipeline, agent, evals, and workflows layers. The `api/` directory has a real FastAPI entrypoint.
+The platform is structurally complete at the integration, component, pipeline, agent, workflows, and evals layers. The `api/` directory has a real FastAPI entrypoint.
 
 ## What is solid
 
