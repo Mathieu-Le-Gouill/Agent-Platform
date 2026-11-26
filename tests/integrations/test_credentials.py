@@ -17,7 +17,6 @@ from agent_platform.integrations.credentials import (
     GoogleVisionCredentials,
     HuggingFaceCredentials,
     JinaCredentials,
-    MidjourneyCredentials,
     MistralCredentials,
     OllamaCredentials,
     OpenAICredentials,
@@ -122,12 +121,6 @@ class TestCohereCredentials:
 class TestJinaCredentials:
     def test_can_be_instantiated(self):
         creds = JinaCredentials()
-        assert isinstance(creds, Credentials)
-
-
-class TestMidjourneyCredentials:
-    def test_can_be_instantiated(self):
-        creds = MidjourneyCredentials()
         assert isinstance(creds, Credentials)
 
 

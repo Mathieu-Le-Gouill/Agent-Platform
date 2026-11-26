@@ -95,9 +95,8 @@ vad = ["agent_platform[vad-silero,vad-webrtc,vad-pvcobra,vad-ten]"]
 
 # --- Image Generation ---
 image-dalle = ["openai"]
-image-midjourney = ["httpx"]
 image-stable-diffusion = ["diffusers[torch]", "accelerate"]
-image = ["agent_platform[image-dalle,image-midjourney,image-stable-diffusion]"]
+image = ["agent_platform[image-dalle,image-stable-diffusion]"]
 
 # --- Clustering ---
 clustering-hdbscan = ["hdbscan"]

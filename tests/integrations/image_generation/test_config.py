@@ -3,9 +3,6 @@ from pydantic import ValidationError
 
 from agent_platform.core.interfaces.image_generation.config import ImageGenConfig
 from agent_platform.integrations.image_generation.dalle.config import DalleConfig
-from agent_platform.integrations.image_generation.midjourney.config import (
-    MidjourneyConfig,
-)
 from agent_platform.integrations.image_generation.stable_diffusion.config import (
     StableDiffusionConfig,
 )
@@ -98,22 +95,3 @@ class TestStableDiffusionConfig:
         assert cfg.num_inference_steps == 30
         assert cfg.negative_prompt == "blurry, low quality"
         assert cfg.seed == 42
-
-
-class TestMidjourneyConfig:
-    def test_default_timeout_and_process_mode(self):
-        cfg = MidjourneyConfig()
-        assert cfg.timeout is None
-        assert cfg.process_mode == "fast"
-
-    def test_custom_timeout(self):
-        cfg = MidjourneyConfig(timeout=60.0)
-        assert cfg.timeout == 60.0
-
-    def test_custom_process_mode(self):
-        for mode in ("fast", "relax", "turbo"):
-            assert MidjourneyConfig(process_mode=mode).process_mode == mode
-
-    def test_invalid_process_mode_raises_validation_error(self):
-        with pytest.raises(ValidationError):
-            MidjourneyConfig(process_mode="ludicrous")

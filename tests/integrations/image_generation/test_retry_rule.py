@@ -1,33 +1,23 @@
-"""The retry rule of DALL-E and Midjourney, seen through their public methods.
+"""The retry rule of DALL-E, seen through its public methods.
 
 A generation that fails after the request left may have been done and billed,
 so only a 429 or a 503 (the service rejected the request before working on it)
-costs more than one call. A failed Midjourney download never sends the
-`/imagine` request again.
+costs more than one call.
 """
 
 from __future__ import annotations
 
 import logging
 from typing import TYPE_CHECKING
-from unittest.mock import AsyncMock, MagicMock
+from unittest.mock import AsyncMock
 
 import httpx
 import pytest
 from pydantic import SecretStr
 
 from agent_platform.core.errors import ProviderError
-from agent_platform.integrations.credentials import (
-    MidjourneyCredentials,
-    OpenAICredentials,
-)
+from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.image_generation.dalle.config import DalleConfig
-from agent_platform.integrations.image_generation.midjourney.config import (
-    MidjourneyConfig,
-)
-from agent_platform.integrations.image_generation.midjourney.provider import (
-    MidjourneyGenerator,
-)
 
 if TYPE_CHECKING:
     from agent_platform.integrations.image_generation.dalle.provider import (
@@ -145,86 +135,3 @@ class TestDallERetryRule:
         generator = DallEImageGenerator(OpenAICredentials(api_key=SecretStr("sk-test")))
 
         assert generator._client_kwargs(DalleConfig(timeout=12.0))["timeout"] == 12.0
-
-
-def _http_status(status: int) -> httpx.HTTPStatusError:
-    return httpx.HTTPStatusError(
-        "vendor said no", request=_REQUEST, response=_response(status)
-    )
-
-
-def _midjourney(
-    mocker, *, post_error: Exception | None = None, get_error: Exception | None = None
-) -> tuple[MidjourneyGenerator, AsyncMock, AsyncMock, MagicMock]:
-    client_class = mocker.patch("httpx.AsyncClient")
-    client = MagicMock()
-    client.__aenter__ = AsyncMock(return_value=client)
-    client.__aexit__ = AsyncMock(return_value=False)
-    client_class.return_value = client
-
-    accepted = MagicMock()
-    accepted.json.return_value = {"image_url": "https://cdn.example.com/i.png"}
-    client.post = AsyncMock(side_effect=post_error, return_value=accepted)
-    downloaded = MagicMock()
-    downloaded.content = b"bytes"
-    client.get = AsyncMock(side_effect=get_error, return_value=downloaded)
-
-    generator = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("k")))
-    return generator, client.post, client.get, client_class
-
-
-class TestMidjourneyRetryRule:
-    async def test_a_503_on_imagine_costs_three_posts(self, mocker, no_retry_sleep):
-        generator, post, _, _ = _midjourney(mocker, post_error=_http_status(503))
-
-        with pytest.raises(ProviderError) as caught:
-            await generator.generate("a cat")
-
-        assert post.call_count == 3
-        assert caught.value.retryable is True
-        assert str(caught.value).startswith(_OPERATION)
-
-    async def test_a_500_on_imagine_costs_one_post(self, mocker, no_retry_sleep):
-        generator, post, _, _ = _midjourney(mocker, post_error=_http_status(500))
-
-        with pytest.raises(ProviderError) as caught:
-            await generator.generate("a cat")
-
-        assert post.call_count == 1
-        assert caught.value.retryable is False
-        assert str(caught.value).startswith(_OPERATION)
-
-    async def test_a_timeout_on_imagine_costs_one_post(self, mocker, no_retry_sleep):
-        timeout = httpx.ReadTimeout("slow", request=_REQUEST)
-        generator, post, _, _ = _midjourney(mocker, post_error=timeout)
-
-        with pytest.raises(ProviderError) as caught:
-            await generator.generate("a cat")
-
-        assert post.call_count == 1
-        assert caught.value.retryable is False
-
-    async def test_generate_many_follows_the_same_rule(self, mocker, no_retry_sleep):
-        generator, post, _, _ = _midjourney(mocker, post_error=_http_status(503))
-
-        with pytest.raises(ProviderError):
-            await generator.generate_many("a cat", n=2)
-
-        assert post.call_count == 3
-
-    async def test_a_failed_download_never_posts_again(self, mocker, no_retry_sleep):
-        generator, post, get, _ = _midjourney(mocker, get_error=_http_status(503))
-
-        with pytest.raises(ProviderError) as caught:
-            await generator.generate("a cat")
-
-        assert post.call_count == 1
-        assert get.call_count == 3
-        assert str(caught.value).startswith(_OPERATION)
-
-    async def test_the_default_timeout_stays_120_seconds(self, mocker, no_retry_sleep):
-        generator, _, _, client_class = _midjourney(mocker)
-
-        await generator.generate("a cat", config=MidjourneyConfig())
-
-        assert client_class.call_args.kwargs["timeout"] == 120

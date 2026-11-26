@@ -6,14 +6,10 @@ from pydantic import SecretStr
 
 pytest.importorskip("openai")
 
-from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas.document import ImageDocument
 from agent_platform.core.schemas.enums import ImageFormat
-from agent_platform.integrations.credentials import (
-    MidjourneyCredentials,
-    OpenAICredentials,
-)
+from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.image_generation.dalle.config import DalleConfig
 from agent_platform.integrations.image_generation.dalle.mappers import (
     validate_n as _validate_n,
@@ -23,15 +19,6 @@ from agent_platform.integrations.image_generation.dalle.mappers import (
 )
 from agent_platform.integrations.image_generation.dalle.provider import (
     DallEImageGenerator,
-)
-from agent_platform.integrations.image_generation.midjourney.config import (
-    MidjourneyConfig,
-)
-from agent_platform.integrations.image_generation.midjourney.mappers import (
-    size_to_aspect as _size_to_aspect,
-)
-from agent_platform.integrations.image_generation.midjourney.provider import (
-    MidjourneyGenerator,
 )
 from agent_platform.integrations.image_generation.stable_diffusion.config import (
     StableDiffusionConfig,
@@ -175,68 +162,6 @@ class TestParseSize:
 
     def test_case_insensitive(self):
         assert _parse_size("1024X768") == (1024, 768)
-
-
-class TestMidjourneyGenerator:
-    def test_constructor_defaults(self):
-        gen = MidjourneyGenerator()
-        assert gen._default_config().timeout is None
-        assert gen._default_config().process_mode == "fast"
-        assert gen._base_url() == "http://localhost:8080"
-
-    def test_constructor_custom_timeout(self):
-        cfg = MidjourneyConfig(timeout=60)
-        assert cfg.timeout == 60
-
-    def test_base_url_from_client_options(self):
-        gen = MidjourneyGenerator(
-            client_options=ClientOptions(base_url="https://mj.example.com")
-        )
-        assert gen._base_url() == "https://mj.example.com"
-
-    def test_base_url_from_env_fallback(self, monkeypatch):
-        monkeypatch.setenv("MIDJOURNEY_API_URL", "https://env.example.com")
-        gen = MidjourneyGenerator()
-        assert gen._base_url() == "https://env.example.com"
-
-    def test_base_url_client_options_overrides_env(self, monkeypatch):
-        monkeypatch.setenv("MIDJOURNEY_API_URL", "https://env.example.com")
-        gen = MidjourneyGenerator(
-            client_options=ClientOptions(base_url="https://mj.example.com")
-        )
-        assert gen._base_url() == "https://mj.example.com"
-
-
-class TestSizeToAspect:
-    def test_none_returns_1_1(self):
-        assert _size_to_aspect(None) == "1:1"
-
-    def test_square(self):
-        assert _size_to_aspect("1024x1024") == "1:1"
-
-    def test_landscape_16_9(self):
-        assert _size_to_aspect("1920x1080") == "16:9"
-
-    def test_landscape_4_3(self):
-        assert _size_to_aspect("1024x768") == "4:3"
-
-    def test_portrait(self):
-        assert _size_to_aspect("768x1024") == "3:4"
-
-    def test_invalid_format_returns_1_1(self):
-        assert _size_to_aspect("invalid") == "1:1"
-
-    def test_empty_string_returns_1_1(self):
-        assert _size_to_aspect("") == "1:1"
-
-    def test_extra_parts_returns_1_1(self):
-        assert _size_to_aspect("100x200x300") == "1:1"
-
-    def test_non_numeric_returns_1_1(self):
-        assert _size_to_aspect("abcxdef") == "1:1"
-
-    def test_case_insensitive(self):
-        assert _size_to_aspect("1024X768") == "4:3"
 
 
 class TestDallEGenerate:
@@ -520,175 +445,6 @@ class TestDallEGenerateErrorHandling:
         assert len(results) == 2
         assert results[0].content == b"img1"
         assert results[1].content == b"img3"
-
-
-def _mock_async_client(mock_httpx_cls: MagicMock) -> MagicMock:
-    """Configure httpx.AsyncClient() to behave as an async context manager."""
-    mock_http_client = MagicMock()
-    mock_http_client.__aenter__ = AsyncMock(return_value=mock_http_client)
-    mock_http_client.__aexit__ = AsyncMock(return_value=False)
-    mock_httpx_cls.return_value = mock_http_client
-    return mock_http_client
-
-
-class TestMidjourneyGenerate:
-    async def test_generate_returns_image_document(self, mocker):
-        mock_httpx_cls = mocker.patch("httpx.AsyncClient")
-        mock_http_client = _mock_async_client(mock_httpx_cls)
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {
-            "image_url": "https://cdn.example.com/img.png",
-            "job_id": "job_123",
-        }
-        mock_http_client.post = AsyncMock(return_value=mock_response)
-        mock_http_client.get = AsyncMock(return_value=mock_response)
-        mock_response.content = b"image_bytes"
-
-        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
-        result = await gen.generate(
-            "test prompt",
-            size="1024x1024",
-            config=MidjourneyConfig(),
-        )
-
-        assert isinstance(result, ImageDocument)
-        assert result.content == b"image_bytes"
-        assert result.metadata.description == "test prompt"
-        assert result.metadata.extra["provider"] == "midjourney"
-        assert result.metadata.extra["size"] == "1024x1024"
-        assert result.metadata.extra["job_id"] == "job_123"
-
-    async def test_generate_without_size(self, mocker):
-        mock_httpx_cls = mocker.patch("httpx.AsyncClient")
-        mock_http_client = _mock_async_client(mock_httpx_cls)
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {
-            "image_url": "https://cdn.example.com/img.png"
-        }
-        mock_http_client.post = AsyncMock(return_value=mock_response)
-        mock_http_client.get = AsyncMock(return_value=mock_response)
-        mock_response.content = b"img_data"
-
-        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
-        result = await gen.generate(
-            "test prompt",
-            config=MidjourneyConfig(),
-        )
-
-        assert result.metadata.extra["size"] is None
-
-    async def test_generate_many(self, mocker):
-        mock_httpx_cls = mocker.patch("httpx.AsyncClient")
-        mock_http_client = _mock_async_client(mock_httpx_cls)
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {
-            "image_urls": [
-                "https://cdn.example.com/img1.png",
-                "https://cdn.example.com/img2.png",
-            ],
-        }
-        mock_http_client.post = AsyncMock(return_value=mock_response)
-        mock_http_client.get = AsyncMock(return_value=mock_response)
-        mock_response.content = b"img_data"
-
-        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
-        results = await gen.generate_many(
-            "test",
-            n=2,
-            config=MidjourneyConfig(),
-        )
-
-        assert len(results) == 2
-        assert all(isinstance(r, ImageDocument) for r in results)
-
-    async def test_generate_closes_client(self, mocker):
-        mock_httpx_cls = mocker.patch("httpx.AsyncClient")
-        mock_http_client = _mock_async_client(mock_httpx_cls)
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {"image_url": "https://cdn.example.com/i.png"}
-        mock_http_client.post = AsyncMock(return_value=mock_response)
-        mock_http_client.get = AsyncMock(return_value=mock_response)
-        mock_response.content = b"bytes"
-
-        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
-        await gen.generate("test", config=MidjourneyConfig())
-
-        mock_http_client.__aenter__.assert_awaited_once()
-        mock_http_client.__aexit__.assert_awaited_once()
-
-    async def test_generate_many_closes_client_on_error(self, mocker):
-        mock_httpx_cls = mocker.patch("httpx.AsyncClient")
-        mock_http_client = _mock_async_client(mock_httpx_cls)
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {}
-        mock_http_client.post = AsyncMock(return_value=mock_response)
-
-        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
-        with pytest.raises(ProviderError):
-            await gen.generate_many("test", n=2, config=MidjourneyConfig())
-
-        # with_retry retries on failure; every attempt must still close its client.
-        assert (
-            mock_http_client.__aenter__.await_count
-            == mock_http_client.__aexit__.await_count
-        )
-        assert mock_http_client.__aexit__.await_count >= 1
-
-    async def test_generate_uses_configured_process_mode(self, mocker):
-        mock_httpx_cls = mocker.patch("httpx.AsyncClient")
-        mock_http_client = _mock_async_client(mock_httpx_cls)
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {"image_url": "https://cdn.example.com/i.png"}
-        mock_http_client.post = AsyncMock(return_value=mock_response)
-        mock_http_client.get = AsyncMock(return_value=mock_response)
-        mock_response.content = b"bytes"
-
-        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
-        await gen.generate(
-            "test",
-            config=MidjourneyConfig(process_mode="turbo"),
-        )
-
-        _, kwargs = mock_http_client.post.call_args
-        assert kwargs["json"]["process_mode"] == "turbo"
-
-    async def test_generate_missing_image_url_raises_provider_error(self, mocker):
-        mock_httpx_cls = mocker.patch("httpx.AsyncClient")
-        mock_http_client = _mock_async_client(mock_httpx_cls)
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {"job_id": "job_123"}
-        mock_http_client.post = AsyncMock(return_value=mock_response)
-
-        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
-        with pytest.raises(ProviderError, match="missing image_url"):
-            await gen.generate("test", config=MidjourneyConfig())
-
-    async def test_generate_many_missing_image_urls_raises_provider_error(self, mocker):
-        mock_httpx_cls = mocker.patch("httpx.AsyncClient")
-        mock_http_client = _mock_async_client(mock_httpx_cls)
-
-        mock_response = MagicMock()
-        mock_response.raise_for_status.return_value = None
-        mock_response.json.return_value = {}
-        mock_http_client.post = AsyncMock(return_value=mock_response)
-
-        gen = MidjourneyGenerator(MidjourneyCredentials(api_key=SecretStr("test-key")))
-        with pytest.raises(ProviderError, match="missing image_url"):
-            await gen.generate_many("test", n=2, config=MidjourneyConfig())
 
 
 @pytest.mark.skipif(not _HAS_DIFFUSERS, reason="requires diffusers")

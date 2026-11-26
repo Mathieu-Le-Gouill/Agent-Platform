@@ -16,7 +16,6 @@ __all__ = [
     "GoogleVisionCredentials",
     "HuggingFaceCredentials",
     "JinaCredentials",
-    "MidjourneyCredentials",
     "MistralCredentials",
     "OllamaCredentials",
     "OpenAICredentials",
@@ -103,12 +102,6 @@ class HuggingFaceCredentials(Credentials, frozen=True):
 class JinaCredentials(Credentials, frozen=True):
     api_key: SecretStr | None = Field(
         default_factory=lambda: secret_from_env("JINA_API_KEY")
-    )
-
-
-class MidjourneyCredentials(Credentials, frozen=True):
-    api_key: SecretStr | None = Field(
-        default_factory=lambda: secret_from_env("MIDJOURNEY_API_KEY")
     )
 
 

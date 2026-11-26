@@ -54,7 +54,7 @@ src/agent_platform/
 | VAD | Silero, WebRTC, PVCobra, TEN |
 | Clustering | HDBSCAN, KMeans, GMM |
 | Loader | Unstructured, PIL, PyAV, SoundFile |
-| Image Generation | DALL-E, Stable Diffusion, Midjourney |
+| Image Generation | DALL-E, Stable Diffusion |
 | Classification | Transformers (zero-shot) |
 
 ## Setup

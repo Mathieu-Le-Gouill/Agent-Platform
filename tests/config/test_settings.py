@@ -27,14 +27,14 @@ class TestSettings:
         monkeypatch.setenv(
             "AGENT_PLATFORM_DEFAULT_LLM_MODEL", "anthropic:claude-sonnet-4-5"
         )
-        monkeypatch.setenv("AGENT_PLATFORM_DEFAULT_IMAGE_MODEL", "midjourney:v6")
+        monkeypatch.setenv("AGENT_PLATFORM_DEFAULT_IMAGE_MODEL", "dalle:dall-e-2")
         monkeypatch.setenv("AGENT_PLATFORM_DEFAULT_AUDIO_MODEL", "deepgram:nova-2")
         monkeypatch.setenv("AGENT_PLATFORM_API_PORT", "9001")
 
         settings = Settings(_env_file=None)
 
         assert settings.default_llm_model == "anthropic:claude-sonnet-4-5"
-        assert settings.default_image_model == "midjourney:v6"
+        assert settings.default_image_model == "dalle:dall-e-2"
         assert settings.default_audio_model == "deepgram:nova-2"
         assert settings.api_port == 9001
 

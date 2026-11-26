@@ -172,14 +172,10 @@ evals = [
 image = [
     { name = "accelerate" },
     { name = "diffusers", extra = ["torch"] },
-    { name = "httpx" },
     { name = "openai" },
 ]
 image-dalle = [
     { name = "openai" },
-]
-image-midjourney = [
-    { name = "httpx" },
 ]
 image-stable-diffusion = [
     { name = "accelerate" },
@@ -356,7 +352,7 @@ requires-dist = [
     { name = "agent-platform", extras = ["dataset-huggingface"], marker = "extra == 'dataset'" },
     { name = "agent-platform", extras = ["dataset-huggingface"], marker = "extra == 'evals'" },
     { name = "agent-platform", extras = ["embeddings-openai", "embeddings-mistral", "embeddings-ollama", "embeddings-huggingface", "embeddings-google"], marker = "extra == 'embeddings'" },
-    { name = "agent-platform", extras = ["image-dalle", "image-midjourney", "image-stable-diffusion"], marker = "extra == 'image'" },
+    { name = "agent-platform", extras = ["image-dalle", "image-stable-diffusion"], marker = "extra == 'image'" },
     { name = "agent-platform", extras = ["llm", "embeddings", "vector-store", "reranking", "stt", "translation", "ocr", "vad", "image", "clustering", "classification-transformers", "moderation", "chunking", "loader-av", "loader-soundfile", "dataset", "evals", "tools-mcp", "api", "tracing"], marker = "extra == 'all'" },
     { name = "agent-platform", extras = ["llm-openai", "llm-anthropic", "llm-mistral", "llm-ollama", "llm-huggingface", "llm-google"], marker = "extra == 'llm'" },
     { name = "agent-platform", extras = ["moderation-openai"], marker = "extra == 'moderation'" },
@@ -386,7 +382,6 @@ requires-dist = [
     { name = "google-genai", marker = "extra == 'llm-google'", specifier = ">=1.0" },
     { name = "hdbscan", marker = "extra == 'clustering-hdbscan'" },
     { name = "httpx", marker = "extra == 'dev'" },
-    { name = "httpx", marker = "extra == 'image-midjourney'" },
     { name = "httpx", marker = "extra == 'reranking-jina'" },
     { name = "huggingface-hub", marker = "extra == 'embeddings-huggingface'", specifier = ">=1.24" },
     { name = "huggingface-hub", marker = "extra == 'llm-huggingface'", specifier = ">=1.24" },
@@ -439,7 +434,7 @@ requires-dist = [
     { name = "webrtcvad", marker = "extra == 'vad-webrtc'" },
     { name = "whisperx", marker = "extra == 'stt-whisperx'" },
 ]
-provides-extras = ["llm-openai", "llm-anthropic", "llm-mistral", "llm-ollama", "llm-huggingface", "llm-google", "llm", "embeddings-openai", "embeddings-mistral", "embeddings-ollama", "embeddings-huggingface", "embeddings-google", "embeddings", "vector-store-chroma", "vector-store-faiss", "vector-store-pinecone", "vector-store-qdrant", "vector-store-weaviate", "vector-store", "reranking-cohere", "reranking-jina", "reranking-huggingface", "reranking-flashrank", "reranking-voyage", "reranking", "stt-whisperx", "stt-faster-whisper", "stt-deepgram", "stt-openai", "stt", "translation-deepl", "translation-google", "translation-azure", "translation", "ocr-tesseract", "ocr-google-vision", "ocr-aws-textract", "ocr-mistral", "ocr", "vad-silero", "vad-webrtc", "vad-pvcobra", "vad-ten", "vad", "image-dalle", "image-midjourney", "image-stable-diffusion", "image", "clustering-hdbscan", "clustering-kmeans", "clustering", "classification-transformers", "moderation-openai", "moderation", "api", "tracing", "chunking-recursive", "chunking-html", "chunking-latex", "chunking-markdown", "chunking-pdf", "chunking", "loader-av", "loader-soundfile", "dataset-huggingface", "dataset", "evals", "tools-mcp", "all", "dev"]
+provides-extras = ["llm-openai", "llm-anthropic", "llm-mistral", "llm-ollama", "llm-huggingface", "llm-google", "llm", "embeddings-openai", "embeddings-mistral", "embeddings-ollama", "embeddings-huggingface", "embeddings-google", "embeddings", "vector-store-chroma", "vector-store-faiss", "vector-store-pinecone", "vector-store-qdrant", "vector-store-weaviate", "vector-store", "reranking-cohere", "reranking-jina", "reranking-huggingface", "reranking-flashrank", "reranking-voyage", "reranking", "stt-whisperx", "stt-faster-whisper", "stt-deepgram", "stt-openai", "stt", "translation-deepl", "translation-google", "translation-azure", "translation", "ocr-tesseract", "ocr-google-vision", "ocr-aws-textract", "ocr-mistral", "ocr", "vad-silero", "vad-webrtc", "vad-pvcobra", "vad-ten", "vad", "image-dalle", "image-stable-diffusion", "image", "clustering-hdbscan", "clustering-kmeans", "clustering", "classification-transformers", "moderation-openai", "moderation", "api", "tracing", "chunking-recursive", "chunking-html", "chunking-latex", "chunking-markdown", "chunking-pdf", "chunking", "loader-av", "loader-soundfile", "dataset-huggingface", "dataset", "evals", "tools-mcp", "all", "dev"]
 
 [[package]]
 name = "aiofiles"
