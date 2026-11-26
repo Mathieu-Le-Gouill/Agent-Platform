@@ -124,7 +124,3 @@ provider instances and wires the `ConversationAgent` the API serves.
 ### Commit messages
 
 Follow [Conventional Commits](https://www.conventionalcommits.org/): `<type>: <summary>`, e.g. `feat: add streaming support to ConversationAgent`, `fix: repair broken CI`, `docs: update README`. Common types: `feat`, `fix`, `docs`, `refactor`, `test`, `chore`.
-
-## For Coding Agents
-
-Read `AGENTS.md` before making any changes. It documents the lookup protocol, layer rules, error hierarchy, testing conventions, and extension guidance. `GLOSSARY.md` defines the domain vocabulary (Document, Provider, Component, Workflow, ...).
