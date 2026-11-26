@@ -248,8 +248,8 @@ above landed.
     name, call id, kind and source, which is what makes an MCP tool
     distinguishable from a local one in a trace (the MCP adapter declares
     `ToolKind.REMOTE`/`mcp`, a plain `Tool` defaults to `ToolKind.FUNCTION`).
-    Arguments and results contribute their size and a short digest always, and
-    their content only under the opt-in content-capture switch (see
+    Arguments and results contribute their size always, and a short digest
+    and their content only under the opt-in content-capture switch (see
     `core/README.md`); streaming tools also report their chunk count.
   - `guardrail` (`guardrails.py`), a `GuardrailCheck` per `before`/`after`
     stage, via `TracedGuardrail`. `Agent` wraps every guardrail it is given, so any

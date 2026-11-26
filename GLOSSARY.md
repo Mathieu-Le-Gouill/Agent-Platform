@@ -168,5 +168,5 @@ One named piece of an Observation that telemetry carries.
 _Avoid_: Attribute, tag, label
 
 **Content Capture**:
-The opt-in recording of prompts, answers and Tool payloads in telemetry, on top of their size and digest, which are always recorded.
+The opt-in recording of prompts, answers and Tool payloads in telemetry, with their digest, on top of their size, which is always recorded.
 _Avoid_: Payload logging, prompt logging

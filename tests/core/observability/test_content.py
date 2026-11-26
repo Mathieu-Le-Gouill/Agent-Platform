@@ -38,8 +38,16 @@ class TestCaptureContent:
 
 class TestPayloadFacts:
     def test_measures_a_string_as_is(self):
+        assert payload_facts("hello").size == 5
+
+    def test_omits_the_digest_unless_capture_is_on(self):
+        # An unsalted hash of a small value space (an email, a yes/no) is
+        # brute-forceable, so it is as sensitive as the content itself.
+        assert payload_facts("hello").digest is None
+
+    def test_includes_the_digest_when_capture_is_on(self, monkeypatch):
+        monkeypatch.setenv(PLATFORM_VAR, "true")
         facts = payload_facts("hello")
-        assert facts.size == 5
         assert facts.digest == hashlib.sha256(b"hello").hexdigest()[:16]
 
     def test_serializes_anything_else_to_json(self):

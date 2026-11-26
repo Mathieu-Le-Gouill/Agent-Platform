@@ -22,8 +22,8 @@ __all__ = [
 OPERATION_KEY = "operation.name"
 ERROR_TYPE_KEY = "error.type"
 
-# Suffixes a payload field expands into. Size and digest are always exported,
-# the content only when capture is enabled (see `content.py`).
+# Suffixes a payload field expands into. Size is always exported, the digest
+# and the content only when capture is enabled (see `content.py`).
 _SIZE_SUFFIX = ".size"
 _DIGEST_SUFFIX = ".digest"
 _CONTENT_SUFFIX = ".content"
@@ -41,7 +41,7 @@ class Fact:
 
     `payload` marks a value that is user data rather than a label. Those are
     never exported verbatim unless content capture is on; what is always
-    exported is the size and digest the runtime derives from them.
+    exported is the size the runtime derives from them.
     """
 
     key: str
@@ -137,6 +137,7 @@ def flatten(observation: Observation) -> dict[str, AttributeValue]:
 def _payload_attributes(key: str, value: Any) -> Iterator[tuple[str, AttributeValue]]:
     facts = payload_facts(value)
     yield key + _SIZE_SUFFIX, facts.size
-    yield key + _DIGEST_SUFFIX, facts.digest
+    if facts.digest is not None:
+        yield key + _DIGEST_SUFFIX, facts.digest
     if facts.content is not None:
         yield key + _CONTENT_SUFFIX, facts.content

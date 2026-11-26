@@ -638,8 +638,9 @@ class TestToolCallObservability:
         assert span.attributes["tool.call.id"] == "c1"
         assert span.attributes["tool.kind"] == "function"
         assert span.attributes["tool.arguments.size"] > 0
-        assert span.attributes["tool.arguments.digest"]
-        # Off by default: arguments routinely carry user data.
+        # Off by default: arguments routinely carry user data, and a digest of
+        # a small value space is as revealing as the value itself.
+        assert "tool.arguments.digest" not in span.attributes
         assert "tool.arguments.content" not in span.attributes
 
     async def test_span_describes_the_result(self, registry, recorded_spans):

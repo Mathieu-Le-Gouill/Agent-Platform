@@ -258,7 +258,7 @@ class TestPayloadContent:
         assert json.loads(span.attributes[Attr.OBSERVATION_INPUT]) == {"q": "Paris"}
         assert span.attributes[Attr.OBSERVATION_OUTPUT] == "sunny"
 
-    def test_only_size_and_digest_are_exported_without_capture(self, exported):
+    def test_only_size_is_exported_without_capture(self, exported):
         with observe(ToolRun(tool_name="t", arguments={"q": "Paris"})) as run:
             run.result = "sunny"
 
@@ -266,6 +266,18 @@ class TestPayloadContent:
         assert Attr.OBSERVATION_INPUT not in span.attributes
         assert Attr.OBSERVATION_OUTPUT not in span.attributes
         assert metadata(span, "tool.arguments.size") > 0
+        assert metadata(span, "tool.result.size") > 0
+        digest_keys = [key for key in span.attributes if key.endswith(".digest")]
+        assert digest_keys == []
+
+    def test_digest_lands_in_metadata_when_capture_is_on(self, exported, monkeypatch):
+        monkeypatch.setenv("AGENT_PLATFORM_CAPTURE_CONTENT", "true")
+
+        with observe(ToolRun(tool_name="t", arguments={"q": "Paris"})) as run:
+            run.result = "sunny"
+
+        span = exported.get("execute_tool")
+        assert metadata(span, "tool.arguments.digest")
         assert metadata(span, "tool.result.digest")
 
 

@@ -19,19 +19,21 @@ _DIGEST_LENGTH = 16
 class PayloadFacts(NamedTuple):
     """What telemetry may say about a payload.
 
-    `size` and `digest` are always safe to export: they answer "how big was
-    it" and "was it the same value as last time" without revealing content.
-    `content` is the serialized payload itself, and is `None` unless content
-    capture is explicitly enabled.
+    `size` is always exported: it reveals only the payload's length, which
+    answers "how big was it". `digest` (a short unsalted sha256) and `content` (the
+    serialized payload itself) are `None` unless content capture is
+    explicitly enabled: a digest of a small value space, such as an email or
+    a yes/no, can be brute-forced and links equal values across users, so it
+    is as sensitive as the content.
     """
 
     size: int
-    digest: str
+    digest: str | None
     content: str | None
 
 
 def capture_content() -> bool:
-    """Whether telemetry may carry prompt/tool payloads verbatim.
+    """Whether telemetry may carry prompt/tool payloads verbatim and their digest.
 
     Off by default: payloads routinely contain user data, and a tracing
     backend is not a place it should land without someone deciding so. Read
@@ -50,10 +52,12 @@ def payload_facts(value: Any) -> PayloadFacts:
     """
     serialized = value if isinstance(value, str) else _to_json(value)
     encoded = serialized.encode("utf-8")
+    if not capture_content():
+        return PayloadFacts(size=len(encoded), digest=None, content=None)
     return PayloadFacts(
         size=len(encoded),
         digest=hashlib.sha256(encoded).hexdigest()[:_DIGEST_LENGTH],
-        content=serialized if capture_content() else None,
+        content=serialized,
     )
 
 

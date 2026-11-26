@@ -146,7 +146,7 @@ class ToolRun(Observation):
 
 One object therefore declares everything a backend needs, and `facts.py::flatten()` derives all of it:
 - the **span attributes**, from every non-`None` fact;
-- the **payload policy**, from the facts marked `payload=True`, which expand into `{key}.size` and `{key}.digest` always and `{key}.content` only when capture is on.
+- the **payload policy**, from the facts marked `payload=True`, which expand into `{key}.size` always and `{key}.digest` and `{key}.content` only when capture is on.
 
 Adding a fact is one annotated field rather than an edit in several places.
 
@@ -173,9 +173,9 @@ with observe(LLMCall(provider="openai", request_model=model)) as call:
 
 ### `observability/content.py`: Opt-In Payload Capture
 
-Prompts, tool arguments and tool results are the most useful thing in a trace and the most likely to contain personal data, so they are **off by default**. What is always exported is the shape of a payload, never its content: `payload_facts(value)` returns its serialized size in bytes and a 16-character sha256 digest, which is enough to spot an oversized argument or to tell two identical calls apart without a backend ever seeing the text.
+Prompts, tool arguments and tool results are the most useful thing in a trace and the most likely to contain personal data, so they are **off by default**. What is always exported is the size of a payload, never its content: `payload_facts(value)` returns its serialized size in bytes, which reveals only the payload's length and is enough to spot an oversized argument without a backend ever seeing the text. Its 16-character sha256 digest, which tells two identical calls apart, is exported only with capture on: it is unsalted, so a value from a small space (an email, a yes/no) can be brute-forced from it, and equal values link across users.
 
-`capture_content()` decides whether the content itself is exported, reading `AGENT_PLATFORM_CAPTURE_CONTENT` per call, so toggling it needs no restart. It is the only switch: a backend never decides capture itself. It also covers errors: without it, a span's error carries the exception type only, never its message or stack trace.
+`capture_content()` decides whether the content and digest are exported, reading `AGENT_PLATFORM_CAPTURE_CONTENT` per call, so toggling it needs no restart. It is the only switch: a backend never decides capture itself. It also covers errors: without it, a span's error carries the exception type only, never its message or stack trace.
 
 ### `observability/decorators.py`: `@traced`
 

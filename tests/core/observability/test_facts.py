@@ -84,15 +84,17 @@ class TestFlatten:
     def test_drops_fields_left_at_none(self):
         assert "sample.detail" not in flatten(Sample(label="a"))
 
-    def test_a_payload_exports_size_and_digest_but_not_content(self):
+    def test_a_payload_exports_only_its_size_without_capture(self):
         attributes = flatten(Sample(label="a", body={"q": "secret"}))
         assert attributes["sample.body.size"] > 0
-        assert attributes["sample.body.digest"]
+        assert "sample.body.digest" not in attributes
         assert "sample.body.content" not in attributes
 
-    def test_a_payload_exports_content_when_capture_is_on(self, monkeypatch):
+    def test_a_payload_exports_digest_and_content_when_capture_is_on(self, monkeypatch):
         monkeypatch.setenv("AGENT_PLATFORM_CAPTURE_CONTENT", "true")
         attributes = flatten(Sample(label="a", body="secret"))
+        assert attributes["sample.body.size"] == 6
+        assert attributes["sample.body.digest"]
         assert attributes["sample.body.content"] == "secret"
 
 
