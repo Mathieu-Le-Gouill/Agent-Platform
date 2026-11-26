@@ -217,6 +217,23 @@ class TestPineconeAdd:
         store._index.assert_not_called()
 
 
+class TestPineconeNamespace:
+    async def test_add_delete_and_search_forward_namespace(self):
+        store = PineconeStore.__new__(PineconeStore)
+        mock_index = _mock_index()
+        mock_index.query.return_value = SimpleNamespace(matches=[])
+        store._index = AsyncMock(return_value=mock_index)
+        config = PineconeConfig(namespace="tenant-a")
+
+        await store.add([TextChunk(text="hi", index=0)], [[0.1]], config=config)
+        await store.delete([uuid4()], config=config)
+        await store.search_with_scores(query_vector=[0.1], config=config)
+
+        assert mock_index.upsert.call_args.kwargs["namespace"] == "tenant-a"
+        assert mock_index.delete.call_args.kwargs["namespace"] == "tenant-a"
+        assert mock_index.query.call_args.kwargs["namespace"] == "tenant-a"
+
+
 class TestPineconeDelete:
     async def test_deletes_by_ids(self):
         store = PineconeStore.__new__(PineconeStore)

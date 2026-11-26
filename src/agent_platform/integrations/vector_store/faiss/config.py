@@ -12,9 +12,12 @@ class DistanceMetric(StrEnum):
 
 
 class FAISSConfig(VectorStoreConfig):
-    # Local on-disk index directory: holds `index.faiss` (the native FAISS
-    # index) and `docstore.pkl` (chunk metadata + id mapping), written by
-    # `FAISSStore.add()`/read by `FAISSStore._load_or_none()`.
+    # Local on-disk index directory: holds `docstore.json` (chunks, id mapping,
+    # dimension, metric, and the name and sha256 of its index) and the native
+    # FAISS index `index-<sha256>.faiss` it names. Every add/delete writes a
+    # new index file, then replaces docstore.json as the single commit step.
+    # A legacy `docstore.pkl` is refused with a ConfigError, never unpickled:
+    # re-ingest instead. None keeps the index in memory only.
     index_path: str | None = None
 
     # Selects the native FAISS index type/similarity transform directly in

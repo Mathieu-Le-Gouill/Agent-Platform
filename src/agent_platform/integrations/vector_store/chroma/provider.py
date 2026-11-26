@@ -17,12 +17,14 @@ from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.score import Score
 from agent_platform.integrations.credentials import ChromaCredentials
 from agent_platform.integrations.sdk_errors import translate_sdk_error
+from agent_platform.integrations.vector_store._base import reject_namespace
 from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
 from agent_platform.integrations.vector_store.chroma.mappers import (
     chunk_to_metadata,
     row_to_chunk,
 )
 
+_STORE = "Chroma"
 _SEARCH_ERROR = "Vector store search failed"
 _translate = functools.partial(translate_sdk_error, operation=_SEARCH_ERROR)
 
@@ -94,6 +96,7 @@ class ChromaStore(BaseVectorStore[ChromaConfig]):
         config: ChromaConfig | None = None,
     ) -> None:
         config = config or self._default_config()
+        reject_namespace(config, _STORE)
         if not documents:
             return
         client = await self._client(config)
@@ -111,6 +114,7 @@ class ChromaStore(BaseVectorStore[ChromaConfig]):
         self, document_ids: list[UUID], config: ChromaConfig | None = None
     ) -> None:
         config = config or self._default_config()
+        reject_namespace(config, _STORE)
         if not document_ids:
             return
         client = await self._client(config)
@@ -141,6 +145,7 @@ class ChromaStore(BaseVectorStore[ChromaConfig]):
         filter: dict[str, Any] | None = None,
     ) -> list[tuple[TextChunk, Score]]:
         config = config or self._default_config()
+        reject_namespace(config, _STORE)
         client = await self._client(config)
         collection, is_async = await self._collection(client, config)
         result = await self._call(

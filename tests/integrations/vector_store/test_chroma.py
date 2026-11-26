@@ -5,7 +5,7 @@ import pytest
 
 pytest.importorskip("chromadb")
 
-from agent_platform.core.errors import ProviderError
+from agent_platform.core.errors import ConfigError, ProviderError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.credentials import ChromaCredentials
 from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
@@ -340,3 +340,28 @@ class TestChromaSearch:
             await store.search_with_scores(
                 query_vector=[0.1, 0.2], config=ChromaConfig()
             )
+
+
+class TestChromaRejectsNamespace:
+    @pytest.mark.parametrize(
+        "call",
+        [
+            lambda s, c: s.add([TextChunk(text="a", index=0)], [[0.1]], config=c),
+            lambda s, c: s.add([], [], config=c),
+            lambda s, c: s.delete([uuid4()], config=c),
+            lambda s, c: s.search(query_vector=[0.1], config=c),
+            lambda s, c: s.search_with_scores(query_vector=[0.1], config=c),
+        ],
+        ids=["add", "add_empty", "delete", "search", "search_with_scores"],
+    )
+    async def test_operation_raises_before_any_client_call(self, call):
+        store = ChromaStore.__new__(ChromaStore)
+        store._credentials = ChromaCredentials(api_key=None)
+        store._client = AsyncMock()
+
+        with pytest.raises(
+            ConfigError, match="Chroma does not support namespace isolation"
+        ):
+            await call(store, ChromaConfig(namespace="tenant-a"))
+
+        store._client.assert_not_called()

@@ -21,12 +21,14 @@ from agent_platform.core.schemas.score import Score
 from agent_platform.core.schemas.vector import SparseVector
 from agent_platform.integrations.credentials import QdrantCredentials
 from agent_platform.integrations.sdk_errors import translate_sdk_error
+from agent_platform.integrations.vector_store._base import reject_namespace
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
 from agent_platform.integrations.vector_store.qdrant.mappers import (
     chunk_to_payload,
     point_to_chunk,
 )
 
+_STORE = "Qdrant"
 _SEARCH_ERROR = "Vector store search failed"
 _HYBRID_SEARCH_ERROR = "Vector store hybrid search failed"
 
@@ -86,6 +88,7 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         config: QdrantConfig | None = None,
     ) -> None:
         config = config or self._default_config()
+        reject_namespace(config, _STORE)
         client = self._client(config)
         points = [
             models.PointStruct(
@@ -100,6 +103,7 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         self, document_ids: list[UUID], config: QdrantConfig | None = None
     ) -> None:
         config = config or self._default_config()
+        reject_namespace(config, _STORE)
         client = self._client(config)
         if document_ids:
             await client.delete(
@@ -129,6 +133,7 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         filter: dict[str, Any] | None = None,
     ) -> list[tuple[TextChunk, Score]]:
         config = config or self._default_config()
+        reject_namespace(config, _STORE)
         client = self._client(config)
         response = await client.query_points(
             collection_name=config.collection_name,
@@ -152,6 +157,7 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         config: QdrantConfig | None = None,
     ) -> None:
         config = config or self._default_config()
+        reject_namespace(config, _STORE)
         client = self._client(config)
         points = [
             models.PointStruct(
@@ -180,6 +186,7 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
         filter: dict[str, Any] | None = None,
     ) -> list[tuple[TextChunk, Score]]:
         config = config or self._default_config()
+        reject_namespace(config, _STORE)
         client = self._client(config)
         response = await client.query_points(
             collection_name=config.collection_name,

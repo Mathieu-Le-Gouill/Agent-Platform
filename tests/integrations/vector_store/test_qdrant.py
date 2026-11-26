@@ -6,8 +6,10 @@ import pytest
 
 pytest.importorskip("qdrant_client")
 
-from agent_platform.core.errors import ProviderError
+from agent_platform.core.errors import ConfigError, ProviderError
+from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.core.schemas.chunk import TextChunk
+from agent_platform.core.schemas.vector import SparseVector
 from agent_platform.integrations.credentials import QdrantCredentials
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
 from agent_platform.integrations.vector_store.qdrant.mappers import (
@@ -403,3 +405,64 @@ class TestQdrantSearchHybrid:
             await provider.search_hybrid(
                 query_vector=[0.1, 0.2], sparse_vector=sparse, config=QdrantConfig()
             )
+
+
+class TestQdrantRejectsNamespace:
+    @pytest.mark.parametrize(
+        "call",
+        [
+            lambda p, c: p.add([TextChunk(text="a", index=0)], [[0.1]], config=c),
+            lambda p, c: p.add([], [], config=c),
+            lambda p, c: p.delete([uuid4()], config=c),
+            lambda p, c: p.search(query_vector=[0.1], config=c),
+            lambda p, c: p.search_with_scores(query_vector=[0.1], config=c),
+            lambda p, c: p.add_hybrid(
+                [TextChunk(text="a", index=0)],
+                [[0.1]],
+                [SparseVector(indices=[1], values=[1.0])],
+                config=c,
+            ),
+            lambda p, c: p.search_hybrid(
+                query_vector=[0.1],
+                sparse_vector=SparseVector(indices=[1], values=[1.0]),
+                config=c,
+            ),
+        ],
+        ids=[
+            "add",
+            "add_empty",
+            "delete",
+            "search",
+            "search_with_scores",
+            "add_hybrid",
+            "search_hybrid",
+        ],
+    )
+    async def test_operation_raises_before_any_client_call(self, mocker, call):
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient"
+        )
+        provider = QdrantVectorStoreProvider(QdrantCredentials(api_key=None))
+
+        with pytest.raises(
+            ConfigError, match="Qdrant does not support namespace isolation"
+        ):
+            await call(provider, QdrantConfig(namespace="tenant-a"))
+
+        mock_client_cls.assert_not_called()
+
+    async def test_base_config_from_a_pipeline_is_rejected_too(self, mocker):
+        # rag pipelines pass a plain VectorStoreConfig, not a QdrantConfig
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient"
+        )
+        provider = QdrantVectorStoreProvider(QdrantCredentials(api_key=None))
+
+        with pytest.raises(ConfigError):
+            await provider.add(
+                [TextChunk(text="a", index=0)],
+                [[0.1]],
+                config=VectorStoreConfig(namespace="tenant-a"),  # type: ignore[arg-type]
+            )
+
+        mock_client_cls.assert_not_called()

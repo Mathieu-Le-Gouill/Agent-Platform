@@ -293,6 +293,25 @@ class TestWeaviateConnectionLifecycle:
         mock_collection.data.insert_many.assert_awaited_once()
         mock_client.close.assert_awaited_once()
 
+    async def test_add_with_namespace_writes_to_that_tenant(
+        self, provider, monkeypatch
+    ):
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        tenant_collection = MagicMock()
+        tenant_collection.data.insert_many = AsyncMock()
+        mock_collection.with_tenant.return_value = tenant_collection
+        mock_client.collections.get.return_value = mock_collection
+
+        await provider.add(
+            [TextChunk(text="hi", index=0)],
+            [[0.1, 0.2]],
+            config=WeaviateConfig(namespace="tenant-a"),
+        )
+
+        mock_collection.with_tenant.assert_called_once_with("tenant-a")
+        tenant_collection.data.insert_many.assert_awaited_once()
+
     async def test_add_skips_insert_when_empty(self, provider, monkeypatch):
         mock_client = self._connected_client(monkeypatch, provider)
         mock_collection = MagicMock()
