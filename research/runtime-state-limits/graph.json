@@ -1,0 +1,2997 @@
+{
+  "created": "2026-11-20",
+  "edges": [
+    {
+      "from": "C11",
+      "rel": "derived_from",
+      "to": "C3"
+    },
+    {
+      "from": "C11",
+      "rel": "derived_from",
+      "to": "C4"
+    },
+    {
+      "from": "C11",
+      "rel": "derived_from",
+      "to": "C6"
+    },
+    {
+      "from": "C11",
+      "rel": "derived_from",
+      "to": "C8"
+    },
+    {
+      "from": "C11",
+      "rel": "derived_from",
+      "to": "C10"
+    },
+    {
+      "from": "C22",
+      "rel": "derived_from",
+      "to": "C15"
+    },
+    {
+      "from": "C22",
+      "rel": "derived_from",
+      "to": "C17"
+    },
+    {
+      "from": "C22",
+      "rel": "derived_from",
+      "to": "C19"
+    },
+    {
+      "from": "C23",
+      "rel": "depends_on",
+      "to": "C12"
+    },
+    {
+      "from": "C23",
+      "rel": "depends_on",
+      "to": "C14"
+    },
+    {
+      "from": "C23",
+      "rel": "depends_on",
+      "to": "C17"
+    },
+    {
+      "from": "C23",
+      "rel": "depends_on",
+      "to": "C18"
+    },
+    {
+      "from": "C30",
+      "rel": "gap",
+      "to": "Q1"
+    },
+    {
+      "from": "C35",
+      "rel": "derived_from",
+      "to": "C24"
+    },
+    {
+      "from": "C35",
+      "rel": "derived_from",
+      "to": "C30"
+    },
+    {
+      "from": "C35",
+      "rel": "derived_from",
+      "to": "C31"
+    },
+    {
+      "from": "C35",
+      "rel": "derived_from",
+      "to": "C34"
+    },
+    {
+      "from": "C36",
+      "rel": "depends_on",
+      "to": "C28"
+    },
+    {
+      "from": "C36",
+      "rel": "depends_on",
+      "to": "C29"
+    },
+    {
+      "from": "C36",
+      "rel": "depends_on",
+      "to": "C35"
+    },
+    {
+      "from": "C44",
+      "rel": "gap",
+      "to": "Q2"
+    },
+    {
+      "from": "C45",
+      "rel": "depends_on",
+      "to": "C37"
+    },
+    {
+      "from": "C45",
+      "rel": "depends_on",
+      "to": "C38"
+    },
+    {
+      "from": "C45",
+      "rel": "depends_on",
+      "to": "C40"
+    },
+    {
+      "from": "C46",
+      "rel": "depends_on",
+      "to": "C42"
+    },
+    {
+      "from": "C46",
+      "rel": "depends_on",
+      "to": "C43"
+    },
+    {
+      "from": "C46",
+      "rel": "depends_on",
+      "to": "C44"
+    },
+    {
+      "from": "C53",
+      "rel": "gap",
+      "to": "Q5"
+    },
+    {
+      "from": "C58",
+      "rel": "derived_from",
+      "to": "C50"
+    },
+    {
+      "from": "C58",
+      "rel": "derived_from",
+      "to": "C51"
+    },
+    {
+      "from": "C58",
+      "rel": "derived_from",
+      "to": "C52"
+    },
+    {
+      "from": "C58",
+      "rel": "gap",
+      "to": "Q4"
+    },
+    {
+      "from": "C59",
+      "rel": "derived_from",
+      "to": "C54"
+    },
+    {
+      "from": "C59",
+      "rel": "derived_from",
+      "to": "C55"
+    },
+    {
+      "from": "C60",
+      "rel": "derived_from",
+      "to": "C48"
+    },
+    {
+      "from": "C60",
+      "rel": "derived_from",
+      "to": "C49"
+    },
+    {
+      "from": "C60",
+      "rel": "gap",
+      "to": "Q3"
+    },
+    {
+      "from": "C63",
+      "rel": "derived_from",
+      "to": "C62"
+    },
+    {
+      "from": "C66",
+      "rel": "derived_from",
+      "to": "C55"
+    },
+    {
+      "from": "C66",
+      "rel": "gap",
+      "to": "Q6"
+    },
+    {
+      "from": "C69",
+      "note": "Answers for OpenAI SDK; Pydantic AI and LangGraph OSS reports not found.",
+      "rel": "gap",
+      "to": "Q3"
+    },
+    {
+      "from": "C72",
+      "rel": "derived_from",
+      "to": "C14"
+    },
+    {
+      "from": "C73",
+      "rel": "derived_from",
+      "to": "C60"
+    },
+    {
+      "from": "C73",
+      "rel": "derived_from",
+      "to": "C72"
+    },
+    {
+      "from": "C76",
+      "rel": "challenges",
+      "to": "C45"
+    },
+    {
+      "from": "C76",
+      "rel": "derived_from",
+      "to": "C74"
+    },
+    {
+      "from": "C76",
+      "rel": "derived_from",
+      "to": "C75"
+    },
+    {
+      "from": "C77",
+      "rel": "gap",
+      "to": "Q3"
+    },
+    {
+      "from": "C78",
+      "rel": "gap",
+      "to": "Q3"
+    },
+    {
+      "from": "C79",
+      "rel": "gap",
+      "to": "Q7"
+    },
+    {
+      "from": "C80",
+      "rel": "derived_from",
+      "to": "C69"
+    },
+    {
+      "from": "C80",
+      "rel": "derived_from",
+      "to": "C77"
+    },
+    {
+      "from": "C80",
+      "rel": "derived_from",
+      "to": "C78"
+    },
+    {
+      "from": "C81",
+      "note": "Refines: OpenAI SDK has a 10 s manager connect timeout in addition to the 5 s per-request session timeout; C42 is not wrong but incomplete.",
+      "rel": "challenges",
+      "to": "C42"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "A1"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "A2"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "A5"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "C12"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "C16"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "C18"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "C69"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "C72"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "C73"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "C80"
+    },
+    {
+      "from": "D1",
+      "rel": "depends_on",
+      "to": "C82"
+    },
+    {
+      "from": "D2",
+      "rel": "depends_on",
+      "to": "C24"
+    },
+    {
+      "from": "D2",
+      "rel": "depends_on",
+      "to": "C26"
+    },
+    {
+      "from": "D2",
+      "rel": "depends_on",
+      "to": "C28"
+    },
+    {
+      "from": "D2",
+      "rel": "depends_on",
+      "to": "C29"
+    },
+    {
+      "from": "D2",
+      "rel": "depends_on",
+      "to": "C30"
+    },
+    {
+      "from": "D3",
+      "rel": "depends_on",
+      "to": "A1"
+    },
+    {
+      "from": "D3",
+      "rel": "depends_on",
+      "to": "C13"
+    },
+    {
+      "from": "D3",
+      "rel": "depends_on",
+      "to": "C27"
+    },
+    {
+      "from": "D3",
+      "rel": "depends_on",
+      "to": "C71"
+    },
+    {
+      "from": "D4",
+      "rel": "depends_on",
+      "to": "A4"
+    },
+    {
+      "from": "D4",
+      "rel": "depends_on",
+      "to": "C3"
+    },
+    {
+      "from": "D4",
+      "rel": "depends_on",
+      "to": "C4"
+    },
+    {
+      "from": "D4",
+      "rel": "depends_on",
+      "to": "C6"
+    },
+    {
+      "from": "D4",
+      "rel": "depends_on",
+      "to": "C8"
+    },
+    {
+      "from": "D4",
+      "rel": "depends_on",
+      "to": "C10"
+    },
+    {
+      "from": "D4",
+      "rel": "depends_on",
+      "to": "C50"
+    },
+    {
+      "from": "D4",
+      "rel": "depends_on",
+      "to": "C52"
+    },
+    {
+      "from": "D5",
+      "rel": "depends_on",
+      "to": "A6"
+    },
+    {
+      "from": "D5",
+      "rel": "depends_on",
+      "to": "C37"
+    },
+    {
+      "from": "D5",
+      "rel": "depends_on",
+      "to": "C38"
+    },
+    {
+      "from": "D5",
+      "rel": "depends_on",
+      "to": "C40"
+    },
+    {
+      "from": "D5",
+      "rel": "depends_on",
+      "to": "C52"
+    },
+    {
+      "from": "D5",
+      "rel": "depends_on",
+      "to": "C74"
+    },
+    {
+      "from": "D5",
+      "rel": "depends_on",
+      "to": "C75"
+    },
+    {
+      "from": "D5",
+      "rel": "depends_on",
+      "to": "C76"
+    },
+    {
+      "from": "D6",
+      "rel": "depends_on",
+      "to": "C42"
+    },
+    {
+      "from": "D6",
+      "rel": "depends_on",
+      "to": "C43"
+    },
+    {
+      "from": "D6",
+      "rel": "depends_on",
+      "to": "C61"
+    },
+    {
+      "from": "D6",
+      "rel": "depends_on",
+      "to": "C62"
+    },
+    {
+      "from": "D6",
+      "rel": "depends_on",
+      "to": "C63"
+    },
+    {
+      "from": "D6",
+      "rel": "depends_on",
+      "to": "C81"
+    },
+    {
+      "from": "D7",
+      "rel": "depends_on",
+      "to": "A3"
+    },
+    {
+      "from": "D7",
+      "rel": "depends_on",
+      "to": "C54"
+    },
+    {
+      "from": "D7",
+      "rel": "depends_on",
+      "to": "C55"
+    },
+    {
+      "from": "D7",
+      "rel": "depends_on",
+      "to": "C66"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S1",
+      "quote": "The maximum cost allowed in USD.",
+      "rel": "supports",
+      "to": "C1"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S1",
+      "quote": "The maximum number of model responses committed to the run's history, as counted by",
+      "rel": "supports",
+      "to": "C2"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S1",
+      "quote": "perform a token counting pass before sending the request to the model.",
+      "rel": "supports",
+      "to": "C4"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S1",
+      "quote": "Token counts are provided in responses from the model, and the token limits are checked after each response.",
+      "rel": "supports",
+      "to": "C50"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S1",
+      "quote": "bounds the number of turns of the agent loop, not the number of requests sent to the provider.",
+      "rel": "supports",
+      "to": "C52"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S2",
+      "quote": "The maximum number of tokens allowed in requests and responses combined.",
+      "rel": "supports",
+      "to": "C1"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S2",
+      "quote": "Each of the limits can be set to `None` to disable that limit.",
+      "rel": "supports",
+      "to": "C2"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S2",
+      "quote": "Raises a `UsageLimitExceeded` exception if the next request would exceed any of the limits.",
+      "quotes": [
+        "Raises a `UsageLimitExceeded` exception if the usage exceeds any of the token limits."
+      ],
+      "rel": "supports",
+      "to": "C3"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S3",
+      "quote": "`capture_run_messages` holds the partial history.",
+      "rel": "supports",
+      "to": "C5"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S3",
+      "quote": "Pydantic AI's `UsageLimits` caps tokens, requests and cost for a single `run()`.",
+      "rel": "supports",
+      "to": "C6"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S3",
+      "quote": "State lives across runs deliberately, so `for_run` is not overridden.",
+      "quotes": [
+        "Once a recorded response spends a window, `SpendLimits` refuses the next request."
+      ],
+      "rel": "supports",
+      "to": "C7"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S3",
+      "quote": "The request that crosses the line completes, and concurrent runs can each pass the check before any of them records anything.",
+      "rel": "supports",
+      "to": "C50"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S3",
+      "quote": "A stream the caller stops part-way is charged for the usage the provider had reported by then, which can fall short of what it bills.",
+      "rel": "supports",
+      "to": "C51"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S4",
+      "quote": "Pass `max_turns=None` to disable this turn limit.",
+      "rel": "supports",
+      "to": "C8"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S4",
+      "quote": "Use them when you want to return a controlled final output instead of ending the run with the corresponding error.",
+      "rel": "supports",
+      "to": "C9"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S4",
+      "quote": "The integrations below are for durable orchestration when runs may span long waits, retries, or process restarts.",
+      "rel": "supports",
+      "to": "C34"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S5",
+      "quote": "each call to `Runner.run(...)` returns usage for that specific run.",
+      "rel": "supports",
+      "to": "C8"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S5",
+      "quote": "captures an independent snapshot of the usage accumulated so far.",
+      "rel": "supports",
+      "to": "C9"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S6",
+      "quote": "When the limit is exceeded, LangGraph raises `GraphRecursionError`.",
+      "rel": "supports",
+      "to": "C10"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S7",
+      "quote": "graph.invoke({...}, {\"recursion_limit\": 1000})",
+      "rel": "supports",
+      "to": "C10"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S10",
+      "quote": "implement the four history methods directly",
+      "rel": "supports",
+      "to": "C12"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S10",
+      "quote": "SQLiteSession, AsyncSQLiteSession, RedisSession, SQLAlchemySession, MongoDBSession, DaprSession, OpenAIConversationsSession",
+      "rel": "supports",
+      "to": "C13"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S10",
+      "note": "Format confirmed JSON; docs page has no version or migration section. Absence only.",
+      "quote": "decodes each row's message_data as JSON",
+      "rel": "supports",
+      "to": "C14"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S10",
+      "quote": "the session ID does not authenticate a user or authorize access to that history.",
+      "rel": "supports",
+      "to": "C15"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S10",
+      "quote": "A concurrent wrapper mutation waits for compaction and then applies to the resulting history",
+      "rel": "supports",
+      "to": "C69"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S10",
+      "quote": "decodes each row's message_data as JSON",
+      "rel": "supports",
+      "to": "C72"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S11",
+      "quote": "async def get_items(self, limit: int | None = None) -> list[TResponseInputItem]:",
+      "rel": "supports",
+      "to": "C12"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S12",
+      "quote": "message_data = [(self.session_id, json.dumps(item)) for item in items]",
+      "rel": "supports",
+      "to": "C14"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S13",
+      "quote": "json.dumps(item, ensure_ascii=self._ensure_ascii, separators=(\",\", \":\"))",
+      "rel": "supports",
+      "to": "C14"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S13",
+      "quote": "only the transaction that removes the current tail receives its payload.",
+      "rel": "supports",
+      "to": "C15"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S15",
+      "quote": "async def write_record(record: ConversationRecord, *, new_entries: Sequence[ConversationEntry] = (), expected_revision: str | None) -> None",
+      "rel": "supports",
+      "to": "C16"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S15",
+      "quote": "keeping each one's messages as a log in which each message is stored once",
+      "rel": "supports",
+      "to": "C17"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S16",
+      "quote": "deliberately unopinionated about your database",
+      "rel": "supports",
+      "to": "C16"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S16",
+      "quote": "Each save is checked against the conversation's revision",
+      "rel": "supports",
+      "to": "C17"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S16",
+      "quote": "No schema migration is needed when Pydantic AI adds a message part",
+      "rel": "supports",
+      "to": "C18"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S16",
+      "quote": "scope=",
+      "rel": "supports",
+      "to": "C19"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S17",
+      "quote": "Short-term memory (thread-level persistence) enables agents to track multi-turn conversations.",
+      "rel": "supports",
+      "to": "C20"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S18",
+      "quote": "serde: SerializerProtocol = JsonPlusSerializer()",
+      "rel": "supports",
+      "to": "C21"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S18",
+      "quote": "Store intermediate writes linked to a checkpoint.",
+      "quotes": [
+        "`pending_writes` must be in `writes_sort_key` order."
+      ],
+      "rel": "supports",
+      "to": "C24"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S19",
+      "quote": "Stores provide long-term memory.",
+      "rel": "supports",
+      "to": "C20"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S20",
+      "quote": "LangGraph persists changes synchronously before the next step starts.",
+      "quotes": [
+        "LangGraph persists changes only when graph execution exits."
+      ],
+      "rel": "supports",
+      "to": "C25"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S20",
+      "quote": "LangGraph stores pending checkpoint writes from any other nodes that completed successfully at that super-step.",
+      "rel": "supports",
+      "to": "C26"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S20",
+      "quote": "Ideal for using in production.",
+      "rel": "supports",
+      "to": "C27"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S20",
+      "quote": "Checkpointers can optionally encrypt all persisted state.",
+      "rel": "supports",
+      "to": "C28"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S21",
+      "quote": "pickle_fallback: bool = False",
+      "quotes": [
+        "Blocked deserialization of %s.%s - not in allowed_msgpack_modules."
+      ],
+      "rel": "supports",
+      "to": "C28"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S22",
+      "quote": "Add new state fields as `NotRequired` (or `Optional[...] = None`) so old checkpoints still validate.",
+      "quotes": [
+        "LangGraph cannot find the node by its saved name and the run fails."
+      ],
+      "rel": "supports",
+      "to": "C29"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S22",
+      "quote": "Existing checkpoints will not satisfy the new schema.",
+      "rel": "supports",
+      "to": "C72"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S23",
+      "quote": "PRIMARY KEY (thread_id, checkpoint_ns, checkpoint_id)",
+      "quotes": [
+        "The SqliteSaver does not support async methods."
+      ],
+      "rel": "supports",
+      "to": "C27"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S24",
+      "quote": "removed in V2, because of the complexity of achieving consistent snapshotting with parallel execution.",
+      "rel": "supports",
+      "to": "C30"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S25",
+      "quote": "the persistence layer for orchestrators that delegate to sub-agents",
+      "rel": "supports",
+      "to": "C31"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S25",
+      "quote": "A marker with an unknown format version raises `ValueError` on `latest_snapshot`",
+      "rel": "supports",
+      "to": "C32"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S25",
+      "quote": "A step that was in flight is not retried: its tool calls show up as `started` effects in the ledger.",
+      "quotes": [
+        "Side-effect deduplication is the orchestrator's responsibility"
+      ],
+      "rel": "supports",
+      "to": "C55"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S25",
+      "quote": "A step that was in flight is not retried: its tool calls show up as `started` effects in the ledger.",
+      "quotes": [
+        "tools with external effects need their own idempotency or reconciliation strategy"
+      ],
+      "rel": "supports",
+      "to": "C66"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S25",
+      "quote": "A stale writer or a deleted session raises `ConversationConflict`.",
+      "quotes": [
+        "this is not a distributed lease and the database must not be shared between hosts."
+      ],
+      "rel": "supports",
+      "to": "C71"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S25",
+      "quote": "The marker format is versioned, and compatibility is upgrade-only.",
+      "rel": "supports",
+      "to": "C72"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S26",
+      "quote": "After a restart, a run replays completed steps from the journal and retries the one in flight.",
+      "rel": "supports",
+      "to": "C33"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S26",
+      "quote": "runs again on every replay",
+      "rel": "supports",
+      "to": "C55"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S26",
+      "quote": "replays the completed ones from the journal and retries the one in flight",
+      "rel": "supports",
+      "to": "C68"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S28",
+      "quote": "Use `state.to_json()` or `state.to_string()` to store pending work in a database or queue",
+      "quotes": [
+        "Only deserialize snapshots from trusted storage, or snapshots whose complete integrity and ownership the application has verified."
+      ],
+      "rel": "supports",
+      "to": "C34"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S29",
+      "note": "Default FallbackModel deliberately covers rejected requests incl. context overflow; C45 should be narrowed.",
+      "quote": "another model or provider may accept a request, credentials or model name the first one rejected",
+      "rel": "contradicts",
+      "to": "C45"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S29",
+      "quote": "By default, fallback triggers on ModelAPIError",
+      "quotes": [
+        "4xx/5xx API errors, and connection failures or timeouts before the response starts."
+      ],
+      "rel": "supports",
+      "to": "C37"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S29",
+      "quote": "That includes every error category",
+      "quotes": [
+        "another model or provider may accept a request, credentials or model name the first one rejected"
+      ],
+      "rel": "supports",
+      "to": "C75"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S30",
+      "quote": "fallback_on: FallbackOn = (ModelAPIError,),",
+      "rel": "supports",
+      "to": "C37"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S31",
+      "quote": "Timeout in seconds for the initial connection and `initialize` handshake.",
+      "quotes": [
+        "Maximum time in seconds to wait for new messages on the long-lived connection. Defaults to 5 minutes."
+      ],
+      "rel": "supports",
+      "to": "C42"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S31",
+      "quote": "self._exit_stack = exit_stack.pop_all()",
+      "rel": "supports",
+      "to": "C43"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S32",
+      "quote": "Nothing retries at this layer unless you install a retrying transport on the HTTP client you pass to the provider.",
+      "quotes": [
+        "a retry at one layer wraps the attempts of every layer nearer the wire"
+      ],
+      "rel": "supports",
+      "to": "C38"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S33",
+      "quote": "500 <= exc.response.status_code < 600",
+      "rel": "supports",
+      "to": "C39"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S34",
+      "quote": "Maximum number of attempts to make before giving up, including the first.",
+      "rel": "supports",
+      "to": "C39"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S35",
+      "quote": "client_session_timeout_seconds: float | None = 5,",
+      "rel": "supports",
+      "to": "C42"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S36",
+      "quote": "Use this helper to keep MCP connect/cleanup on the same task and avoid run failures when a server is unavailable.",
+      "quotes": [
+        "`drop_failed_servers=True` removes failed servers from `active_servers` (recommended)."
+      ],
+      "rel": "supports",
+      "to": "C43"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S36",
+      "quote": "connect_timeout_seconds: float | None = 10.0,",
+      "quotes": [
+        "They accept positive finite seconds or `None` to disable the timeout."
+      ],
+      "rel": "supports",
+      "to": "C81"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S37",
+      "quote": "Client errors like 401 (unauthorized) or 404 are not retried.",
+      "rel": "supports",
+      "to": "C40"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S38",
+      "quote": "Any exception that is not a subclass of these exceptions will be raised immediately.",
+      "rel": "supports",
+      "to": "C40"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S39",
+      "quote": "Retries are runtime-only and opt in.",
+      "rel": "supports",
+      "to": "C41"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S40",
+      "quote": "Make `FallbackModel` fall back on all model API errors, not just HTTP status 400+.",
+      "rel": "supports",
+      "to": "C37"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S41",
+      "quote": "The issue is that `checkpoint_blobs` keeps growing much faster over time.",
+      "rel": "supports",
+      "to": "C47"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S42",
+      "quote": "Zero thread safety for file-based SQLite sessions",
+      "rel": "supports",
+      "to": "C56"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S44",
+      "quote": "By definition `FallbackModel` cannot automatically retry things that happen upstream from it",
+      "rel": "supports",
+      "to": "C53"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S45",
+      "quote": "Message history serialized with V1 (via ModelMessagesTypeAdapter) continues to deserialize in V2.",
+      "quotes": [
+        "Retries in a history stored before upgrading are rendered the new way too."
+      ],
+      "rel": "supports",
+      "to": "C49"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S46",
+      "quote": "we also store exceptions in our checkpointer, which cannot inherit from the `Serializable` class,",
+      "rel": "supports",
+      "to": "C48"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S47",
+      "quote": "the workflow sees no recorded success. It calls the API again.",
+      "rel": "supports",
+      "to": "C55"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S48",
+      "quote": "the model re-issues the same call, and the tool runs a second time.",
+      "rel": "supports",
+      "to": "C54"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S49",
+      "quote": "Production agents can consume a very large token volume within a small number of calls.",
+      "rel": "supports",
+      "to": "C57"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S50",
+      "quote": "await _close_pipe(process.stdin)\nif not await _wait_for_process_exit(process, PROCESS_TERMINATION_TIMEOUT):\n    await _terminate_process_tree(process)",
+      "rel": "supports",
+      "to": "C61"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S51",
+      "note": "Commenter's view; DouweM disputed it.",
+      "quote": "This is a fundamental limitation of anyio's structured concurrency model when combined with AsyncExitStack.",
+      "rel": "supports",
+      "to": "C62"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S52",
+      "quote": "exiting the context from a **different `asyncio.Task` than the one that entered it**",
+      "rel": "supports",
+      "to": "C44"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S52",
+      "quote": "then `cancel_scope.__exit__` hits the wrong-task guard and raises **before** removing the host task from `_tasks`",
+      "rel": "supports",
+      "to": "C62"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S53",
+      "quote": "This violates the structured concurrency of AnyIO.",
+      "rel": "supports",
+      "to": "C44"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S53",
+      "quote": "addresses the architectural root cause",
+      "rel": "supports",
+      "to": "C63"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S54",
+      "quote": "Maximum time in seconds to wait for new messages on the long-lived connection. Defaults to 5 minutes.",
+      "rel": "supports",
+      "to": "C42"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S54",
+      "quote": "init_timeout: Timeout in seconds for the initial connection and `initialize` handshake.",
+      "rel": "supports",
+      "to": "C64"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S55",
+      "quote": "client_session_timeout_seconds: float | None = 5,",
+      "rel": "supports",
+      "to": "C42"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S55",
+      "quote": "client_session_timeout_seconds: float | None = 5,",
+      "rel": "supports",
+      "to": "C65"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S56",
+      "quote": "It is not available in the LangGraph open source framework.",
+      "quotes": [
+        "a tool call may have been initiated but not yet completed at the time of interruption."
+      ],
+      "rel": "supports",
+      "to": "C70"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S58",
+      "note": "Vendor KB documents upgrade breakage rules for LangGraph checkpoints; not a reproducible user bug report.",
+      "quote": "Existing checkpoints will error.",
+      "rel": "supports",
+      "to": "C60"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S58",
+      "quote": "Existing checkpoints will error.",
+      "rel": "supports",
+      "to": "C72"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S61",
+      "quote": "a concurrent `add_items` during the request was silently deleted",
+      "rel": "supports",
+      "to": "C69"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S62",
+      "quote": "If Session.add_items() commits the batch and then raises because the acknowledgement is lost, the RunState has no durable checkpoint for that append.",
+      "rel": "supports",
+      "to": "C55"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S62",
+      "quote": "the Session contains two occurrences of Late input and the same pending-input guardrail runs twice.",
+      "rel": "supports",
+      "to": "C67"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S63",
+      "note": "Independent of the original blog: external ledger holds both refunds while the session lost them.",
+      "quote": "Session after cancel: [{'content': 'Refund ORD-1 and ORD-2', 'role': 'user'}]",
+      "rel": "supports",
+      "to": "C55"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S63",
+      "quote": "Session after cancel: [{'content': 'Refund ORD-1 and ORD-2', 'role': 'user'}]",
+      "rel": "supports",
+      "to": "C66"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S64",
+      "quote": "The implementation does allow overlapping pop_item() calls to select the same item before deletion.",
+      "rel": "supports",
+      "to": "C69"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S65",
+      "note": "Pydantic AI ships a load-time upgrade path for older stored history: a documented upgrade-compat concern, not a bug report.",
+      "quote": "Save the history again afterwards, and it carries the record and no longer needs the context.",
+      "rel": "supports",
+      "to": "C60"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S65",
+      "quote": "History saved by an earlier version has no such record.",
+      "rel": "supports",
+      "to": "C72"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S66",
+      "note": "Context-length errors are a first-class fallback trigger in LiteLLM.",
+      "quote": "For litellm.ContextWindowExceededErrors - LiteLLM maps context window error messages across providers",
+      "rel": "contradicts",
+      "to": "C45"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S66",
+      "quote": "For litellm.ContextWindowExceededErrors - LiteLLM maps context window error messages across providers",
+      "quotes": [
+        "Fallback across providers (e.g. from Azure OpenAI to Anthropic) if you hit content policy violation errors."
+      ],
+      "rel": "supports",
+      "to": "C74"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S67",
+      "quote": "ADK 1.24 changed `DatabaseSessionService.append_event()` from raising `ValueError` on stale sessions",
+      "quotes": [
+        "The LLM sees duplicate/contradictory tool calls and responses",
+        "ADK versions affected: ≥1.24.0 (tested 1.24.0, 1.25.0, 1.26.0)"
+      ],
+      "rel": "supports",
+      "to": "C77"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S68",
+      "quote": "When two requests for the same session overlap (e.g. a new turn arrives while the previous turn is still writing events)",
+      "quotes": [
+        "so concurrent `append_event()` writes can trigger OCC aborts even on pure reads."
+      ],
+      "rel": "supports",
+      "to": "C78"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S69",
+      "quote": "This PR implements optimistic concurrency control using an event sequence number.",
+      "quotes": [
+        "The session has been modified in storage. Please reload the session before appending events."
+      ],
+      "rel": "supports",
+      "to": "C79"
+    },
+    {
+      "accessed": "2026-11-20",
+      "from": "S70",
+      "quote": "Set equal to `val_json_bytes` to get back an equal value after serialization round trip.",
+      "quotes": [
+        "New in v2.9",
+        "Defaults to `'utf8'`."
+      ],
+      "rel": "supports",
+      "to": "C82"
+    }
+  ],
+  "last_research_date": "2026-11-20",
+  "merged_fragments": [
+    "251196f346df60391391066b5e91599b1d304e791db4ce654b1210778b45e7a6",
+    "2744f7fc24a79f39e48eecfcbce0c58603f60f0cd5c74c419920aa7ed692a733",
+    "2d67f145919f3d2a2c69a8ded3a59be8947c40692a8ed4cdcf54523fb87d1d3a",
+    "305b1042f92ae16cd52eae38d262d07c59389212de71c837c1ea57626ce8b0bd",
+    "642073782aa0620acd0a53f7b22ff4dde13260290a8dda0e709b2dd35eb69e68",
+    "6d68185cac379d0baa66dd53178e916bdad76e7e54e068be811ded4b1ad90f56",
+    "7ae44afaf68fed00dd0acf37141b859b54262e551335c1908d1f364d968c4fb7",
+    "99aad42f50e7c3770e1c77514667026b40cd3b2f4123ecaa1fb87ccd7f54f675",
+    "a30b59c314f44ef44b687acb34dfb3bbf315025181882d97c02cf2ec94a1bce7",
+    "b5e8aaee6125aebe83acab1eb92821b1429c906d167db51d47212479a757b56e"
+  ],
+  "nodes": [
+    {
+      "fragility": "medium",
+      "id": "A1",
+      "text": "The host runs a single process, and at most one turn writes a given conversation at a time; an in-process per-conversation lock is enough.",
+      "type": "assumption"
+    },
+    {
+      "fragility": "low",
+      "id": "A2",
+      "text": "Histories stay bounded (max_history_turns defaults to 20), so rewriting the whole conversation record once per completed turn is cheap.",
+      "type": "assumption"
+    },
+    {
+      "fragility": "high",
+      "id": "A3",
+      "text": "The default tools are free of external side effects; a host that registers effectful tools makes them idempotent, so replaying a failed turn from the last saved turn is acceptable.",
+      "type": "assumption"
+    },
+    {
+      "fragility": "medium",
+      "id": "A4",
+      "text": "Provider-reported token usage is accurate enough for a soft cap; exact billing is reconciled by the host against the provider.",
+      "type": "assumption"
+    },
+    {
+      "fragility": "medium",
+      "id": "A5",
+      "text": "The platform message models (including ImageDocument and AudioDocument bytes) round-trip through JSON only if the codec sets ser_json_bytes and val_json_bytes to base64 (or the fields use Base64Bytes); pydantic defaults both to utf8. The locked pydantic is 2.13.4, which has val_json_bytes (added in 2.9).",
+      "type": "assumption"
+    },
+    {
+      "fragility": "medium",
+      "id": "A6",
+      "text": "Each of the six LLM adapters can map vendor errors into request-scoped permanent (bad request, context length, content policy), provider-scoped permanent (auth, permission, model not found) and transient errors.",
+      "type": "assumption"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C1",
+      "kind": "observed",
+      "status": "supported",
+      "text": "Pydantic-AI UsageLimits offers cost_limit (USD Decimal), request_limit, tool_calls_limit, input_tokens_limit, output_tokens_limit, total_tokens_limit and per_request_input_tokens_limit; all except request_limit default to None.",
+      "topic": "pydantic-ai limits",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C2",
+      "kind": "observed",
+      "limitations": "Default value read from the docs page; the 'usage_limits or UsageLimits()' line came from a truncated read of agent/__init__.py (s9, skim).",
+      "status": "supported",
+      "text": "Pydantic-AI request_limit defaults to 50, and a default UsageLimits() is created when none is passed, so a request cap is ON by default (not zero-config opt-in). It counts model responses committed to history, not retries or fallback attempts. Setting a limit to None disables it.",
+      "topic": "pydantic-ai limits",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C3",
+      "kind": "observed",
+      "status": "supported",
+      "text": "Pydantic-AI enforces limits at two points: check_before_request (request count, and projected input/total tokens/cost) before each model call, and check_tokens after each response. Both raise the typed UsageLimitExceeded; tool-call limits use check_before_tool_call. H4 is confirmed on enforcement points.",
+      "topic": "pydantic-ai limits",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C4",
+      "kind": "observed",
+      "status": "supported",
+      "text": "Pydantic-AI pre-request token enforcement is opt-in: count_tokens_before_request=False by default, because it costs an extra token-counting call and is supported only for Anthropic, Google, Bedrock Converse and OpenAI Responses. Otherwise input/output/total token limits trip only after the response that crossed them (overshoot by one response).",
+      "topic": "predictive enforcement",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C5",
+      "kind": "observed",
+      "limitations": "Interrupted-state quote comes from a truncated skim of the agent docs; the spend page confirms capture_run_messages holds the partial history.",
+      "status": "supported",
+      "text": "When a Pydantic-AI limit trips, the run raises UsageLimitExceeded instead of returning a result, but the crossing response is kept in the run's captured messages with state='interrupted', so partial history is recoverable via capture_run_messages and can be resumed.",
+      "topic": "partial state",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C6",
+      "kind": "observed",
+      "status": "supported",
+      "text": "Pydantic-AI UsageLimits is scoped to a single run(); a longer period needs the earlier usage carried in via the usage= parameter (a RunUsage accumulated across runs) or a harness SpendLimits capability. H4's per-conversation part is confirmed in mechanism, though the exact check-against-shared-usage semantics were read only from docs prose.",
+      "topic": "cross-run limits",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C7",
+      "kind": "observed",
+      "limitations": "Separate harness package, not core; overshoot is by design (post-hoc recording).",
+      "status": "supported",
+      "text": "Pydantic AI Harness SpendLimits adds budgets (e.g. usd per window such as UTC day or run) with state persisting across runs. It gates before each request, records spend after each response, raises SpendLimitExceeded (a UsageLimitExceeded subclass), and can overshoot: the crossing request completes and concurrent runs can both pass the check.",
+      "topic": "spend limits",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C8",
+      "kind": "observed",
+      "limitations": "Docs-based; absence of a feature is inferred from docs not mentioning it.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK has no token, cost or tool-call cap: usage is tracked per run for monitoring only, each Runner.run returns usage for that run alone, and sessions do not carry usage. Its only limit is max_turns (LLM calls in the loop) raising MaxTurnsExceeded; max_turns=None disables it. H5 confirmed for the SDK.",
+      "topic": "openai agents sdk",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C9",
+      "kind": "observed",
+      "status": "supported",
+      "text": "OpenAI Agents SDK error_handlers (keys max_turns, model_refusal, invalid_final_output) let the host return a controlled final output instead of raising MaxTurnsExceeded; the fallback enters history and the session by default (include_in_history=True). RunResult.to_state() snapshots usage so a resumed run continues from those totals.",
+      "topic": "openai agents sdk",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C10",
+      "kind": "observed",
+      "limitations": "Docs-based; absence of a token cap inferred. State on error unverified (middleware like ModelCallLimit exists in langchain but was not checked).",
+      "status": "supported",
+      "text": "LangGraph caps only graph steps (super-steps) via config recursion_limit, raising GraphRecursionError; default 10,007 since 1.1.4 (10,000 for 1.0.6-1.1.3). It has no built-in token or cost limit, and the docs do not say what state is preserved when it trips. H5 confirmed.",
+      "topic": "langgraph",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C11",
+      "kind": "inference",
+      "status": "supported",
+      "text": "Design inference: a library should offer an opt-in limits object checked before each model call (request/step count, projected tokens/cost) and after each response, raising one typed exception that carries the partial messages, with a caller-owned usage accumulator passed between runs for conversation scope. Pydantic-AI is the closest model; its non-zero request_limit default and after-the-fact token checks are the weak points, and OpenAI/LangGraph offer only turn/step caps.",
+      "topic": "architecture",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C12",
+      "kind": "observed",
+      "limitations": "Docs and source of the same vendor: not independent.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK Session is a runtime_checkable async Protocol with session_id, session_settings and four methods: get_items(limit), add_items(items), pop_item(), clear_session(). Granularity is item-level (append, pop-last, clear), not whole history. SessionABC exists but third parties are told to implement the Protocol.",
+      "topic": "session store protocol",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C13",
+      "kind": "observed",
+      "status": "supported",
+      "text": "OpenAI Agents SDK ships many backends: SQLite (sync and async), Redis, SQLAlchemy, MongoDB, Dapr, OpenAIConversationsSession (server-side), compaction wrapper, AdvancedSQLite, EncryptedSession; community Django. H1 confirmed and extended.",
+      "topic": "reference backends",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C14",
+      "kind": "observed",
+      "limitations": "Absence of a versioning mechanism inferred from reading two backend files, not an explicit doc statement.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK stores each history item as its own JSON text row (json.dumps of the Responses-API input item), so the format is the OpenAI Responses item shape; no version field or migration mechanism was seen in the SQLite/SQLAlchemy backends, and unparsable SQLite rows are skipped silently.",
+      "topic": "serialization",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C15",
+      "kind": "observed",
+      "limitations": "Turn-level concurrency (two runs on one session) not documented in pages read; inferred from absence.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK leaves session id ownership and authorization to the host: the id selects history but does not authenticate or authorize. Concurrency is backend-level: SQLAlchemy serializes mutations per session with a lock and atomic tail pop (DELETE RETURNING / FOR UPDATE); SQLite uses process-wide per-path locks; there is no turn-level lock or conflict detection.",
+      "topic": "ownership and concurrency",
+      "type": "claim"
+    },
+    {
+      "applicability": "Based on Pydantic AI docs as of 2026-11; API appears recent and may still change.",
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C16",
+      "kind": "observed",
+      "limitations": "Only InMemoryConversationStore ships for the ConversationStore ABC; durable file, SQLite and PostgreSQL stores exist for the Memory capability and the harness. API appears recent and may change.",
+      "status": "supported",
+      "text": "Pydantic AI has moved beyond H2: docs now recommend storing a Conversation (messages, usage, conversation_id, deferred tool requests) rather than messages alone, and offer an abstract ConversationStore (ABC) with five async primitives: read_record, read_records(scope, limit), write_record(record, new_entries, expected_revision), delete_record(id, expected_revision), read_entry. Only InMemoryConversationStore ships (tests/examples); production backends are host-written; the DB schema is left to the host.",
+      "topic": "session store protocol",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C17",
+      "kind": "observed",
+      "status": "supported",
+      "text": "Pydantic AI stores conversations as an append-only log where each message is stored once (forks share entries), with optimistic concurrency: save checks a revision and raises ConversationConflict instead of overwriting; the conflict does not undo model calls or tool calls already made. Metadata/title updates do not change the revision.",
+      "topic": "ownership and concurrency",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C18",
+      "kind": "observed",
+      "limitations": "Message-history page read only first 100k of 154k characters, and as a tool summary.",
+      "status": "supported",
+      "text": "Pydantic AI serializes history with ModelMessagesTypeAdapter (to_jsonable_python / validate_python, or to_json / validate_json); the format is Pydantic AI's own provider-neutral message model, with provider-specific details (e.g. signed reasoning) kept inside parts. JSON round-trips lose non-JSON-native types in tool returns (tuple to list, datetime to string). Compatibility promise: no migration needed when a message part is added; no version field documented; one known cross-version loader flag (rebuild_unrecorded_tool_files).",
+      "topic": "serialization and versioning",
+      "type": "claim"
+    },
+    {
+      "confidence": "low",
+      "evidence_type": "observational",
+      "id": "C19",
+      "kind": "observed",
+      "limitations": "The quote is only the parameter name; semantics from the scout summary.",
+      "status": "supported",
+      "text": "Pydantic AI's caller supplies the conversation_id; scope= restricts reads to an owner (e.g. user id); saving a new conversation under an existing id raises a conflict.",
+      "topic": "ownership and isolation",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C20",
+      "kind": "observed",
+      "limitations": "Both sources are LangChain-owned: not independent.",
+      "status": "supported",
+      "text": "LangGraph persists conversation history as graph state in checkpoints keyed by thread_id (short-term, thread-level memory); the Store (BaseStore: get, put, search, delete, batch over tuple namespaces) is for long-term cross-thread memory. H3 confirmed. Checkpointer backends: InMemorySaver, SqliteSaver, PostgresSaver, plus MongoDB, Redis, Oracle.",
+      "topic": "session store protocol",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C21",
+      "kind": "observed",
+      "limitations": "Docstring says v is 1 but code sets LATEST_VERSION=2. Async variants and per-backend schema not read. Graph checkpointing is another scout's scope.",
+      "status": "supported",
+      "text": "LangGraph BaseCheckpointSaver exposes get_tuple, put, put_writes, list, delete_thread (plus async variants); default serde is JsonPlusSerializer; the Checkpoint dict carries an integer format version field v. The unit stored is a graph-state snapshot, not a message log, so it is coupled to graph state schema.",
+      "topic": "serialization and versioning",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C22",
+      "kind": "inference",
+      "status": "supported",
+      "text": "Across the three libraries the host owns the session/thread id and authorization; none enforces isolation itself except optional scope= in Pydantic AI. Only Pydantic AI documents optimistic conflict detection for concurrent turns; OpenAI only locks individual operations.",
+      "type": "claim"
+    },
+    {
+      "confidence": "low",
+      "id": "C23",
+      "kind": "recommendation",
+      "status": "requires_validation",
+      "text": "Design implication: for host embedding, the simplest protocol is item-level async (OpenAI shape: get/add/pop/clear), while Pydantic AI's revisioned record+entries log is the more robust concurrency design; a provider-neutral, version-tagged envelope for stored messages is something none of the three documents fully.",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C24",
+      "kind": "observed",
+      "status": "supported",
+      "text": "LangGraph's BaseCheckpointSaver protocol is put (checkpoint + metadata + new channel versions), put_writes (intermediate per-task writes), get_tuple (returns CheckpointTuple or None, pending_writes in writes_sort_key order) and list (filter, before, limit), each with an async twin (aput, aput_writes, aget_tuple, alist), plus get_next_version (monotonic, default int +1). Base methods raise NotImplementedError until a saver implements them.",
+      "topic": "langgraph protocol",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C25",
+      "kind": "observed",
+      "status": "supported",
+      "text": "LangGraph durability has three modes: exit (persist only when the graph exits, so a mid-run crash is unrecoverable), async (persist while the next step runs, so the latest checkpoint can be lost on a crash) and sync (persist before the next step starts, highest durability, some cost).",
+      "topic": "langgraph durability",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C26",
+      "kind": "observed",
+      "status": "supported",
+      "text": "On resume from a super-step, LangGraph keeps pending writes of nodes that completed in that super-step, so completed nodes are not re-run. Resume granularity is the node/super-step, not mid-node.",
+      "topic": "langgraph resume",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C27",
+      "kind": "observed",
+      "limitations": "PostgresSaver source not read; the docs do not state a single-host limit for SqliteSaver.",
+      "status": "supported",
+      "text": "LangGraph reference savers: InMemorySaver keeps checkpoints in RAM; the SqliteSaver class is synchronous and thread-locked (an AsyncSqliteSaver exists separately) and keys checkpoints and writes by (thread_id, checkpoint_ns, checkpoint_id[, task_id, idx]) with serialized blobs; the docs call SqliteSaver ideal for experimentation and local workflows and PostgresSaver the production option, with no formal per-saver durability guarantees.",
+      "topic": "langgraph savers",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C28",
+      "kind": "observed",
+      "limitations": "Strict-mode default flips in future versions (warning says 'blocked in a future version'); version-specific.",
+      "status": "supported",
+      "text": "LangGraph's default JsonPlusSerializer is msgpack-based with typed ext codes (constructors, Pydantic v1/v2, numpy, delta snapshot); pickle is off by default (pickle_fallback=False) and enabled explicitly. Unregistered types are allowed with a warning in permissive mode and blocked (raw data returned) when an allowlist or strict mode applies; an allowlist (allowed_msgpack_modules) exists. Optional encryption is available through EncryptedSerializer passed as serde.",
+      "topic": "langgraph serde",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C29",
+      "kind": "observed",
+      "limitations": "A single practitioner post claims the rename failure is silent (resume does nothing) rather than an error; not verified here.",
+      "status": "supported",
+      "text": "LangGraph schema evolution: renaming or removing a node can fail resume for threads paused at that node; adding optional state fields and rewiring edges between surviving nodes are safe (edge topology is not persisted); removing/renaming/tightening a state field breaks older checkpoints. Recommended: deprecate before delete, rename in stages, stamp a version flag at thread start.",
+      "topic": "langgraph schema evolution",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C30",
+      "kind": "observed",
+      "limitations": "Docs say removed in V2; the v1 BaseStatePersistence/NodeSnapshot API was not fetched, so its shape is unverified here.",
+      "status": "supported",
+      "text": "Pydantic-AI removed pydantic_graph.persistence (BaseStatePersistence and file/in-memory implementations) in V2; graph state is no longer snapshotted, because of the complexity of consistent snapshotting under parallel execution. This contradicts the hypothesis that pydantic_graph still ships a persistence protocol.",
+      "topic": "pydantic-ai graph",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C31",
+      "kind": "observed",
+      "limitations": "Docs page summarized by the fetch tool; package is 0.x and the API may change between minor releases. Persists message history, not arbitrary workflow state.",
+      "status": "supported",
+      "text": "Pydantic-AI replaced graph persistence with a Harness capability StepPersistence: an async StepStore Protocol (about ten methods) with InMemory, File, Sqlite, Mongo and Postgres backends. Snapshots of message history are written after each tool-call step whose calls have all returned and on failure; continue_run returns the latest complete snapshot's messages, fork_run branches, a missing snapshot raises LookupError, and an in-flight step is not retried automatically (tool effects stay 'started' in a ledger). Snapshots exclude mid-step state, capability state and workspace files.",
+      "topic": "pydantic-ai step persistence",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C32",
+      "kind": "observed",
+      "status": "supported",
+      "text": "StepPersistence stores JSON (files: run.json, events.jsonl, snapshots/{seq}.json; SQLite with messages keyed by SHA-256) with a content-addressed media marker whose format is versioned; compatibility is upgrade-only and an unknown marker version raises ValueError. Old SQLite DBs get new columns on open (additive migration on open).",
+      "topic": "pydantic-ai schema evolution",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C33",
+      "kind": "observed",
+      "status": "supported",
+      "text": "Pydantic-AI delegates whole-run crash survival to durable execution engines (Temporal, DBOS, Prefect, Restate and others): the engine journals model requests and wrapped tool calls, replays completed steps after restart and retries the in-flight one; non-durable tools run in workflow code on each replay and must be deterministic.",
+      "topic": "pydantic-ai durable execution",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C34",
+      "kind": "observed",
+      "limitations": "Absence of a store was inferred from two docs pages; RunState schema versioning not checked. The HITL page itself does not mention Temporal/DBOS; the running-agents page does.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK has no checkpoint store protocol in the pages read: RunState is a serializable snapshot (to_json/to_string, from_json/from_string, result.to_state(), resume via Runner.run(agent, state)) used for paused runs (approvals) and cancel(mode=\"after_turn\"); the application owns storage. Docs warn to deserialize only trusted snapshots. Durable engines (Temporal, DBOS, Dapr, Restate) are external integrations.",
+      "topic": "openai agents sdk",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C35",
+      "kind": "inference",
+      "status": "supported",
+      "text": "Common pattern across the three libraries: checkpoint at a completed-step boundary and keep the store interface small and async (LangGraph: put/put_writes/get_tuple/list; Pydantic-AI: about ten-method StepStore; OpenAI: app-owned RunState blob), and delegate whole-run durability to external durable engines. Pydantic-AI deliberately dropped arbitrary graph-state checkpointing because of parallel execution.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C36",
+      "kind": "recommendation",
+      "status": "requires_validation",
+      "text": "For a single-instance host, a core checkpoint protocol should be minimal: save(run_id, step snapshot), latest(run_id), list/history and writes keyed by (run_id, step_id), JSON-only serialization with an explicit schema-version field and no pickle by default, and a reference SQLite/file backend; defer pending-writes (parallel branches) and durability modes unless parallel nodes are supported.",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C37",
+      "kind": "observed",
+      "limitations": "Sources are from the same project: not independent.",
+      "status": "supported",
+      "text": "Pydantic-AI FallbackModel default fallback_on is (ModelAPIError,): it falls to the next model on every API error (429, 5xx, connection, timeout and also 4xx rejected requests/bad credentials), not only HTTP status errors; validation errors do not trigger fallback. Hypothesis H6 ('only ModelHTTPError') is outdated: merged Nov 2025.",
+      "topic": "A2",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C38",
+      "kind": "observed",
+      "limitations": "Single docs page.",
+      "status": "supported",
+      "text": "Pydantic-AI has no retry at the HTTP transport unless a retrying transport is installed; provider SDKs retry by default (3 attempts OpenAI/Anthropic/Groq, 1 Google/Mistral/HF, 5 Bedrock); retry layers multiply; FallbackModel walks models inside a single attempt and never re-attempts the same model. AsyncTenacityTransport is deprecated (removed in v3) in favour of SDK-level retries.",
+      "topic": "A1",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C39",
+      "kind": "observed",
+      "limitations": "Fetch tool paraphrased default_retry_on; exact handling of 4xx HTTPStatusError not verified.",
+      "status": "supported",
+      "text": "LangGraph RetryPolicy defaults: initial_interval 0.5 s, backoff 2.0, max_interval 128 s, max_attempts 3 (including first), jitter on; default_retry_on retries ConnectionError and 5xx (httpx/requests) and excludes ValueError, TypeError, ArithmeticError, ImportError, LookupError, NameError, SyntaxError, RuntimeError, ReferenceError, StopIteration, OSError; any other exception is retried. It does not classify 4xx explicitly (non-5xx HTTPStatusError falls to the generic True branch is not verified).",
+      "topic": "A1",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C40",
+      "kind": "observed",
+      "limitations": "Sources are from the same project: not independent.",
+      "status": "supported",
+      "text": "LangChain with_fallbacks defaults to exceptions_to_handle=(Exception,), so it falls through on every error including permanent ones unless narrowed; separately, chat model max_retries retries network errors, 429 and 5xx but not 401/404 (OpenAI/Anthropic 2 retries, Google 6).",
+      "topic": "A1,A2",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C41",
+      "kind": "observed",
+      "limitations": "Absence of fallback is from one docs page only.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK retries are opt-in and runtime-only, with composable policies (network_error, http_status, provider_suggested, retry_after); replay is blocked when unsafe (streamed output started, stateful follow-ups with unknown safety); ModelSettings.timeout bounds each attempt. The models page documents no fallback model chain.",
+      "topic": "A1,A2",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C42",
+      "kind": "observed",
+      "limitations": "MCPServerStdio class in pydantic-ai was not read (extract covered MCPToolset only); Agents SDK page read only first 100k chars.",
+      "status": "supported",
+      "text": "MCP timeouts: Pydantic-AI's current MCP toolset (mcp.py) has init_timeout default 5 s (connection plus initialize handshake) and read_timeout default 5 min; the Agents SDK has client_session_timeout_seconds default 5 (the ClientSession read timeout, i.e. per request, not documented as a separate startup timeout; None/0 disables). H7's '5 s default' holds for both, but they mean different things.",
+      "topic": "B1",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C43",
+      "kind": "observed",
+      "limitations": "Sources are from the same project: not independent.",
+      "status": "supported",
+      "text": "Cleanup designs: Pydantic-AI's MCP class builds an AsyncExitStack in __aenter__, commits with pop_all(), refcounts nested enters (_running_count) and closes only at zero, with a shutdown grace period; the Agents SDK MCPServerManager keeps connect and cleanup on the same task (worker task per server when connect_in_parallel), cleans up servers in reverse order, and recommends drop_failed_servers=True.",
+      "topic": "B2",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C44",
+      "kind": "finding",
+      "limitations": "Confirmed in python-sdk and Google ADK issues; FastMCP and langchain-mcp-adapters reports not read.",
+      "status": "supported",
+      "text": "Cross-task cancel-scope errors ('Attempted to exit cancel scope in a different task than it was entered in') from anyio affect MCP stdio clients when enter and exit happen in different tasks (pools, GC finalizers, background cleanup); seen in langchain-mcp-adapters, FastMCP, Google ADK, deer-flow. Evidence is from search snippets only; no pydantic-ai or Agents SDK issue was found.",
+      "topic": "B2",
+      "type": "claim"
+    },
+    {
+      "confidence": "low",
+      "id": "C45",
+      "kind": "recommendation",
+      "limitations": "Pydantic AI and LiteLLM both treat context-window overflow (and LiteLLM content-policy errors) as fallback triggers; narrowed by C76.",
+      "status": "disputed",
+      "text": "Core should own one transient/permanent classifier (timeout, connection, 429, 5xx, overloaded = transient; 400, 401/403, 404, context-length = permanent). Retry only transient errors in one layer (set SDK max_retries to 0 or own it, not both). The fallback chain should move on transient errors and provider-side permanent errors (auth, model not found) but not on caller errors (400 bad request, context length), by passing an explicit predicate rather than the permissive library defaults.",
+      "topic": "A",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C46",
+      "kind": "recommendation",
+      "status": "supported",
+      "text": "MCP lifecycle: wrap each server startup in an explicit timeout (init handshake about 5 s), set a separate per-call timeout, own each client in one dedicated task or an AsyncExitStack entered and exited by the same task, clean up in reverse order, and drop failed servers instead of failing the host.",
+      "topic": "B",
+      "type": "claim"
+    },
+    {
+      "applicability": "LangGraph per-step checkpointing; one user report plus peer replies, no maintainer statement. Does not apply to a store that saves one record per completed turn.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C47",
+      "kind": "observed",
+      "limitations": "Replies came from community members, not LangGraph maintainers. Web-search snippets also mention a 40GB-in-six-weeks postmortem on Towards AI, which could not be fetched (403) and is not cited.",
+      "status": "supported",
+      "text": "LangGraph PostgresSaver users report the checkpoint_blobs table growing much faster than the checkpoints table, because the whole messages channel is rewritten each step. Retention needs explicit prune/TTL work. A library that persists full state per step needs a retention and compaction story from day one.",
+      "type": "claim"
+    },
+    {
+      "applicability": "LangGraph JsonPlusSerializer; single user report with a contributor's explanation, not a maintainer statement.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C48",
+      "kind": "observed",
+      "status": "supported",
+      "text": "A library upgrade that hardens the checkpoint serializer can make previously storable objects (exceptions, non-Serializable custom objects) fail to serialize. The LangGraph langgraph-checkpoint 3.0.0 change was a deliberate security fix, so custom objects in stored state are a compatibility liability.",
+      "type": "claim"
+    },
+    {
+      "applicability": "Pydantic AI; the changelog shows compat is maintained, not that it breaks. Partly supports the hypothesis that stored histories need versioning or tolerant loading, but no broken-upgrade bug report was found.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C49",
+      "kind": "observed",
+      "status": "supported",
+      "text": "Pydantic AI guarantees only that V1-serialized message history deserializes in V2. It still changes stored-part semantics between releases: RetryPromptPart is no longer written, old retry parts are reinterpreted on load, and the first request after an upgrade misses the provider prompt cache. A library-owned message format changes over time, and the maintainers need an explicit load-compat layer.",
+      "type": "claim"
+    },
+    {
+      "applicability": "Pydantic AI UsageLimits and SpendLimits; two pages from one vendor's docs, so not independent. This is what the documentation states, not a user-reported failure.",
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C50",
+      "kind": "observed",
+      "limitations": "Same-vendor sources. The count_tokens_before_request detail comes from a summary of the page; the quoted sentence is the verbatim part.",
+      "status": "supported",
+      "text": "Pydantic AI token limits are checked after each model response. The request that crosses the line still completes and is billed, unless count_tokens_before_request=True is set for the per-request input limit. Concurrent runs can each pass the check before any records usage. A cap is therefore a soft bound, not a hard ceiling.",
+      "type": "claim"
+    },
+    {
+      "applicability": "Pydantic AI SpendLimits (harness); vendor documentation of its own limitation.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C51",
+      "kind": "observed",
+      "status": "supported",
+      "text": "A stream stopped part-way is charged only for the usage the provider had reported by then, which can fall short of the provider's bill. Known token totals for incomplete usage are lower bounds. Reconcile against the provider for exact totals.",
+      "type": "claim"
+    },
+    {
+      "applicability": "Pydantic AI usage docs.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C52",
+      "kind": "observed",
+      "status": "supported",
+      "text": "In Pydantic AI, request_limit bounds agent-loop turns, not provider requests. Fallback attempts and provider retries do not count toward it, but their tokens and cost still count toward token and cost limits. A fallback chain therefore multiplies spend inside token caps, and a request-count cap does not bound it.",
+      "type": "claim"
+    },
+    {
+      "applicability": "Pydantic AI FallbackModel; maintainer replies in a GitHub issue. Does not show fallback masking real bugs.",
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C53",
+      "kind": "observed",
+      "status": "supported",
+      "text": "FallbackModel cannot recover from failures above it, such as output parsing or validation failures. A maintainer said it 'cannot automatically retry things that happen upstream from it'. A model-level fallback chain does not cover real-world failure modes that occur after the response is received.",
+      "type": "claim"
+    },
+    {
+      "applicability": "OpenAI Agents SDK sessions with streaming, stop_on_first_tool and output guardrails; a narrow path, fixed upstream.",
+      "confidence": "high",
+      "evidence_type": "observational",
+      "id": "C54",
+      "kind": "observed",
+      "status": "supported",
+      "text": "OpenAI Agents SDK streamed runs had a bug where a tripped output guardrail dropped the function_call/function_call_output pair from the saved session. The next run re-issued the call and the tool ran twice. This is a duplicated side effect caused by session persistence at turn level, fixed in PR 4148.",
+      "type": "claim"
+    },
+    {
+      "applicability": "General durable-execution argument from a practitioner blog; no measurement or incident data.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C55",
+      "kind": "finding",
+      "limitations": "Unrecorded-effect and replay parts independently reproduced (OpenAI SDK issues, Pydantic AI docs); the idempotency-key-source part rests on one industry blog.",
+      "status": "supported",
+      "text": "A crash between a committed external effect and the checkpoint write makes resume repeat the effect, for example a duplicate refund. Checkpoints alone do not make tools safe; the idempotency key must come from durable run state, not the model.",
+      "type": "claim"
+    },
+    {
+      "applicability": "SQLiteSession, thread-level safety; does not show two async turns on one session_id being serialized.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C56",
+      "kind": "observed",
+      "limitations": "Content from a PR description summary, not the diff.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK SQLiteSession created a new lock on every call for file-based databases, so it had no thread safety for file DBs. Only in-memory DBs used the shared lock. A shipped session store therefore lacked concurrency protection until a later fix.",
+      "type": "claim"
+    },
+    {
+      "applicability": "LangChain agents, a forum post; the reply was not from a maintainer.",
+      "confidence": "low",
+      "evidence_type": "observational",
+      "id": "C57",
+      "kind": "observed",
+      "status": "weakly_supported",
+      "text": "LangChain agents' built-in limiters cap call count, not tokens, so a few large calls can consume a very large token volume. Users asked for a token budget. A call-count cap is not a spend cap.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C58",
+      "kind": "inference",
+      "status": "supported",
+      "text": "Hypothesis 2 holds: post-response token checks let a single call exceed the cap, so opt-in caps need a pre-request estimate (or a hard per-request max_tokens) if they must be hard, and the typed error must say the cap was crossed by the last call. Docs should say the cap is soft.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C59",
+      "kind": "inference",
+      "status": "supported",
+      "text": "Hypothesis 3 is supported but needs refinement. Save-after-completed-turn loses effects of an interrupted turn, and tool side effects can be duplicated on replay (crash window; PR 4148 guardrail path). The design should require idempotency keys for effectful tools, persist tool call and result pairs atomically, and document that a failed turn is replayed from the last saved turn.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C60",
+      "kind": "inference",
+      "status": "supported",
+      "text": "Hypothesis 1 is only partly supported. Evidence shows format changes (Pydantic AI retry parts, LangGraph serializer hardening) handled through load-time compat or breaking releases, not user-reported corruption. A versioned envelope with a tolerant reader is a cheap safeguard, but no upgrade-corruption bug report was found.",
+      "type": "claim"
+    },
+    {
+      "applicability": "Current main branch of the SDK; older releases used a different, shorter sequence and the exact version where the process-group kill landed was not checked.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C61",
+      "kind": "observed",
+      "last_verified": "2026-11-20",
+      "limitations": "Source summary came through a fetch tool that paraphrased the code; quotes are from that output. Not checked against a pinned release.",
+      "status": "supported",
+      "text": "MCP Python SDK stdio_client shutdown (_stop_server_process): close the server's stdin, wait PROCESS_TERMINATION_TIMEOUT = 2.0 s for it to exit on its own, then kill the whole process tree (SIGTERM to the process group, SIGKILL after FORCE_KILL_TIMEOUT = 2.0 s; Windows Job Object). The server is spawned in its own session/process group (POSIX) or Job Object (Windows), so descendants are killed too. A process that survives the kill is logged and abandoned, so an orphan is still possible in that last case.",
+      "type": "claim"
+    },
+    {
+      "applicability": "MCP Python SDK stdio/HTTP clients on asyncio+anyio; reported in python-sdk, Google ADK.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C62",
+      "kind": "finding",
+      "limitations": "No upstream python-sdk maintainer states a recommended pattern; #577 is still open with no confirmed fix; the #577 root cause is a commenter's opinion that another commenter disputed. Reports of FastMCP and langchain-mcp-adapters were not fetched.",
+      "status": "supported",
+      "text": "The anyio cancel-scope 'different task' error arises when an async context (task group / cancel scope, e.g. inside stdio_client or an AsyncExitStack) is exited from a different asyncio task than the one that entered it, typically a cleanup task calling AsyncExitStack.aclose(); anyio's wrong-task guard raises before removing the host task from the scope. Out-of-order (non-LIFO) cleanup of several clients is a second trigger reported in #577.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "deployment",
+      "id": "C63",
+      "kind": "finding",
+      "limitations": "Taken from one maintainer comment in an ADK issue; the python-sdk itself gives no official pattern.",
+      "status": "supported",
+      "text": "Recommended pattern: have one dedicated long-lived owner task enter and exit the MCP client context (connect, serve requests via messages, cleanup), instead of entering in the request task and exiting elsewhere. Google ADK's maintainer called this the architectural root-cause fix (PR #4025, merged in v1.23.0, per the thread); the symptom-only fix was PR #3835.",
+      "type": "claim"
+    },
+    {
+      "applicability": "The fetched main-branch file documents MCPToolset; MCPServerStdio was not found there, so the defaults for the older MCPServerStdio class were not confirmed from source.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C64",
+      "kind": "observed",
+      "limitations": "Defaults are _UNSET sentinels resolved at runtime to 5 and 5*60, as reported by the fetch tool's summary rather than a verbatim line.",
+      "status": "supported",
+      "text": "Pydantic-AI's MCP toolset (main) exposes init_timeout (initial connection plus initialize handshake; default 5 s) and read_timeout (max wait for new messages on the long-lived connection; default 5 minutes).",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C65",
+      "kind": "observed",
+      "limitations": "Only the first 100000 of 118498 chars were read.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK MCPServerStdio takes client_session_timeout_seconds: float | None = 5, forwarded to ClientSession as the read timeout (per-request); None and 0 disable it. In the SDK's v2 path the client runs in its own asyncio task.",
+      "type": "claim"
+    },
+    {
+      "applicability": "Cancellation and timeout mid-run in the OpenAI SDK; Pydantic AI statement concerns its step-persistence harness, which checkpoints per step (the candidate does not).",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C66",
+      "kind": "observed",
+      "limitations": "Issue #6091 is open with no maintainer reply.",
+      "status": "supported",
+      "text": "Per-turn session persistence leaves a window where an external effect is committed but the session has no record of it: OpenAI Agents SDK issue #6091 reproduces a cancelled run whose external ledger holds both refunds while the Session holds only the user message, so a rerun cannot see the completed effect and may repeat it. Pydantic AI's step persistence states that an in-flight step is not retried and that tools with external effects need their own idempotency or reconciliation.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C67",
+      "kind": "observed",
+      "limitations": "Reproduced with a fake Session that stores then raises; a client-managed Session with RunState, not the built-in SQLite backend.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK issue #4775: if Session.add_items() commits and then raises (lost acknowledgement), a retried run appends the same logical input twice and reruns the input guardrail. A maintainer closed it as not establishing practical impact in a supported backend workflow, and said closure does not mean the code path was fixed.",
+      "type": "claim"
+    },
+    {
+      "applicability": "Durable engines (Temporal/DBOS style) with journaled steps; not per-turn persistence.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C68",
+      "kind": "finding",
+      "status": "supported",
+      "text": "Pydantic AI durable execution: a tool run with durable=False executes in workflow code and runs again on every replay, and a restarted run replays completed units from the journal and retries the one in flight. Tools kept out of the durable unit must be deterministic.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C69",
+      "kind": "observed",
+      "limitations": "#4680 test plan uses event-gated interleavings, not a free-running repro; #4988 repro used a fake client. #4736 merge status taken from the #4680 page, not fetched. No equivalent report found for Pydantic AI or LangGraph OSS.",
+      "status": "supported",
+      "text": "A reproducible same-session overlap bug exists in the OpenAI Agents SDK: run_compaction, triggered after every turn save, could silently delete a concurrent add_items from an overlapping Runner.run on the same session. It was fixed by maintainer PR #4736, not by #4680 itself. Concurrent pop_item calls on OpenAIConversationsSession can also return the same item (#4988; closed, maintainer asked for a real-API scenario). The sessions docs add concurrency guarantees only for the compaction wrapper, none for plain sessions.",
+      "type": "claim"
+    },
+    {
+      "applicability": "LangSmith Agent Server; an embedded library has to implement its own policy.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C70",
+      "kind": "observed",
+      "status": "supported",
+      "text": "LangGraph's four multitask strategies for two runs on one thread (reject, enqueue as default, interrupt, rollback) are documented as a LangSmith Agent Server feature, not part of the open-source framework. Interrupt can leave a started-but-unfinished tool call that the graph must clean up.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C71",
+      "kind": "observed",
+      "limitations": "Applies to the step-persistence harness stores; the plain message_history pattern has no such guard in the pages read.",
+      "status": "supported",
+      "text": "Pydantic AI's harness guards a conversation head against concurrent writers: a stale writer or a deleted session raises ConversationConflict; SQLite writes wait up to 30 seconds for another writer; busy detection is local, not a distributed lease, and the database must not be shared between hosts. Single process is the supported scope.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C72",
+      "kind": "observed",
+      "limitations": "Documentation of rules, not bug reports. The OpenAI claim rests on absence from a docs page and is inference-grade.",
+      "status": "supported",
+      "text": "Versioning of stored data differs by library. Pydantic AI step persistence: marker format is versioned, compatibility is upgrade-only, old SQLite DBs gain the new column on open. Pydantic message history is saved via ModelMessagesTypeAdapter and older histories need a load-time context flag (rebuild_unrecorded_tool_files) then a re-save. LangGraph: the latest graph applies to every thread; adding optional state fields is safe, while a type change, required field without default, or rename makes existing checkpoints fail or lose data. OpenAI Agents SDK sessions page documents no version or migration mechanism (SQLite rows are JSON; only the MongoDB backend notes legacy per-item documents remain readable).",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C73",
+      "kind": "inference",
+      "status": "supported",
+      "text": "For a single-process library saving once per completed turn, the stored-history format should carry a version marker and a tolerant reader (optional new fields, upgrade-only reads, re-save after load), as Pydantic AI does, because LangGraph documents that type changes, required fields without defaults and renames break existing checkpoints.",
+      "type": "claim"
+    },
+    {
+      "applicability": "LiteLLM proxy/router, a vendor gateway; fallback goes to a different model group (larger window, other provider), not a retry of the same request.",
+      "confidence": "medium",
+      "evidence_type": "deployment",
+      "id": "C74",
+      "kind": "observed",
+      "limitations": "Page gives no guidance on when fallback is unwise (e.g. for caller bugs); only the existence and intent of the chains.",
+      "status": "supported",
+      "text": "LiteLLM treats context-window overflow and content-policy rejection as dedicated fallback triggers (context_window_fallbacks for ContextWindowExceededError, content_policy_fallbacks for ContentPolicyViolationError), mapped across providers; the documented use is falling back to another model or provider. This is evidence against a blanket 'never fall back on caller errors such as 400 or context length'.",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "deployment",
+      "id": "C75",
+      "kind": "observed",
+      "limitations": "Describes the default; it is configurable, so it is not a recommendation to fall back on every 4xx.",
+      "status": "supported",
+      "text": "Pydantic AI FallbackModel's default trigger is ModelAPIError (4xx/5xx and pre-response connection failures/timeouts), explicitly including rejected requests such as bad credentials, rejected model name and context-window overflow, on the reasoning that another model may accept what the first rejected.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C76",
+      "kind": "inference",
+      "status": "supported",
+      "text": "Refinement of the fallback policy: context-length (and content-policy) errors are fallback-worthy only when the fallback target differs in a way that can fix them (larger window, other provider policy); generic 4xx caller errors (malformed request, auth on the same credential) are not fixed by another model. Both LiteLLM and Pydantic AI treat context overflow as a fallback case, so @C45 should be narrowed to 'not on caller bugs', not 'not on context length'.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C77",
+      "kind": "observed",
+      "limitations": "Single user issue report (reproduction by the author), not a maintainer-confirmed analysis on the page fetched. Scenario is two servers resuming one session; a single-process host serialising turns per session avoids it.",
+      "status": "supported",
+      "text": "Google ADK 1.24.0 changed DatabaseSessionService.append_event() from raising ValueError on a stale session to reloading the session and appending anyway; with two concurrent run_async calls on one session this interleaves events, the LLM sees duplicate/contradictory tool calls and responses, and history is corrupted. Reported affected versions >=1.24.0 (1.24.0, 1.25.0, 1.26.0); last working 1.23.0.",
+      "type": "claim"
+    },
+    {
+      "applicability": "Spanner dialect of DatabaseSessionService.",
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C78",
+      "kind": "observed",
+      "limitations": "Dialect-specific; second independent report of concurrent-turn problems in ADK.",
+      "status": "supported",
+      "text": "ADK issue #4771 reports that overlapping requests on one session (a new turn arriving while the previous turn still writes events) make the new turn start with missing session state; a maintainer notes concurrent append_event() writes can trigger OCC aborts even on pure reads (Spanner dialect). Page does not mention duplicate tool calls; those are in #4751.",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "evidence_type": "observational",
+      "id": "C79",
+      "kind": "observed",
+      "limitations": "Fix commit not read; whether main restored the ValueError on stale sessions is unverified.",
+      "status": "supported",
+      "text": "ADK PR #4752 (optimistic concurrency via an event sequence number, rejecting stale updates with 'The session has been modified in storage. Please reload the session before appending events.') was closed unmerged on 2026-07-06; the maintainer closed it saying #4751 was already fixed in main by commit b8e7647. The content of that fix was not verified (commit page returned HTTP 503).",
+      "type": "claim"
+    },
+    {
+      "confidence": "medium",
+      "id": "C80",
+      "kind": "inference",
+      "status": "supported",
+      "text": "Concurrent turns on one persisted session are a recurring failure source across frameworks (ADK stale-session reload-and-continue; OpenAI SDK concurrent add_items deletion), so a single-process library should serialise turns per session (or use a version check on save) rather than rely on the storage layer.",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "deployment",
+      "id": "C81",
+      "kind": "observed",
+      "limitations": "Reference page for the version current on 2026-11-20.",
+      "status": "supported",
+      "text": "OpenAI Agents SDK MCPServerManager defaults connect_timeout_seconds=10.0 and cleanup_timeout_seconds=10.0 (None disables, zero rejected), with strict=False, drop_failed_servers=True and connect_in_parallel=False. This is a manager-level connect timeout, distinct from the 5 s client_session_timeout_seconds per-request timeout in @C42.",
+      "type": "claim"
+    },
+    {
+      "confidence": "high",
+      "evidence_type": "deployment",
+      "id": "C82",
+      "kind": "finding",
+      "limitations": "The last sentence (non-UTF-8 bytes) is our inference from the utf8 description, not a quoted statement.",
+      "status": "supported",
+      "text": "Pydantic v2 ser_json_bytes and val_json_bytes both default to 'utf8' (options utf8, base64, hex); to get an equal value after a serialise/validate round trip they must be set equal. val_json_bytes was added in v2.9. With the utf8 default, arbitrary (non-UTF-8) bytes do not round-trip safely, so persisted conversation JSON containing bytes should use base64 on both sides.",
+      "type": "claim"
+    },
+    {
+      "alternatives": [
+        "Item-level append protocol (OpenAI Session get_items/add_items/pop_item/clear): trimming and summarizing rewrite history, so append-only items fit badly, and its pop/compaction paths had race bugs",
+        "Revisioned record plus entries log with optimistic concurrency (Pydantic AI ConversationStore): built for concurrent writers and forks, which a single-instance host does not need yet"
+      ],
+      "basis": "evidence_informed",
+      "chosen": "Keep a whole-record save/load protocol per conversation id (the existing Checkpointer shape), storing a ConversationRecord with format_version, messages and cumulative usage; serialize with a pydantic TypeAdapter configured with base64 bytes and a tolerant reader that accepts older versions and raises a typed error on an unknown newer one. ConversationAgent holds a per-conversation asyncio.Lock from load to save across the whole turn; a second turn on the same conversation waits for the first.",
+      "decision_rule": "If the host runs several replicas or concurrent writers per conversation, add an expected_revision argument to save and raise a typed conflict error, as Pydantic AI does.",
+      "id": "D1",
+      "rationale": "ConversationAgent already saves the whole history after each completed turn, and its context strategies trim or summarize history, which rewrites it; a record-level save matches that. Pydantic AI stores a conversation record with usage beside messages; versioned formats with upgrade-only readers are the documented practice; OpenAI's item-level append store has had concurrency bugs around pop and compaction.",
+      "reversibility": "costly",
+      "title": "Conversation store: protocol shape and stored format",
+      "tradeoffs": "Simple to implement for a host (two methods); rewrites the whole history per turn; turns on one conversation are serialized in process, with no conflict detection across processes.",
+      "type": "decision",
+      "uncertainty": "Medium: rests on single-process and bounded-history assumptions."
+    },
+    {
+      "alternatives": [
+        "LangGraph-style saver (put, put_writes, get_tuple, list, durability modes): needed only for parallel branches and checkpoint history",
+        "Drop workflow persistence as Pydantic AI did: the feature exists with tests and works for sequential graphs"
+      ],
+      "basis": "evidence_informed",
+      "chosen": "Reuse the same save/load protocol and JSON codec for WorkflowCheckpoint, keyed by run id, keeping only the latest checkpoint after each completed node; no pending-writes, history listing or durability modes.",
+      "decision_rule": "If parallel nodes or checkpoint history are added, move to a put/put_writes/list protocol.",
+      "id": "D2",
+      "rationale": "Resume after a completed step is the requirement; LangGraph's put_writes and list exist for parallel super-steps and time travel, which the platform's sequential graph does not have; Pydantic AI dropped arbitrary graph-state snapshotting because of parallel execution.",
+      "reversibility": "easy",
+      "title": "Workflow checkpoint store",
+      "tradeoffs": "Minimal surface; no time travel or checkpoint history. The workflow state type must be pydantic-serializable, and custom objects in state are a compatibility risk across upgrades; an agent node that crashes mid-node is replayed from the last completed node, with the replay semantics of D7.",
+      "type": "decision",
+      "uncertainty": "Low."
+    },
+    {
+      "alternatives": [
+        "aiosqlite: native async but a new dependency for a small gain",
+        "Postgres: needs a server and is the multi-replica option, out of scope",
+        "JSON files per key: no atomic multi-record writes and poor listing"
+      ],
+      "basis": "evidence_informed",
+      "chosen": "One SQLite backend on the standard-library sqlite3 module, under integrations/, with one key-value table (namespace, key, format_version, JSON payload, updated_at); each call opens its own connection inside asyncio.to_thread (no shared connection, so no check_same_thread issue), with WAL mode; the in-memory store stays for tests.",
+      "decision_rule": "If the host runs several replicas, add a Postgres backend behind the same protocol.",
+      "id": "D3",
+      "rationale": "OpenAI Agents SDK ships SQLite as its default local session store and LangGraph ships SQLite savers for local workflows; Pydantic AI documents that its SQLite stores must not be shared between hosts, which matches the single-instance constraint; the standard library avoids a new dependency.",
+      "reversibility": "easy",
+      "title": "Reference backend",
+      "tradeoffs": "Single-host only; thread offloading adds small latency.",
+      "type": "decision",
+      "uncertainty": "Low."
+    },
+    {
+      "alternatives": [
+        "Pre-request token counting (Pydantic AI count_tokens_before_request): an extra provider call, supported by only some providers",
+        "Turn or step caps only (OpenAI max_turns, LangGraph recursion_limit): the platform already has max_iterations and it does not bound tokens",
+        "Spend limit in currency: not requested; needs a price table per model"
+      ],
+      "basis": "evidence_backed",
+      "chosen": "An opt-in UsageLimits value (input, output and total tokens, and request count) with a run scope and a conversation scope, off by default; checked before each LLM call against accumulated usage and after each response; raises a typed UsageLimitExceeded carrying the scope, the limit and the usage. Conversation usage is stored in the conversation record and is updated even when a turn fails: a failed turn saves a usage-only update (messages unchanged) before the error propagates. Documented as a soft cap.",
+      "id": "D4",
+      "rationale": "Pydantic AI is the only library of the three with token limits, checks them before requests and after responses, and raises a typed error; it documents that the crossing request completes, so the cap is soft; OpenAI and LangGraph cap only turns or steps, and a call-count cap is not a spend cap. Conversation scope needs usage carried across runs.",
+      "reversibility": "easy",
+      "title": "Opt-in usage limits",
+      "tradeoffs": "Soft cap: one call can overshoot unless the host also sets a per-request max_tokens, the cheap hard bound on output. Fallback attempts add tokens inside the cap, and a failed attempt that reports no usage is not counted.",
+      "type": "decision",
+      "uncertainty": "Medium: accuracy depends on provider-reported usage."
+    },
+    {
+      "alternatives": [
+        "Fall back on every API error (Pydantic AI default): a malformed request fails on each model in turn and multiplies cost",
+        "Re-raise every permanent error (audit F6 fix text): a bad key on the primary, or a prompt too long for it, blocks a fallback that would work",
+        "Never fall back on context length (first draft of this decision): contradicted by LiteLLM and Pydantic AI practice"
+      ],
+      "basis": "evidence_informed",
+      "chosen": "One classifier in core sorts errors into transient (timeout, connection, 429, 5xx), caller errors (malformed request, schema or argument error), context-length, content-policy and provider-scoped permanent (auth, permission, model not found). Only transient errors are retried, in one layer, including the batch methods. The fallback chain moves on for transient, provider-scoped and content-policy errors; on a context-length error it moves on only to a provider whose model has a larger context window, else re-raises; it re-raises caller errors at once.",
+      "id": "D5",
+      "rationale": "Retry layers multiply, and SDK retries skip 401 and 404. Falling back on every error (Pydantic AI and LangChain defaults) makes a malformed request fail on each model and multiplies spend. But another model can fix some rejections: Pydantic AI falls back on rejected credentials, model names and context overflow, and LiteLLM has dedicated context-window and content-policy fallbacks.",
+      "reversibility": "easy",
+      "title": "LLM error policy: retry and fallback",
+      "tradeoffs": "Each adapter maps vendor errors into five classes; the chain needs each model context window to apply the context-length rule.",
+      "type": "decision",
+      "uncertainty": "Medium: depends on vendor error codes being distinguishable; content-policy mapping varies by vendor."
+    },
+    {
+      "alternatives": [
+        "A dedicated owner task per server (Google ADK fix, Agents SDK parallel connect): needed only when clients open and close in different tasks, which the lifespan does not do"
+      ],
+      "basis": "evidence_informed",
+      "chosen": "Bound connect plus initialize with a configurable startup timeout, default 10 s (the OpenAI Agents SDK manager default; Pydantic AI uses 5 s, tight for servers started through npx or uvx); keep the existing per-call tool timeout (mcp_tool_timeout, 60 s); at shutdown close every client in reverse order, each close guarded so one failure does not skip the rest, in the same task that opened them (the app lifespan).",
+      "decision_rule": "If clients are opened lazily per request or closed from another task, move each client into an owner task.",
+      "id": "D6",
+      "rationale": "Both libraries bound the startup handshake (Pydantic AI init_timeout 5 s; OpenAI MCPServerManager connect_timeout_seconds 10 s), separate from the per-request read timeout. The MCP SDK already kills the server process tree on close; the anyio cancel-scope error appears when a client is closed from another task or out of order; the Agents SDK manager cleans up in reverse order on the same task.",
+      "reversibility": "easy",
+      "title": "MCP client lifecycle",
+      "tradeoffs": "A slow-starting server fails startup unless the timeout is raised.",
+      "type": "decision",
+      "uncertainty": "Low."
+    },
+    {
+      "alternatives": [
+        "Per-step checkpoints inside the agent loop: excluded by scope, left to the capabilities brainstorm",
+        "An effect ledger with idempotency keys (Pydantic AI harness annotate_tool_effect), as the disconfirming review recommended for effectful tools: more machinery than a single-instance host needs now",
+        "A stable turn id saved before the turn starts, passed to tools: cheap, but adds a write per turn and a tool-context contract; revisit with the capabilities brainstorm"
+      ],
+      "basis": "evidence_informed",
+      "chosen": "A failed or cancelled turn saves no messages (only its usage, per D4); the host retries from the last saved turn. Tool calls and results are saved with the completed turn. The library offers no deduplication handle: a replayed turn gets new model-generated tool-call ids, so tools with external effects must derive their own idempotency key from host state. Documented as the top risk.",
+      "id": "D7",
+      "rationale": "Per-turn persistence leaves a window where an external effect is committed but unrecorded, reproduced in OpenAI Agents SDK issues; Pydantic AI's step persistence also leaves in-flight effects to the tool's own idempotency. Per-step checkpoints are out of scope by the human's decision.",
+      "reversibility": "easy",
+      "title": "Replay semantics of a failed turn",
+      "tradeoffs": "An effectful tool can run twice after a crash mid-turn.",
+      "type": "decision",
+      "uncertainty": "Medium: depends on what tools hosts register."
+    },
+    {
+      "id": "Q1",
+      "text": "What is the exact v1 pydantic_graph BaseStatePersistence/NodeSnapshot/EndSnapshot API and semantics (superseded by removal in V2)? Does PostgresSaver commit writes and checkpoints atomically?",
+      "type": "question"
+    },
+    {
+      "id": "Q2",
+      "text": "Fetch the primary GitHub issues for the anyio cancel-scope bug (langchain-mcp-adapters #99, fastmcp #348, python-sdk) and the MCP Python SDK stdio_client shutdown sequence (stdin close, terminate, kill timeouts); verify orphan-subprocess behavior.",
+      "type": "question"
+    },
+    {
+      "id": "Q3",
+      "text": "Is there a reproducible report of two concurrent turns on one session_id corrupting or losing history in Pydantic AI, OpenAI Agents SDK or LangGraph? Searches found only thread-safety and partial-failure bugs.",
+      "type": "question"
+    },
+    {
+      "id": "Q4",
+      "text": "Is there a concrete bug report that a token limit is bypassed by streaming, or not covered by handoffs or sub-agents in OpenAI Agents SDK? Not found; only Pydantic AI docs on post-response checks and shared usage.",
+      "type": "question"
+    },
+    {
+      "id": "Q5",
+      "text": "Does a fallback chain mask real bugs or cause cost spikes in practice? Only the docs-level cost accounting (c6) was found, no post-mortem.",
+      "type": "question"
+    },
+    {
+      "id": "Q6",
+      "text": "What does the official LangGraph durable-execution page (docs.langchain.com/oss/python/langgraph/durable-execution) say verbatim about wrapping side effects in tasks and idempotency? The fetch returned other pages in this run, so only secondary summaries were seen.",
+      "type": "question"
+    },
+    {
+      "id": "Q7",
+      "text": "What does ADK commit b8e7647 change in DatabaseSessionService.append_event, and does current main raise on stale sessions again? (commit page unavailable)",
+      "type": "question"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S1",
+      "read": "full",
+      "source_type": "docs",
+      "title": "pydantic_ai.usage API reference (UsageLimits, RunUsage)",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/api/pydantic-ai/usage/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S2",
+      "read": "full",
+      "source_type": "repo",
+      "title": "pydantic_ai_slim/pydantic_ai/usage.py (source)",
+      "type": "source",
+      "url": "https://raw.githubusercontent.com/pydantic/pydantic-ai/main/pydantic_ai_slim/pydantic_ai/usage.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S3",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI Harness: Spend limits (SpendLimits)",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/harness/spend/index.md"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S4",
+      "read": "full",
+      "source_type": "docs",
+      "title": "OpenAI Agents SDK: Running agents (max_turns, error_handlers)",
+      "type": "source",
+      "url": "https://openai.github.io/openai-agents-python/running_agents/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S5",
+      "read": "full",
+      "source_type": "docs",
+      "title": "OpenAI Agents SDK: Usage",
+      "type": "source",
+      "url": "https://openai.github.io/openai-agents-python/usage/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S6",
+      "read": "full",
+      "source_type": "docs",
+      "title": "LangGraph Graph API (recursion limit)",
+      "type": "source",
+      "url": "https://docs.langchain.com/oss/python/langgraph/graph-api"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S7",
+      "read": "full",
+      "source_type": "docs",
+      "title": "LangGraph error: GRAPH_RECURSION_LIMIT",
+      "type": "source",
+      "url": "https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S8",
+      "read": "skim",
+      "source_type": "docs",
+      "title": "Pydantic AI agent docs (usage_limits, usage=, interrupted response)",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/core-concepts/agent/index.md"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S9",
+      "read": "skim",
+      "source_type": "repo",
+      "title": "pydantic_ai agent/__init__.py (source)",
+      "type": "source",
+      "url": "https://raw.githubusercontent.com/pydantic/pydantic-ai/main/pydantic_ai_slim/pydantic_ai/agent/__init__.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S10",
+      "read": "full",
+      "source_type": "docs",
+      "title": "OpenAI Agents SDK: Sessions",
+      "type": "source",
+      "url": "https://openai.github.io/openai-agents-python/sessions/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S11",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python src/agents/memory/session.py",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/blob/main/src/agents/memory/session.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S12",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python sqlite_session.py",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/blob/main/src/agents/memory/sqlite_session.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S13",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python extensions/memory/sqlalchemy_session.py",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/blob/main/src/agents/extensions/memory/sqlalchemy_session.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S14",
+      "read": "skim",
+      "source_type": "docs",
+      "title": "Pydantic AI docs: Message history",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/core-concepts/message-history/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S15",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI API: conversation store",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/api/pydantic-ai/conversation-store/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S16",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI docs: Persistence",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/core-concepts/persistence/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S17",
+      "read": "full",
+      "source_type": "docs",
+      "title": "LangChain docs: LangGraph add memory",
+      "type": "source",
+      "url": "https://docs.langchain.com/oss/python/langgraph/add-memory"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S18",
+      "read": "full",
+      "source_type": "repo",
+      "title": "langgraph libs/checkpoint base/__init__.py (BaseCheckpointSaver)",
+      "type": "source",
+      "url": "https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint/langgraph/checkpoint/base/__init__.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S19",
+      "read": "full",
+      "source_type": "repo",
+      "title": "langgraph libs/checkpoint store/base/__init__.py (BaseStore)",
+      "type": "source",
+      "url": "https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint/langgraph/store/base/__init__.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S20",
+      "read": "full",
+      "source_type": "docs",
+      "title": "LangGraph Checkpointers (docs.langchain.com)",
+      "type": "source",
+      "url": "https://docs.langchain.com/oss/python/langgraph/checkpointers"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S21",
+      "read": "full",
+      "source_type": "repo",
+      "title": "langgraph checkpoint serde jsonplus.py (JsonPlusSerializer source)",
+      "type": "source",
+      "url": "https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint/langgraph/checkpoint/serde/jsonplus.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S22",
+      "read": "full",
+      "source_type": "docs",
+      "title": "LangGraph backward compatibility (docs.langchain.com)",
+      "type": "source",
+      "url": "https://docs.langchain.com/oss/python/langgraph/backward-compatibility"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S23",
+      "read": "full",
+      "source_type": "repo",
+      "title": "langgraph checkpoint-sqlite SqliteSaver source",
+      "type": "source",
+      "url": "https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint-sqlite/langgraph/checkpoint/sqlite/__init__.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S24",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI Graph (beta) - Persistence and Resumability",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/graph/beta/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S25",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI Harness: StepPersistence",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/harness/step-persistence/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S26",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI durable execution overview",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/capabilities/durable_execution/overview/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S27",
+      "read": "skim",
+      "source_type": "repo",
+      "title": "pydantic-ai issue #530 (graph persistence discussion)",
+      "type": "source",
+      "url": "https://github.com/pydantic/pydantic-ai/issues/530"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S28",
+      "read": "full",
+      "source_type": "docs",
+      "title": "OpenAI Agents SDK: Human-in-the-loop (RunState)",
+      "type": "source",
+      "url": "https://openai.github.io/openai-agents-python/human_in_the_loop/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S29",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI docs: Models overview (FallbackModel)",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/models/overview/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S30",
+      "read": "full",
+      "source_type": "repo",
+      "title": "pydantic_ai/models/fallback.py (main)",
+      "type": "source",
+      "url": "https://raw.githubusercontent.com/pydantic/pydantic-ai/main/pydantic_ai_slim/pydantic_ai/models/fallback.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S31",
+      "read": "full",
+      "source_type": "repo",
+      "title": "pydantic_ai/mcp.py (main)",
+      "type": "source",
+      "url": "https://raw.githubusercontent.com/pydantic/pydantic-ai/main/pydantic_ai_slim/pydantic_ai/mcp.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S32",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI docs: Retries",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/advanced-features/retries/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S33",
+      "read": "full",
+      "source_type": "repo",
+      "title": "langgraph _internal/_retry.py (default_retry_on)",
+      "type": "source",
+      "url": "https://raw.githubusercontent.com/langchain-ai/langgraph/main/libs/langgraph/langgraph/_internal/_retry.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S34",
+      "read": "full",
+      "source_type": "repo",
+      "title": "langgraph types.py (RetryPolicy)",
+      "type": "source",
+      "url": "https://raw.githubusercontent.com/langchain-ai/langgraph/main/libs/langgraph/langgraph/types.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S35",
+      "read": "full",
+      "source_type": "docs",
+      "title": "OpenAI Agents SDK reference: mcp server",
+      "type": "source",
+      "url": "https://openai.github.io/openai-agents-python/ref/mcp/server/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S36",
+      "read": "full",
+      "source_type": "docs",
+      "title": "OpenAI Agents SDK reference: MCPServerManager",
+      "type": "source",
+      "url": "https://openai.github.io/openai-agents-python/ref/mcp/manager/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S37",
+      "read": "full",
+      "source_type": "docs",
+      "title": "LangChain docs: Models (retries)",
+      "type": "source",
+      "url": "https://docs.langchain.com/oss/python/langchain/models"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S38",
+      "read": "full",
+      "source_type": "repo",
+      "title": "langchain_core runnables/fallbacks.py",
+      "type": "source",
+      "url": "https://raw.githubusercontent.com/langchain-ai/langchain/master/libs/core/langchain_core/runnables/fallbacks.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S39",
+      "read": "full",
+      "source_type": "docs",
+      "title": "OpenAI Agents SDK docs: Models (retries)",
+      "type": "source",
+      "url": "https://openai.github.io/openai-agents-python/models/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S40",
+      "read": "full",
+      "source_type": "repo",
+      "title": "pydantic-ai PR 3494: FallbackModel falls back on all model API errors",
+      "type": "source",
+      "url": "https://github.com/pydantic/pydantic-ai/pull/3494"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S41",
+      "published": "2026-08",
+      "read": "full",
+      "source_type": "other",
+      "title": "How to handle growing checkpoint blob? (LangChain forum)",
+      "type": "source",
+      "url": "https://forum.langchain.com/t/how-to-handle-growing-checkpoint-blob/4448"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S42",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python PR 1954: SQLiteSession thread-safety fix",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/pull/1954"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S44",
+      "published": "2025-09",
+      "read": "full",
+      "source_type": "repo",
+      "title": "pydantic-ai issue 2837: FallbackModel does not cover parsing/validation failures",
+      "type": "source",
+      "url": "https://github.com/pydantic/pydantic-ai/issues/2837"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S45",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI changelog and upgrade guide",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/project/changelog/"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S46",
+      "read": "full",
+      "source_type": "other",
+      "title": "JsonPlusSerializer does not serialize exceptions (LangChain forum)",
+      "type": "source",
+      "url": "https://forum.langchain.com/t/jsonplusserializer-does-not-serialize-exceptions/2429"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S47",
+      "read": "full",
+      "source_type": "industry",
+      "title": "Durable agent workflows need idempotency before they need checkpoints",
+      "type": "source",
+      "url": "https://hackernoon.com/durable-agent-workflows-need-idempotency-before-they-need-checkpoints"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S48",
+      "published": "2026-08",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python PR 4148: streamed guardrail trip drops tool call from session",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/pull/4148"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S49",
+      "read": "full",
+      "source_type": "other",
+      "title": "Proposal: token usage budgets for LangChain agents (LangChain forum)",
+      "type": "source",
+      "url": "https://forum.langchain.com/t/a-proposal-to-add-token-usage-budgets-to-langchain-agents-via-a-new-middleware-since-the-existing-limiters-only-cap-call-count-not-tokens/4147"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S50",
+      "read": "full",
+      "source_type": "repo",
+      "title": "python-sdk src/mcp/client/stdio.py (main)",
+      "type": "source",
+      "url": "https://github.com/modelcontextprotocol/python-sdk/blob/main/src/mcp/client/stdio.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S51",
+      "read": "full",
+      "source_type": "repo",
+      "title": "python-sdk issue #577: RuntimeError: Attempted to exit cancel scope in a different task (out-of-order cleanup)",
+      "type": "source",
+      "url": "https://github.com/modelcontextprotocol/python-sdk/issues/577"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S52",
+      "read": "full",
+      "source_type": "repo",
+      "title": "python-sdk issue #2147: cancel-scope wrong-task guard",
+      "type": "source",
+      "url": "https://github.com/modelcontextprotocol/python-sdk/issues/2147"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S53",
+      "read": "full",
+      "source_type": "repo",
+      "title": "google/adk-python issue #3708: MCP cancel scope error",
+      "type": "source",
+      "url": "https://github.com/google/adk-python/issues/3708"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S54",
+      "read": "full",
+      "source_type": "repo",
+      "title": "pydantic-ai pydantic_ai/mcp.py (main), MCPToolset",
+      "type": "source",
+      "url": "https://github.com/pydantic/pydantic-ai/blob/main/pydantic_ai_slim/pydantic_ai/mcp.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S55",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python src/agents/mcp/server.py (main)",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/blob/main/src/agents/mcp/server.py"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S56",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Double texting (LangSmith Deployment docs)",
+      "type": "source",
+      "url": "https://docs.langchain.com/langsmith/double-texting.md"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S58",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Managing State Schema Changes Across LangSmith Deployment Versions",
+      "type": "source",
+      "url": "https://kb.langchain.com/articles/1785884356-managing-state-schema-changes-across-langsmith-deployment-versions"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S61",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python PR #4680: preserve writes that land while responses.compact is in flight",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/pull/4680"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S62",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python issue #4775: RunState pending input duplicated when a Session append loses acknowledgement",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/issues/4775"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S63",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python issue #6091: Runner.run with Session drops in-flight and completed sibling function_calls on cancellation",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/issues/6091"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S64",
+      "read": "full",
+      "source_type": "repo",
+      "title": "openai-agents-python issue #4988: OpenAIConversationsSession.pop_item is not safe for concurrent calls",
+      "type": "source",
+      "url": "https://github.com/openai/openai-agents-python/issues/4988"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S65",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic AI message history",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/ai/message-history"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S66",
+      "read": "full",
+      "source_type": "docs",
+      "title": "LiteLLM Proxy: Fallbacks and reliability",
+      "type": "source",
+      "url": "https://docs.litellm.ai/docs/proxy/reliability"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S67",
+      "read": "full",
+      "source_type": "repo",
+      "title": "google/adk-python issue #4751: DatabaseSessionService.append_event reload-and-continue in 1.24+",
+      "type": "source",
+      "url": "https://github.com/google/adk-python/issues/4751"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S68",
+      "read": "full",
+      "source_type": "repo",
+      "title": "google/adk-python issue #4771 (concurrent append_event OCC aborts, Spanner)",
+      "type": "source",
+      "url": "https://github.com/google/adk-python/issues/4771"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S69",
+      "read": "full",
+      "source_type": "repo",
+      "title": "google/adk-python PR #4752: optimistic concurrency with event sequence number",
+      "type": "source",
+      "url": "https://github.com/google/adk-python/pull/4752"
+    },
+    {
+      "accessed": "2026-11-20",
+      "id": "S70",
+      "read": "full",
+      "source_type": "docs",
+      "title": "Pydantic: Configuration API (ser_json_bytes, val_json_bytes)",
+      "type": "source",
+      "url": "https://pydantic.dev/docs/validation/latest/api/pydantic/config/"
+    }
+  ],
+  "retired_ids": [
+    "S43",
+    "S57",
+    "S59",
+    "S60"
+  ],
+  "slug": "runtime-state-limits",
+  "topic": "Runtime state and cost limits in embeddable Python agent libraries"
+}

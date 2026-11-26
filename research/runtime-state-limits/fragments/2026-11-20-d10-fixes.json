@@ -1,0 +1,14 @@
+{
+  "nodes": [],
+  "edges": [
+    {"from": "@S25", "rel": "supports", "to": "@C66", "accessed": "2026-11-20", "quote": "tools with external effects need their own idempotency or reconciliation strategy"},
+    {"from": "@S25", "rel": "supports", "to": "@C55", "accessed": "2026-11-20", "quote": "Side-effect deduplication is the orchestrator's responsibility"},
+    {"from": "@D1", "rel": "depends_on", "to": "@C80"},
+    {"from": "@D1", "rel": "depends_on", "to": "@C82"},
+    {"from": "@D5", "rel": "depends_on", "to": "@C76"},
+    {"from": "@D5", "rel": "depends_on", "to": "@C74"},
+    {"from": "@D5", "rel": "depends_on", "to": "@C75"},
+    {"from": "@D6", "rel": "depends_on", "to": "@C81"},
+    {"from": "@D6", "rel": "depends_on", "to": "@C63"}
+  ]
+}

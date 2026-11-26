@@ -1,0 +1,263 @@
+<!DOCTYPE html>
+<html><head><meta charset="utf-8"><title>Runtime state and cost limits in embeddable Python agent libraries</title>
+<style>
+body { font-family: sans-serif; font-size: 10pt; }
+h1 { font-size: 18pt; } h2 { font-size: 14pt; page-break-before: auto; } h3 { font-size: 11pt; }
+td, th { font-size: 9pt; vertical-align: top; }
+.note { font-weight: bold; }
+</style></head><body>
+
+<h1>Runtime state and cost limits in embeddable Python agent libraries</h1>
+<p>Research report, 20 November 2026. Compared libraries: Pydantic AI, LangGraph, OpenAI Agents SDK, with LiteLLM, Google ADK and the MCP Python SDK as secondary references. Target: <code>agent_platform</code>, a Python agent library that host products embed.</p>
+
+<h2>Executive Summary</h2>
+<p><b>Answer.</b> The three libraries converge on small, async, host-owned persistence interfaces, a typed error for limits, and store formats that evolve through tolerant readers rather than migrations. None of them makes per-turn persistence safe for tools with external effects. For <code>agent_platform</code>, the evidence supports extending its existing <code>Checkpointer</code> save/load protocol with a versioned JSON record, one SQLite backend, opt-in token limits, a five-class LLM error classifier, and bounded MCP startup and cleanup.</p>
+<p><b>Findings that matter most.</b></p>
+<ul>
+<li>Conversation stores differ in grain: OpenAI Agents SDK appends items through a four-method <code>Session</code> protocol [S11, S10]; Pydantic AI stores a revisioned conversation record with usage beside messages [S15, S16]; LangGraph persists history as graph state in a checkpoint per thread [S17]. Item-level stores have had race bugs between concurrent writes on one session [S61, S64], and Google ADK corrupted histories when two turns ran on one session [S67].</li>
+<li>Only Pydantic AI ships token limits. It checks them before each request and after each response, raises <code>UsageLimitExceeded</code>, and documents that the crossing request still completes, so the cap is soft [S2, S1, S3]. OpenAI and LangGraph cap only turns or steps [S4, S6].</li>
+<li>Default fallback policies are permissive: Pydantic AI falls back on every model API error [S30, S40], LangChain on every exception [S38]. Falling back on context-length and content-policy errors is documented practice in Pydantic AI and LiteLLM [S29, S66].</li>
+<li>Per-turn persistence leaves a window in which an external effect is committed but not recorded, reproduced in OpenAI Agents SDK issues [S63, S62]; Pydantic AI leaves deduplication to the orchestrator [S25].</li>
+<li>MCP stdio cleanup fails when a client is closed from a different task than the one that opened it [S52, S53]; libraries bound the startup handshake (5 s in Pydantic AI, 10 s in the OpenAI manager) [S31, S36].</li>
+</ul>
+<p><b>Recommended architecture.</b> One core store protocol with a versioned JSON codec serves conversations and workflow checkpoints, backed by SQLite for single-host use (D1, D2, D3). Opt-in limits, a shared error classifier and an MCP lifecycle rule bound cost and failure (D4, D5, D6), and a failed turn is replayed from the last saved turn (D7).</p>
+<p><b>Biggest open risk.</b> A host that registers tools with external effects can see them run twice after a crash mid-turn, and the library gives no stable key to deduplicate them (assumption A3, decision D7).</p>
+
+<h2>Scope and Research Questions</h2>
+<p><b>Subject.</b> How embeddable Python agent libraries persist runtime state and bound cost: (1) conversation stores, (2) workflow checkpoints and resume after a completed step, (3) per-run and per-conversation token limits, (4) retry versus fallback for permanent and transient LLM errors, (5) MCP client startup and shutdown.</p>
+<p><b>Outcome.</b> State of the art plus an architecture for <code>agent_platform</code>: core protocols with one reference backend in <code>integrations/</code>.</p>
+<p><b>Constraints.</b> The library is embedded in host products. It runs as a single instance first; multi-replica must stay possible. Tenancy and authentication belong to the host. State is saved after each completed turn; mid-run checkpoints and human-in-the-loop are out of scope. The current code already has a generic <code>Checkpointer[T]</code> protocol with <code>save</code>/<code>load</code>, used by <code>ConversationAgent</code> (whole history after each turn) and by workflows (<code>WorkflowCheckpoint</code> after each node), with only an in-memory implementation.</p>
+<p><b>Research questions.</b> What protocol shapes and backends exist; how histories and checkpoints are serialized and versioned; where limits are enforced and what error they raise; which errors are retried and which trigger fallback; how MCP clients are bounded at startup and cleaned up; and which failures have been reported for each approach.</p>
+<p><b>Skipped sections.</b> Existing-State Assessment (no prior report was supplied; the current code is described above), Data and Information Taxonomy (the system does not ingest data sources), Information-Fusion, Decision Architecture and Feedback Loops (the subject does not fuse sources, decide autonomously or learn).</p>
+
+<h2>Methodology</h2>
+<p>Depth: standard. Search date: 20 November 2026. Five scout dimensions (conversation stores; checkpoint stores; usage limits; error policy plus MCP lifecycle; disconfirming evidence), then two gap scouts (MCP lifecycle; replay, concurrency and versioning), a critic pass that re-fetched 13 quoted edges, and one post-critic gap scout (fallback on context length, Google ADK concurrency, MCP connect timeout, pydantic bytes handling). Sources: 66 in the graph, 62 read in full, 4 skimmed and not cited; 32 repository pages (source code, issues, pull requests), 30 documentation pages, 3 forum threads, 1 industry blog. Pages were fetched through a summarizing tool, so quotes are short verbatim extracts. Grading: a claim is <i>supported</i> with one good source; <i>strongly supported</i> needs two independent sources, and documentation plus source code of the same project count as one. Stop conditions met: every research question has an answer or an open question node; late searches returned sources already in the graph; contradictions found were examined (D5). "State of the art" here means these libraries' public documentation and code as of November 2026.</p>
+
+<h2>State-of-the-Art Review</h2>
+<h3>Conversation stores are small async interfaces owned by the host</h3>
+<p>OpenAI Agents SDK defines <code>Session</code> as a runtime-checkable protocol with <code>get_items</code>, <code>add_items</code>, <code>pop_item</code> and <code>clear_session</code> [S11, S10] and ships SQLite, Redis, SQLAlchemy, MongoDB, Dapr and server-side backends [S10]. Each item is stored as JSON of a Responses API item, with no version field seen [S12, S13]. Pydantic AI recently added a <code>Conversation</code> record (messages, usage, id) and an abstract <code>ConversationStore</code> with revision-checked writes; only an in-memory store ships for it [S15, S16]. LangGraph keeps short-term history as graph state in a checkpoint per <code>thread_id</code>, and its Store API serves long-term memory across threads [S17, S19]. All three leave the session id and authorization to the host [S10, S16].</p>
+<h3>Checkpoint stores persist at a completed-step boundary</h3>
+<p>LangGraph's <code>BaseCheckpointSaver</code> has <code>put</code>, <code>put_writes</code>, <code>get_tuple</code> and <code>list</code> with async twins [S18], three durability modes (exit, async, sync) [S20], and keeps writes of nodes that completed in a super-step so they are not re-run [S20]. Its default serializer is msgpack-based with pickle off by default and an allow-list [S21]. Pydantic AI removed graph-state persistence in its graph V2 because consistent snapshots are hard under parallel execution [S24], and moved run persistence to a harness <code>StepPersistence</code> capability with versioned, upgrade-only formats [S25]. OpenAI Agents SDK serializes a <code>RunState</code> for paused runs and leaves storage to the application [S28]; all three point to durable engines (Temporal, DBOS and others) for whole-run crash survival [S26, S4].</p>
+<h3>Token limits exist only in Pydantic AI, and they are soft</h3>
+<p>Pydantic AI <code>UsageLimits</code> covers requests, tool calls, input, output and total tokens, and cost [S1, S2]. It checks the request count and projected usage before each request and token counts after each response, raising <code>UsageLimitExceeded</code> [S2]. Token pre-counting is opt-in and limited to some providers [S1]. Limits apply to one run; longer windows need usage carried in, or the harness <code>SpendLimits</code> [S3]. OpenAI Agents SDK tracks usage per run for monitoring and caps only <code>max_turns</code> [S4, S5]; LangGraph caps only graph steps with <code>recursion_limit</code> [S6, S7].</p>
+<h3>Retry belongs in one layer; fallback defaults are broad</h3>
+<p>Pydantic AI retries only through provider SDKs or an installed transport and warns that retry layers multiply [S32]. LangGraph's <code>RetryPolicy</code> retries connection errors and 5xx and excludes programming errors [S33, S34]. LangChain chat models skip 401 and 404 [S37], but <code>with_fallbacks</code> handles every exception by default [S38]. OpenAI Agents SDK retries are opt-in, and it documents no fallback chain [S39]. Pydantic AI's <code>FallbackModel</code> moved in November 2025 from HTTP status errors to every model API error [S40, S30], including rejected credentials, model names and context overflow [S29]. LiteLLM has dedicated context-window and content-policy fallbacks [S66].</p>
+<h3>MCP lifecycle: bounded handshake, same-task cleanup</h3>
+<p>Pydantic AI's MCP toolset bounds connect plus <code>initialize</code> with <code>init_timeout</code> (5 s) and has a 5-minute read timeout [S31, S54]. The OpenAI Agents SDK's per-request session timeout is 5 s [S35, S55], and its <code>MCPServerManager</code> adds a 10 s connect timeout, cleans up in reverse order on the same task, and recommends dropping failed servers [S36]. The MCP Python SDK closes stdin, waits 2 s, then kills the process tree [S50]. Closing a client from another task trips anyio's cancel-scope guard [S52, S53, S51]; Google ADK fixed it by giving each client an owner task [S53].</p>
+
+<h2>Evidence Taxonomy</h2>
+<p>Evidence hierarchy, weakest to strongest: forum or blog opinion; vendor documentation; source code; reproduced issue; maintainer-confirmed fix. Most evidence here is observational: what documentation and code state. No benchmark or controlled experiment applies to this subject.</p>
+<table><tr><th>Status</th><th>Claims</th></tr>
+<tr><td>supported</td><td>78</td></tr><tr><td>requires_validation</td><td>2</td></tr><tr><td>disputed</td><td>1</td></tr><tr><td>weakly_supported</td><td>1</td></tr></table>
+<table><tr><th>Kind</th><th>Claims</th></tr>
+<tr><td>observed</td><td>63</td></tr><tr><td>inference</td><td>9</td></tr><tr><td>finding</td><td>6</td></tr><tr><td>recommendation</td><td>4</td></tr></table>
+<p>No claim reaches <i>strongly supported</i>: most rest on one project's own documentation and code, which count as one source.</p>
+
+<h2>Research Findings</h2>
+<h3>Item-level session stores have race bugs on one session</h3>
+<p>OpenAI Agents SDK compaction could silently delete a concurrent <code>add_items</code> on the same session [S61], and concurrent <code>pop_item</code> calls could return the same item [S64]. Its file SQLite session had no thread safety until a fix [S42]. Google ADK 1.24 changed a stale-session error into reload-and-append, and two concurrent runs then interleaved events and duplicated tool calls [S67]; overlapping turns also lost state on Spanner [S68]. A proposed optimistic-concurrency fix was closed unmerged [S69]. Given these reports, we infer that a library should serialize turns per conversation rather than rely on the store [C80]. Status: supported; applicability: single process.</p>
+<h3>Stored formats evolve through tolerant readers, and upgrades still change them</h3>
+<p>Pydantic AI promises that V1 histories load in V2 [S45] and that adding a message part needs no migration [S16], yet it changed how stored retry parts are read [S45] and needs a load-time flag for older histories [S65]. LangGraph documents that type changes, required fields and renames break existing checkpoints [S22, S58], and its serializer hardening made some stored objects unserializable [S46]. Pydantic AI step persistence versions its format and reads upgrade-only [S25]. Status: supported.</p>
+<h3>Pydantic serializes bytes as UTF-8 by default</h3>
+<p>Pydantic's <code>ser_json_bytes</code> and <code>val_json_bytes</code> default to <code>utf8</code> and must be set equal for a round trip [S70]. Image and audio bytes in stored messages therefore need base64 on both sides. Status: supported.</p>
+<h3>Token caps overshoot by one call and miss failed attempts</h3>
+<p>Pydantic AI checks token limits after each response, so the request that crosses the line completes, and concurrent runs can each pass the check [S1, S3]. A stopped stream is charged only for usage reported so far [S3]. Request limits count loop turns, not provider requests, so fallback attempts add tokens that a request cap does not bound [S1]. A call-count cap is not a token cap [S49]. Status: supported.</p>
+<h3>Fallback cannot fix caller bugs, but can fix context length and policy rejections</h3>
+<p>Pydantic AI's maintainers note that <code>FallbackModel</code> cannot retry failures above it, such as output validation [S44]. Pydantic AI and LiteLLM both treat context overflow as a fallback case [S29, S66]. We infer that the fallback chain should re-raise malformed-request errors but move on for context length (to a larger window) and content policy [C76]. The first-draft recommendation never to fall back on context length is now disputed [C45].</p>
+<h3>Per-turn persistence leaves effects unrecorded after a crash</h3>
+<p>A cancelled OpenAI Agents SDK run left both refunds in an external ledger while the session held only the user message [S63]. A session append that committed and then raised duplicated input on retry [S62]. A guardrail path dropped a tool call from the saved session, so the tool ran twice [S48]. Pydantic AI says side-effect deduplication is the orchestrator's responsibility and tools with external effects need their own idempotency [S25]. A practitioner blog argues the key must come from durable run state, not the model [S47]. Status: supported.</p>
+<h3>Checkpoint tables grow when whole state is rewritten per step</h3>
+<p>A LangGraph user reports <code>checkpoint_blobs</code> growing much faster than checkpoints [S41]. This applies to per-step saving of whole state; a per-turn record with bounded history grows more slowly. Status: supported, one user report.</p>
+
+<h2>Missing Components / Gap Analysis</h2>
+<ul>
+<li>No library documents a provider-neutral, version-tagged envelope for stored messages; Pydantic AI comes closest [S25, S16].</li>
+<li>No library gives the host a stable per-turn key for deduplicating tool effects outside a durable engine or harness ledger [S25, S63].</li>
+<li>None documents conversation-scope token limits in its core; Pydantic AI needs carried usage or a harness capability [S3].</li>
+<li>For <code>agent_platform</code> today: the store has only an in-memory backend; there is no serialization format; usage is not stored with the conversation; the fallback chain falls through on every error and batch methods retry every error (audit finding F6); MCP shutdown can skip clients after one failure and the handshake has no timeout (audit finding F11).</li>
+</ul>
+
+<h2>Component Taxonomy</h2>
+<table><tr><th>Component</th><th>Purpose</th><th>Inputs</th><th>Outputs</th><th>Evidence</th><th>Dependencies</th><th>Failure modes</th></tr>
+<tr><td>Store protocol and codec</td><td>Persist records by namespace and key</td><td>ConversationRecord, WorkflowCheckpoint</td><td>Record or none</td><td>[S15, S18, S25]</td><td>pydantic</td><td>Unknown format version; bytes round trip</td></tr>
+<tr><td>SQLite backend</td><td>Reference durable store</td><td>JSON payload</td><td>JSON payload</td><td>[S10, S20, S25]</td><td>stdlib sqlite3</td><td>Locked database; shared between hosts</td></tr>
+<tr><td>Turn lock</td><td>One turn per conversation at a time</td><td>Conversation id</td><td>Serialized turns</td><td>[S61, S67]</td><td>asyncio</td><td>Lost lock across processes</td></tr>
+<tr><td>Usage limits</td><td>Bound tokens per run and conversation</td><td>TokenUsage per response</td><td>UsageLimitExceeded</td><td>[S1, S2, S3]</td><td>Conversation record</td><td>One-call overshoot; unreported usage</td></tr>
+<tr><td>Error classifier</td><td>Drive retry and fallback</td><td>Vendor exception</td><td>Error class</td><td>[S29, S32, S66]</td><td>Each adapter</td><td>Misclassified vendor code</td></tr>
+<tr><td>MCP lifecycle</td><td>Bound startup, clean shutdown</td><td>Server configs</td><td>Connected clients</td><td>[S31, S36, S50]</td><td>MCP SDK, app lifespan</td><td>Hung handshake; cross-task close</td></tr>
+</table>
+
+<h2>Architecture Overview</h2>
+<p>The host owns conversation ids, authentication and the decision to retry a failed turn. Inside the library, <code>ConversationAgent</code> serializes turns per conversation and enforces limits; the LLM call path applies the error policy; MCP clients are opened and closed by the app lifespan. Conversations and workflow runs write through one core store protocol and codec to a backend in <code>integrations/</code>.</p>
+<img src="diagrams/fig1.svg" width="480"/>
+<p><i>Figure 1. Components of the proposed runtime and the decisions that shape each.</i></p>
+
+<h2>Detailed Component Descriptions</h2>
+<p><b>Store protocol and codec (D1, D2).</b> Keeps the existing <code>save(key, state)</code>/<code>load(key)</code> shape. A codec turns a pydantic model into JSON with <code>format_version</code> and base64 bytes, and reads older versions; an unknown newer version raises a typed error. Consumers: <code>ConversationAgent</code> and the workflow graph. State: none in memory beyond the backend.</p>
+<p><b>SQLite backend (D3).</b> One table keyed by namespace and key, with format version, JSON payload and update time. Each call opens its own connection in a worker thread, with WAL mode. Failure modes: a locked database (retry by the caller of the turn) and a file shared between hosts, which is unsupported.</p>
+<p><b>Turn lock (D1).</b> A per-conversation <code>asyncio.Lock</code> held from load to save. A second turn waits. Validation: two overlapping turns on one conversation keep both turns in order.</p>
+<p><b>Usage limits (D4).</b> An opt-in value with run and conversation scopes. Checked before each LLM call against accumulated usage and after each response. A failed turn saves a usage-only update. Error: <code>UsageLimitExceeded</code> with scope, limit and usage.</p>
+<p><b>Error classifier and fallback (D5).</b> Five classes: transient, caller error, context length, content policy, provider-scoped permanent. Only transient errors retry; fallback follows the rule in D5.</p>
+<p><b>MCP lifecycle (D6).</b> Startup timeout (default 10 s), existing per-call timeout (60 s), guarded reverse-order close in the lifespan task.</p>
+
+<h2>Data-Flow Architecture</h2>
+<p>A turn: the host calls <code>chat</code>; the agent takes the conversation lock, loads the record, checks limits, calls the LLM (retry and fallback inside), runs tools, checks limits after each response, then saves messages and usage and releases the lock. On failure it saves usage only and re-raises. A workflow saves a checkpoint after each completed node. All saves are one write per turn or node, in milliseconds on local SQLite.</p>
+
+<h2>Uncertainty and Robustness</h2>
+<p>Most uncertainty is epistemic: documentation and code describe intended behavior, and several conclusions rest on one project's sources. The decisions carry it as follows: D1 and D3 depend on the single-process assumption A1 and switch through their decision rules when it fails; D4 depends on provider-reported usage (A4) and is labeled a soft cap; D5 depends on adapters distinguishing vendor error codes (A6); D7 depends on what tools hosts register (A3).</p>
+
+<h2>Failure Modes</h2>
+<table><tr><th>Failure</th><th>Probability</th><th>Impact</th><th>Detection</th><th>Mitigation</th><th>Residual risk</th></tr>
+<tr><td>Effectful tool runs twice after a crash mid-turn</td><td>Medium</td><td>High</td><td>Host ledger only</td><td>Document; idempotent tools (D7)</td><td>High</td></tr>
+<tr><td>Two turns on one conversation overwrite each other</td><td>Low with lock</td><td>High</td><td>Test with overlapping turns</td><td>Turn lock (D1)</td><td>Low in one process</td></tr>
+<tr><td>Stored record unreadable after upgrade</td><td>Medium</td><td>Medium</td><td>Typed error on load</td><td>Format version, tolerant reader (D1)</td><td>Low</td></tr>
+<tr><td>Token cap overshoot</td><td>High</td><td>Low</td><td>Usage in error</td><td>Soft-cap docs; max_tokens (D4)</td><td>Low</td></tr>
+<tr><td>Bad request fails over every model</td><td>Medium today</td><td>Medium</td><td>Logs</td><td>Re-raise caller errors (D5)</td><td>Low</td></tr>
+<tr><td>Hung MCP handshake blocks startup</td><td>Low</td><td>High</td><td>Startup timeout</td><td>Timeout (D6)</td><td>Low</td></tr>
+</table>
+
+<h2>Bottlenecks and Constraints</h2>
+<p>Structural: SQLite limits the reference backend to one host (D3). Implementation: rewriting the whole record each turn costs more as histories grow, bounded by the history trim. Fundamental: per-turn persistence cannot record effects inside an unfinished turn (D7).</p>
+
+<h2>Alternative Architectures</h2>
+<table><tr><th>Architecture</th><th>Robustness</th><th>Complexity</th><th>Scalability</th><th>Evidence</th><th>Recommendation</th></tr>
+<tr><td>A. Record-level store, turn lock, SQLite (recommended)</td><td>++</td><td>Low</td><td>One host</td><td>[S15, S25, S61, S67]</td><td>Adopt</td></tr>
+<tr><td>B. Item-level append store (OpenAI Session shape)</td><td>+</td><td>Low</td><td>Many backends</td><td>[S11, S61, S64]</td><td>Reject: trimming rewrites history; race bugs</td></tr>
+<tr><td>C. Revisioned log with optimistic concurrency (Pydantic AI)</td><td>+++</td><td>Medium</td><td>Many writers</td><td>[S15, S16]</td><td>Adopt when multi-replica</td></tr>
+<tr><td>D. External durable engine (Temporal, DBOS)</td><td>+++</td><td>High</td><td>High</td><td>[S26]</td><td>Out of scope</td></tr>
+</table>
+<p>Legend: +++ established or strongly supported; ++ supported; + weakly supported; ± disputed; - contradicted; ? no claim. Robustness marks reflect the strength of the evidence behind each design's concurrency and recovery behavior.</p>
+
+<h2>Recommended Architecture</h2>
+<p>Architecture A wins for a single-instance host. It reuses the protocol the code already has, needs two methods from a host backend, and closes the concurrency gap with a lock instead of revision checks. Architecture C is the planned step when the host runs several replicas, and the D1 decision rule triggers it.</p>
+
+<h2>Architecture Decision Rationale</h2>
+<h3>D1 Conversation store: protocol shape and stored format (evidence-informed, costly to reverse)</h3>
+<p><b>Chosen.</b> A whole-record save/load per conversation id, storing <code>format_version</code>, messages and cumulative usage, with a base64-bytes JSON codec and a tolerant reader, plus a per-conversation turn lock. <b>Runner-ups.</b> Item-level append store: trimming and summarizing rewrite history, and its pop and compaction paths had races [S61, S64]. Revisioned log: built for concurrent writers that a single host does not have [S15]. <b>Decision rule.</b> With several replicas or writers, add <code>expected_revision</code> to save and raise a typed conflict. <b>Evidence.</b> [S15, S16, S25, S67, S70]. <b>Trade-offs.</b> Whole history rewritten per turn. <b>Uncertainty.</b> Medium.</p>
+<h3>D2 Workflow checkpoint store (evidence-informed, easy to reverse)</h3>
+<p><b>Chosen.</b> The same protocol and codec for <code>WorkflowCheckpoint</code>, latest checkpoint per run after each completed node. <b>Runner-ups.</b> LangGraph-style saver with pending writes and listing: needed for parallel branches and history [S18]. Dropping workflow persistence as Pydantic AI did [S24]: the platform's graph is sequential and the feature works. <b>Decision rule.</b> With parallel nodes or checkpoint history, move to a put, put_writes and list protocol. <b>Trade-offs.</b> Workflow state must be pydantic-serializable; custom objects are an upgrade risk [S46].</p>
+<h3>D3 Reference backend (evidence-informed, easy to reverse)</h3>
+<p><b>Chosen.</b> Standard-library SQLite, one table, one connection per call in a worker thread, WAL mode. <b>Runner-ups.</b> aiosqlite: a new dependency for small gain. Postgres: needs a server, the multi-replica option. JSON files: no atomic writes or listing. <b>Evidence.</b> SQLite is the default local store in OpenAI Agents SDK [S10] and LangGraph ships SQLite savers [S20]; Pydantic AI says its SQLite stores must not be shared between hosts [S25]. <b>Decision rule.</b> Add a Postgres backend for several replicas.</p>
+<h3>D4 Opt-in usage limits (evidence-backed, easy to reverse)</h3>
+<p><b>Chosen.</b> Opt-in token and request limits per run and per conversation, checked before each call and after each response, raising <code>UsageLimitExceeded</code>; a failed turn still saves its usage; documented as a soft cap. <b>Runner-ups.</b> Pre-request token counting: an extra call, some providers only [S1]. Turn caps only: they do not bound tokens [S4, S6]. Spend limit in currency: not requested. <b>Trade-offs.</b> One call can overshoot unless the host sets <code>max_tokens</code>; failed attempts with no reported usage are not counted [S3].</p>
+<h3>D5 LLM error policy: retry and fallback (evidence-informed, easy to reverse)</h3>
+<p><b>Chosen.</b> Five error classes; retry only transient errors in one layer, batch methods included; fall back on transient, provider-scoped and content-policy errors; on context length, fall back only to a larger window; re-raise caller errors. <b>Runner-ups.</b> Fall back on every error [S30]: a malformed request fails on each model. Re-raise every permanent error: blocks fallbacks that would work [S29, S66]. Never fall back on context length: contradicted by Pydantic AI and LiteLLM. <b>Trade-offs.</b> Each adapter maps vendor errors into five classes.</p>
+<h3>D6 MCP client lifecycle (evidence-informed, easy to reverse)</h3>
+<p><b>Chosen.</b> A 10 s default startup timeout around connect plus initialize, the existing 60 s per-call timeout, and a guarded reverse-order close in the lifespan task. <b>Runner-up.</b> An owner task per server [S53]: needed only when clients open and close in different tasks. <b>Evidence.</b> [S31, S36, S50, S52]. <b>Decision rule.</b> Move to owner tasks if clients are opened lazily or closed elsewhere.</p>
+<h3>D7 Replay semantics of a failed turn (evidence-informed, easy to reverse)</h3>
+<p><b>Chosen.</b> A failed turn saves no messages, only usage; the host retries from the last saved turn; effectful tools derive their own idempotency key from host state. <b>Runner-ups.</b> Per-step checkpoints: out of scope. An effect ledger with idempotency keys [S25]: more machinery than needed now. A stable turn id passed to tools: revisit with the capabilities brainstorm. <b>Evidence.</b> [S63, S62, S48, S25].</p>
+<p class="note">D4 is evidence-backed; D1, D2, D3, D5, D6 and D7 are evidence-informed: the evidence shapes them, but their exact form is our design.</p>
+
+<h2>Validation Strategy</h2>
+<ul>
+<li>Codec: round-trip every message type, including image and audio bytes that are not valid UTF-8; load a record written with an older <code>format_version</code>; reject a newer one with the typed error. Pass: equal objects after round trip.</li>
+<li>Turn lock: run two overlapping turns on one conversation; pass if both turns appear in order in the saved record.</li>
+<li>Restart: save, restart the process with the SQLite backend, resume; pass if history and usage match.</li>
+<li>Limits: a fake provider with known usage; pass if the error fires on the first call past the cap and carries usage, and if a failed turn's usage counts toward the conversation cap.</li>
+<li>Error policy: per adapter, map a 400, 401, 404, 429, 5xx, context-length and content-policy error; pass if the class, the retry count and the fallback step match D5.</li>
+<li>MCP: a server that never answers initialize must fail startup within the timeout; a client whose close raises must not stop the others from closing.</li>
+<li>Hypothesis C44 (cross-task close trips the cancel-scope guard) is now supported; the kill criterion for D6's same-task rule is a reproduction of the error with open and close in one task.</li>
+</ul>
+
+<h2>Open Research Questions</h2>
+<ol>
+<li>Q3 (highest impact): reproducible reports of concurrent turns corrupting history in Pydantic AI or LangGraph; partly answered for OpenAI Agents SDK and Google ADK.</li>
+<li>Q6: the verbatim LangGraph durable-execution guidance on wrapping side effects in tasks.</li>
+<li>Q5: whether fallback chains mask bugs or spike cost in practice.</li>
+<li>Q4: whether token limits are bypassed by streaming or sub-agents.</li>
+<li>Q7: whether Google ADK main restored the stale-session error.</li>
+<li>Q2: remaining anyio cancel-scope reports in FastMCP and langchain-mcp-adapters.</li>
+<li>Q1: the old pydantic_graph persistence API and PostgresSaver write atomicity.</li>
+</ol>
+
+<h2>Future Directions</h2>
+<p>Watch on the next rerun: Pydantic AI's <code>ConversationStore</code>, which is new and may change; whether OpenAI Agents SDK adds a version field to stored items; LangGraph's serializer strict mode becoming the default [S21]; and MCP SDK cleanup changes.</p>
+
+<h2>Limitations</h2>
+<p>Coverage is concentrated in the three libraries' own documentation and code; Microsoft Agent Framework, LlamaIndex and CrewAI were not searched, and Google ADK and LiteLLM were added only after the critic pass. Fetches returned short extracts, not raw pages. Several "no feature" statements rest on absence from documentation. Critic notes kept as limitations: the single-host limit for SQLite rests on Pydantic AI's statement only; D7 offers no deduplication handle, which departs from the disconfirming review's recommendation of idempotency keys.</p>
+
+<h2>Conclusions</h2>
+<p><code>agent_platform</code> already has the right protocol shape. It lacks a durable backend, a versioned format, a turn lock, usage stored with the conversation, a narrower fallback rule and bounded MCP startup. Effectful tools remain the main risk of per-turn persistence.</p>
+
+<h2>References</h2>
+<p class="ref" id="S1">[S1] <i>pydantic_ai.usage API reference (UsageLimits, RunUsage)</i>. https://pydantic.dev/docs/ai/api/pydantic-ai/usage/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S2">[S2] <i>pydantic_ai_slim/pydantic_ai/usage.py (source)</i>. https://raw.githubusercontent.com/pydantic/pydantic-ai/main/pydantic_ai_slim/pydantic_ai/usage.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S3">[S3] <i>Pydantic AI Harness: Spend limits (SpendLimits)</i>. https://pydantic.dev/docs/ai/harness/spend/index.md. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S4">[S4] <i>OpenAI Agents SDK: Running agents (max_turns, error_handlers)</i>. https://openai.github.io/openai-agents-python/running_agents/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S5">[S5] <i>OpenAI Agents SDK: Usage</i>. https://openai.github.io/openai-agents-python/usage/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S6">[S6] <i>LangGraph Graph API (recursion limit)</i>. https://docs.langchain.com/oss/python/langgraph/graph-api. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S7">[S7] <i>LangGraph error: GRAPH_RECURSION_LIMIT</i>. https://docs.langchain.com/oss/python/langgraph/errors/GRAPH_RECURSION_LIMIT. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S8">[S8] <i>Pydantic AI agent docs (usage_limits, usage=, interrupted response)</i>. https://pydantic.dev/docs/ai/core-concepts/agent/index.md. accessed 2026-11-20. docs. read: skim.</p>
+<p class="ref" id="S9">[S9] <i>pydantic_ai agent/__init__.py (source)</i>. https://raw.githubusercontent.com/pydantic/pydantic-ai/main/pydantic_ai_slim/pydantic_ai/agent/__init__.py. accessed 2026-11-20. repo. read: skim.</p>
+<p class="ref" id="S10">[S10] <i>OpenAI Agents SDK: Sessions</i>. https://openai.github.io/openai-agents-python/sessions/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S11">[S11] <i>openai-agents-python src/agents/memory/session.py</i>. https://github.com/openai/openai-agents-python/blob/main/src/agents/memory/session.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S12">[S12] <i>openai-agents-python sqlite_session.py</i>. https://github.com/openai/openai-agents-python/blob/main/src/agents/memory/sqlite_session.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S13">[S13] <i>openai-agents-python extensions/memory/sqlalchemy_session.py</i>. https://github.com/openai/openai-agents-python/blob/main/src/agents/extensions/memory/sqlalchemy_session.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S14">[S14] <i>Pydantic AI docs: Message history</i>. https://pydantic.dev/docs/ai/core-concepts/message-history/. accessed 2026-11-20. docs. read: skim.</p>
+<p class="ref" id="S15">[S15] <i>Pydantic AI API: conversation store</i>. https://pydantic.dev/docs/ai/api/pydantic-ai/conversation-store/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S16">[S16] <i>Pydantic AI docs: Persistence</i>. https://pydantic.dev/docs/ai/core-concepts/persistence/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S17">[S17] <i>LangChain docs: LangGraph add memory</i>. https://docs.langchain.com/oss/python/langgraph/add-memory. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S18">[S18] <i>langgraph libs/checkpoint base/__init__.py (BaseCheckpointSaver)</i>. https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint/langgraph/checkpoint/base/__init__.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S19">[S19] <i>langgraph libs/checkpoint store/base/__init__.py (BaseStore)</i>. https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint/langgraph/store/base/__init__.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S20">[S20] <i>LangGraph Checkpointers (docs.langchain.com)</i>. https://docs.langchain.com/oss/python/langgraph/checkpointers. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S21">[S21] <i>langgraph checkpoint serde jsonplus.py (JsonPlusSerializer source)</i>. https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint/langgraph/checkpoint/serde/jsonplus.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S22">[S22] <i>LangGraph backward compatibility (docs.langchain.com)</i>. https://docs.langchain.com/oss/python/langgraph/backward-compatibility. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S23">[S23] <i>langgraph checkpoint-sqlite SqliteSaver source</i>. https://github.com/langchain-ai/langgraph/blob/main/libs/checkpoint-sqlite/langgraph/checkpoint/sqlite/__init__.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S24">[S24] <i>Pydantic AI Graph (beta) - Persistence and Resumability</i>. https://pydantic.dev/docs/ai/graph/beta/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S25">[S25] <i>Pydantic AI Harness: StepPersistence</i>. https://pydantic.dev/docs/ai/harness/step-persistence/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S26">[S26] <i>Pydantic AI durable execution overview</i>. https://pydantic.dev/docs/ai/capabilities/durable_execution/overview/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S27">[S27] <i>pydantic-ai issue #530 (graph persistence discussion)</i>. https://github.com/pydantic/pydantic-ai/issues/530. accessed 2026-11-20. repo. read: skim.</p>
+<p class="ref" id="S28">[S28] <i>OpenAI Agents SDK: Human-in-the-loop (RunState)</i>. https://openai.github.io/openai-agents-python/human_in_the_loop/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S29">[S29] <i>Pydantic AI docs: Models overview (FallbackModel)</i>. https://pydantic.dev/docs/ai/models/overview/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S30">[S30] <i>pydantic_ai/models/fallback.py (main)</i>. https://raw.githubusercontent.com/pydantic/pydantic-ai/main/pydantic_ai_slim/pydantic_ai/models/fallback.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S31">[S31] <i>pydantic_ai/mcp.py (main)</i>. https://raw.githubusercontent.com/pydantic/pydantic-ai/main/pydantic_ai_slim/pydantic_ai/mcp.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S32">[S32] <i>Pydantic AI docs: Retries</i>. https://pydantic.dev/docs/ai/advanced-features/retries/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S33">[S33] <i>langgraph _internal/_retry.py (default_retry_on)</i>. https://raw.githubusercontent.com/langchain-ai/langgraph/main/libs/langgraph/langgraph/_internal/_retry.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S34">[S34] <i>langgraph types.py (RetryPolicy)</i>. https://raw.githubusercontent.com/langchain-ai/langgraph/main/libs/langgraph/langgraph/types.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S35">[S35] <i>OpenAI Agents SDK reference: mcp server</i>. https://openai.github.io/openai-agents-python/ref/mcp/server/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S36">[S36] <i>OpenAI Agents SDK reference: MCPServerManager</i>. https://openai.github.io/openai-agents-python/ref/mcp/manager/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S37">[S37] <i>LangChain docs: Models (retries)</i>. https://docs.langchain.com/oss/python/langchain/models. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S38">[S38] <i>langchain_core runnables/fallbacks.py</i>. https://raw.githubusercontent.com/langchain-ai/langchain/master/libs/core/langchain_core/runnables/fallbacks.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S39">[S39] <i>OpenAI Agents SDK docs: Models (retries)</i>. https://openai.github.io/openai-agents-python/models/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S40">[S40] <i>pydantic-ai PR 3494: FallbackModel falls back on all model API errors</i>. https://github.com/pydantic/pydantic-ai/pull/3494. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S41">[S41] <i>How to handle growing checkpoint blob? (LangChain forum)</i>. 2026-08. https://forum.langchain.com/t/how-to-handle-growing-checkpoint-blob/4448. accessed 2026-11-20. other. read in full.</p>
+<p class="ref" id="S42">[S42] <i>openai-agents-python PR 1954: SQLiteSession thread-safety fix</i>. https://github.com/openai/openai-agents-python/pull/1954. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S44">[S44] <i>pydantic-ai issue 2837: FallbackModel does not cover parsing/validation failures</i>. 2025-09. https://github.com/pydantic/pydantic-ai/issues/2837. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S45">[S45] <i>Pydantic AI changelog and upgrade guide</i>. https://pydantic.dev/docs/ai/project/changelog/. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S46">[S46] <i>JsonPlusSerializer does not serialize exceptions (LangChain forum)</i>. https://forum.langchain.com/t/jsonplusserializer-does-not-serialize-exceptions/2429. accessed 2026-11-20. other. read in full.</p>
+<p class="ref" id="S47">[S47] <i>Durable agent workflows need idempotency before they need checkpoints</i>. https://hackernoon.com/durable-agent-workflows-need-idempotency-before-they-need-checkpoints. accessed 2026-11-20. industry. read in full.</p>
+<p class="ref" id="S48">[S48] <i>openai-agents-python PR 4148: streamed guardrail trip drops tool call from session</i>. 2026-08. https://github.com/openai/openai-agents-python/pull/4148. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S49">[S49] <i>Proposal: token usage budgets for LangChain agents (LangChain forum)</i>. https://forum.langchain.com/t/a-proposal-to-add-token-usage-budgets-to-langchain-agents-via-a-new-middleware-since-the-existing-limiters-only-cap-call-count-not-tokens/4147. accessed 2026-11-20. other. read in full.</p>
+<p class="ref" id="S50">[S50] <i>python-sdk src/mcp/client/stdio.py (main)</i>. https://github.com/modelcontextprotocol/python-sdk/blob/main/src/mcp/client/stdio.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S51">[S51] <i>python-sdk issue #577: RuntimeError: Attempted to exit cancel scope in a different task (out-of-order cleanup)</i>. https://github.com/modelcontextprotocol/python-sdk/issues/577. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S52">[S52] <i>python-sdk issue #2147: cancel-scope wrong-task guard</i>. https://github.com/modelcontextprotocol/python-sdk/issues/2147. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S53">[S53] <i>google/adk-python issue #3708: MCP cancel scope error</i>. https://github.com/google/adk-python/issues/3708. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S54">[S54] <i>pydantic-ai pydantic_ai/mcp.py (main), MCPToolset</i>. https://github.com/pydantic/pydantic-ai/blob/main/pydantic_ai_slim/pydantic_ai/mcp.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S55">[S55] <i>openai-agents-python src/agents/mcp/server.py (main)</i>. https://github.com/openai/openai-agents-python/blob/main/src/agents/mcp/server.py. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S56">[S56] <i>Double texting (LangSmith Deployment docs)</i>. https://docs.langchain.com/langsmith/double-texting.md. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S58">[S58] <i>Managing State Schema Changes Across LangSmith Deployment Versions</i>. https://kb.langchain.com/articles/1785884356-managing-state-schema-changes-across-langsmith-deployment-versions. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S61">[S61] <i>openai-agents-python PR #4680: preserve writes that land while responses.compact is in flight</i>. https://github.com/openai/openai-agents-python/pull/4680. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S62">[S62] <i>openai-agents-python issue #4775: RunState pending input duplicated when a Session append loses acknowledgement</i>. https://github.com/openai/openai-agents-python/issues/4775. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S63">[S63] <i>openai-agents-python issue #6091: Runner.run with Session drops in-flight and completed sibling function_calls on cancellation</i>. https://github.com/openai/openai-agents-python/issues/6091. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S64">[S64] <i>openai-agents-python issue #4988: OpenAIConversationsSession.pop_item is not safe for concurrent calls</i>. https://github.com/openai/openai-agents-python/issues/4988. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S65">[S65] <i>Pydantic AI message history</i>. https://pydantic.dev/docs/ai/message-history. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S66">[S66] <i>LiteLLM Proxy: Fallbacks and reliability</i>. https://docs.litellm.ai/docs/proxy/reliability. accessed 2026-11-20. docs. read in full.</p>
+<p class="ref" id="S67">[S67] <i>google/adk-python issue #4751: DatabaseSessionService.append_event reload-and-continue in 1.24+</i>. https://github.com/google/adk-python/issues/4751. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S68">[S68] <i>google/adk-python issue #4771 (concurrent append_event OCC aborts, Spanner)</i>. https://github.com/google/adk-python/issues/4771. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S69">[S69] <i>google/adk-python PR #4752: optimistic concurrency with event sequence number</i>. https://github.com/google/adk-python/pull/4752. accessed 2026-11-20. repo. read in full.</p>
+<p class="ref" id="S70">[S70] <i>Pydantic: Configuration API (ser_json_bytes, val_json_bytes)</i>. https://pydantic.dev/docs/validation/latest/api/pydantic/config/. accessed 2026-11-20. docs. read in full.</p>
+<h2>Decision traceability</h2>
+<table><tr><th>Decision</th><th>Basis</th><th>Claims (status)</th><th>Sources</th></tr>
+<tr><td>D1 Conversation store: protocol shape and stored format</td><td>evidence_informed</td><td>C12 (supported), C14 (supported), C16 (supported), C18 (supported), C48 (supported), C49 (supported), C60 (supported), C69 (supported), C72 (supported), C73 (supported), C77 (supported), C78 (supported), C80 (supported), C82 (supported)</td><td>S10, S11, S12, S13, S15, S16, S22, S25, S45, S46, S58, S61, S64, S65, S67, S68, S70</td></tr>
+<tr><td>D2 Workflow checkpoint store</td><td>evidence_informed</td><td>C24 (supported), C26 (supported), C28 (supported), C29 (supported), C30 (supported)</td><td>S18, S20, S21, S22, S24</td></tr>
+<tr><td>D3 Reference backend</td><td>evidence_informed</td><td>C13 (supported), C27 (supported), C71 (supported)</td><td>S10, S20, S23, S25</td></tr>
+<tr><td>D4 Opt-in usage limits</td><td>evidence_backed</td><td>C3 (supported), C4 (supported), C6 (supported), C8 (supported), C10 (supported), C50 (supported), C52 (supported)</td><td>S1, S2, S3, S4, S5, S6, S7</td></tr>
+<tr><td>D5 LLM error policy: retry and fallback</td><td>evidence_informed</td><td>C37 (supported), C38 (supported), C40 (supported), C52 (supported), C74 (supported), C75 (supported), C76 (supported)</td><td>S1, S29, S30, S32, S37, S38, S40, S66</td></tr>
+<tr><td>D6 MCP client lifecycle</td><td>evidence_informed</td><td>C42 (supported), C43 (supported), C61 (supported), C62 (supported), C63 (supported), C81 (supported)</td><td>S31, S35, S36, S50, S51, S52, S53, S54, S55</td></tr>
+<tr><td>D7 Replay semantics of a failed turn</td><td>evidence_informed</td><td>C54 (supported), C55 (supported), C66 (supported)</td><td>S25, S26, S47, S48, S62, S63</td></tr>
+</table>
+<h3>Claim-to-evidence chains for the most consequential decisions</h3>
+<p><b>D1.</b> Concurrent turns corrupt histories in item-level stores [C69: S61, S64] and in Google ADK [C77: S67] → serialize turns per conversation [C80] → per-conversation turn lock. Stored formats change across upgrades [C49: S45; C72: S25, S22] → format version and tolerant reader [C73]. Bytes default to UTF-8 [C82: S70] → base64 codec.</p>
+<p><b>D5.</b> Fallback defaults cover every API error [C37: S29, S30, S40] or every exception [C40: S38]; another model can fix context overflow and policy rejections [C74: S66; C75: S29] → narrowed fallback rule [C76], replacing the disputed first draft [C45].</p>
+<p><b>D7.</b> Cancelled runs leave committed effects unrecorded [C66: S63, S25] and failed appends duplicate input [C67: S62]; deduplication is left to the orchestrator [C55: S25, S47] → a failed turn saves no messages, and effectful tools own their idempotency.</p>
+</body></html>
