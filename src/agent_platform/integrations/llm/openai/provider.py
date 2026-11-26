@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import functools
 import json
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any, cast
 
 import openai
@@ -50,7 +50,7 @@ from agent_platform.integrations.sdk_errors import (
 )
 
 if TYPE_CHECKING:
-    from agent_platform.agents.tools.base import Tool
+    from agent_platform.core.interfaces.llm.tool_spec import ToolSpec
 
 _BATCH_STATUS_ERROR = "Batch status check failed"
 _BATCH_RESULTS_ERROR = "Batch result retrieval failed"
@@ -83,7 +83,7 @@ class OpenAILLM(
         self._client_options = resolve_client_options(client_options)
         self._bind(model, options)
 
-    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
+    def _tool_to_schema(self, tool: ToolSpec) -> dict[str, Any]:
         parameters = model_schema(tool.input_schema)
         strict_parameters = strict_json_schema(parameters)
         return {
@@ -163,7 +163,7 @@ class OpenAILLM(
         client: OpenAI,
         prompt: Prompt,
         config: OpenAIGenerationConfig,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> ChatCompletion:
         messages = to_native_messages(prompt)
         params = to_native_params(config, has_tools=bool(tools))
@@ -181,7 +181,7 @@ class OpenAILLM(
         client: AsyncOpenAI,
         prompt: Prompt,
         config: OpenAIGenerationConfig,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> ChatCompletion:
         messages = to_native_messages(prompt)
         params = to_native_params(config, has_tools=bool(tools))
@@ -201,7 +201,7 @@ class OpenAILLM(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         resolved = self._resolve(config)
         client = self._stream_client(resolved)

@@ -2,17 +2,14 @@ from __future__ import annotations
 
 from collections.abc import AsyncIterator, Sequence
 from dataclasses import dataclass
-from typing import TYPE_CHECKING
 
 from agent_platform.core.errors import PlatformError, ProviderError
 from agent_platform.core.interfaces.llm.base import BaseLLMProvider
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
+from agent_platform.core.interfaces.llm.tool_spec import ToolSpec
 from agent_platform.core.resilience import CircuitBreaker, CircuitState, RateLimiter
 from agent_platform.core.schemas.message import Prompt
-
-if TYPE_CHECKING:
-    from agent_platform.agents.tools.base import Tool
 
 __all__ = ["FallbackEntry", "FallbackLLMProvider"]
 
@@ -83,7 +80,7 @@ class FallbackLLMProvider(BaseLLMProvider):
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> LLMResponse:
         last_exc: Exception | None = None
         for entry, circuit in zip(self._entries, self._circuits, strict=True):
@@ -105,7 +102,7 @@ class FallbackLLMProvider(BaseLLMProvider):
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> LLMResponse:
         if self._rate_limiter is not None:
             await self._rate_limiter.acquire()
@@ -129,7 +126,7 @@ class FallbackLLMProvider(BaseLLMProvider):
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         """Falls over to the next entry only if a provider fails *before*
         yielding its first chunk. Once a chunk has reached the caller,

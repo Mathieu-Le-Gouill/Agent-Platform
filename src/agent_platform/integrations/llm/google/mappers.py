@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import logging
+from collections.abc import Callable, Sequence
 from typing import Any
 from uuid import uuid4
 
@@ -10,6 +11,7 @@ from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     ResponseFormat,
 )
+from agent_platform.core.interfaces.llm.tool_spec import ToolSpec
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     AudioBlock,
@@ -157,8 +159,8 @@ def _thinking_config(config: GoogleGenerationConfig) -> types.ThinkingConfig | N
 def to_native_config(
     config: GoogleGenerationConfig,
     system: str | None,
-    tools: list[Any] | None,
-    tool_to_schema: Any,
+    tools: Sequence[ToolSpec] | None,
+    tool_to_schema: Callable[[ToolSpec], types.Tool],
 ) -> types.GenerateContentConfig:
     kwargs: dict[str, Any] = {}
     if config.temperature is not None:

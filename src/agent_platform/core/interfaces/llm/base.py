@@ -1,16 +1,13 @@
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from collections.abc import AsyncIterator
-from typing import TYPE_CHECKING, Generic, TypeVar
+from collections.abc import AsyncIterator, Sequence
+from typing import Generic, TypeVar
 
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
+from agent_platform.core.interfaces.llm.tool_spec import ToolSpec
 from agent_platform.core.schemas.message import Prompt
-
-if TYPE_CHECKING:
-    # type-only: avoids a real runtime import from agents/, which core/ may never depend on
-    from agent_platform.agents.tools.base import Tool
 
 GenerationConfigT = TypeVar("GenerationConfigT", bound=GenerationConfig)
 
@@ -21,7 +18,7 @@ class BaseLLMProvider(ABC, Generic[GenerationConfigT]):
         self,
         prompt: Prompt,
         config: GenerationConfigT | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> LLMResponse: ...
 
     @abstractmethod
@@ -29,7 +26,7 @@ class BaseLLMProvider(ABC, Generic[GenerationConfigT]):
         self,
         prompt: Prompt,
         config: GenerationConfigT | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> LLMResponse:
         """Generate a response; failures raise typed errors (see `integrations/README.md`)."""
 
@@ -38,6 +35,6 @@ class BaseLLMProvider(ABC, Generic[GenerationConfigT]):
         self,
         prompt: Prompt,
         config: GenerationConfigT | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         """Stream a response; failures raise typed errors (see `integrations/README.md`)."""

@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 from abc import abstractmethod
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from contextlib import AbstractContextManager
 from types import MappingProxyType
 from typing import TYPE_CHECKING, Any, ClassVar, Generic, TypeVar, cast
@@ -31,7 +31,7 @@ from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.sdk_errors import is_transient_status
 
 if TYPE_CHECKING:
-    from agent_platform.agents.tools.base import Tool
+    from agent_platform.core.interfaces.llm.tool_spec import ToolSpec
 
 _logger = logging.getLogger(__name__)
 
@@ -228,7 +228,7 @@ class NativeLLMProvider(
         client: SyncClientT,
         prompt: Prompt,
         config: GenerationConfigT,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> ResponseT:
         """Assemble the native request and make the blocking call, returning the raw response."""
 
@@ -238,7 +238,7 @@ class NativeLLMProvider(
         client: AsyncClientT,
         prompt: Prompt,
         config: GenerationConfigT,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> ResponseT:
         """Assemble the native request and make the async call, returning the raw response."""
 
@@ -249,7 +249,7 @@ class NativeLLMProvider(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> LLMResponse:
         resolved = self._resolve(config)
 
@@ -266,7 +266,7 @@ class NativeLLMProvider(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> LLMResponse:
         resolved = self._resolve(config)
 
@@ -292,7 +292,10 @@ class NativeLLMProvider(
         return resolve_max_retries(config.max_retries, self._client_options) + 1
 
     def _attempt_sync(
-        self, prompt: Prompt, config: GenerationConfigT, tools: list[Tool] | None
+        self,
+        prompt: Prompt,
+        config: GenerationConfigT,
+        tools: Sequence[ToolSpec] | None,
     ) -> LLMResponse:
         # The translation sits outside the observation, so the span records
         # the vendor exception and its type rather than the `ProviderError`.
@@ -309,7 +312,10 @@ class NativeLLMProvider(
             raise self._translate(exc) from exc
 
     async def _attempt_async(
-        self, prompt: Prompt, config: GenerationConfigT, tools: list[Tool] | None
+        self,
+        prompt: Prompt,
+        config: GenerationConfigT,
+        tools: Sequence[ToolSpec] | None,
     ) -> LLMResponse:
         try:
             with self._observe(config) as call:
@@ -396,7 +402,7 @@ class NativeLLMProvider(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         """Stream the response; see `integrations/README.md` for the errors it raises."""
         # A client disconnect cancels the task: `asyncio.CancelledError` is a
@@ -414,7 +420,7 @@ class NativeLLMProvider(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         """Make the streaming vendor call and yield its chunks, accumulating usage.
 

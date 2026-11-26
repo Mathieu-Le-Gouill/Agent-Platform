@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 
 import httpx
@@ -35,7 +35,7 @@ from agent_platform.integrations.llm.huggingface.mappers import (
 )
 
 if TYPE_CHECKING:
-    from agent_platform.agents.tools.base import Tool
+    from agent_platform.core.interfaces.llm.tool_spec import ToolSpec
 
 
 class HuggingFaceLLM(
@@ -62,7 +62,7 @@ class HuggingFaceLLM(
         self._client_options = resolve_client_options(client_options)
         self._bind(model, options)
 
-    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
+    def _tool_to_schema(self, tool: ToolSpec) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -116,7 +116,7 @@ class HuggingFaceLLM(
         client: InferenceClient,
         prompt: Prompt,
         config: HuggingFaceGenerationConfig,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> ChatCompletionOutput:
         messages = to_native_messages(prompt)
         params = to_native_params(config, has_tools=bool(tools))
@@ -130,7 +130,7 @@ class HuggingFaceLLM(
         client: AsyncInferenceClient,
         prompt: Prompt,
         config: HuggingFaceGenerationConfig,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> ChatCompletionOutput:
         messages = to_native_messages(prompt)
         params = to_native_params(config, has_tools=bool(tools))
@@ -146,7 +146,7 @@ class HuggingFaceLLM(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         resolved = self._resolve(config)
         client = self._async_client(resolved)

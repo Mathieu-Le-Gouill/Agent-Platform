@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -45,7 +45,7 @@ from agent_platform.integrations.llm.google.mappers import (
 )
 
 if TYPE_CHECKING:
-    from agent_platform.agents.tools.base import Tool
+    from agent_platform.core.interfaces.llm.tool_spec import ToolSpec
 
 
 class GoogleLLM(
@@ -74,7 +74,7 @@ class GoogleLLM(
         self._client_options = resolve_client_options(client_options)
         self._bind(model, options)
 
-    def _tool_to_schema(self, tool: Tool) -> types.Tool:
+    def _tool_to_schema(self, tool: ToolSpec) -> types.Tool:
         return types.Tool(
             function_declarations=[
                 types.FunctionDeclaration(
@@ -124,7 +124,7 @@ class GoogleLLM(
         client: genai.Client,
         prompt: Prompt,
         config: GoogleGenerationConfig,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> types.GenerateContentResponse:
         system, contents = to_native_contents(prompt)
         native_config = to_native_config(config, system, tools, self._tool_to_schema)
@@ -139,7 +139,7 @@ class GoogleLLM(
         client: genai.Client,
         prompt: Prompt,
         config: GoogleGenerationConfig,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> types.GenerateContentResponse:
         system, contents = to_native_contents(prompt)
         native_config = to_native_config(config, system, tools, self._tool_to_schema)
@@ -158,7 +158,7 @@ class GoogleLLM(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         resolved = self._resolve(config)
         client = self._async_client(resolved)

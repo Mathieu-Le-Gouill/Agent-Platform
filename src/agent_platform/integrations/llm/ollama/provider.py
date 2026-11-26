@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Mapping
+from collections.abc import AsyncIterator, Mapping, Sequence
 from typing import TYPE_CHECKING, Any
 from uuid import uuid4
 
@@ -35,7 +35,7 @@ from agent_platform.integrations.llm.ollama.mappers import (
 from agent_platform.utils.env import from_env
 
 if TYPE_CHECKING:
-    from agent_platform.agents.tools.base import Tool
+    from agent_platform.core.interfaces.llm.tool_spec import ToolSpec
 
 # Ollama has no auth concept, only a server location; when no client_options.base_url
 # is given, fall back to the env var / the SDK's own local-daemon default.
@@ -60,7 +60,7 @@ class OllamaLLM(
         self._client_options = resolve_client_options(client_options)
         self._bind(model, options)
 
-    def _tool_to_schema(self, tool: Tool) -> dict[str, Any]:
+    def _tool_to_schema(self, tool: ToolSpec) -> dict[str, Any]:
         return {
             "type": "function",
             "function": {
@@ -124,7 +124,7 @@ class OllamaLLM(
         client: Client,
         prompt: Prompt,
         config: OllamaGenerationConfig,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> ChatResponse:
         messages = to_native_messages(prompt)
         params = to_native_params(config, has_tools=bool(tools))
@@ -138,7 +138,7 @@ class OllamaLLM(
         client: AsyncClient,
         prompt: Prompt,
         config: OllamaGenerationConfig,
-        tools: list[Tool] | None,
+        tools: Sequence[ToolSpec] | None,
     ) -> ChatResponse:
         messages = to_native_messages(prompt)
         params = to_native_params(config, has_tools=bool(tools))
@@ -154,7 +154,7 @@ class OllamaLLM(
         self,
         prompt: Prompt,
         config: GenerationConfig | None = None,
-        tools: list[Tool] | None = None,
+        tools: Sequence[ToolSpec] | None = None,
     ) -> AsyncIterator[StreamChunk]:
         resolved = self._resolve(config)
         client = self._stream_client(resolved)

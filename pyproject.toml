@@ -229,7 +229,9 @@ exclude_also = [
 
 [tool.importlinter]
 root_package = "agent_platform"
-exclude_type_checking_imports = true
+# False: a type-only import still couples layers, so the contracts below count
+# `if TYPE_CHECKING:` imports too.
+exclude_type_checking_imports = false
 # Needed by the "Core imports no tracing SDK" contract; import-linter only
 # accepts it at the root, where it applies to every contract.
 include_external_packages = true

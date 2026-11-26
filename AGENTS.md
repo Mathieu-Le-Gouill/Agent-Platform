@@ -195,7 +195,9 @@ rather than guessing silently.
   because it may grade any of them. This is not just convention:
   `[tool.importlinter]` in `pyproject.toml` enforces the layer order and
   that `core/` never imports a sibling layer; run `lint-imports` to check,
-  CI fails the same way.
+  CI fails the same way. Imports under `if TYPE_CHECKING:` count too: when a
+  lower layer needs a type from above, declare a `Protocol` for what it uses
+  in the lower layer (e.g. `core/interfaces/llm/tool_spec.py::ToolSpec`).
 - **Outside the stack** (no import-linter contract covers them):
   `utils/` imports no other package and any layer may use it; `audio/`
   builds on `core/` only and serves `integrations/` and up; `config/` and
