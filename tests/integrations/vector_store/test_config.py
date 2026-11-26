@@ -1,8 +1,12 @@
+import pytest
 from pydantic import ValidationError
 
 from agent_platform.core.interfaces.vector_store.config import VectorStoreConfig
 from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
+from agent_platform.integrations.vector_store.faiss.config import FAISSConfig
+from agent_platform.integrations.vector_store.pinecone.config import PineconeConfig
 from agent_platform.integrations.vector_store.qdrant.config import QdrantConfig
+from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
 
 
 def test_vector_store_config_defaults():
@@ -15,6 +19,24 @@ def test_vector_store_config_custom():
     cfg = VectorStoreConfig(collection_name="docs", namespace="tenant-a")
     assert cfg.collection_name == "docs"
     assert cfg.namespace == "tenant-a"
+
+
+@pytest.mark.parametrize(
+    "config_cls",
+    [
+        VectorStoreConfig,
+        ChromaConfig,
+        QdrantConfig,
+        PineconeConfig,
+        WeaviateConfig,
+        FAISSConfig,
+    ],
+)
+def test_empty_namespace_is_rejected(config_cls):
+    # "" is the shared default partition on Pinecone and Weaviate, so it
+    # would silently give a tenant no isolation.
+    with pytest.raises(ValidationError, match="namespace"):
+        config_cls(namespace="")
 
 
 def test_chroma_config_inherits():

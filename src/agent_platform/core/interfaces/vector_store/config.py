@@ -1,3 +1,5 @@
+from pydantic import Field
+
 from agent_platform.core.config import RequestOptions
 
 
@@ -8,7 +10,6 @@ class VectorStoreConfig(RequestOptions):
     # Logical partition within a collection for multi-tenant isolation. Only
     # Pinecone (namespace) and Weaviate (tenant) honor it; Qdrant, Chroma and
     # FAISS raise ConfigError when it is set rather than mix tenants.
-    # An empty string is the shared default partition on both: Pinecone's
-    # default namespace is "", and Weaviate treats "" as unset (no tenant),
-    # so "" gives no isolation on either.
-    namespace: str | None = None
+    # An empty string is rejected: it is the shared default partition on
+    # Pinecone and Weaviate, so it would give a tenant no isolation.
+    namespace: str | None = Field(default=None, min_length=1)

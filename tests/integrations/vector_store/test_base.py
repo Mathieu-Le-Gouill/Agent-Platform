@@ -16,8 +16,3 @@ def test_reject_namespace_raises_config_error_naming_the_store():
         reject_namespace(VectorStoreConfig(namespace="tenant-a"), "Qdrant")
 
     assert "tenant-a" not in str(exc_info.value)
-
-
-def test_reject_namespace_treats_empty_string_as_set():
-    with pytest.raises(ConfigError):
-        reject_namespace(VectorStoreConfig(namespace=""), "Chroma")

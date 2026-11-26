@@ -125,7 +125,7 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
 
     def _collection(self, client: WeaviateAsyncClient, config: WeaviateConfig) -> Any:
         collection = client.collections.get(config.collection_name)
-        if config.namespace:
+        if config.namespace is not None:
             collection = collection.with_tenant(config.namespace)
         return collection
 
