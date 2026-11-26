@@ -26,7 +26,7 @@ integrations/
 │       ├── config.py      # Provider-specific Pydantic config
 │       ├── mappers.py     # Optional: free functions converting vendor types <-> core
 │       │                   #   schemas, when the provider has more than a couple of them
-│       └── <provider>.py  # Concrete class implementing core/interfaces ABC
+│       └── provider.py    # Concrete class implementing core/interfaces ABC
 └── …
 ```
 
@@ -40,7 +40,7 @@ rather than inline in the provider file, so the provider file stays focused on
 orchestration. `mappers.py` holds only pure functions (no `self`, no network/client
 calls) and imports the same things the provider file would (vendor SDK types for
 annotations, `core/schemas`, `core/interfaces`); it never imports its sibling
-`<provider>.py`, since the provider file imports from it. This mirrors how the domain
+`provider.py`, since the provider file imports from it. This mirrors how the domain
 already separates cross-provider shared conversions into `ocr/sources.py`,
 `speech_to_text/language.py`, and `reranking/scoring.py`, just at per-provider granularity
 when the conversions are provider-specific rather than shared. Providers with only thin,
@@ -148,7 +148,7 @@ DALL-E, OpenAI Whisper and Deepgram default to a 300 s timeout when none is conf
 integrations/<domain>/<new_provider>/
 ├── __init__.py
 ├── config.py              # Pydantic model for provider-specific settings
-└── <new_provider>.py      # class implements the domain's ABC
+└── provider.py            # class implements the domain's ABC
 ```
 
 If the provider needs credentials, add its model to `integrations/credentials.py`.
@@ -162,6 +162,7 @@ Steps:
    one-line conversions, otherwise inline it in the provider file
 6. Use `asyncio.to_thread()` for blocking library calls
 7. Translate all failures to `ProviderError` from `core/errors.py`
+8. Register the class in the domain's `_PROVIDERS` map and add its `<domain>-<provider>` extra (see Integration Conventions)
 
 ### Add a new domain
 

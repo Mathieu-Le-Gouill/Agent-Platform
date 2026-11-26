@@ -28,15 +28,11 @@ when a word could mean two things.
 ## 1. Project overview
 
 `agent_platform` is an async-first Python library for building LLM agents and
-pipelines (RAG, speech translation, ingestion) on top of pluggable provider
-integrations, LLMs (OpenAI, Anthropic, Mistral, Ollama, HuggingFace), vector
-stores (Chroma, Qdrant, Pinecone, Weaviate, FAISS), embeddings, reranking,
-OCR, speech-to-text, translation, VAD, clustering, classification, and image
-generation, calling native vendor SDKs/REST endpoints directly (LangChain is
-only used inside `chunking`, wrapping `langchain-text-splitters`). Everything
-is `pydantic` v2 typed
-and layered strictly bottom-up: `core` → `integrations` → `components` →
-`pipelines` → `agents` → `workflows` → `evals`.
+pipelines (RAG, speech translation, ingestion) on pluggable providers (LLMs,
+vector stores, embeddings, OCR, speech, …; full list in
+`integrations/README.md`). Providers call native vendor SDKs/REST endpoints;
+LangChain appears only inside `chunking` (`langchain-text-splitters`).
+Everything is `pydantic` v2 typed and layered strictly bottom-up (§6).
 
 ## 2. Directory map
 
@@ -71,7 +67,7 @@ paragraph.
 
 ```bash
 uv run --extra dev --extra all pytest -v              # full suite, with every provider extra as in CI (creates/updates .venv on first run)
-uv run pytest -v -m unit                               # unit tests only (currently: all of them, see below)
+uv run pytest -v -m unit                               # unit tests only
 uv run pytest -v tests/agents/test_executor.py          # single file
 uv run mypy src/                                       # type-check
 uv run lint-imports                                     # enforce the layered-architecture rules in §6
@@ -98,26 +94,16 @@ a version change is deliberate: `uv lock --upgrade-package <name>` (or
   no `@pytest.mark.asyncio` needed.
 - **Coverage gate**: `pyproject.toml [tool.pytest.ini_options] addopts` runs
   every local and CI invocation with `--cov=src/agent_platform
-  --cov-fail-under=90`; `[tool.coverage.*]` lives in `pyproject.toml`, not a
-  separate `.coveragerc` (a stale `.coveragerc` silently overriding it was
-  removed, don't reintroduce one). Coverage config only makes the number
-  honest, it doesn't chase 100%, known 0%-covered files are tracked in
-  `CLAUDE.md` "Known issues", not hidden via `omit =`.
-- **Mocking**: use the `mocker` fixture (`pytest-mock`) for
-  patching/monkeypatching, not raw `unittest.mock.patch`/`@patch`
-  (`mocker.patch(...)`/`mocker.patch.object(...)` auto-unwind at teardown
-  the same way `with patch(...)` did, just without the indentation and
-  decorator-argument-order footguns). Direct `MagicMock()`/`AsyncMock()`
-  construction is unaffected and still idiomatic. `monkeypatch` remains fine
-  for `setattr`/`setenv`/`delenv` outside the patch/patch.object case.
-- **Markers**: every collected test is auto-tagged `unit` by a
-  `pytest_collection_modifyitems` hook in `tests/conftest.py` unless it
-  already carries `@pytest.mark.integration`. As of this writing zero tests
-  are marked `integration`, every `importorskip`/`skipif` guard in the suite
-  gates on an optional SDK not being installed, not a real network call, so
-  `-m unit` currently selects the whole suite. Add
-  `@pytest.mark.integration` explicitly on any future test that genuinely
-  hits a live provider (e.g. an opt-in smoke test).
+  --cov-fail-under=90`; all coverage config lives in `pyproject.toml
+  [tool.coverage.*]`. Known 0%-covered files are tracked in
+  `src/agent_platform/README.md` "Known Issues", never excluded via `omit =`.
+- **Mocking**: patch with the `mocker` fixture (`pytest-mock`:
+  `mocker.patch(...)`/`mocker.patch.object(...)`, auto-unwound at teardown).
+  Constructing `MagicMock()`/`AsyncMock()` directly is fine, and so is
+  `monkeypatch` for `setattr`/`setenv`/`delenv`.
+- **Markers**: `tests/conftest.py` tags every test `unit` unless it carries
+  `@pytest.mark.integration`; mark any test that hits a live provider
+  `integration`.
 - Shared fixtures live in the `conftest.py` at the narrowest scope that
   covers their users (root `tests/conftest.py` for cross-domain fixtures
   like `fake_text_chunk`/`mock_llm`; a domain-level `conftest.py`, e.g.
@@ -158,11 +144,11 @@ a version change is deliberate: `uv lock --upgrade-package <name>` (or
 - All platform errors extend `PlatformError` (`core/errors.py`):
   `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`,
   `MissingCredentialError`, plus layer-specific subtrees (`LLMError` in
-  `integrations/llm/`, `AgentError`/`ToolError` in `agents/`).
+  `core/interfaces/llm/errors.py`, `AgentError`/`ToolError` in `agents/`).
 - **Errors must be translated at layer boundaries, never leaked as internal
   types.** Concretely: an integration raises `ProviderError` (or a domain
   subclass); a `Tool` wrapping it must catch and re-raise as `ToolError`
-  (use `agents/tools/_utils.py::safe_call()`); the agent loop must surface
+  (use `agents/tools/safe_execution.py::safe_call()`); the agent loop must surface
   failures as `AgentError`.
 - New error cases extend the existing local hierarchy for that layer
   (`core/errors.py`, `agents/errors.py`, `agents/tools/errors.py`) rather
@@ -173,10 +159,10 @@ a version change is deliberate: `uv lock --upgrade-package <name>` (or
 
 | Want to add | Start here |
 |---|---|
-| New LLM / embedding / OCR / vector store / … provider | `integrations/<domain>/<new_provider>/` implementing `core/interfaces/<domain>/base.py`; register in that domain's `_PROVIDERS` map in `integrations/<domain>/__init__.py`; add its package(s) as a `<domain>-<new_provider>` extra in `pyproject.toml` and append it to that domain's bundle extra and to `all` |
+| New LLM / embedding / OCR / vector store / … provider | `integrations/<domain>/<new_provider>/` implementing `core/interfaces/<domain>/base.py`, steps in `integrations/README.md` "How to Extend" (incl. `_PROVIDERS` and the `pyproject.toml` extra) |
 | New processing unit | `components/<stage>/<name>/component.py` subclassing `Component[InputT, OutputT]`, in the stage of the pipeline step it serves (rule in `components/README.md`) |
 | New orchestration flow | `pipelines/<name>.py` composing existing components, see `pipelines/README.md` |
-| New agent tool | `agents/tools/<name>.py` implementing the `Tool` protocol, wrapped with `safe_call()`, see `agents/README.md` |
+| New agent tool | `agents/tools/<name>/tool.py` implementing the `Tool` protocol, wrapped with `safe_call()`, see `agents/README.md` |
 | New error type | `core/errors.py` (or the layer-local hierarchy) under the correct `PlatformError` branch |
 | New shared data type | `core/schemas/<name>.py` + export from `core/schemas/__init__.py` |
 

@@ -10,7 +10,7 @@
 core/
 ├── base.py           # Entity (UUID mixin), Timestamped
 ├── config.py         # ProviderConfig (base class every interfaces/<domain>/config.py extends), ModelConfig (ProviderConfig subclass adding `model: str`, for model-backed domains), RequestOptions (ProviderConfig subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs)
-├── errors.py         # PlatformError hierarchy (ProviderError, ConfigError, LLMError, AgentError, …)
+├── errors.py         # PlatformError and its core subclasses (ProviderError, ConfigError, …)
 ├── retry.py          # retry_async()/retry_sync() per-call retry and the with_retry(translate=) decorator: exponential backoff, honors PlatformError.retryable, translates each failed attempt first when given `translate`; retry_once_on_invalid(): run, check, corrective retry once, else RecoveryExhausted
 ├── resilience.py     # CircuitBreaker (open/half-open/closed state machine), RateLimiter (token bucket)
 ├── middleware.py     # Middleware protocol + MiddlewarePipeline: generic pre/post hooks around a typed operation
@@ -107,12 +107,12 @@ PlatformError
 ├── MissingCredentialError
 ├── RecoveryExhausted          (one corrective retry still failed; carries `last_result`)
 │   └── StructuredOutputError  (`interfaces/llm/structured.py`; adds summed `usage`)
-├── AgentError
+├── AgentError                  (`agents/errors.py`)
 │   ├── AgentThinkError
 │   ├── AgentActError
 │   ├── AgentMaxIterations
 │   └── AgentRecoveryExhausted  (not a `RecoveryExhausted`; see `agents/README.md`)
-└── ToolError
+└── ToolError                   (`agents/tools/errors.py`)
 ```
 
 Every error carries `code`, `retryable`, `retry_after` and `context` fields. `retry_after` is the number of seconds the failing service asked callers to wait (from a `Retry-After` header), or `None`; `retry_async`/`retry_sync` wait at least that long, capped at `MAX_RETRY_AFTER_SECONDS` (30 s). `retry.py` holds the retry loop in two per-call functions, `retry_async(attempt_once, max_attempts=...)` and `retry_sync(...)` (exponential backoff with jitter, `retry_on` configurable; the sync one sleeps with `time.sleep`), and the `with_retry()` decorator delegates to the async one. They check this flag: if a caught exception is a `PlatformError` with `retryable=False`, it re-raises immediately instead of burning through retry attempts. `with_retry(translate=fn)` calls `fn(exc)` on every failed attempt and retries on the result, so a `PlatformError(retryable=False)` stops at once: a new error is raised `from` the original, an error `fn` returns unchanged is re-raised as it is, and `asyncio.CancelledError` is never translated. `core` stays vendor-free: the non-LLM `integrations/` call sites pass `integrations/sdk_errors.py::translate_sdk_error` (see `integrations/README.md`), so the flag-check applies there. A `@with_retry()` call site without `translate=` that sits inside an outer `@error_logged(re_raise=ProviderError)` only sees the raw SDK exception, and the flag-check is a no-op. The `llm` providers are the exception: `NativeLLMProvider.generate`/`agenerate` classify each vendor error as temporary or not inside one attempt (`ProviderError(retryable=...)`) and run the attempts through `retry_sync`/`retry_async`, so a bad request fails after one call and `retryable` is honored.

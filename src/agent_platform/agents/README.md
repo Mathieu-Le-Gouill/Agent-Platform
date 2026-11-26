@@ -1,4 +1,4 @@
-# Agents: Status & Roadmap
+# Agents: Single-Agent Composition
 
 The agents layer is single-agent composition: LLM reasoning, tool calls, and conversation state. Running several agents together is `workflows/`, the layer above.
 
@@ -36,7 +36,7 @@ Each tool lives in its own `tools/<name>/tool.py`, one directory per tool, match
 | `AgentExecutor` | `executor.py` | think-act loop with `max_iterations` guard; `run(user_input)` and `run_with_messages(messages)`; each round is wrapped in `core.retry.retry_once_on_invalid` so a `ToolCallValidationError` (tagged via `tools.registry.is_tool_validation_error`) triggers one corrective retry before giving up; `run_streaming(user_input)` calls `Agent.think_from_stream()` (so guardrails and `response_schema` apply as on `run()`) and yields its text deltas interleaved with `act_stream()` tool events; each attempt of the corrective retry buffers its own events and only the kept attempt's are yielded. Fragmented `ToolCallDelta`s are reassembled into `ToolCall`s by `_assemble_tool_calls()` in `agent.py` |
 | `ConversationAgent` | `conversation.py` | Extends `Agent` with persistent `_history`, `chat()`, pluggable `context_strategy: ContextStrategy | None` for history trimming, optional `checkpointer: Checkpointer[list[Message]] | None` (saves history after every `chat()` turn); `ConversationAgent.resume(conversation_id, checkpointer, ...)` classmethod reconstructs an agent's history from a checkpointer |
 | `ContextStrategy` | `context.py` | Protocol: `trim(history) -> history`. `TurnCountStrategy(max_turns)` is the original built-in implementation, `ConversationAgent(max_history_turns=N)` is sugar for `context_strategy=TurnCountStrategy(N)` (passing both raises `ValueError`). `TokenBudgetStrategy(max_tokens, count_tokens)` drops oldest whole turns until under budget, given an injected token-counting callable (always keeps at least the most recent turn). `SummarizingStrategy(llm, max_turns=...)` behaves like `TurnCountStrategy` but folds dropped turns into a `SystemMessage` summary via the injected `BaseLLMProvider`'s synchronous `generate()` (not `agenerate()`), so `trim()` stays synchronous and the `ContextStrategy` protocol/`ConversationAgent` need no changes. |
-| `Guardrail` | `guardrails.py` | `Guardrail = Middleware[GuardrailContext]` (Phase 1's `core/middleware.py` primitive, parameterized over `GuardrailContext(messages)`); `Agent(guardrails=[...])` runs them through a `MiddlewarePipeline` wrapping generation (`before` can short-circuit with a canned `AssistantMessage`, `after` can inspect/reject the real one). `OutputNotEmptyGuardrail` is the shipped example: raises `AgentGuardrailError` if the final answer has no text and no tool calls. Policy is opt-in, not baked in. Guardrails also run on `run_streaming()` (through `think_from_stream()`), so a blocked answer raises before any text is yielded. |
+| `Guardrail` | `guardrails.py` | `Guardrail = Middleware[GuardrailContext]` (the `core/middleware.py` primitive, parameterized over `GuardrailContext(messages)`); `Agent(guardrails=[...])` runs them through a `MiddlewarePipeline` wrapping generation (`before` can short-circuit with a canned `AssistantMessage`, `after` can inspect/reject the real one). `OutputNotEmptyGuardrail` is the shipped example: raises `AgentGuardrailError` if the final answer has no text and no tool calls. Policy is opt-in, not baked in. Guardrails also run on `run_streaming()` (through `think_from_stream()`), so a blocked answer raises before any text is yielded. |
 | `retry_once_on_invalid` | `core/retry.py` | Shared "run, check, corrective-retry-once, else give up" helper (`attempt`/`check`/`correct` callables) used by malformed tool-call recovery (`AgentExecutor`), `response_schema` validation (`Agent.think()`) and `core/interfaces/llm/structured.py`; raises `RecoveryExhausted` (`core/errors.py`, carrying the failing `last_result`) if the retried attempt is still invalid. |
 
 `Agent` builds its `response_schema` config, validation and correction message with `schema_config`, `schema_error` and `schema_correction` from `core/interfaces/llm/structured.py`. Its `model` defaults to `""`: the provider's bound model then applies.
@@ -64,173 +64,13 @@ ToolError
                               per-call timeout, set via register(timeout=...), elapses)
 ```
 
-## What's Left to Build
+## Design Decisions
 
-All planned tools (`OCRTool`, `SearchTool`, `TranscribeTool`, `TranslateTool`, `SummarizeTool`, `ClassifyTool`, `GenerateImageTool`) are implemented under `agents/tools/`.
-
-## Roadmap: closing the gap with modern agent platforms
-
-The provider/integration layer (13 domains, clean ABCs, DI) is close to parity
-with libraries like Pydantic-AI or LiteLLM. The gap is above that layer: a
-single fixed agent loop, no multi-agent orchestration, and no evals. This
-section tracks that gap as a living roadmap, phased by leverage (each phase
-should be usable on its own, not blocked on the next one). Update it in the
-same change that closes or reshapes an item, same rule as the rest of this
-README.
-
-### Phase 1 — Evals (done)
-
-A new top-level `evals/` package now provides `EvalCase`/`EvalDataset`/
-`EvalRunner`/`Scorer`/`EvalReport`, an `agent-platform-eval` CLI entrypoint,
-and a golden `ConversationAgent`/`AgentExecutor` tool-selection dataset,
-wired into CI as an optional `evals` job. See `evals/README.md` for the
-package's design and how to add scorers/targets/datasets.
-
-### Phase 2 — Orchestration (`workflows/`) (done)
-
-The only agent shape before this phase was one `ConversationAgent` per
-process; `pipelines/` only gave fixed hand-written linear flows. `workflows/`
-now provides a typed-state DAG: `WorkflowGraph`/`CompiledWorkflow`
-(`graph.py`), `WorkflowState`/`MessagesState`/`HandoffState`/
-`WorkflowCheckpoint` (`state.py`), and `agent_node`/`tool_node`/
-`binary_router`/`handoff_node` (`nodes/`). See `workflows/README.md` for the
-full design.
-
-- Engine decision: an in-house DAG executor, not LangGraph, consistent with
-  every other layer's "dependency-free ABCs, vendor SDKs isolated to
-  `integrations/`" pattern (the unused `langgraph`/`langchain` base
-  dependencies this decision left dangling have been removed from
-  `pyproject.toml`).
-- Multi-agent handoff: `nodes/handoff.py::handoff_node` hands control to a
-  different `Agent`, sharing `state.messages`, and stamps `state.active_agent`.
-- Pluggable checkpointing: `CompiledWorkflow.arun(checkpointer=..., run_id=...)`
-  saves a `WorkflowCheckpoint` (state + next node) after every step;
-  `resume(run_id, checkpointer)` continues an interrupted run. Built on Phase
-  1's `Checkpointer[StateT]`, the same primitive `ConversationAgent` uses.
-
-### Phase 3 — Harness engineering hardening (done)
-
-Makes the existing single-agent loop production-grade; independent of Phase 2
-and can proceed in parallel.
-
-- ~~`Agent.act()` currently awaits tool calls sequentially~~ **done**: `act()`
-  now runs independent tool calls concurrently via `asyncio.gather`
-  (order-preserving).
-- ~~`with_retry` retries any exception regardless of `PlatformError.retryable`~~
-  **done**: `core/retry.py`'s `with_retry()` now re-raises immediately on a
-  `PlatformError` with `retryable=False`. It applies wherever the attempt
-  raises a `PlatformError`: `llm`'s `generate` and `agenerate`, and the
-  `integrations/` call sites that pass `translate=` to `with_retry()`
-  (embeddings, moderation, reranking, OCR, speech-to-text, translation, vector
-  stores, image generation, batch reads), which classify each SDK error with
-  `translate_sdk_error` inside the attempt. A call site with no `translate=`
-  still sees the raw SDK exception, so the check is a no-op there. It also
-  applies to anything that raises `PlatformError` directly (a tool, the agent
-  loop).
-- ~~Context management: `ConversationAgent` only truncates by turn count~~
-  **done**: `TokenBudgetStrategy` (token-budget-aware trimming, injected
-  token counter) and `SummarizingStrategy` (folds dropped turns into an
-  LLM-generated summary via `BaseLLMProvider.generate()`) join
-  `TurnCountStrategy` in `context.py`, all implementing `ContextStrategy`.
-- ~~Streaming LLM text generation: `Agent.think()` has no streaming variant~~
-  **done**: `Agent.think_stream()` wraps `BaseLLMProvider.stream()` the same
-  way `think()` wraps `agenerate()`; `AgentExecutor.run_streaming()` uses
-  `Agent.think_from_stream()` on top of it, so the assistant's own text is
-  emitted (not just tool-call deltas) after the guardrails and the
-  `response_schema` check, one model call at a time rather than token by token
-  while the model is still answering, and `api/app.py` exposes it as SSE via
-  `POST /chat/stream`.
-- ~~Malformed tool-call recovery~~ **done**: `AgentExecutor` catches a
-  `ToolCallValidationError`-tagged `ToolMessage` (via
-  `tools.registry.is_tool_validation_error`) and retries `think()`+`act()`
-  once with corrective feedback appended to the conversation, via the shared
-  `core.retry.retry_once_on_invalid` helper, before giving up and raising
-  `AgentRecoveryExhausted`. `run_streaming()` applies the same recovery and
-  yields nothing from the failed attempt. A `response_schema` retry that still
-  fails raises the same error from `Agent`.
-- New this phase, not originally scoped but built on the same primitives:
-  `response_schema` on `Agent` (structured final-answer validation, reusing
-  `retry_once_on_invalid`), `Guardrail`s (`guardrails.py`, built on Phase 1's
-  `MiddlewarePipeline`), and `ConversationAgent` checkpointing/`resume()`
-  (built on Phase 1's `Checkpointer[StateT]`). These pull forward two Phase 4
-  items below (guardrails, part of persistence); Phase 4 is updated to match.
-
-### Phase 3b - Tooling ecosystem (done)
-
-Independent of Phases 2/4: closes the "every tool is hand-registered Python"
-gap without changing the `Tool` protocol itself, so anything already
-implementing `Tool` (including a `workflows/` node) keeps working
-unmodified.
-
-- Per-tool resilience: `ToolRegistry.register(tool, *, timeout=None,
-  max_concurrency=None)`, enforced in `call_and_wrap`/`call_and_stream`
-  (`asyncio.wait_for` for `timeout`, an `asyncio.Semaphore` for
-  `max_concurrency`), both opt-in, reusing `core/resilience.py`'s spirit
-  (guarding a call site's traffic) without pulling `CircuitBreaker`/
-  `RateLimiter` themselves in, a single slow/runaway tool is a simpler
-  failure mode than the sustained-traffic one those guard against.
-- Generic plugin discovery: `ToolRegistry.discover_entry_points(group=
-  "agent_platform.tools")` loads `Tool` factories any installed package
-  exposes via `importlib.metadata` entry points, no registry code change
-  needed to pick up a new third-party tool package.
-- MCP interop, following the existing provider-inversion pattern (a tool
-  wraps a `core/interfaces/<domain>` ABC, never a concrete `integrations/`
-  class directly, see `TranscribeTool`/`BaseSpeechToText`):
-  - `core/schemas/mcp.py::MCPToolSpec` (name/description/raw JSON Schema)
-    and `core/interfaces/mcp/base.py::BaseMCPClient` (the only domain ABC
-    that owns connection lifecycle, `connect()`/`aclose()`, since an MCP
-    server is a stateful session, not a stateless per-call provider).
-  - `integrations/mcp/stdio/provider.py::StdioMCPClient` is the only file
-    that imports the third-party `mcp` SDK (optional `tools-mcp` extra),
-    per `integrations/README.md`'s "only integrations/ imports third-party
-    packages" rule.
-  - `agents/tools/mcp/adapter.py::MCPToolAdapter` and
-    `agents/tools/mcp/discovery.py::discover_mcp_tools()` depend only on
-    `BaseMCPClient`, so they import fine even without the `mcp` SDK
-    installed; only constructing a concrete `StdioMCPClient` needs the extra.
-  - Settings-driven wiring: `Settings.mcp_stdio_servers` (`{name: [command,
-    *args]}`, the same shape as Claude Desktop/VS Code's `mcpServers` config)
-    plus `config/container.py::build_agent_async()` - a separate async
-    entrypoint from the sync `build_agent()`, since connecting to an MCP
-    server is an async handshake and every other provider `build_agent`
-    resolves is synchronous. `api/app.py`'s lifespan calls it and closes
-    each returned client on shutdown; non-API callers (evals, scripts, most
-    tests) keep using the plain sync `build_agent()` and simply get no MCP
-    tools unless they opt into the async variant.
-
-### Phase 4 — Production hygiene / observability polish (done)
-
-Lower urgency than Phases 1-3; these round out tracing and resilience once the
-above landed.
-
-- ~~Attach `conversation_id`/`session_id` as a span attribute~~ **done**:
-  `AgentExecutor.run`/`run_with_messages`/`run_streaming` take an optional
-  `conversation_id` keyword and set it on the `AgentRun` observation when
-  given (omitted, not set to `None`, otherwise);
-  `ConversationAgent.chat()` and `api/app.py`'s `/chat`, `/chat/stream` routes
-  always pass theirs (`/chat/stream` uses a throwaway id per request), so a
-  multi-turn session's spans correlate without an external join.
-- ~~Rate limiter and circuit breaker utilities wired into an LLM call site~~
-  **done, for `CircuitBreaker`**: `core/interfaces/llm/fallback.py`'s
-  `FallbackLLMProvider` tries an ordered list of `BaseLLMProvider`s, each
-  behind its own `CircuitBreaker`, falling through to the next on failure - a
-  `BaseLLMProvider` itself, so `Agent(llm=...)` doesn't need to know it's
-  talking to more than one vendor. `config/container.py::build_agent` wires
-  it in when `Settings.fallback_llm_models` is non-empty; empty (the default)
-  skips the wrapper entirely. `RateLimiter` remains unwired, no call site
-  needed it yet.
-- ~~Cost/token attribution rollup~~ **done**: `Agent` takes an optional
-  `token_usage_aggregator`/`usage_key`, records `TokenUsage` after every
-  `_generate()` call and every `think_stream()` chunk that carries one, and
-  exposes the running total via `Agent.token_usage`. `ConversationAgent` uses
-  its own `conversation_id` as the key; `config/container.py::build_agent`
-  wires one in by default. `ConversationAgent.with_conversation()` gives each
-  fork its own aggregator, and `api/app.py`'s `/chat` route returns the
-  conversation's total as `ChatResponse.usage`.
-- ~~Guardrails as an extension point~~ **done**: see Phase 3 above
-  (`agents/guardrails.py`).
-- ~~`ConversationAgent` session persistence~~ **done**: see Phase 3 above
-  (`checkpointer` param, `ConversationAgent.resume()`).
+- **Tools wrap a `core/interfaces` ABC, never a concrete `integrations/` class** (`TranscribeTool` wraps `BaseSpeechToText`). MCP follows suit: `tools/mcp/` depends only on `BaseMCPClient`, so it imports without the `tools-mcp` extra; only `integrations/mcp/stdio/` imports the `mcp` SDK.
+- **MCP wiring is async.** Servers come from `Settings.mcp_stdio_servers` (`{name: [command, *args]}`). Connecting is an async handshake, so `config/container.py::build_agent_async()` sits beside the sync `build_agent()`: `api/app.py`'s lifespan calls it and closes each client on shutdown; other callers (evals, scripts, tests) use `build_agent()` and get no MCP tools.
+- **Per-tool `timeout`/`max_concurrency`, not `CircuitBreaker`/`RateLimiter`.** One slow or runaway tool is a per-call failure; those two guard a call site's sustained traffic. `RateLimiter` has no call site yet.
+- **LLM fallback is opt-in:** `build_agent` wraps the LLM in `FallbackLLMProvider` (see `core/README.md`) only when `Settings.fallback_llm_models` is non-empty.
+- **Token usage:** `ConversationAgent.with_conversation()` gives each fork its own `TokenUsageAggregator` (see `core/README.md`); `/chat` returns the conversation's total as `ChatResponse.usage`.
 
 ## Infrastructure notes
 
@@ -261,12 +101,11 @@ above landed.
   `TokenUsage` and `emit(ModelCost(...))` stamps it onto the enclosing span
   (the provider's own `chat` span is already closed by then). When several
   model calls share one `invoke_agent` span the attribute reports the latest.
-- **Streaming**, `Agent.think_from_stream()` and `AgentExecutor.run_streaming()`
-  emit the assistant's own text, not just tool-call deltas, once per accepted
-  model call (guardrails and the schema check run first); `/chat/stream`
-  exposes this over SSE. Note `/chat/stream` is single-turn (built directly on
-  `AgentExecutor`, not `ConversationAgent`): it does not read from or append
-  to a `ConversationAgent`'s persistent history the way `/chat` does.
+
+  `AgentExecutor.run`/`run_with_messages`/`run_streaming` take an optional
+  `conversation_id` and set it on the `AgentRun` observation;
+  `ConversationAgent.chat()` and both API chat routes always pass one, so a
+  session's spans correlate without an external join.
 
 ## Idempotent Tools and Partial History
 
@@ -287,7 +126,7 @@ async def run(self, **kwargs: Any) -> Any:
 
 ## Adding a New Tool
 
-1. Create `agents/tools/<name>.py`
+1. Create `agents/tools/<name>/tool.py`
 2. Define an `input_schema` class (Pydantic `BaseModel`)
 3. Implement the `Tool` protocol: set `name`, `description`, `input_schema`; implement `async run(**kwargs) -> Any`
 4. Wrap provider calls with `safe_call()` from `safe_execution.py` so errors surface as `ToolError`

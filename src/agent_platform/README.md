@@ -40,7 +40,7 @@ Near-zero external dependencies. Everything here is pure Python, `pydantic`, `ab
 |---|---|
 | `core/base.py` | `Entity` (UUID mixin), `Timestamped` |
 | `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends; `ModelConfig`, a `ProviderConfig` subclass adding `model: str` for model-backed domains (llm, embeddings, reranking, speech, image_generation); `RequestOptions`, a `ProviderConfig` subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs alongside `ModelConfig` (currently `llm`, `embeddings`, `moderation`) |
-| `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `RecoveryExhausted`, `AgentError`, `ToolError`. `PlatformError` carries `code`, `retryable`, `retry_after`, `context`. `retry.py`'s `with_retry(translate=)` turns each failed attempt into a `PlatformError` before the retry decision; non-LLM providers pass `integrations/sdk_errors.py::translate_sdk_error`. `LLMError` (under `ProviderError`) lives in `interfaces/llm/errors.py` |
+| `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `RecoveryExhausted`; each carries `code`, `retryable`, `retry_after`, `context`. Subtrees live elsewhere: `LLMError` in `interfaces/llm/errors.py`, `AgentError`/`ToolError` in `agents/`. `retry.py`'s `with_retry(translate=)` turns each failed attempt into a `PlatformError` before the retry decision; non-LLM providers pass `integrations/sdk_errors.py::translate_sdk_error` |
 | `core/credentials.py` | `Credentials` (secrets only, e.g. `api_key`), `ClientOptions` (non-secret construction-time transport settings: `base_url`, `timeout`, `max_retries`) |
 | `core/interfaces/tracing/` | Backend-agnostic tracing contract: `BaseTracer`, the `Span` protocol (`set_attribute()`, `record_error()`, `trace_id`, `span_id`), and the `NoOpTracer`/`NoOpSpan` default |
 | `core/observability/` | What call sites use: typed `Observation`s describing what the platform observed in its own vocabulary (`observations.py`: `LLMCall`, `ToolRun`, `AgentRun`, `GuardrailCheck`, `WorkflowNode`, `PipelineRun`, ...), the `Fact` annotation and `flatten()` that derive span attributes and payload policy from them (`facts.py`), the `observe()`/`emit()`/`current()` runtime, the tracer registry, opt-in payload capture, and `@traced`. No backend name appears here: `integrations/tracing/langfuse/mapping.py` maps the platform's vocabulary onto Langfuse fields |
@@ -66,21 +66,7 @@ All models are `pydantic.BaseModel`. Frozen where appropriate.
 
 ### `integrations/`: Service Adapters
 
-Each domain follows:
-
-```
-integrations/<domain>/
-├── __init__.py
-├── langchain_base.py    # Optional: LangChain intermediate abstract
-└── <provider>/
-    ├── __init__.py
-    ├── config.py        # Provider-specific Pydantic config
-    └── <provider>.py    # Concrete class implementing core/interfaces ABC
-```
-
-`loader/` uses `strategies/` instead of plain `<provider>/` subdirectories because each strategy handles a different media type rather than a different vendor.
-
-Each domain's `integrations/<domain>/__init__.py` re-exports its provider classes lazily via a module-level `__getattr__` (PEP 562) over a `_PROVIDERS: dict[class_name, module_path]` map, so callers get a flat import, `from agent_platform.integrations.llm import OpenAILLM`, without eagerly importing every provider's SDK (each class is only imported on first access). Add a new provider to a domain by adding one entry to that domain's `_PROVIDERS` map.
+One `integrations/<domain>/<provider>/` package per vendor, implementing that domain's `core/interfaces` ABC and re-exported lazily through the domain's `_PROVIDERS` map. Layout, conventions and how to add a provider or a domain: `integrations/README.md`.
 
 ### `components/`: Composable Units
 
@@ -99,7 +85,7 @@ Multi-step operations that chain components together. See `pipelines/README.md`.
 
 - `settings.py`, `Settings` (`pydantic-settings`, env prefix `AGENT_PLATFORM_`), `get_settings()` (`lru_cache`'d singleton; a malformed setting raises `ConfigError` naming the field and rule, never the value). Default provider selection for each of the three wired domains is a single `"<provider>:<model>"` string (`default_llm_model`, `default_image_model`, `default_audio_model`), parsed by `model_string.py::parse_model_string`
 - `model_string.py`, `parse_model_string(value)`, splits a `"<provider>:<model>"` string into `(provider, model)`; kept separate from `core/config.py`'s `ProviderConfig`/`ModelConfig` pydantic schemas since it's DI-wiring logic specific to `Settings`' model-string convention, not a schema those classes share
-- `container.py`, `build_provider(domain_module, provider_name)`, a generic factory that instantiates any `integrations.<domain>` provider. `provider_name` is resolved against that domain module's `PROVIDER_ALIASES` map first (a short slug, e.g. `"openai"` -> `"OpenAILLM"`), falling back to the literal exported class name (`getattr(domain_module, provider_name)()`) so an explicit class name still works; raises `ConfigError` if neither resolves. It reads no separate provider registry, the target domain's own `_PROVIDERS` + `PROVIDER_ALIASES` maps (see `integrations/` above) are already the source of truth for valid names
+- `container.py`, `build_provider(domain_module, provider_name)`, a generic factory that instantiates any `integrations.<domain>` provider. `provider_name` is resolved against that domain module's `PROVIDER_ALIASES` map first (a short slug, e.g. `"openai"` -> `"OpenAILLM"`), falling back to the literal exported class name (`getattr(domain_module, provider_name)()`) so an explicit class name still works; raises `ConfigError` if neither resolves. It reads no separate provider registry, the target domain's own `_PROVIDERS` + `PROVIDER_ALIASES` maps (see `integrations/README.md`) are already the source of truth for valid names
 - `container.py`, `build_provider_from_model_string(domain_module, model_string)`, combines `parse_model_string` + `build_provider`, returning `(provider_instance, model)`
 - `container.py`, `build_agent(settings)`, builds a `ConversationAgent` whose LLM, `GenerateImageTool`, and `TranscribeTool` (registered on its `ToolRegistry`) are all resolved this way from `settings.default_llm_model`/`default_image_model`/`default_audio_model`
 
@@ -114,29 +100,7 @@ Multi-step operations that chain components together. See `pipelines/README.md`.
 
 ## Extension Patterns
 
-### Add a new integration provider
-```
-integrations/<domain>/<new_provider>/
-├── __init__.py
-├── config.py
-└── <new_provider>.py   # implements core/interfaces/<domain>/base.py ABC
-```
-
-### Add a new LLM provider (native SDK)
-```python
-class MyLLM(BaseLLMProvider[MyGenerationConfig]):
-    def _client(self, config: MyGenerationConfig) -> SomeVendorClient:
-        return SomeVendorClient(api_key=..., **_to_native_params(config))
-```
-
-`llm`, `embeddings`, `vector_store`, and `reranking` providers each call their
-vendor's native SDK or REST endpoint directly, no shared LangChain wrapper.
-Only `chunking` still has an optional `langchain_base.py`, wrapping
-`langchain-text-splitters` (see `integrations/README.md`).
-
-### Add a new integration domain
-1. Create the ABC in `core/interfaces/<domain>/` (see `core/README.md`)
-2. Create `integrations/<domain>/<first_provider>/` and implement the ABC
+Recipes for providers, domains, components and tools live in their directory's README (routing table: `AGENTS.md` §5). The one cross-layer recipe is here:
 
 ### Wire a new provider domain into `Settings`/DI
 
