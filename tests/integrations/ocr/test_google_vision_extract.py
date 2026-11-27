@@ -5,6 +5,8 @@ import pytest
 
 pytest.importorskip("google.cloud")
 
+from google.cloud import vision
+
 from agent_platform.core.errors import ProviderError
 from agent_platform.integrations.ocr.google_vision.config import GoogleVisionConfig
 from agent_platform.integrations.ocr.google_vision.provider import GoogleVisionOCR
@@ -25,7 +27,21 @@ def _make_response(words_per_paragraph):
     full_text_annotation.pages = [page]
     response = MagicMock()
     response.full_text_annotation = full_text_annotation
+    response.error.code = 0
     return response
+
+
+def _patch_vision_call(mocker, response):
+    mocker.patch(
+        "agent_platform.integrations.ocr.google_vision.provider.vision.ImageAnnotatorClient",
+        return_value=MagicMock(),
+    )
+    return mocker.patch(
+        "agent_platform.integrations.ocr.google_vision.provider.asyncio.to_thread",
+        side_effect=lambda fn, *args, **kwargs: (
+            b"fake-bytes" if fn is load_bytes else response
+        ),
+    )
 
 
 def _make_word(text, confidence):
@@ -92,6 +108,7 @@ async def test_extract_no_pages_returns_empty(mocker):
     full_text_annotation.pages = []
     response = MagicMock()
     response.full_text_annotation = full_text_annotation
+    response.error.code = 0
 
     ocr = GoogleVisionOCR()
     mocker.patch(
@@ -151,6 +168,34 @@ async def test_extract_raises_on_api_error(mocker):
     )
     with pytest.raises(ProviderError, match="API error occurred"):
         await ocr.extract("http://example.com/img.jpg")
+
+
+async def test_extract_raises_when_response_carries_an_error(mocker):
+    response = vision.AnnotateImageResponse(
+        error={"code": 3, "message": "Bad image data."}
+    )
+    to_thread = _patch_vision_call(mocker, response)
+
+    with pytest.raises(ProviderError, match="Bad image data.") as excinfo:
+        await GoogleVisionOCR().extract("http://example.com/img.jpg")
+
+    assert excinfo.value.code == "provider_bad_request"
+    assert excinfo.value.retryable is False
+    assert to_thread.call_count == 2
+
+
+async def test_extract_retries_a_transient_response_error(mocker):
+    response = vision.AnnotateImageResponse(
+        error={"code": 14, "message": "Service unavailable."}
+    )
+    mocker.patch("agent_platform.core.retry.asyncio.sleep")
+    to_thread = _patch_vision_call(mocker, response)
+
+    with pytest.raises(ProviderError) as excinfo:
+        await GoogleVisionOCR().extract("http://example.com/img.jpg")
+
+    assert excinfo.value.code == "provider_unavailable"
+    assert to_thread.call_count == 6
 
 
 async def test_extract_forwards_language_hints_and_uses_document_text_detection(

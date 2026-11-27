@@ -4,6 +4,7 @@ from collections.abc import Sequence
 from typing import Any
 from uuid import UUID, uuid4
 
+from google.api_core import exceptions as api_exceptions
 from google.cloud import vision
 
 from agent_platform.core.credentials import (
@@ -91,6 +92,12 @@ class GoogleVisionOCR(BaseOCR[GoogleVisionConfig]):
             else client.document_text_detection
         )
         response = await asyncio.to_thread(method, **kwargs)
+        # A failed annotation comes back as a normal response with `error` set,
+        # not as a raised RPC error.
+        if response.error.code:
+            raise api_exceptions.from_grpc_status(
+                response.error.code, response.error.message
+            )
 
         return from_google_vision(
             response, document_id=doc_id, min_confidence=config.min_confidence

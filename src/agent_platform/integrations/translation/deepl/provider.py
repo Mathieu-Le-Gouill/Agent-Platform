@@ -22,8 +22,11 @@ from agent_platform.integrations.translation._base import (
 )
 from agent_platform.integrations.translation.deepl.config import DeepLConfig
 
+# The SDK rejects the bare "EN" and "PT" targets, so each gets the variant CLDR
+# picks for the bare code. Source languages take the bare code only.
 _DEEPL_TARGETS: dict[Language, str] = {
     Language.EN: "EN-US",
+    Language.PO: "PT-BR",
 }
 
 # The platform's `with_retry` is the only retry layer. This setting is a
@@ -77,7 +80,7 @@ class DeepLTranslator(NativeTranslator[DeepLConfig, deepl.Translator]):
         config: DeepLConfig,
     ) -> TextChunk:
         target_lang = _DEEPL_TARGETS.get(target, target.value)
-        source_lang = _DEEPL_TARGETS.get(source) if source else None
+        source_lang = source.value.upper() if source else None
 
         extra_kwargs: dict[str, Any] = {}
         if config.formality is not None:

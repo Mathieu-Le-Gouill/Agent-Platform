@@ -72,6 +72,66 @@ class TestDeepLTranslator:
         assert kwargs["target_lang"] == "EN-US"
         assert "formality" not in kwargs
 
+    @pytest.mark.parametrize(
+        ("target", "expected"),
+        [(Language.EN, "EN-US"), (Language.PO, "PT-BR"), (Language.FR, "FR")],
+    )
+    def test_target_lang_sent_is_accepted_by_the_sdk(self, mocker, target, expected):
+        api_call = mocker.patch.object(
+            deepl.Translator,
+            "_api_call",
+            return_value=(200, "", self._TRANSLATE_RESPONSE),
+        )
+
+        translator = DeepLTranslator(_deepl_credentials())
+        result = translator.translate(TextChunk(text="Hi", metadata={}), target=target)
+
+        assert result.text == "Olá"
+        assert api_call.call_args.kwargs["json"]["target_lang"] == expected
+
+    @pytest.mark.parametrize(
+        ("source", "expected"),
+        [(Language.EN, "EN"), (Language.FR, "FR"), (Language.PO, "PT")],
+    )
+    def test_source_lang_is_sent_as_base_code(self, mocker, source, expected):
+        api_call = mocker.patch.object(
+            deepl.Translator,
+            "_api_call",
+            return_value=(200, "", self._TRANSLATE_RESPONSE),
+        )
+
+        translator = DeepLTranslator(_deepl_credentials())
+        translator.translate(
+            TextChunk(text="Hi", metadata={}), target=Language.GE, source=source
+        )
+
+        assert api_call.call_args.kwargs["json"]["source_lang"] == expected
+
+    def test_glossary_with_non_english_source_reaches_the_api(self, mocker):
+        api_call = mocker.patch.object(
+            deepl.Translator,
+            "_api_call",
+            return_value=(200, "", self._TRANSLATE_RESPONSE),
+        )
+
+        translator = DeepLTranslator(_deepl_credentials())
+        translator.translate(
+            TextChunk(text="Salut", metadata={}),
+            target=Language.EN,
+            source=Language.FR,
+            config=DeepLConfig(glossary_id="glossary-123"),
+        )
+
+        sent = api_call.call_args.kwargs["json"]
+        assert sent["source_lang"] == "FR"
+        assert sent["glossary_id"] == "glossary-123"
+
+    _TRANSLATE_RESPONSE = {
+        "translations": [
+            {"text": "Olá", "detected_source_language": "EN", "billed_characters": 2}
+        ]
+    }
+
     def test_client_is_cached_across_calls(self, mocker):
         content = TextChunk(text="Hi", metadata={})
         mock_result = MagicMock(spec=["text", "detected_source_lang"])

@@ -23,8 +23,11 @@ class _FakeSession:
                         "required": ["text"],
                     },
                 )
-            ]
+            ],
+            next_cursor=None,
         )
+        self.list_tools_pages: dict[str | None, SimpleNamespace] | None = None
+        self.list_tools_cursors: list[str | None] = []
         self.call_tool_result = SimpleNamespace(
             content=[SimpleNamespace(text="hello")], is_error=False
         )
@@ -32,11 +35,24 @@ class _FakeSession:
     async def initialize(self) -> None:
         self.initialized = True
 
-    async def list_tools(self):
+    async def list_tools(self, *, params=None):
+        self.list_tools_cursors.append(params.cursor if params else None)
+        if self.list_tools_pages is not None:
+            return self.list_tools_pages[params.cursor if params else None]
         return self.list_tools_result
 
     async def call_tool(self, name, arguments):
         return self.call_tool_result
+
+
+def _tools_page(names, next_cursor):
+    return SimpleNamespace(
+        tools=[
+            SimpleNamespace(name=name, description=None, input_schema={})
+            for name in names
+        ],
+        next_cursor=next_cursor,
+    )
 
 
 @pytest.fixture
@@ -88,6 +104,32 @@ class TestStdioMCPClient:
         assert specs[0].name == "echo"
         assert specs[0].description == "Echoes input"
         assert specs[0].input_schema["required"] == ["text"]
+
+    @pytest.mark.asyncio
+    async def test_list_tools_follows_next_cursor_to_the_last_page(
+        self, client, fake_session
+    ):
+        fake_session.list_tools_pages = {
+            None: _tools_page(["a", "b"], next_cursor="page-2"),
+            "page-2": _tools_page(["c"], next_cursor="page-3"),
+            "page-3": _tools_page(["d"], next_cursor=None),
+        }
+        async with client:
+            specs = await client.list_tools()
+        assert [spec.name for spec in specs] == ["a", "b", "c", "d"]
+        assert fake_session.list_tools_cursors == [None, "page-2", "page-3"]
+
+    @pytest.mark.asyncio
+    async def test_list_tools_raises_when_server_repeats_a_cursor(
+        self, client, fake_session
+    ):
+        fake_session.list_tools_pages = {
+            None: _tools_page(["a"], next_cursor="loop"),
+            "loop": _tools_page(["b"], next_cursor="loop"),
+        }
+        async with client:
+            with pytest.raises(ProviderError, match="repeated cursor"):
+                await client.list_tools()
 
     @pytest.mark.asyncio
     async def test_call_tool_returns_text(self, client):

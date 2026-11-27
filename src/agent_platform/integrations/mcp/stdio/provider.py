@@ -5,6 +5,7 @@ from typing import Any
 
 from mcp import ClientSession, StdioServerParameters
 from mcp.client.stdio import stdio_client
+from mcp.types import PaginatedRequestParams
 
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.mcp.base import BaseMCPClient
@@ -62,15 +63,28 @@ class StdioMCPClient(BaseMCPClient[MCPClientConfig]):
         self, config: MCPClientConfig | None = None
     ) -> list[MCPToolSpec]:
         session = self._require_session()
-        result = await session.list_tools()
-        return [
-            MCPToolSpec(
-                name=tool.name,
-                description=tool.description or "",
-                input_schema=tool.input_schema,
+        specs: list[MCPToolSpec] = []
+        seen_cursors: set[str] = set()
+        params: PaginatedRequestParams | None = None
+        while True:
+            result = await session.list_tools(params=params)
+            specs.extend(
+                MCPToolSpec(
+                    name=tool.name,
+                    description=tool.description or "",
+                    input_schema=tool.input_schema,
+                )
+                for tool in result.tools
             )
-            for tool in result.tools
-        ]
+            cursor = result.next_cursor
+            if cursor is None:
+                return specs
+            if cursor in seen_cursors:
+                raise ProviderError(
+                    f"MCP server returned a repeated cursor in tools/list: {cursor!r}"
+                )
+            seen_cursors.add(cursor)
+            params = PaginatedRequestParams(cursor=cursor)
 
     async def call_tool(
         self,
