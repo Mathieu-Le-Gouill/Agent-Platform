@@ -71,9 +71,12 @@ def test_detect_with_speech(mocker):
         ),
     ]
 
-    result = vad.detect(chunks)
+    # 2 x 18.75 ms of speech then 9.375 ms of silence at 16 kHz
+    config = TenVadConfig(min_speech_duration_ms=37, min_silence_duration_ms=9)
+
+    result = vad.detect(chunks, config)
     assert len(result) == 1
-    assert result[0] == SampleSpan(start=0, end=630)
+    assert result[0] == SampleSpan(start=0, end=600 + 480)  # 30 ms pad
 
 
 def test_is_speech_above_threshold(mocker):
@@ -161,9 +164,12 @@ async def test_adetect_async_flow(mocker):
             dtype=DataType.INT16,
         )
 
-    results = [span async for span in vad.adetect(_gen())]
+    # 18.75 ms of speech then 9.375 ms of silence at 16 kHz
+    config = TenVadConfig(min_speech_duration_ms=18, min_silence_duration_ms=9)
+
+    results = [span async for span in vad.adetect(_gen(), config)]
     assert len(results) == 1
-    assert results[0] == SampleSpan(start=0, end=330)
+    assert results[0] == SampleSpan(start=0, end=300 + 480)  # 30 ms pad
 
 
 def test_detect_empty_returns_empty(mocker):

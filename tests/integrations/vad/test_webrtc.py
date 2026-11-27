@@ -86,10 +86,12 @@ def test_detect_with_speech_spans(mocker):
         _chunk(480, 480),
         _chunk(160, 960),
     ]
+    # 60 ms of speech then 10 ms of silence at 16 kHz
+    config = WebrtcVadConfig(min_speech_duration_ms=60, min_silence_duration_ms=10)
 
-    result = vad.detect(chunks)
+    result = vad.detect(chunks, config)
     assert len(result) == 1
-    assert result[0] == SampleSpan(start=0, end=990)
+    assert result[0] == SampleSpan(start=0, end=960 + 480)  # 30 ms pad
     mock_vad.set_mode.assert_called_once_with(1)
 
 
@@ -212,9 +214,12 @@ async def test_adetect_yields_span(mocker):
         yield _chunk(480, 0)
         yield _chunk(160, 480)
 
-    results = [span async for span in vad.adetect(_gen())]
+    # 30 ms of speech then 10 ms of silence at 16 kHz
+    config = WebrtcVadConfig(min_speech_duration_ms=30, min_silence_duration_ms=10)
+
+    results = [span async for span in vad.adetect(_gen(), config)]
     assert len(results) == 1
-    assert results[0] == SampleSpan(start=0, end=510)
+    assert results[0] == SampleSpan(start=0, end=480 + 480)  # 30 ms pad
 
 
 async def test_adetect_validate_chunk_raises(mocker):

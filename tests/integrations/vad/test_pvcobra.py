@@ -143,8 +143,10 @@ def test_detect_with_speech_spans(mocker):
         _chunk(FRAME_LENGTH, FRAME_LENGTH),
         _chunk(FRAME_LENGTH, 2 * FRAME_LENGTH),
     ]
+    # 64 ms of speech then 32 ms of silence at 16 kHz
+    config = PvcobraVadConfig(min_speech_duration_ms=64, min_silence_duration_ms=32)
 
-    result = vad.detect(chunks)
+    result = vad.detect(chunks, config)
     assert len(result) == 1
 
 
@@ -343,7 +345,10 @@ async def test_adetect_yields_span(mocker):
         yield _chunk(FRAME_LENGTH, 0)
         yield _chunk(FRAME_LENGTH, FRAME_LENGTH)
 
-    results = [span async for span in vad.adetect(_gen())]
+    # 32 ms of speech then 32 ms of silence at 16 kHz
+    config = PvcobraVadConfig(min_speech_duration_ms=32, min_silence_duration_ms=32)
+
+    results = [span async for span in vad.adetect(_gen(), config)]
     assert len(results) == 1
 
 

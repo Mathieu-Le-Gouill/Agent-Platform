@@ -32,7 +32,7 @@ src/agent_platform/
 ├── pipelines/         # Multi-step orchestration flows
 ├── agents/            # LLM reasoning loop, tool registry, conversation management
 ├── workflows/         # Multi-agent orchestration: typed-state graph, agent/tool/handoff nodes, checkpointing
-├── evals/             # Regression testing: EvalRunner, EvalDataset, Scorer, agent-platform-eval CLI
+├── evals/             # Regression testing: EvalCase, EvalRunner, Scorer, EvalReport, agent-platform-eval CLI
 ├── audio/             # Audio I/O + DSP utilities
 ├── utils/             # Shared helpers
 ├── config/            # Settings (pydantic-settings), logging, DI container (build_agent, build_provider)
@@ -43,8 +43,8 @@ src/agent_platform/
 
 | Domain | Providers |
 |---|---|
-| LLM | OpenAI, Anthropic, Mistral, Ollama, HuggingFace |
-| Embeddings | OpenAI, Mistral, Ollama, HuggingFace |
+| LLM | OpenAI, Anthropic, Mistral, Ollama, HuggingFace, Google |
+| Embeddings | OpenAI, Mistral, Ollama, HuggingFace, Google, BM25 (sparse) |
 | Vector Store | Chroma, FAISS, Pinecone, Qdrant, Weaviate |
 | OCR | Tesseract, Google Vision, AWS Textract, Mistral |
 | Speech-to-Text | WhisperX, Faster-Whisper, Deepgram, OpenAI |
@@ -56,6 +56,10 @@ src/agent_platform/
 | Loader | Unstructured, PIL, PyAV, SoundFile |
 | Image Generation | DALL-E, Stable Diffusion |
 | Classification | Transformers (zero-shot) |
+| Moderation | OpenAI, Local |
+| Dataset | HuggingFace |
+| MCP | stdio client |
+| Tracing | Langfuse |
 
 ## Setup
 
@@ -75,7 +79,7 @@ uv run --extra dev --extra llm pytest -v
 uv run --extra dev --extra all pytest -v
 ```
 
-Extras are named `<domain>-<provider>` (e.g. `stt-whisperx`, `ocr-tesseract`); see `pyproject.toml` for the full list. Requires Python 3.11. Some providers have system dependencies (Tesseract, CUDA for WhisperX). No `uv` installed? `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"` also works, but ignores `uv.lock` and installs the newest versions `pyproject.toml` allows, so it can differ from CI and the Docker image.
+Extras are named `<domain>-<provider>` (e.g. `stt-whisperx`, `ocr-tesseract`); see `pyproject.toml` for the full list. Requires Python 3.11 or 3.12. Some providers have system dependencies (Tesseract, CUDA for WhisperX). No `uv` installed? `python -m venv .venv && source .venv/bin/activate && pip install -e ".[dev]"` also works, but ignores `uv.lock` and installs the newest versions `pyproject.toml` allows, so it can differ from CI and the Docker image.
 
 ## Development
 
@@ -84,10 +88,10 @@ Extras are named `<domain>-<provider>` (e.g. `stt-whisperx`, `ocr-tesseract`); s
 uv run pytest -v
 
 # Run a specific test
-uv run pytest -v tests/agents/test_executor.py::test_max_iterations
+uv run pytest -v tests/agents/test_executor.py::TestExecutorConstruction::test_default_max_iterations
 
 # Lint
-uv run ruff check src/
+uv run ruff check .
 ```
 
 ### Git hooks
@@ -107,7 +111,7 @@ Regression testing for agents/pipelines lives in `evals/`, run via the
 `OPENAI_API_KEY`, so it's separate from the mocked `pytest` suite):
 
 ```bash
-uv run --extra llm-openai --extra dev agent-platform-eval \
+uv run --extra llm-openai --extra evals --extra dev agent-platform-eval \
     src/agent_platform/evals/datasets/conversation_tool_selection.jsonl \
     --provider OpenAILLM --scorer tool-selection --threshold 0.7
 ```

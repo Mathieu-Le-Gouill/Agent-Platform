@@ -8,8 +8,10 @@ pytest.importorskip("webrtcvad")
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.enums import DataType
 from agent_platform.core.schemas.span import SampleSpan
+from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
 from agent_platform.integrations.vad.silero.config import SileroVadConfig
 from agent_platform.integrations.vad.ten.config import TenVadConfig
+from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
 
 _HAS_TEN_VAD = True
 try:
@@ -53,9 +55,12 @@ async def test_webrtc_adetect_yields_span(mocker):
         yield _int16_chunk(480, 480)
         yield _int16_chunk(160, 960)
 
-    results = [span async for span in vad.adetect(_gen())]
+    # 60 ms of speech then 10 ms of silence at 16 kHz
+    config = WebrtcVadConfig(min_speech_duration_ms=60, min_silence_duration_ms=10)
+
+    results = [span async for span in vad.adetect(_gen(), config)]
     assert len(results) == 1
-    assert results[0] == SampleSpan(start=0, end=990)
+    assert results[0] == SampleSpan(start=0, end=960 + 480)  # 30 ms pad
 
 
 async def test_webrtc_adetect_all_silence(mocker):
@@ -98,7 +103,10 @@ async def test_pvcobra_adetect_yields_span(mocker):
         yield _int16_chunk(512, 0)
         yield _int16_chunk(512, 512)
 
-    results = [span async for span in vad.adetect(_gen())]
+    # 32 ms of speech then 32 ms of silence at 16 kHz
+    config = PvcobraVadConfig(min_speech_duration_ms=32, min_silence_duration_ms=32)
+
+    results = [span async for span in vad.adetect(_gen(), config)]
     assert len(results) == 1
 
 

@@ -28,4 +28,4 @@ class RequestOptions(ProviderConfig):
     # `max_retries`. Domain configs for network-bound providers mix this in
     # alongside ModelConfig/ProviderConfig.
     timeout: float | None = None
-    max_retries: int | None = None
+    max_retries: int | None = Field(default=None, ge=0)

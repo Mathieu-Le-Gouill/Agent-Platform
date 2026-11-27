@@ -2,7 +2,7 @@ from __future__ import annotations
 
 from typing import TypeVar
 
-from pydantic import BaseModel, ConfigDict, SecretStr
+from pydantic import BaseModel, ConfigDict, Field, SecretStr
 
 
 class Credentials(BaseModel, frozen=True):
@@ -16,7 +16,7 @@ class ClientOptions(BaseModel, frozen=True):
 
     base_url: str | None = None
     timeout: float | None = None
-    max_retries: int = 3
+    max_retries: int = Field(default=3, ge=0)
 
 
 # --- Utils ---

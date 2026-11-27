@@ -51,11 +51,11 @@ def config():
     )
 
 
-def _chunk(start: int, end: int) -> AudioChunk:
+def _chunk(start: int, end: int, sample_rate: int = 1000) -> AudioChunk:
     return AudioChunk(
         id=uuid4(),
         data=b"\x00\x80",
-        sample_rate=16000,
+        sample_rate=sample_rate,
         start=start,
         end=end,
         channels=1,
@@ -174,3 +174,34 @@ def test_on_silence_resets_silence_on_subsequent_not_in_speech(vad, config):
     result = vad._on_silence(state, chunk2, config)
     assert result is None
     assert state.silence_ms == 0
+
+
+# --- sample offsets vs milliseconds ---
+
+
+def test_on_speech_counts_milliseconds_not_samples_at_16khz(vad, config):
+    state = VADState()
+    vad._on_speech(state, _chunk(0, 512, sample_rate=16000), config)
+    assert state.speech_ms == 32
+
+
+def test_on_speech_accumulates_fractional_ms_without_drift(vad, config):
+    state = VADState()
+    for i in range(100):
+        vad._on_speech(state, _chunk(i * 300, (i + 1) * 300, sample_rate=16000), config)
+    assert state.speech_ms == pytest.approx(1875)  # 100 x 18.75 ms
+
+
+def test_on_speech_pads_backward_in_samples_at_16khz(vad, config):
+    state = VADState(last_speech_end=8000)
+    vad._on_speech(state, _chunk(16000, 16512, sample_rate=16000), config)
+    assert state.segment_start == 16000 - 480  # 30 ms at 16 kHz
+
+
+def test_on_silence_counts_milliseconds_and_pads_end_in_samples_at_8khz(vad, config):
+    state = VADState(in_speech=True, speech_ms=300, segment_start=0)
+    first = vad._on_silence(state, _chunk(8000, 8400, sample_rate=8000), config)
+    assert first is None
+    assert state.silence_ms == 50
+    span = vad._on_silence(state, _chunk(8400, 8800, sample_rate=8000), config)
+    assert span == SampleSpan(start=0, end=8400 + 240)  # 30 ms at 8 kHz

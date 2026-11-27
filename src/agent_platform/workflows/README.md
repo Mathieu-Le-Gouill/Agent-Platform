@@ -28,7 +28,8 @@ workflows/
     ├── agent_node.py  # agent_node(agent) -> NodeFn, adapts an Agent's think-act loop
     ├── tool_node.py   # tool_node(tool, input_fn, output_fn) -> NodeFn, deterministic step
     ├── router.py      # binary_router(predicate) -> Router, yes/no conditional edges
-    └── handoff.py     # handoff_node(agent) -> NodeFn, multi-agent delegation
+    ├── handoff.py     # handoff_node(agent) -> NodeFn, multi-agent delegation
+    └── fan_out.py     # fan_out(branches, merge) -> NodeFn, concurrent branches merged into one state
 ```
 
 ## Implemented
@@ -45,6 +46,7 @@ workflows/
 | `tool_node(tool, *, input_fn, output_fn)` | `nodes/tool_node.py` | Deterministic (no LLM) step: `input_fn` extracts the tool's kwargs from state, `output_fn` folds the `ToolMessage` back in. Runs through a private single-tool `ToolRegistry` so argument validation/timeout/error-wrapping match `Agent.act()`, rather than calling `tool.run()` directly. The call id, which the tool reads as `current_tool_call().idempotency_key`, is `run_id:node:step[:branch]:n` (`n` counts the node run's calls), the same on `resume`, so a tool can skip work a crashed run already did; without a `run_id` it is a random `uuid4`. A tool the model calls inside an `agent_node` gets no such stable key: the model's call ids change when a resumed node asks again |
 | `binary_router(predicate)` | `nodes/router.py` | Wraps a boolean predicate into a `Router` for the common yes/no conditional edge (`TRUE`/`FALSE` path-map keys) |
 | `handoff_node(agent, *, max_iterations=10)` | `nodes/handoff.py` | Built directly on `agent_node`: hands control to a different agent, sharing `state.messages`, and stamps `state.active_agent` afterward, plus `workflow.handoff.to` onto the enclosing node span so a trace names the receiving agent |
+| `fan_out(branches, merge)` | `nodes/fan_out.py` | A `NodeFn` combinator: runs `(name, node)` branches concurrently (`asyncio.gather`) over the same incoming state, each in its own `WorkflowNode` span and step context, then folds the results with `merge(state, results)` |
 
 ### Error Types (`workflows/errors.py`)
 
@@ -59,7 +61,7 @@ WorkflowError
 
 ```python
 from agent_platform.workflows import END, MessagesState, WorkflowGraph
-from agent_platform.workflows.nodes import agent_node, binary_router
+from agent_platform.workflows.nodes import FALSE, TRUE, agent_node, binary_router
 
 class TriageState(MessagesState):
     escalate: bool = False
@@ -71,7 +73,7 @@ graph.set_entry_point("first_line")
 graph.add_conditional_edges(
     "first_line",
     binary_router(lambda s: s.escalate),
-    {"true": "specialist", "false": END},
+    {TRUE: "specialist", FALSE: END},
 )
 graph.add_edge("specialist", END)
 
@@ -87,6 +89,6 @@ and a `run_id` to `arun()`; an interrupted run continues via
 
 ## What's Left to Build
 
-- No parallel fan-out/fan-in (running multiple nodes concurrently from one
-  state and merging results back); today's graph is a strict DAG walked one
-  node at a time.
+- No graph-level parallel edges: the engine walks one node at a time.
+  Concurrency exists only inside a node, through the `fan_out` combinator,
+  whose branches are not graph nodes (no edges or checkpoint of their own).

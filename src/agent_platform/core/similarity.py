@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import math
 
+from agent_platform.core.errors import ValidationError
 from agent_platform.core.schemas.enums import SimilarityMetric
 
 __all__ = ["compute_similarity", "similarity_bounds"]
@@ -11,7 +12,7 @@ def _cosine(a: list[float], b: list[float]) -> float:
     dot = 0.0
     norm_a = 0.0
     norm_b = 0.0
-    for x, y in zip(a, b):
+    for x, y in zip(a, b, strict=True):
         dot += x * y
         norm_a += x * x
         norm_b += y * y
@@ -22,17 +23,17 @@ def _cosine(a: list[float], b: list[float]) -> float:
 
 
 def _dot(a: list[float], b: list[float]) -> float:
-    return sum(x * y for x, y in zip(a, b))
+    return sum(x * y for x, y in zip(a, b, strict=True))
 
 
 def _euclidean(a: list[float], b: list[float]) -> float:
     # inverted so a distance metric becomes a bounded (0, 1] similarity score
-    distance = math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b)))
+    distance = math.sqrt(sum((x - y) ** 2 for x, y in zip(a, b, strict=True)))
     return 1.0 / (1.0 + distance)
 
 
 def _manhattan(a: list[float], b: list[float]) -> float:
-    distance = sum(abs(x - y) for x, y in zip(a, b))
+    distance = sum(abs(x - y) for x, y in zip(a, b, strict=True))
     return 1.0 / (1.0 + distance)
 
 
@@ -54,6 +55,10 @@ _METRIC_BOUNDS = {
 def compute_similarity(
     a: list[float], b: list[float], metric: SimilarityMetric = SimilarityMetric.COSINE
 ) -> float:
+    if len(a) != len(b):
+        raise ValidationError(
+            f"Cannot compare vectors of different lengths: {len(a)} and {len(b)}"
+        )
     return _METRIC_FUNCS[metric](a, b)
 
 

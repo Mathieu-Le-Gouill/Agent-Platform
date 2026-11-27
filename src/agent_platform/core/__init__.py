@@ -8,7 +8,6 @@ from agent_platform.core.errors import (
     PlatformError,
     ProviderError,
     ValidationError,
-    catch_noraise,
     error_logged,
 )
 from agent_platform.core.retry import retry_async, retry_sync, with_retry
@@ -79,7 +78,6 @@ __all__ = [
     "with_retry",
     "retry_async",
     "retry_sync",
-    "catch_noraise",
     "ClientOptions",
     "Credentials",
     "Document",

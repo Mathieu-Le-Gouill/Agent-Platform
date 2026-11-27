@@ -40,6 +40,7 @@ core/
 │   ├── loader/
 │   ├── image_generation/
 │   ├── dataset/
+│   ├── moderation/
 │   ├── tracing/      # BaseTracer + Span protocol + NoOpTracer default (see below),
 │   │                   #   the one domain whose "no provider installed" case is a
 │   │                   #   usable implementation rather than an error
@@ -57,6 +58,9 @@ core/
     ├── message.py
     ├── conversation.py
     ├── mcp.py        # MCPToolSpec: one MCP server tool's name/description/raw JSON Schema
+    ├── bounding_box.py
+    ├── dimensions.py
+    ├── vector.py     # SparseVector
     └── enums.py
 ```
 
@@ -68,16 +72,18 @@ Each subdirectory follows a fixed pattern (example: `interfaces/llm/`):
 interfaces/<domain>/
 ├── base.py           # ABC (e.g. BaseLLMProvider) with abstract async methods
 ├── config.py         # Pydantic config model for the domain
-└── response.py       # Pydantic response model(s)
+└── response.py       # Pydantic response model(s), only in domains that define their own (llm, embeddings, classification, clustering, moderation)
 ```
 
-`interfaces/llm/` has one file beyond that fixed pattern: `fallback.py`'s `FallbackLLMProvider` (+ `FallbackEntry`), a `BaseLLMProvider` implementation that tries an ordered list of other `BaseLLMProvider`s, one `CircuitBreaker` per entry, falling through to the next on every failure, though only a retryable one counts against that entry's circuit (see `resilience.py` below). It belongs here rather than in `integrations/` because it composes the ABC generically and imports no vendor SDK, same rule as everything else in `interfaces/`.
+`interfaces/tracing/` has no `config.py` (see below).
+
+`interfaces/llm/` has five files beyond that fixed pattern: `batch.py` (`BaseBatchLLMProvider`, the async batch submit/poll/fetch mixin), `errors.py` (the `LLMError` subtree), `structured.py` and `tool_spec.py` (both below), and `fallback.py`'s `FallbackLLMProvider` (+ `FallbackEntry`), a `BaseLLMProvider` implementation that tries an ordered list of other `BaseLLMProvider`s, one `CircuitBreaker` per entry, falling through to the next on every failure, though only a retryable one counts against that entry's circuit (see `resilience.py` below). It belongs here rather than in `integrations/` because it composes the ABC generically and imports no vendor SDK, same rule as everything else in `interfaces/`.
 
 `interfaces/llm/structured.py` holds `generate_structured(llm, prompt, output_type, config)`: it asks for the JSON schema of a `BaseModel` (or plain text for `str`), validates the answer, and re-asks once through `retry_once_on_invalid`. It returns a `StructuredResult` (`output`, `usage` summed over every attempt, `response` of the accepted attempt) or raises `StructuredOutputError`. `Agent` reuses its `schema_config`, `schema_error` and `schema_correction` functions; `components/generation/llm_task/` builds on it.
 
 `interfaces/llm/tool_spec.py` holds `ToolSpec`, the read-only `Protocol` (`name`, `description`, `input_schema`) that the `tools: Sequence[ToolSpec] | None` parameter of `BaseLLMProvider` takes: all an adapter needs to declare a tool to the model. `agents/tools/base.py::Tool` satisfies it structurally, so neither `core/` nor `integrations/` imports `agents/`, not even under `TYPE_CHECKING` (import-linter counts those imports, `exclude_type_checking_imports = false`).
 
-An interface ABC **never imports from any layer above `core/`** (`integrations/` through `evals/`). It may only use `core/schemas/`, `core/config.py`, `core/errors.py`, and `core/credentials.py`. Every domain's `config.py` defines a `<Domain>Config` that extends `core/config.py`'s `ProviderConfig`, the shared base for all provider configs. Domains whose providers are parameterized by a model id (llm, embeddings, reranking, speech, image_generation) extend `ModelConfig` instead, which adds `model: str` on top of `ProviderConfig`; domains without a model concept (loader, chunking, clustering, vad, ocr, translation, classification, vector_store, dataset) extend `ProviderConfig` directly.
+An interface ABC **never imports from any layer above `core/`** (`integrations/` through `evals/`). It may only use `core/schemas/`, `core/config.py`, `core/errors.py`, and `core/credentials.py`. Every domain's `config.py` defines a `<Domain>Config` that extends `core/config.py`'s `ProviderConfig`, the shared base for all provider configs. Domains whose providers are parameterized by a model id (llm, embeddings, reranking, speech, image_generation) extend `ModelConfig` instead, which adds `model: str` on top of `ProviderConfig`; domains without a model concept extend `ProviderConfig` directly (loader, chunking, clustering, vad, classification, dataset) or through `RequestOptions` when they are network-bound (ocr, translation, vector_store, moderation, mcp). Model-backed domains mix in `RequestOptions` as well.
 
 **Where a field belongs:** put it on the shared `<Domain>Config` only if almost every provider in the domain actually uses it. If just one or two do, it belongs on that provider's own `config.py` instead (e.g. `max_samples` lives on `SileroVadConfig`, not `VADConfig`, since only Silero needs it). Fields no provider uses get deleted, not kept around. One exception: a field a cross-cutting caller sets regardless of backend (`OCRConfig.min_confidence`) can stay on the shared config even if a specific provider ignores it. `GenerationConfig.reasoning_effort` and `parallel_tool_calls` use this exception: callers set them whatever the provider, and a provider without the control warns and skips the field.
 
@@ -111,7 +117,8 @@ PlatformError
 │   ├── AgentThinkError
 │   ├── AgentActError
 │   ├── AgentMaxIterations
-│   └── AgentRecoveryExhausted  (not a `RecoveryExhausted`; see `agents/README.md`)
+│   ├── AgentRecoveryExhausted  (not a `RecoveryExhausted`; see `agents/README.md`)
+│   └── AgentGuardrailError
 └── ToolError                   (`agents/tools/errors.py`)
 ```
 
@@ -184,7 +191,7 @@ Prompts, tool arguments and tool results are the most useful thing in a trace an
 
 ### `resilience.py`: Circuit Breaker & Rate Limiter
 
-Sits alongside `retry.py` rather than replacing it: `with_retry()` retries a single failing call, `CircuitBreaker` and `RateLimiter` guard a call site's overall traffic. `CircuitBreaker(failure_threshold, reset_timeout)` wraps an async callable via `call(func, *args, **kwargs)`; it tracks consecutive failures, opens (raising `ProviderError(retryable=True)` without invoking `func`) once `failure_threshold` is hit, and moves to half-open after `reset_timeout` seconds elapse, a single success there closes it again, a failure reopens it. A `PlatformError` with `retryable=False` (a bad request, a revoked key) is re-raised without counting as a failure, since it says nothing about the service being down. `RateLimiter(rate, burst=None)` is a token-bucket limiter (`burst` defaults to `rate`, i.e. one second of headroom); it raises `ConfigError` when `rate <= 0` or the capacity (`burst`, else `rate`) is below 1, since a bucket that cannot hold one token would block every `acquire()` forever; `await acquire(tokens=1.0)` blocks until enough tokens have replenished. Both are generic over any async callable, no `agents/tools/` concept involved. `record_success()`/`record_failure()`/`record_error(exc)` on `CircuitBreaker` are public (not just reachable through `call()`; `record_error` applies the non-retryable rule before counting) so a call site that can't route through an awaited wrapper, a sync call, or one step of a streaming response, can still report the outcome; `core/interfaces/llm/fallback.py::FallbackLLMProvider` is the first such consumer. `CircuitBreaker` is wired into that per-provider LLM fallback chain; `RateLimiter` remains available but unused by any call site so far.
+Sits alongside `retry.py` rather than replacing it: `with_retry()` retries a single failing call, `CircuitBreaker` and `RateLimiter` guard a call site's overall traffic. `CircuitBreaker(failure_threshold, reset_timeout)` wraps an async callable via `call(func, *args, **kwargs)`; it tracks consecutive failures, opens (raising `ProviderError(retryable=True)` without invoking `func`) once `failure_threshold` is hit, and moves to half-open after `reset_timeout` seconds elapse, a single success there closes it again, a failure reopens it. A `PlatformError` with `retryable=False` (a bad request, a revoked key) is re-raised without counting as a failure, since it says nothing about the service being down. `RateLimiter(rate, burst=None)` is a token-bucket limiter (`burst` defaults to `rate`, i.e. one second of headroom); it raises `ConfigError` when `rate <= 0` or the capacity (`burst`, else `rate`) is below 1, since a bucket that cannot hold one token would block every `acquire()` forever; `await acquire(tokens=1.0)` blocks until enough tokens have replenished. Both are generic over any async callable, no `agents/tools/` concept involved. `record_success()`/`record_failure()`/`record_error(exc)` on `CircuitBreaker` are public (not just reachable through `call()`; `record_error` applies the non-retryable rule before counting) so a call site that can't route through an awaited wrapper, a sync call, or one step of a streaming response, can still report the outcome; `core/interfaces/llm/fallback.py::FallbackLLMProvider` is the first such consumer. Both are wired into that LLM fallback chain: one `CircuitBreaker` per entry, and an optional `RateLimiter` shared by all entries (`rate_limiter=`), which `config/container.py::build_llm_with_fallback` builds from `Settings.llm_rate_limit`/`llm_rate_limit_burst` when fallback models are configured.
 
 ### `middleware.py`: Generic Pre/Post Hooks
 

@@ -8,6 +8,14 @@ from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.span import SampleSpan
 
 
+def _duration_ms(chunk: AudioChunk) -> float:
+    return (chunk.end - chunk.start) * 1000 / chunk.sample_rate
+
+
+def _ms_to_samples(ms: int, sample_rate: int) -> int:
+    return ms * sample_rate // 1000
+
+
 class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
     def _on_speech(
         self,
@@ -17,7 +25,7 @@ class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
     ) -> None:
 
         state.silence_ms = 0
-        state.speech_ms += chunk.end - chunk.start
+        state.speech_ms += _duration_ms(chunk)
 
         if state.in_speech:
             return
@@ -29,7 +37,8 @@ class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
             # only pad backward for segments after the first (nothing precedes the very first one)
             state.segment_start = max(
                 0,
-                state.segment_start - config.speech_pad_ms,
+                state.segment_start
+                - _ms_to_samples(config.speech_pad_ms, chunk.sample_rate),
             )
 
     def _on_silence(
@@ -43,7 +52,7 @@ class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
             state.silence_ms = 0
             return None
 
-        state.silence_ms += chunk.end - chunk.start
+        state.silence_ms += _duration_ms(chunk)
 
         if state.silence_ms < config.min_silence_duration_ms:
             return None
@@ -56,7 +65,8 @@ class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
 
             span = SampleSpan(
                 start=state.segment_start,
-                end=chunk.start + config.speech_pad_ms,
+                end=chunk.start
+                + _ms_to_samples(config.speech_pad_ms, chunk.sample_rate),
             )
 
         state.in_speech = False

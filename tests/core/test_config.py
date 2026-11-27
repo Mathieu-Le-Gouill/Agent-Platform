@@ -1,6 +1,7 @@
+import pytest
 from pydantic import ValidationError
 
-from agent_platform.core.config import ModelConfig, ProviderConfig
+from agent_platform.core.config import ModelConfig, ProviderConfig, RequestOptions
 
 
 def test_provider_config_defaults():
@@ -30,3 +31,17 @@ def test_model_config_construction():
 
 def test_model_config_is_provider_config():
     assert issubclass(ModelConfig, ProviderConfig)
+
+
+def test_request_options_max_retries_defaults_to_none():
+    assert RequestOptions().max_retries is None
+
+
+@pytest.mark.parametrize("value", [0, 5])
+def test_request_options_accepts_non_negative_max_retries(value):
+    assert RequestOptions(max_retries=value).max_retries == value
+
+
+def test_request_options_rejects_negative_max_retries():
+    with pytest.raises(ValidationError):
+        RequestOptions(max_retries=-1)

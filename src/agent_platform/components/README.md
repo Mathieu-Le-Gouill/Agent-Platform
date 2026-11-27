@@ -15,12 +15,11 @@ Unlike an Integration (which implements a `core/interfaces` ABC for a specific l
 `components/base.py` defines:
 
 ```python
-class Component(ABC, Generic[Out]):
+class Component(ABC, Generic[InputT, OutputT]):
     @abstractmethod
-    async def arun(self, input: In) -> Out: ...
+    async def arun(self, input: InputT) -> OutputT: ...
 
-    def run(self, input: In) -> Out:
-        return asyncio.run(self.arun(input))
+    def run(self, input: InputT) -> OutputT: ...
 ```
 
 Every component receives typed input and returns typed output. The sync `run()` is a convenience wrapper around `arun()`.

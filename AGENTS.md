@@ -46,7 +46,7 @@ Purpose only, enough to know which README to open next.
 | `src/agent_platform/pipelines/` | Multi-step orchestration flows composing components (ingestion, RAG, speech translation) | yes |
 | `src/agent_platform/agents/` | Single-agent composition: `Agent`, `AgentExecutor`, `ConversationAgent`, `ToolRegistry`, tools (incl. MCP), guardrails | yes |
 | `src/agent_platform/workflows/` | Multi-agent orchestration: in-house typed-state DAG (`WorkflowGraph`/`CompiledWorkflow`), `agent_node`/`tool_node`/`handoff_node`, pluggable checkpointing | yes |
-| `src/agent_platform/evals/` | Regression testing for agents/pipelines: `EvalCase`/`EvalDataset`/`EvalRunner`/`Scorer`/`EvalReport`, `agent-platform-eval` CLI | yes |
+| `src/agent_platform/evals/` | Regression testing for agents/pipelines: `EvalCase`/`EvalRunner`/`Scorer`/`EvalReport`, `agent-platform-eval` CLI | yes |
 | `src/agent_platform/audio/` | DSP utilities, resampling, waveform chunking, tensor/numpy/base64 conversion | no |
 | `src/agent_platform/utils/` | Shared helpers: async batching, env var parsing, score utilities | no |
 | `src/agent_platform/config/` | Logging setup, `Settings` (pydantic-settings), `build_agent()` DI factory, generic `build_provider(domain_module, provider_name)` factory reused by any future domain wiring | no |

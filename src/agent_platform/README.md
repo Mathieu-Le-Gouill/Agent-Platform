@@ -39,12 +39,12 @@ Near-zero external dependencies. Everything here is pure Python, `pydantic`, `ab
 | Path | Contents |
 |---|---|
 | `core/base.py` | `Entity` (UUID mixin), `Timestamped` |
-| `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends; `ModelConfig`, a `ProviderConfig` subclass adding `model: str` for model-backed domains (llm, embeddings, reranking, speech, image_generation); `RequestOptions`, a `ProviderConfig` subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs alongside `ModelConfig` (currently `llm`, `embeddings`, `moderation`) |
+| `core/config.py` | `ProviderConfig`, the base class every `core/interfaces/<domain>/config.py` extends; `ModelConfig`, a `ProviderConfig` subclass adding `model: str` for model-backed domains (llm, embeddings, reranking, speech, image_generation); `RequestOptions`, a `ProviderConfig` subclass adding `timeout`/`max_retries`, mixed in by network-bound domains' configs, alongside `ModelConfig` where the domain has one (currently `llm`, `embeddings`, `reranking`, `speech`, `image_generation`, `translation`, `ocr`, `vector_store`, `moderation`, `mcp`) |
 | `core/errors.py` | `PlatformError` hierarchy, `ProviderError`, `ConfigError`, `NotFoundError`, `ValidationError`, `MissingCredentialError`, `RecoveryExhausted`; each carries `code`, `retryable`, `retry_after`, `context`. Subtrees live elsewhere: `LLMError` in `interfaces/llm/errors.py`, `AgentError`/`ToolError` in `agents/`. `retry.py`'s `with_retry(translate=)` turns each failed attempt into a `PlatformError` before the retry decision; non-LLM providers pass `integrations/sdk_errors.py::translate_sdk_error` |
 | `core/credentials.py` | `Credentials` (secrets only, e.g. `api_key`), `ClientOptions` (non-secret construction-time transport settings: `base_url`, `timeout`, `max_retries`) |
 | `core/interfaces/tracing/` | Backend-agnostic tracing contract: `BaseTracer`, the `Span` protocol (`set_attribute()`, `record_error()`, `trace_id`, `span_id`), and the `NoOpTracer`/`NoOpSpan` default |
 | `core/observability/` | What call sites use: typed `Observation`s describing what the platform observed in its own vocabulary (`observations.py`: `LLMCall`, `ToolRun`, `AgentRun`, `GuardrailCheck`, `WorkflowNode`, `PipelineRun`, ...), the `Fact` annotation and `flatten()` that derive span attributes and payload policy from them (`facts.py`), the `observe()`/`emit()`/`current()` runtime, the tracer registry, opt-in payload capture, and `@traced`. No backend name appears here: `integrations/tracing/langfuse/mapping.py` maps the platform's vocabulary onto Langfuse fields |
-| `core/interfaces/<domain>/` | ABCs for every capability (llm, embeddings, vad, ocr, vector_store, reranking, chunking, speech, translation, clustering, classification, loader, image_generation, dataset) |
+| `core/interfaces/<domain>/` | ABCs for every capability (llm, embeddings, vad, ocr, vector_store, reranking, chunking, speech, translation, clustering, classification, loader, image_generation, dataset, moderation, mcp) |
 | `core/schemas/` | Shared Pydantic v2 data models used across all layers |
 
 #### `core/schemas/`: Shared Data Structures
@@ -134,4 +134,4 @@ so this is the only code needed, no new registry, no per-domain dict.
 
 | Issue | Location | Status |
 |---|---|---|
-| No parallel fan-out/fan-in (a strict DAG walked one node at a time) | `workflows/graph.py` | Tracked in `workflows/README.md` |
+| No graph-level parallel edges (one node at a time; concurrency only inside a node via `fan_out`) | `workflows/graph.py` | Tracked in `workflows/README.md` |

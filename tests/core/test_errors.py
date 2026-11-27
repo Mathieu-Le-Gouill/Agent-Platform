@@ -1,5 +1,3 @@
-import logging
-
 import pytest
 from pydantic import SecretStr
 
@@ -17,7 +15,6 @@ from agent_platform.core.errors import (
     PlatformError,
     ProviderError,
     ValidationError,
-    catch_noraise,
     error_logged,
     require_secret,
 )
@@ -223,15 +220,3 @@ class TestErrorLoggedNoReRaise:
 
         with pytest.raises(ValueError, match="boom"):
             raises_raw()
-
-
-class TestCatchNoraise:
-    def test_passthrough_on_success(self):
-        logger = logging.getLogger("test")
-        with catch_noraise(logger, fallback=42, context_msg="parse"):
-            pass
-
-    def test_does_not_leak_exception(self):
-        logger = logging.getLogger("test")
-        with catch_noraise(logger, fallback=42, context_msg="parse"):
-            raise ValueError("bad")

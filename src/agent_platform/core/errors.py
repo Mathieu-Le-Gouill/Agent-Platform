@@ -2,14 +2,12 @@ from __future__ import annotations
 
 import functools
 import logging
-from collections.abc import Callable, Iterator
-from contextlib import contextmanager
+from collections.abc import Callable
 from typing import Any, TypeVar
 
 from pydantic import SecretStr
 
 _CompatibleFunc = TypeVar("_CompatibleFunc", bound=Callable[..., Any])
-_T = TypeVar("_T")
 
 __all__ = [
     # Exception classes
@@ -23,7 +21,6 @@ __all__ = [
     # Utilities
     "require_secret",
     "error_logged",
-    "catch_noraise",
 ]
 
 
@@ -146,23 +143,6 @@ def error_logged(
         return sync_wrapper  # type: ignore[return-value]
 
     return decorate
-
-
-@contextmanager
-def catch_noraise(
-    logger: logging.Logger,
-    fallback: _T | None = None,
-    context_msg: str = "",
-) -> Iterator[None]:
-    """Catch any exception, log as warning, yield the fallback value."""
-    try:
-        yield
-    except Exception:
-        logger.warning(
-            "%s failed — using fallback",
-            context_msg or "Operation",
-            exc_info=True,
-        )
 
 
 def _asyncio_iscoroutinefunction(func: Callable[..., Any]) -> bool:

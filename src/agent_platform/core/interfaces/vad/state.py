@@ -8,5 +8,5 @@ class VADState:
     segment_start: int | None = None
     last_speech_end: int | None = None
 
-    speech_ms: int = 0
-    silence_ms: int = 0
+    speech_ms: float = 0.0
+    silence_ms: float = 0.0

@@ -2,6 +2,7 @@ import math
 
 import pytest
 
+from agent_platform.core.errors import ValidationError
 from agent_platform.core.schemas.enums import SimilarityMetric
 from agent_platform.core.similarity import compute_similarity, similarity_bounds
 
@@ -57,6 +58,11 @@ class TestComputeSimilarity:
         assert compute_similarity(a, b, SimilarityMetric.COSINE) == pytest.approx(
             expected
         )
+
+    @pytest.mark.parametrize("metric", list(SimilarityMetric))
+    def test_mismatched_lengths_raise_validation_error(self, metric):
+        with pytest.raises(ValidationError, match=r"\b2\b.*\b3\b"):
+            compute_similarity([1.0, 0.0], [1.0, 0.0, 0.0], metric)
 
 
 class TestSimilarityBounds:
