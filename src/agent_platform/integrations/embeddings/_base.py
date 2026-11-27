@@ -45,6 +45,23 @@ class NativeEmbeddingProvider(
     ) -> Sequence[list[float]]:
         """Return one raw vector per text, in order, via the async native call."""
 
+    def _document_response(
+        self,
+        items: Sequence[TextChunk],
+        vectors: Sequence[list[float]],
+        config: EmbeddingConfigT,
+    ) -> EmbeddingResponse:
+        if len(vectors) != len(items):
+            raise ProviderError(
+                f"{_ERROR_MESSAGE}: the provider returned {len(vectors)} vectors "
+                f"for {len(items)} texts"
+            )
+        embeddings = [
+            Embedding.from_list(vector, model=config.model, id=item.id)
+            for item, vector in zip(items, vectors, strict=True)
+        ]
+        return EmbeddingResponse(embeddings=embeddings, model=config.model)
+
     def embed_document(
         self,
         items: Sequence[TextChunk],
@@ -52,11 +69,7 @@ class NativeEmbeddingProvider(
     ) -> EmbeddingResponse:
         config = config or self._default_config()
         vectors = self._embed_sync([item.text for item in items], config)
-        embeddings = [
-            Embedding.from_list(vector, model=config.model, id=item.id)
-            for item, vector in zip(items, vectors)
-        ]
-        return EmbeddingResponse(embeddings=embeddings, model=config.model)
+        return self._document_response(items, vectors, config)
 
     @error_logged(re_raise=ProviderError, message=_ERROR_MESSAGE)
     @with_retry(translate=_translate)
@@ -67,11 +80,7 @@ class NativeEmbeddingProvider(
     ) -> EmbeddingResponse:
         config = config or self._default_config()
         vectors = await self._embed_async([item.text for item in items], config)
-        embeddings = [
-            Embedding.from_list(vector, model=config.model, id=item.id)
-            for item, vector in zip(items, vectors)
-        ]
-        return EmbeddingResponse(embeddings=embeddings, model=config.model)
+        return self._document_response(items, vectors, config)
 
     def embed_query(
         self,

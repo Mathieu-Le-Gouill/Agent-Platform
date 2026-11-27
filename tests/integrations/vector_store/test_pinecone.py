@@ -254,6 +254,41 @@ class TestPineconeDelete:
         store._index.assert_not_called()
 
 
+class TestPineconeWriteErrors:
+    async def test_add_retries_transient_failure_then_succeeds(self, no_retry_sleep):
+        store = PineconeStore.__new__(PineconeStore)
+        mock_index = _mock_index()
+        mock_index.upsert.side_effect = [ConnectionError("transient"), None]
+        store._index = AsyncMock(return_value=mock_index)
+
+        await store.add([TextChunk(text="a", index=0)], [[0.1]], PineconeConfig())
+
+        assert mock_index.upsert.await_count == 2
+
+    async def test_add_rejects_fewer_vectors_than_documents(self, no_retry_sleep):
+        store = PineconeStore.__new__(PineconeStore)
+        mock_index = _mock_index()
+        store._index = AsyncMock(return_value=mock_index)
+
+        with pytest.raises(ProviderError, match="Vector store add failed"):
+            await store.add(
+                [TextChunk(text="a", index=0), TextChunk(text="b", index=1)],
+                [[0.1]],
+                PineconeConfig(),
+            )
+        mock_index.upsert.assert_not_awaited()
+
+    async def test_delete_translates_failure_after_retries(self, no_retry_sleep):
+        store = PineconeStore.__new__(PineconeStore)
+        mock_index = _mock_index()
+        mock_index.delete.side_effect = ConnectionError("down")
+        store._index = AsyncMock(return_value=mock_index)
+
+        with pytest.raises(ProviderError, match="Vector store delete failed"):
+            await store.delete([uuid4()], PineconeConfig())
+        assert mock_index.delete.await_count == 3
+
+
 class TestPineconeSearch:
     async def test_search_returns_chunks(self):
         store = PineconeStore.__new__(PineconeStore)

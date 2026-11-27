@@ -27,6 +27,12 @@ from agent_platform.integrations.vector_store.pinecone.mappers import (
 
 _SEARCH_ERROR = "Vector store search failed"
 _translate = functools.partial(translate_sdk_error, operation=_SEARCH_ERROR)
+# Writes are retried because they are idempotent: an upsert by vector id and a
+# delete by id leave the same state however often they run.
+_ADD_ERROR = "Vector store add failed"
+_DELETE_ERROR = "Vector store delete failed"
+_translate_add = functools.partial(translate_sdk_error, operation=_ADD_ERROR)
+_translate_delete = functools.partial(translate_sdk_error, operation=_DELETE_ERROR)
 
 
 class PineconeStore(BaseVectorStore[PineconeConfig]):
@@ -87,6 +93,8 @@ class PineconeStore(BaseVectorStore[PineconeConfig]):
         host = await self._resolve_host(config)
         return self._new_client(config).IndexAsyncio(host=host)
 
+    @error_logged(re_raise=ProviderError, message=_ADD_ERROR)
+    @with_retry(translate=_translate_add)
     async def add(
         self,
         documents: list[TextChunk],
@@ -103,10 +111,12 @@ class PineconeStore(BaseVectorStore[PineconeConfig]):
                     "values": vector,
                     "metadata": chunk_to_metadata(doc),
                 }
-                for doc, vector in zip(documents, vectors)
+                for doc, vector in zip(documents, vectors, strict=True)
             ]
             await index.upsert(vectors=payload, namespace=config.namespace)
 
+    @error_logged(re_raise=ProviderError, message=_DELETE_ERROR)
+    @with_retry(translate=_translate_delete)
     async def delete(
         self, document_ids: list[UUID], config: PineconeConfig | None = None
     ) -> None:

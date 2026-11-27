@@ -316,6 +316,74 @@ class TestQdrantSearch:
             )
 
 
+class TestQdrantWriteErrors:
+    def _provider(self, mocker) -> tuple[QdrantVectorStoreProvider, MagicMock]:
+        mock_client = MagicMock()
+        mocker.patch(
+            "agent_platform.integrations.vector_store.qdrant.provider.AsyncQdrantClient",
+            return_value=mock_client,
+        )
+        return QdrantVectorStoreProvider(QdrantCredentials(api_key=None)), mock_client
+
+    async def test_add_retries_transient_failure_then_succeeds(
+        self, mocker, no_retry_sleep
+    ):
+        provider, client = self._provider(mocker)
+        client.upsert = AsyncMock(side_effect=[ConnectionError("transient"), None])
+
+        await provider.add([TextChunk(text="a", index=0)], [[0.1]], QdrantConfig())
+
+        assert client.upsert.await_count == 2
+
+    async def test_delete_translates_permanent_failure(self, mocker, no_retry_sleep):
+        provider, client = self._provider(mocker)
+        client.delete = AsyncMock(side_effect=ValueError("bad id"))
+
+        with pytest.raises(ProviderError, match="Vector store delete failed"):
+            await provider.delete([uuid4()], QdrantConfig())
+        assert client.delete.await_count == 1
+
+    async def test_add_hybrid_translates_failure(self, mocker, no_retry_sleep):
+        provider, client = self._provider(mocker)
+        client.upsert = AsyncMock(side_effect=ConnectionError("down"))
+
+        with pytest.raises(ProviderError, match="Vector store hybrid add failed"):
+            await provider.add_hybrid(
+                [TextChunk(text="a", index=0)],
+                [[0.1]],
+                [SparseVector(indices=[1], values=[1.0])],
+                QdrantConfig(),
+            )
+        assert client.upsert.await_count == 3
+
+    async def test_add_hybrid_rejects_missing_sparse_vector(
+        self, mocker, no_retry_sleep
+    ):
+        provider, client = self._provider(mocker)
+        client.upsert = AsyncMock()
+
+        with pytest.raises(ProviderError, match="Vector store hybrid add failed"):
+            await provider.add_hybrid(
+                [TextChunk(text="a", index=0), TextChunk(text="b", index=1)],
+                [[0.1], [0.2]],
+                [SparseVector(indices=[1], values=[1.0])],
+                QdrantConfig(),
+            )
+        client.upsert.assert_not_awaited()
+
+    async def test_add_rejects_more_vectors_than_documents(
+        self, mocker, no_retry_sleep
+    ):
+        provider, client = self._provider(mocker)
+        client.upsert = AsyncMock()
+
+        with pytest.raises(ProviderError, match="Vector store add failed"):
+            await provider.add(
+                [TextChunk(text="a", index=0)], [[0.1], [0.2]], QdrantConfig()
+            )
+        client.upsert.assert_not_awaited()
+
+
 class TestQdrantAddHybrid:
     async def test_upserts_named_vectors(self, mocker):
         from agent_platform.core.schemas.vector import SparseVector

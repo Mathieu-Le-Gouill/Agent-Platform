@@ -86,7 +86,7 @@ class TestMistralEmbeddingConfig:
     def test_defaults(self):
         cfg = MistralEmbeddingConfig()
         assert cfg.timeout is None
-        assert cfg.endpoint == "https://api.mistral.ai/v1/"
+        assert cfg.endpoint == "https://api.mistral.ai"
         assert cfg.wait_time is None
         assert cfg.max_concurrent_requests is None
 

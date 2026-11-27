@@ -6,6 +6,13 @@ import pytest
 
 pytest.importorskip("weaviate")
 
+from weaviate.collections.classes.batch import (
+    BatchObjectReturn,
+    DeleteManyReturn,
+    ErrorObject,
+)
+
+from agent_platform.core.errors import ProviderError
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.vector_store.weaviate.config import WeaviateConfig
 from agent_platform.integrations.vector_store.weaviate.mappers import (
@@ -283,7 +290,7 @@ class TestWeaviateConnectionLifecycle:
     async def test_add_closes_client_after_use(self, provider, monkeypatch):
         mock_client = self._connected_client(monkeypatch, provider)
         mock_collection = MagicMock()
-        mock_collection.data.insert_many = AsyncMock()
+        mock_collection.data.insert_many = AsyncMock(return_value=BatchObjectReturn())
         mock_client.collections.get.return_value = mock_collection
 
         await provider.add(
@@ -299,7 +306,7 @@ class TestWeaviateConnectionLifecycle:
         mock_client = self._connected_client(monkeypatch, provider)
         mock_collection = MagicMock()
         tenant_collection = MagicMock()
-        tenant_collection.data.insert_many = AsyncMock()
+        tenant_collection.data.insert_many = AsyncMock(return_value=BatchObjectReturn())
         mock_collection.with_tenant.return_value = tenant_collection
         mock_client.collections.get.return_value = mock_collection
 
@@ -323,10 +330,104 @@ class TestWeaviateConnectionLifecycle:
         mock_collection.data.insert_many.assert_not_awaited()
         mock_client.close.assert_awaited_once()
 
+    async def test_add_raises_on_partial_insert_failure(
+        self, provider, monkeypatch, no_retry_sleep
+    ):
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        failed = BatchObjectReturn(
+            errors={1: ErrorObject(message="vector lengths don't match", object_=None)},
+            has_errors=True,
+        )
+        mock_collection.data.insert_many = AsyncMock(return_value=failed)
+        mock_client.collections.get.return_value = mock_collection
+
+        with pytest.raises(
+            ProviderError, match="1 of 2 objects.*vector lengths don't match"
+        ):
+            await provider.add(
+                [TextChunk(text="a", index=0), TextChunk(text="b", index=1)],
+                [[0.1, 0.2], [0.3]],
+                config=WeaviateConfig(),
+            )
+
+        mock_collection.data.insert_many.assert_awaited_once()
+        mock_client.close.assert_awaited_once()
+
+    async def test_add_rejects_fewer_vectors_than_documents(
+        self, provider, monkeypatch, no_retry_sleep
+    ):
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        mock_collection.data.insert_many = AsyncMock(return_value=BatchObjectReturn())
+        mock_client.collections.get.return_value = mock_collection
+
+        with pytest.raises(ProviderError, match="Vector store add failed"):
+            await provider.add(
+                [TextChunk(text="a", index=0), TextChunk(text="b", index=1)],
+                [[0.1]],
+                config=WeaviateConfig(),
+            )
+
+        mock_collection.data.insert_many.assert_not_awaited()
+        mock_client.close.assert_awaited_once()
+
+    async def test_add_retries_transient_failure_then_succeeds(
+        self, provider, monkeypatch, no_retry_sleep
+    ):
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        mock_collection.data.insert_many = AsyncMock(
+            side_effect=[ConnectionError("transient"), BatchObjectReturn()]
+        )
+        mock_client.collections.get.return_value = mock_collection
+
+        await provider.add(
+            [TextChunk(text="a", index=0)], [[0.1]], config=WeaviateConfig()
+        )
+
+        assert mock_collection.data.insert_many.await_count == 2
+        assert mock_client.close.await_count == 2
+
+    async def test_delete_translates_permanent_failure(
+        self, provider, monkeypatch, no_retry_sleep
+    ):
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        mock_collection.data.delete_many = AsyncMock(side_effect=ValueError("bad"))
+        mock_client.collections.get.return_value = mock_collection
+
+        with pytest.raises(ProviderError, match="Vector store delete failed"):
+            await provider.delete([uuid4()], config=WeaviateConfig())
+
+        mock_collection.data.delete_many.assert_awaited_once()
+
+    async def test_delete_raises_on_partial_delete_failure(
+        self, provider, monkeypatch, no_retry_sleep
+    ):
+        mock_client = self._connected_client(monkeypatch, provider)
+        mock_collection = MagicMock()
+        mock_collection.data.delete_many = AsyncMock(
+            return_value=DeleteManyReturn(
+                failed=1, matches=2, objects=None, successful=1
+            )
+        )
+        mock_client.collections.get.return_value = mock_collection
+
+        with pytest.raises(ProviderError, match="1 of 2 matched objects"):
+            await provider.delete([uuid4(), uuid4()], config=WeaviateConfig())
+
+        mock_collection.data.delete_many.assert_awaited_once()
+        mock_client.close.assert_awaited_once()
+
     async def test_delete_closes_client_after_use(self, provider, monkeypatch):
         mock_client = self._connected_client(monkeypatch, provider)
         mock_collection = MagicMock()
-        mock_collection.data.delete_many = AsyncMock()
+        mock_collection.data.delete_many = AsyncMock(
+            return_value=DeleteManyReturn(
+                failed=0, matches=1, objects=None, successful=1
+            )
+        )
         mock_client.collections.get.return_value = mock_collection
 
         doc_id = uuid4()

@@ -146,8 +146,9 @@ class TestChromaCollectionDispatch:
         result = await store._call(True, add_one, 41)
         assert result == 42
 
-    async def test_collection_uses_get_or_create(self):
+    async def test_collection_uses_get_or_create_with_cosine_space(self):
         store = ChromaStore.__new__(ChromaStore)
+        store._credentials = ChromaCredentials(api_key=None)
         mock_client = MagicMock()
         mock_client.get_or_create_collection.return_value = "the-collection"
 
@@ -156,8 +157,64 @@ class TestChromaCollectionDispatch:
         assert collection == "the-collection"
         assert is_async is False
         mock_client.get_or_create_collection.assert_called_once_with(
+            name=ChromaConfig().collection_name,
+            configuration={"hnsw": {"space": "cosine"}},
+        )
+
+    async def test_each_call_gets_a_fresh_configuration(self):
+        store = ChromaStore.__new__(ChromaStore)
+        store._credentials = ChromaCredentials(api_key=None)
+        mock_client = MagicMock()
+        received: list[dict] = []
+
+        def mutate(**kwargs):
+            received.append(dict(kwargs["configuration"]))
+            # chromadb adds the embedding function to the dict it is given.
+            kwargs["configuration"]["embedding_function"] = object()
+
+        mock_client.get_or_create_collection.side_effect = mutate
+
+        await store._collection(mock_client, ChromaConfig())
+        await store._collection(mock_client, ChromaConfig())
+
+        assert received == [{"hnsw": {"space": "cosine"}}] * 2
+
+    async def test_cloud_collection_sends_no_hnsw_configuration(self):
+        store = ChromaStore.__new__(ChromaStore)
+        store._credentials = ChromaCredentials(api_key="cloud-key")
+        mock_client = MagicMock()
+
+        await store._collection(mock_client, ChromaConfig())
+
+        mock_client.get_or_create_collection.assert_called_once_with(
             name=ChromaConfig().collection_name
         )
+
+    async def test_created_collection_scores_by_cosine(self, tmp_path):
+        store = ChromaStore(ChromaCredentials(api_key=None))
+        config = ChromaConfig(persist_directory=str(tmp_path))
+        chunk = TextChunk(text="hello", index=0)
+
+        await store.add([chunk], [[2.0, 0.0]], config=config)
+        results = await store.search_with_scores([1.0, 0.0], k=1, config=config)
+
+        assert results[0][0].id == chunk.id
+        assert results[0][1].value == pytest.approx(1.0)
+
+    async def test_re_adding_a_stored_id_is_ignored_so_a_retry_is_safe(self, tmp_path):
+        store = ChromaStore(ChromaCredentials(api_key=None))
+        config = ChromaConfig(persist_directory=str(tmp_path))
+        chunk_id = uuid4()
+
+        await store.add(
+            [TextChunk(id=chunk_id, text="first", index=0)], [[1.0]], config
+        )
+        await store.add(
+            [TextChunk(id=chunk_id, text="second", index=0)], [[1.0]], config
+        )
+        results = await store.search([1.0], k=5, config=config)
+
+        assert [(r.id, r.text) for r in results] == [(chunk_id, "first")]
 
 
 class TestChromaMappers:
@@ -235,6 +292,39 @@ class TestChromaAdd:
         await store.add([], [], config=ChromaConfig())
         store._client.assert_not_called()
 
+    async def test_add_retries_transient_failure_then_succeeds(self, no_retry_sleep):
+        store = ChromaStore.__new__(ChromaStore)
+        mock_collection = MagicMock()
+        mock_collection.add.side_effect = [ConnectionError("transient"), None]
+        store._client = AsyncMock(return_value=MagicMock())
+        store._collection = AsyncMock(return_value=(mock_collection, False))
+
+        await store.add([TextChunk(text="a", index=0)], [[0.1]], config=ChromaConfig())
+
+        assert mock_collection.add.call_count == 2
+
+    async def test_add_translates_permanent_failure(self, no_retry_sleep):
+        store = ChromaStore.__new__(ChromaStore)
+        mock_collection = MagicMock()
+        mock_collection.add.side_effect = ValueError("bad embedding")
+        store._client = AsyncMock(return_value=MagicMock())
+        store._collection = AsyncMock(return_value=(mock_collection, False))
+
+        with pytest.raises(ProviderError, match="Vector store add failed"):
+            await store.add(
+                [TextChunk(text="a", index=0)], [[0.1]], config=ChromaConfig()
+            )
+        assert mock_collection.add.call_count == 1
+
+    async def test_add_rejects_more_vectors_than_documents(
+        self, tmp_path, no_retry_sleep
+    ):
+        store = ChromaStore(ChromaCredentials(api_key=None))
+        config = ChromaConfig(persist_directory=str(tmp_path))
+
+        with pytest.raises(ProviderError, match="Vector store add failed"):
+            await store.add([TextChunk(text="a", index=0)], [[1.0], [2.0]], config)
+
 
 class TestChromaDelete:
     async def test_delete_calls_collection_delete(self):
@@ -255,6 +345,17 @@ class TestChromaDelete:
         store._client = AsyncMock()
         await store.delete([], config=ChromaConfig())
         store._client.assert_not_called()
+
+    async def test_delete_retries_then_translates_failure(self, no_retry_sleep):
+        store = ChromaStore.__new__(ChromaStore)
+        mock_collection = MagicMock()
+        mock_collection.delete.side_effect = ConnectionError("down")
+        store._client = AsyncMock(return_value=MagicMock())
+        store._collection = AsyncMock(return_value=(mock_collection, False))
+
+        with pytest.raises(ProviderError, match="Vector store delete failed"):
+            await store.delete([uuid4()], config=ChromaConfig())
+        assert mock_collection.delete.call_count == 3
 
 
 class TestChromaSearch:
@@ -340,6 +441,22 @@ class TestChromaSearch:
             await store.search_with_scores(
                 query_vector=[0.1, 0.2], config=ChromaConfig()
             )
+
+    async def test_search_with_scores_rejects_ragged_result(self, no_retry_sleep):
+        store = ChromaStore.__new__(ChromaStore)
+        mock_collection = MagicMock()
+        mock_collection.query.return_value = {
+            "ids": [[str(uuid4()), str(uuid4())]],
+            "documents": [["a", "b"]],
+            "metadatas": [[{}, {}]],
+            "distances": [[0.1]],
+        }
+        store._client = AsyncMock(return_value=MagicMock())
+        store._collection = AsyncMock(return_value=(mock_collection, False))
+
+        with pytest.raises(ProviderError, match="Vector store search failed"):
+            await store.search_with_scores(query_vector=[0.1], config=ChromaConfig())
+        assert mock_collection.query.call_count == 1
 
 
 class TestChromaRejectsNamespace:

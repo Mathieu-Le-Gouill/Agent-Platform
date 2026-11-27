@@ -44,6 +44,20 @@ _translate_hybrid_search = functools.partial(
     operation=_HYBRID_SEARCH_ERROR,
     transient_types=_TRANSIENT_TYPES,
 )
+# Writes are retried because they are idempotent: an upsert by point id and a
+# delete by id leave the same state however often they run.
+_ADD_ERROR = "Vector store add failed"
+_HYBRID_ADD_ERROR = "Vector store hybrid add failed"
+_DELETE_ERROR = "Vector store delete failed"
+_translate_add = functools.partial(
+    translate_sdk_error, operation=_ADD_ERROR, transient_types=_TRANSIENT_TYPES
+)
+_translate_hybrid_add = functools.partial(
+    translate_sdk_error, operation=_HYBRID_ADD_ERROR, transient_types=_TRANSIENT_TYPES
+)
+_translate_delete = functools.partial(
+    translate_sdk_error, operation=_DELETE_ERROR, transient_types=_TRANSIENT_TYPES
+)
 
 
 class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
@@ -81,6 +95,8 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
             ]
         )
 
+    @error_logged(re_raise=ProviderError, message=_ADD_ERROR)
+    @with_retry(translate=_translate_add)
     async def add(
         self,
         documents: list[TextChunk],
@@ -94,11 +110,13 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
             models.PointStruct(
                 id=str(doc.id), vector=vector, payload=chunk_to_payload(doc)
             )
-            for doc, vector in zip(documents, vectors)
+            for doc, vector in zip(documents, vectors, strict=True)
         ]
         if points:
             await client.upsert(collection_name=config.collection_name, points=points)
 
+    @error_logged(re_raise=ProviderError, message=_DELETE_ERROR)
+    @with_retry(translate=_translate_delete)
     async def delete(
         self, document_ids: list[UUID], config: QdrantConfig | None = None
     ) -> None:
@@ -149,6 +167,8 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
             for point in response.points
         ]
 
+    @error_logged(re_raise=ProviderError, message=_HYBRID_ADD_ERROR)
+    @with_retry(translate=_translate_hybrid_add)
     async def add_hybrid(
         self,
         documents: list[TextChunk],
@@ -170,7 +190,9 @@ class QdrantVectorStoreProvider(BaseVectorStore[QdrantConfig]):
                 },
                 payload=chunk_to_payload(doc),
             )
-            for doc, vector, sparse in zip(documents, vectors, sparse_vectors)
+            for doc, vector, sparse in zip(
+                documents, vectors, sparse_vectors, strict=True
+            )
         ]
         if points:
             await client.upsert(collection_name=config.collection_name, points=points)

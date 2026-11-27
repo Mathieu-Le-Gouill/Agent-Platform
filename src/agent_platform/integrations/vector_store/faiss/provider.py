@@ -417,7 +417,7 @@ class FAISSStore(BaseVectorStore[FAISSConfig]):
             distances, ids = state.index.search(query, fetch_k)
 
             results: list[tuple[TextChunk, Score]] = []
-            for raw_distance, internal_id in zip(distances[0], ids[0]):
+            for raw_distance, internal_id in zip(distances[0], ids[0], strict=True):
                 if internal_id == -1:
                     continue
                 chunk = state.docs.get(int(internal_id))

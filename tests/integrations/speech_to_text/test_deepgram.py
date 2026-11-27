@@ -4,10 +4,14 @@ import pytest
 
 pytest.importorskip("deepgram")
 
-from agent_platform.core.errors import MissingCredentialError, ProviderError
+from agent_platform.core.errors import (
+    MissingCredentialError,
+    ProviderError,
+    ValidationError,
+)
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Utterance
-from agent_platform.core.schemas.enums import AudioFormat, Language
+from agent_platform.core.schemas.enums import AudioFormat, DataType, Language
 from agent_platform.integrations.credentials import DeepgramCredentials
 from agent_platform.integrations.speech_to_text.deepgram.config import DeepgramConfig
 from agent_platform.integrations.speech_to_text.deepgram.mappers import (
@@ -194,7 +198,7 @@ class TestDeepgramClientOptions:
         assert kwargs["max_retries"] == 0
 
 
-def _mock_response(channel_json: dict, language: str | None = "en"):
+def _mock_response(channel_json: dict, detected_language: str | None = None):
     alt = MagicMock()
     alt.words = channel_json.get("words")
     alt.paragraphs = (
@@ -208,9 +212,9 @@ def _mock_response(channel_json: dict, language: str | None = "en"):
             pass
     channel = MagicMock()
     channel.alternatives = [alt]
+    channel.detected_language = detected_language
     results = MagicMock()
     results.channels = [channel]
-    results.language = language
     response = MagicMock()
     response.results = results
     return response
@@ -284,6 +288,33 @@ class TestDeepgramTranscribe:
 
         _, kwargs = mock_client.listen.v1.media.transcribe_file.call_args
         assert "language" not in kwargs
+
+    @pytest.mark.parametrize(
+        ("detected", "configured", "expected"),
+        [
+            ("fr", None, Language.FR),
+            (None, "de", Language.GE),
+            (None, None, Language.EN),
+        ],
+        ids=["detected", "configured", "default"],
+    )
+    async def test_language_read_from_channel_detection(
+        self, mocker, detected, configured, expected
+    ):
+        stt = DeepgramSTT(DeepgramCredentials(api_key="key"))
+        response = _mock_response(
+            {"words": None, "paragraph_text": "hi"}, detected_language=detected
+        )
+        mock_client = MagicMock()
+        mock_client.listen.v1.media.transcribe_file = AsyncMock(return_value=response)
+
+        mocker.patch.object(stt, "_build_client", return_value=mock_client)
+        transcript = await stt.transcribe(
+            _make_audio(),
+            DeepgramConfig(language=configured, detect_language=configured is None),
+        )
+
+        assert transcript.language == expected
 
     async def test_provider_exception_wrapped(self, mocker):
         stt = DeepgramSTT(DeepgramCredentials(api_key="key"))
@@ -398,3 +429,111 @@ class TestDeepgramStream:
         assert results == []
         _, kwargs = mock_client.listen.v1.connect.call_args
         assert kwargs["language"] == "es"
+
+    async def _connect_kwargs(self, mocker, frames):
+        stt = DeepgramSTT(DeepgramCredentials(api_key="key"))
+        socket = _FakeSocket([])
+        mock_client = MagicMock()
+        mock_client.listen.v1.connect = MagicMock(return_value=_FakeConnectCM(socket))
+        mocker.patch.object(stt, "_build_client", return_value=mock_client)
+
+        _ = [t async for t in stt.stream(self._frames(frames), DeepgramConfig())]
+
+        assert socket.sent == [frame.data for frame in frames]
+        return mock_client.listen.v1.connect.call_args.kwargs
+
+    @pytest.mark.parametrize(
+        ("dtype", "encoding"),
+        [(DataType.FLOAT32, "linear32"), (DataType.INT16, "linear16")],
+    )
+    async def test_raw_pcm_declares_encoding_sample_rate_and_channels(
+        self, mocker, dtype, encoding
+    ):
+        frames = [
+            AudioChunk(data=b"\x00\x01" * 8, dtype=dtype, sample_rate=8000),
+            AudioChunk(data=b"\x02\x03" * 8, dtype=dtype, sample_rate=8000),
+        ]
+
+        kwargs = await self._connect_kwargs(mocker, frames)
+
+        assert kwargs["encoding"] == encoding
+        assert kwargs["sample_rate"] == 8000
+        assert kwargs["channels"] == 1
+
+    @pytest.mark.parametrize(
+        ("data", "audio_format"),
+        [
+            (b"RIFF\x24\x00\x00\x00WAVEfmt ", AudioFormat.WAV),
+            (b"\x00\x00\x00\x20ftypM4A \x00\x00", AudioFormat.M4A),
+            (b"ID3\x04\x00\x00\x00\x00\x00\x00", AudioFormat.MP3),
+            # MPEG-1 Layer III, 128 kbit/s, 44.1 kHz.
+            (b"\xff\xfb\x90\x64\x00\x00", AudioFormat.MP3),
+            # ADTS AAC-LC, 44.1 kHz.
+            (b"\xff\xf1\x50\x80\x00\x00", AudioFormat.AAC),
+        ],
+        ids=["wav", "ftyp", "id3", "mpeg-frame", "adts-frame"],
+    )
+    async def test_containerized_audio_declares_no_encoding(
+        self, mocker, data, audio_format
+    ):
+        frames = [AudioChunk(data=data, format=audio_format)]
+
+        kwargs = await self._connect_kwargs(mocker, frames)
+
+        assert "encoding" not in kwargs
+        assert "sample_rate" not in kwargs
+
+    @pytest.mark.parametrize(
+        "data",
+        [
+            b"\xff\xff" * 8,  # int16 -1 repeated: bitrate index 0b1111
+            b"\xff\xff\x00\x00" * 4,  # -1 then 0: free-format bitrate
+            b"\xff\xfb\x9c\x64" * 4,  # sample-rate index 0b11
+            b"\xff\xeb\x90\x64" * 4,  # reserved MPEG version 0b01
+        ],
+        ids=["bitrate-1111", "bitrate-0000", "srate-11", "version-01"],
+    )
+    async def test_raw_pcm_with_frame_sync_bytes_keeps_its_encoding(self, mocker, data):
+        frames = [AudioChunk(data=data, dtype=DataType.INT16, format=AudioFormat.MP3)]
+
+        kwargs = await self._connect_kwargs(mocker, frames)
+
+        assert kwargs["encoding"] == "linear16"
+
+    async def test_frame_sync_ignored_for_other_formats(self, mocker):
+        frames = [
+            AudioChunk(
+                data=b"\xff\xfb\x90\x64", dtype=DataType.INT16, format=AudioFormat.WAV
+            )
+        ]
+
+        kwargs = await self._connect_kwargs(mocker, frames)
+
+        assert kwargs["encoding"] == "linear16"
+
+    async def test_empty_stream_opens_no_socket(self, mocker):
+        stt = DeepgramSTT(DeepgramCredentials(api_key="key"))
+        build_client = mocker.patch.object(stt, "_build_client")
+
+        results = [t async for t in stt.stream(self._frames([]), DeepgramConfig())]
+
+        assert results == []
+        build_client.assert_not_called()
+
+    @pytest.mark.parametrize(
+        "chunk",
+        [
+            AudioChunk(data=b"\x00\x01", dtype=DataType.INT8),
+            AudioChunk(data=b"\x00\x01" * 4, dtype=DataType.INT16, channels=2),
+        ],
+        ids=["int8", "stereo"],
+    )
+    async def test_unsupported_raw_audio_is_rejected(self, mocker, chunk):
+        stt = DeepgramSTT(DeepgramCredentials(api_key="key"))
+        mock_client = MagicMock()
+        mocker.patch.object(stt, "_build_client", return_value=mock_client)
+
+        with pytest.raises(ValidationError, match="Deepgram streaming"):
+            _ = [t async for t in stt.stream(self._frames([chunk]), DeepgramConfig())]
+
+        mock_client.listen.v1.connect.assert_not_called()

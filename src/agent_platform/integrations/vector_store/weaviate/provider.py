@@ -39,11 +39,20 @@ from agent_platform.utils.env import from_env
 
 _DEFAULT_URL = "http://localhost:8080"
 
+_TRANSIENT_TYPES = (WeaviateConnectionError, WeaviateTimeoutError, WeaviateRetryError)
 _SEARCH_ERROR = "Vector store search failed"
 _translate = functools.partial(
-    translate_sdk_error,
-    operation=_SEARCH_ERROR,
-    transient_types=(WeaviateConnectionError, WeaviateTimeoutError, WeaviateRetryError),
+    translate_sdk_error, operation=_SEARCH_ERROR, transient_types=_TRANSIENT_TYPES
+)
+# Writes are retried because they are idempotent: a batch insert overwrites an
+# object whose UUID already exists, and a delete by id can run twice.
+_ADD_ERROR = "Vector store add failed"
+_DELETE_ERROR = "Vector store delete failed"
+_translate_add = functools.partial(
+    translate_sdk_error, operation=_ADD_ERROR, transient_types=_TRANSIENT_TYPES
+)
+_translate_delete = functools.partial(
+    translate_sdk_error, operation=_DELETE_ERROR, transient_types=_TRANSIENT_TYPES
 )
 
 
@@ -137,6 +146,8 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
         ]
         return conditions[0] if len(conditions) == 1 else Filter.all_of(conditions)
 
+    @error_logged(re_raise=ProviderError, message=_ADD_ERROR)
+    @with_retry(translate=_translate_add)
     async def add(
         self,
         documents: list[TextChunk],
@@ -153,13 +164,21 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
                     uuid=doc.id,
                     vector=vector,
                 )
-                for doc, vector in zip(documents, vectors)
+                for doc, vector in zip(documents, vectors, strict=True)
             ]
             if objects:
-                await collection.data.insert_many(objects)
+                result = await collection.data.insert_many(objects)
+                if result.has_errors:
+                    first = next(iter(result.errors.values()))
+                    raise ProviderError(
+                        f"{_ADD_ERROR}: {len(result.errors)} of {len(objects)} "
+                        f"objects were not inserted, first error: {first.message}"
+                    )
         finally:
             await client.close()
 
+    @error_logged(re_raise=ProviderError, message=_DELETE_ERROR)
+    @with_retry(translate=_translate_delete)
     async def delete(
         self, document_ids: list[UUID], config: WeaviateConfig | None = None
     ) -> None:
@@ -168,11 +187,16 @@ class WeaviateStore(BaseVectorStore[WeaviateConfig]):
         try:
             collection = self._collection(client, config)
             if document_ids:
-                await collection.data.delete_many(
+                result = await collection.data.delete_many(
                     where=Filter.by_id().contains_any(
                         [str(doc_id) for doc_id in document_ids]
                     )
                 )
+                if result.failed:
+                    raise ProviderError(
+                        f"{_DELETE_ERROR}: {result.failed} of {result.matches} "
+                        "matched objects were not deleted"
+                    )
         finally:
             await client.close()
 

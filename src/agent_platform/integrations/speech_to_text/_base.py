@@ -24,7 +24,8 @@ async def buffered_stream(
 
     async for chunk in frames:
         buffer.append(chunk)
-        buffer_ms += chunk.end - chunk.start
+        # `start`/`end` are sample offsets, not milliseconds.
+        buffer_ms += (chunk.end - chunk.start) * 1000 / chunk.sample_rate
 
         if buffer_ms < min_duration_ms:
             continue

@@ -2,7 +2,9 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 from uuid import uuid4
 
+import httpx
 import pytest
+from mistralai import Mistral
 from pydantic import SecretStr
 
 from agent_platform.core.errors import MissingCredentialError, ProviderError
@@ -48,8 +50,38 @@ class TestMistralEmbeddingProviderClient:
         client = provider._client(cfg)
         assert client is mock_mistral.return_value
         _, kwargs = mock_mistral.call_args
-        assert kwargs["server_url"] == "https://api.mistral.ai/v1/"
+        assert kwargs["server_url"] == "https://api.mistral.ai"
         assert kwargs["timeout_ms"] == 30000
+
+    def test_default_endpoint_requests_v1_embeddings_once(self, mocker):
+        requested: list[str] = []
+
+        def handler(request: httpx.Request) -> httpx.Response:
+            requested.append(str(request.url))
+            return httpx.Response(
+                200,
+                json={
+                    "id": "e",
+                    "object": "list",
+                    "model": "mistral-embed",
+                    "usage": {"prompt_tokens": 1, "total_tokens": 1},
+                    "data": [{"object": "embedding", "embedding": [0.1], "index": 0}],
+                },
+            )
+
+        transport = httpx.MockTransport(handler)
+        mocker.patch(
+            "agent_platform.integrations.embeddings.mistral.provider.Mistral",
+            side_effect=lambda **kwargs: Mistral(
+                **kwargs,
+                client=httpx.Client(transport=transport),
+                async_client=httpx.AsyncClient(transport=transport),
+            ),
+        )
+
+        MistralEmbeddingProvider(_creds()).embed_query("hi")
+
+        assert requested == ["https://api.mistral.ai/v1/embeddings"]
 
     def test_client_custom_endpoint(self, mocker):
         mock_mistral = mocker.patch(
@@ -105,6 +137,32 @@ class TestMistralEmbedDocument:
         assert response.embeddings[0].to_list() == [0.1, 0.2]
         _, kwargs = mock_client.embeddings.create.call_args
         assert kwargs["inputs"] == ["hello", "world"]
+
+    def test_sync_rejects_fewer_vectors_than_texts(self, mocker):
+        mock_mistral = mocker.patch(
+            "agent_platform.integrations.embeddings.mistral.provider.Mistral"
+        )
+        mock_mistral.return_value.embeddings.create.return_value = _embeddings_response(
+            [[0.1]]
+        )
+
+        items = [TextChunk(id=uuid4(), text="a"), TextChunk(id=uuid4(), text="b")]
+        provider = MistralEmbeddingProvider(_creds())
+        with pytest.raises(ProviderError, match="1 vectors for 2 texts"):
+            provider.embed_document(items, config=MistralEmbeddingConfig())
+
+    async def test_async_rejects_fewer_vectors_than_texts(self, mocker):
+        mock_mistral = mocker.patch(
+            "agent_platform.integrations.embeddings.mistral.provider.Mistral"
+        )
+        mock_mistral.return_value.embeddings.create_async = AsyncMock(
+            return_value=_embeddings_response([[0.1]])
+        )
+
+        items = [TextChunk(id=uuid4(), text="a"), TextChunk(id=uuid4(), text="b")]
+        provider = MistralEmbeddingProvider(_creds())
+        with pytest.raises(ProviderError, match="1 vectors for 2 texts"):
+            await provider.aembed_document(items, config=MistralEmbeddingConfig())
 
     def test_empty_list(self, mocker):
         mock_mistral = mocker.patch(

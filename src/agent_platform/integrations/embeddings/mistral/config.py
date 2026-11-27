@@ -11,8 +11,9 @@ class MistralEmbeddingConfig(EmbeddingConfig):
     # attempt-count knob; the platform's own `@with_retry()` decorator on
     # `aembed_document`/`aembed_query` already provides equivalent retry
     # behavior.
-    # Base URL for the Mistral API, forwarded as `server_url`.
-    endpoint: str = "https://api.mistral.ai/v1/"
+    # Base URL for the Mistral API, forwarded as `server_url`. Without the
+    # `/v1` version prefix: the SDK adds `/v1/embeddings` to it.
+    endpoint: str = "https://api.mistral.ai"
     # Unused: the provider issues one `embeddings.create` call per
     # `embed_document`/`embed_query` invocation (batching happens one level
     # up, in `components/retrieval/embedder/component.py`), so there is no per-provider

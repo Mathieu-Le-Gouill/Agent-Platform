@@ -43,8 +43,9 @@ def test_concrete_subclass_instantiates():
     assert isinstance(instance, BaseSpeechToText)
 
 
-def _chunk(start: int, end: int) -> AudioChunk:
-    return AudioChunk(start=start, end=end)
+def _chunk(start: int, end: int, sample_rate: int = 1000) -> AudioChunk:
+    """`start`/`end` are sample offsets; at the default 1 kHz one sample is 1 ms."""
+    return AudioChunk(start=start, end=end, sample_rate=sample_rate)
 
 
 async def _frames(*chunks: AudioChunk):
@@ -65,6 +66,25 @@ async def test_buffered_stream_flushes_once_min_duration_reached():
     assert len(results) == 1
     assert seen == [chunks]
     assert results[0].metadata == {"n": 2}
+
+
+async def test_buffered_stream_measures_duration_from_sample_rate():
+    seen: list[list[AudioChunk]] = []
+
+    async def transcribe(buffer: list[AudioChunk]) -> Transcript:
+        seen.append(buffer)
+        return Transcript(utterances=[])
+
+    # 8000 samples at 16 kHz are 500 ms each: two fill one 1000 ms window.
+    chunks = [
+        _chunk(0, 8000, sample_rate=16000),
+        _chunk(8000, 16000, sample_rate=16000),
+        _chunk(16000, 24000, sample_rate=16000),
+    ]
+    results = [t async for t in buffered_stream(_frames(*chunks), 1000, transcribe)]
+
+    assert len(results) == 2
+    assert seen == [chunks[:2], chunks[2:]]
 
 
 async def test_buffered_stream_flushes_remainder_below_threshold():

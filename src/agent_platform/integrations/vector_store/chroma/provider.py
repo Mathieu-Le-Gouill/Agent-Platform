@@ -26,7 +26,13 @@ from agent_platform.integrations.vector_store.chroma.mappers import (
 
 _STORE = "Chroma"
 _SEARCH_ERROR = "Vector store search failed"
+_ADD_ERROR = "Vector store add failed"
+_DELETE_ERROR = "Vector store delete failed"
 _translate = functools.partial(translate_sdk_error, operation=_SEARCH_ERROR)
+# Retrying an add is safe: Chroma ignores an id it already stores, so a retry
+# after a write that landed changes nothing.
+_translate_add = functools.partial(translate_sdk_error, operation=_ADD_ERROR)
+_translate_delete = functools.partial(translate_sdk_error, operation=_DELETE_ERROR)
 
 
 class ChromaStore(BaseVectorStore[ChromaConfig]):
@@ -77,8 +83,16 @@ class ChromaStore(BaseVectorStore[ChromaConfig]):
 
     async def _collection(self, client: Any, config: ChromaConfig) -> tuple[Any, bool]:
         is_async = self._is_async(client)
+        kwargs: dict[str, Any] = {"name": config.collection_name}
+        # Chroma Cloud indexes with SPANN, not HNSW, and its docs do not say
+        # how it treats an HNSW configuration, so none is sent there.
+        # Search scores assume cosine. Chroma defaults to l2 and fixes the space
+        # when it creates a collection, so an older collection keeps its own.
+        # A new dict per call: chromadb adds keys to the one it is given.
+        if not self._credentials.api_key:
+            kwargs["configuration"] = {"hnsw": {"space": "cosine"}}
         collection = await self._call(
-            is_async, client.get_or_create_collection, name=config.collection_name
+            is_async, client.get_or_create_collection, **kwargs
         )
         return collection, is_async
 
@@ -89,6 +103,8 @@ class ChromaStore(BaseVectorStore[ChromaConfig]):
             return dict(filter)
         return {"$and": [{key: value} for key, value in filter.items()]}
 
+    @error_logged(re_raise=ProviderError, message=_ADD_ERROR)
+    @with_retry(translate=_translate_add)
     async def add(
         self,
         documents: list[TextChunk],
@@ -110,6 +126,8 @@ class ChromaStore(BaseVectorStore[ChromaConfig]):
             metadatas=[chunk_to_metadata(doc) for doc in documents],
         )
 
+    @error_logged(re_raise=ProviderError, message=_DELETE_ERROR)
+    @with_retry(translate=_translate_delete)
     async def delete(
         self, document_ids: list[UUID], config: ChromaConfig | None = None
     ) -> None:
@@ -165,13 +183,9 @@ class ChromaStore(BaseVectorStore[ChromaConfig]):
         return [
             (
                 row_to_chunk(id_, text, metadata),
-                # Assumes a cosine-configured collection (`hnsw:space=cosine`),
-                # the common setup for text embeddings; the collection is
-                # pre-existing and not created by this provider, so its
-                # actual metric isn't otherwise known here.
                 Score.similarity(min(1.0, max(0.0, 1.0 - distance))),
             )
             for id_, text, metadata, distance in zip(
-                ids, documents, metadatas, distances
+                ids, documents, metadatas, distances, strict=True
             )
         ]
