@@ -16,7 +16,6 @@ from agent_platform.core.credentials import (
 from agent_platform.core.errors import require_secret
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     StreamChunk,
     ToolCallDelta,
@@ -26,12 +25,20 @@ from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import MistralCredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.mistral.config import MistralGenerationConfig
 from agent_platform.integrations.llm.mistral.mappers import (
+    error_body,
     from_native_response,
     to_native_messages,
     to_native_params,
 )
+from agent_platform.integrations.sdk_errors import parse_retry_after
+
+# Mistral's code for a prompt longer than the model's context window.
+# https://docs.mistral.ai/resources/error-glossary (row 3059)
+_PROMPT_TOO_LONG_CODE = "3059"
+_PROMPT_TOO_LONG_TYPE = "invalid_request_prompt_too_long"
 
 if TYPE_CHECKING:
     from agent_platform.core.interfaces.llm.tool_spec import ToolSpec
@@ -97,6 +104,20 @@ class MistralLLM(
             return exc.status_code
         return None
 
+    def _retry_after(self, exc: Exception) -> float | None:
+        if isinstance(exc, MistralError):
+            return parse_retry_after(exc.headers.get("retry-after"))
+        return None
+
+    def _is_context_window(self, exc: Exception) -> bool:
+        if not isinstance(exc, MistralError) or exc.status_code != 400:
+            return False
+        body = error_body(exc.body)
+        return (
+            str(body.get("code")) == _PROMPT_TOO_LONG_CODE
+            or body.get("type") == _PROMPT_TOO_LONG_TYPE
+        )
+
     def _is_timeout(self, exc: Exception) -> bool:
         return isinstance(exc, httpx.TimeoutException) or super()._is_timeout(exc)
 
@@ -153,7 +174,11 @@ class MistralLLM(
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
         with self._observe(resolved) as call:
-            usage_totals = TokenUsage.zero()
+            usage: TokenUsage | None = None
+            raw_finish_reason: object = None
+            # Stream-wide index per call id: the SDK's own `index` defaults
+            # to 0 on every chunk, which would merge separate calls.
+            call_indices: dict[str, int] = {}
             events = await client.chat.stream_async(
                 model=resolved.model,
                 messages=messages,  # type: ignore[arg-type]
@@ -162,38 +187,41 @@ class MistralLLM(
             async for event in events:
                 chunk = event.data
                 if chunk.choices:
-                    delta = chunk.choices[0].delta.content
+                    choice = chunk.choices[0]
+                    if choice.finish_reason is not None:
+                        raw_finish_reason = choice.finish_reason
+                    delta = choice.delta.content
                     if isinstance(delta, str) and delta:
                         yield StreamChunk(delta=delta)
-                    tool_call_deltas = [
-                        ToolCallDelta(
-                            index=idx,
-                            id=tc.id,
-                            name=tc.function.name if tc.function else None,
-                            arguments_delta=(
-                                tc.function.arguments
-                                if tc.function
-                                and isinstance(tc.function.arguments, str)
-                                else None
-                            ),
+                    tool_call_deltas = []
+                    for tc in choice.delta.tool_calls or []:
+                        if tc.id and tc.id not in call_indices:
+                            call_indices[tc.id] = len(call_indices)
+                        # A fragment without an id continues the latest call.
+                        index = (
+                            call_indices[tc.id]
+                            if tc.id
+                            else max(len(call_indices) - 1, 0)
                         )
-                        for idx, tc in enumerate(
-                            chunk.choices[0].delta.tool_calls or []
+                        tool_call_deltas.append(
+                            ToolCallDelta(
+                                index=index,
+                                id=tc.id,
+                                name=tc.function.name if tc.function else None,
+                                arguments_delta=(
+                                    tc.function.arguments
+                                    if tc.function
+                                    and isinstance(tc.function.arguments, str)
+                                    else None
+                                ),
+                            )
                         )
-                    ]
                     if tool_call_deltas:
                         yield StreamChunk(delta="", tool_call_deltas=tool_call_deltas)
                 if chunk.usage is not None:
-                    chunk_usage = TokenUsage(
-                        input_tokens=chunk.usage.prompt_tokens,
-                        output_tokens=chunk.usage.completion_tokens,
-                    )
-                    usage_totals = chunk_usage
-                    yield StreamChunk(
-                        delta="",
-                        finish_reason=FinishReason.STOP,
-                        usage=chunk_usage,
+                    usage = TokenUsage(
+                        input_tokens=chunk.usage.prompt_tokens or 0,
+                        output_tokens=chunk.usage.completion_tokens or 0,
                     )
 
-            self._record_usage(call, usage_totals)
-            yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
+            yield self._end_stream(call, usage, to_finish_reason(raw_finish_reason))

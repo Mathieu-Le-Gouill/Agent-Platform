@@ -14,7 +14,7 @@ from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.interfaces.llm.response import ResponseFormat
 from agent_platform.core.schemas.document import AudioDocument, ImageDocument
-from agent_platform.core.schemas.enums import AudioFormat, ImageFormat
+from agent_platform.core.schemas.enums import AudioFormat, FinishReason, ImageFormat
 from agent_platform.core.schemas.message import (
     AudioBlock,
     ImageBlock,
@@ -26,6 +26,7 @@ from agent_platform.core.schemas.message import (
     ToolResult,
     UserMessage,
 )
+from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import GoogleCredentials
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
 from agent_platform.integrations.llm.google.mappers import (
@@ -45,8 +46,8 @@ def _creds(key: str = "gm-test") -> GoogleCredentials:
     return GoogleCredentials(api_key=SecretStr(key))
 
 
-def _part(text=None, function_call=None):
-    return SimpleNamespace(text=text, function_call=function_call)
+def _part(text=None, function_call=None, thought=None):
+    return SimpleNamespace(text=text, function_call=function_call, thought=thought)
 
 
 def _function_call(id, name, args):
@@ -312,6 +313,13 @@ class TestToNativeConfig:
 
 
 class TestFromNativeResponse:
+    def test_thought_parts_are_not_part_of_the_answer(self):
+        response = _response(
+            [_part(text="Reasoning summary", thought=True), _part(text="Answer")]
+        )
+        result = _from_native_response(response, "gemini-2.5-flash")
+        assert result.message.content == "Answer"
+
     def test_extracts_text_and_tool_calls(self):
         response = _response(
             [
@@ -421,9 +429,20 @@ class TestGoogleLLMStream:
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
 
+        # Gemini repeats the cumulative usage on every chunk.
         chunks = [
-            _response([_part(text="Hello")]),
-            _response([_part(text=" World")], prompt_tokens=5, candidates_tokens=10),
+            _response(
+                [_part(text="Hello")],
+                prompt_tokens=5,
+                candidates_tokens=4,
+                finish_reason=None,
+            ),
+            _response(
+                [_part(text=" World")],
+                prompt_tokens=5,
+                candidates_tokens=10,
+                finish_reason="MAX_TOKENS",
+            ),
         ]
 
         async def _gen():
@@ -436,10 +455,57 @@ class TestGoogleLLMStream:
         prompt = Prompt(messages=[UserMessage(content="Hi")])
         results = [c async for c in provider.stream(prompt)]
 
-        assert results[0].delta == "Hello"
-        assert results[1].delta == " World"
-        assert results[2].usage.input_tokens == 5
-        assert results[2].usage.output_tokens == 10
+        assert [c.delta for c in results] == ["Hello", " World", ""]
+        assert [c.usage for c in results if c.usage is not None] == [
+            TokenUsage(input_tokens=5, output_tokens=10)
+        ]
+        assert results[-1].finish_reason == FinishReason.LENGTH
+
+    async def test_stream_keeps_thought_parts_out_of_the_text(self, mocker):
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.llm.google.provider.genai.Client"
+        )
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+
+        async def _gen():
+            yield _response([_part(text="Thinking...", thought=True)])
+            yield _response([_part(text="Answer")])
+
+        mock_client.aio.models.generate_content_stream = AsyncMock(return_value=_gen())
+
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
+        prompt = Prompt(messages=[UserMessage(content="Hi")])
+        results = [c async for c in provider.stream(prompt)]
+
+        assert "".join(c.delta for c in results) == "Answer"
+
+    async def test_stream_tool_call_indices_count_across_chunks(self, mocker):
+        mock_client_cls = mocker.patch(
+            "agent_platform.integrations.llm.google.provider.genai.Client"
+        )
+        mock_client = MagicMock()
+        mock_client_cls.return_value = mock_client
+
+        async def _gen():
+            yield _response(
+                [
+                    _part(text="Let me look."),
+                    _part(function_call=_function_call(None, "search", {"q": "a"})),
+                ]
+            )
+            yield _response(
+                [_part(function_call=_function_call(None, "lookup", {"q": "b"}))]
+            )
+
+        mock_client.aio.models.generate_content_stream = AsyncMock(return_value=_gen())
+
+        provider = GoogleLLM(_creds(), model="gemini-2.5-flash")
+        prompt = Prompt(messages=[UserMessage(content="Hi")])
+        results = [c async for c in provider.stream(prompt)]
+
+        deltas = [d for c in results for d in c.tool_call_deltas]
+        assert [(d.index, d.name) for d in deltas] == [(0, "search"), (1, "lookup")]
 
     async def test_stream_with_tools_yields_tool_call_delta(self, mocker):
         class _Input(BaseModel):

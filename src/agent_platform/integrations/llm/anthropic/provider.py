@@ -23,7 +23,6 @@ from agent_platform.core.interfaces.llm.batch import (
 )
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     StreamChunk,
     ToolCallDelta,
@@ -35,6 +34,7 @@ from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import AnthropicCredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 from agent_platform.integrations.llm.anthropic.mappers import (
     batch_job_from_native,
@@ -212,7 +212,10 @@ class AnthropicLLM(
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
         with self._observe(resolved) as call:
-            usage_totals = TokenUsage.zero()
+            # `message_start` carries the input count; every `message_delta`
+            # carries cumulative counts, so the last one wins.
+            usage: TokenUsage | None = None
+            stop_reason: str | None = None
             events = cast(
                 "AsyncStream[RawMessageStreamEvent]",
                 await client.messages.create(
@@ -261,24 +264,23 @@ class AnthropicLLM(
                         ],
                     )
                 elif event.type == "message_start":
-                    usage_totals = usage_totals + TokenUsage(
-                        input_tokens=event.message.usage.input_tokens,
-                        output_tokens=0,
+                    usage = TokenUsage(
+                        input_tokens=event.message.usage.input_tokens or 0,
+                        output_tokens=event.message.usage.output_tokens or 0,
                     )
-                elif event.type == "message_delta" and event.usage is not None:
-                    chunk_usage = TokenUsage(
-                        input_tokens=0,
-                        output_tokens=event.usage.output_tokens or 0,
-                    )
-                    usage_totals = usage_totals + chunk_usage
-                    yield StreamChunk(
-                        delta="",
-                        finish_reason=FinishReason.STOP,
-                        usage=chunk_usage,
-                    )
+                elif event.type == "message_delta":
+                    if event.delta.stop_reason is not None:
+                        stop_reason = event.delta.stop_reason
+                    if event.usage is not None:
+                        input_tokens = event.usage.input_tokens
+                        if input_tokens is None:
+                            input_tokens = usage.input_tokens if usage else 0
+                        usage = TokenUsage(
+                            input_tokens=input_tokens,
+                            output_tokens=event.usage.output_tokens or 0,
+                        )
 
-            self._record_usage(call, usage_totals)
-            yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
+            yield self._end_stream(call, usage, to_finish_reason(stop_reason))
 
     # Not retried: a failure after the request left may mean the batch was
     # created and will be billed, and a second submission would run it twice.

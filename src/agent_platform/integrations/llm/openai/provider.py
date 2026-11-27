@@ -24,7 +24,6 @@ from agent_platform.core.interfaces.llm.batch import (
 )
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     StreamChunk,
     ToolCallDelta,
@@ -36,6 +35,7 @@ from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 from agent_platform.integrations.llm.openai.mappers import (
     batch_job_from_native,
@@ -212,7 +212,8 @@ class OpenAILLM(
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
         with self._observe(resolved) as call:
-            usage_totals = TokenUsage.zero()
+            usage: TokenUsage | None = None
+            raw_finish_reason: str | None = None
             events = cast(
                 "AsyncStream[ChatCompletionChunk]",
                 await client.chat.completions.create(
@@ -224,6 +225,8 @@ class OpenAILLM(
             )
             async for chunk in events:
                 if chunk.choices:
+                    if chunk.choices[0].finish_reason is not None:
+                        raw_finish_reason = chunk.choices[0].finish_reason
                     delta = chunk.choices[0].delta.content
                     if delta:
                         yield StreamChunk(delta=delta)
@@ -241,19 +244,12 @@ class OpenAILLM(
                     if tool_call_deltas:
                         yield StreamChunk(delta="", tool_call_deltas=tool_call_deltas)
                 if chunk.usage is not None:
-                    chunk_usage = TokenUsage(
+                    usage = TokenUsage(
                         input_tokens=chunk.usage.prompt_tokens,
                         output_tokens=chunk.usage.completion_tokens,
                     )
-                    usage_totals = chunk_usage
-                    yield StreamChunk(
-                        delta="",
-                        finish_reason=FinishReason.STOP,
-                        usage=chunk_usage,
-                    )
 
-            self._record_usage(call, usage_totals)
-            yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
+            yield self._end_stream(call, usage, to_finish_reason(raw_finish_reason))
 
     # Not retried: a failure after the request left may mean the batch was
     # created and will be billed, and a second submission would run it twice.

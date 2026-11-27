@@ -27,7 +27,6 @@ from agent_platform.core.credentials import (
 from agent_platform.core.errors import require_secret
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     StreamChunk,
     ToolCallDelta,
@@ -37,6 +36,7 @@ from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import GoogleCredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
 from agent_platform.integrations.llm.google.mappers import (
     from_native_response,
@@ -166,7 +166,11 @@ class GoogleLLM(
         native_config = to_native_config(resolved, system, tools, self._tool_to_schema)
 
         with self._observe(resolved) as call:
-            usage_totals = TokenUsage.zero()
+            # Every chunk repeats the usage so far (the whole prompt, the
+            # candidates generated up to it), so only the last one counts.
+            usage: TokenUsage | None = None
+            raw_finish_reason: object = None
+            tool_call_count = 0
             events = await client.aio.models.generate_content_stream(
                 model=resolved.model,
                 contents=contents,
@@ -174,38 +178,35 @@ class GoogleLLM(
             )
             async for chunk in events:
                 if chunk.candidates:
-                    content = chunk.candidates[0].content
-                    parts = content.parts if content else None
-                    for idx, part in enumerate(parts or []):
-                        if part.text:
+                    candidate = chunk.candidates[0]
+                    if candidate.finish_reason is not None:
+                        raw_finish_reason = candidate.finish_reason
+                    content = candidate.content
+                    for part in (content.parts if content else None) or []:
+                        if part.text and not part.thought:
                             yield StreamChunk(delta=part.text)
                         if part.function_call:
                             fc = part.function_call
                             # Gemini emits each function call whole in one
                             # chunk (no argument fragmentation like OpenAI/
-                            # Anthropic), and has no native call id.
+                            # Anthropic), and has no native call id, so the
+                            # index counts calls across the whole stream.
                             yield StreamChunk(
                                 delta="",
                                 tool_call_deltas=[
                                     ToolCallDelta(
-                                        index=idx,
+                                        index=tool_call_count,
                                         id=fc.id or uuid4().hex,
                                         name=fc.name,
                                         arguments_delta=json.dumps(dict(fc.args or {})),
                                     )
                                 ],
                             )
+                            tool_call_count += 1
                 if chunk.usage_metadata is not None:
-                    chunk_usage = TokenUsage(
+                    usage = TokenUsage(
                         input_tokens=chunk.usage_metadata.prompt_token_count or 0,
                         output_tokens=chunk.usage_metadata.candidates_token_count or 0,
                     )
-                    usage_totals = chunk_usage
-                    yield StreamChunk(
-                        delta="",
-                        finish_reason=FinishReason.STOP,
-                        usage=chunk_usage,
-                    )
 
-            self._record_usage(call, usage_totals)
-            yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
+            yield self._end_stream(call, usage, to_finish_reason(raw_finish_reason))

@@ -99,7 +99,9 @@ class OpenAILLM(NativeLLMProvider[OpenAIGenerationConfig, AsyncOpenAI, OpenAI, C
 
 `retryable` says the same call may succeed later: `retry_async`/`retry_sync` stop at once on `False`, and a `CircuitBreaker` only counts retryable errors. `retry_after` is the seconds the vendor asked to wait; the retry loop waits at least that long, capped at 30 s.
 
-A new LLM provider implements the abstract `_stream` (not `stream`, which the base wraps to translate errors) and, where its SDK differs from the defaults, the hooks `_status_code`, `_retry_after`, `_error_kinds`, `_is_context_window`, `_is_timeout` and `_is_transient`. It sets `_api_key_env` to the name of its key's env var, or leaves it `None` when it needs no key; `build_llm_with_fallback` warns at startup when that key is missing.
+**Stream contract.** Every provider's `_stream` ends with one chunk built by `_base.py::_end_stream`. That last chunk is the only one carrying `usage` (the call's total, or `None` when the vendor reported none), because callers add up the usage of every chunk; it also carries the real `finish_reason`, mapped through `to_finish_reason` (`UNKNOWN` when the vendor sent none). Earlier chunks keep the `StreamChunk.finish_reason` default `STOP`, so only the last chunk's reason is authoritative. `ToolCallDelta.index` is unique across the whole stream, not per chunk, so fragments of different tool calls never merge.
+
+A new LLM provider implements the abstract `_stream` (not `stream`, which the base wraps to translate errors) and ends it with `_end_stream`, and, where its SDK differs from the defaults, the hooks `_status_code`, `_retry_after`, `_error_kinds`, `_is_context_window`, `_is_timeout` and `_is_transient`. It sets `_api_key_env` to the name of its key's env var, or leaves it `None` when it needs no key; `build_llm_with_fallback` warns at startup when that key is missing.
 
 ### Non-LLM error contract
 

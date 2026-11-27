@@ -22,6 +22,7 @@ from agent_platform.core.schemas.message import (
     ToolResult,
     UserMessage,
 )
+from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
@@ -43,6 +44,22 @@ from agent_platform.integrations.llm.huggingface.provider import HuggingFaceLLM
 
 def _creds(key: str = "hf_test") -> HuggingFaceCredentials:
     return HuggingFaceCredentials(api_key=SecretStr(key))
+
+
+def _stream_chunk(
+    content: str | None = None,
+    tool_calls: list[SimpleNamespace] | None = None,
+    finish_reason: str | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                delta=SimpleNamespace(content=content, tool_calls=tool_calls),
+                finish_reason=finish_reason,
+            )
+        ],
+        usage=None,
+    )
 
 
 def _tool_call(id: str, name: str, arguments: str) -> SimpleNamespace:
@@ -274,8 +291,17 @@ class TestToNativeParams:
         result = _to_native_params(cfg)
         assert result["response_format"] == {
             "type": "json_schema",
-            "json_schema": {"name": "response", "schema": schema},
+            "json_schema": {"name": "response", "schema": schema, "strict": True},
         }
+
+    def test_response_format_json_schema_name_comes_from_the_title(self):
+        schema = {"title": "Weather Report", "type": "object", "properties": {}}
+        cfg = HuggingFaceGenerationConfig(
+            response_format=ResponseFormat.JSON_SCHEMA, json_schema=schema
+        )
+        result = _to_native_params(cfg)
+        assert result["response_format"]["json_schema"]["name"] == "WeatherReport"
+        assert result["response_format"]["json_schema"]["strict"] is True
 
 
 class TestFromNative:
@@ -529,22 +555,8 @@ class TestHuggingFaceLLMStream:
         mock_client_cls.return_value = mock_client
 
         chunks = [
-            SimpleNamespace(
-                choices=[
-                    SimpleNamespace(
-                        delta=SimpleNamespace(content="Hello", tool_calls=None)
-                    )
-                ],
-                usage=None,
-            ),
-            SimpleNamespace(
-                choices=[
-                    SimpleNamespace(
-                        delta=SimpleNamespace(content=" World", tool_calls=None)
-                    )
-                ],
-                usage=None,
-            ),
+            _stream_chunk(content="Hello"),
+            _stream_chunk(content=" World", finish_reason="length"),
             SimpleNamespace(
                 choices=[],
                 usage=SimpleNamespace(prompt_tokens=5, completion_tokens=10),
@@ -562,13 +574,13 @@ class TestHuggingFaceLLMStream:
         config = HuggingFaceGenerationConfig(model="test/model")
         results = [c async for c in provider.stream(prompt, config=config)]
 
-        assert results[0].delta == "Hello"
-        assert results[1].delta == " World"
-        assert results[2].delta == ""
-        assert results[2].usage.input_tokens == 5
-        assert results[2].usage.output_tokens == 10
-        assert results[3].delta == ""
-        assert results[3].finish_reason == FinishReason.STOP
+        _, kwargs = mock_client.chat_completion.call_args
+        assert kwargs["stream_options"].include_usage is True
+        assert [c.delta for c in results] == ["Hello", " World", ""]
+        assert [c.usage for c in results if c.usage is not None] == [
+            TokenUsage(input_tokens=5, output_tokens=10)
+        ]
+        assert results[-1].finish_reason == FinishReason.LENGTH
 
     async def test_stream_with_no_chunks(self, mocker):
         mock_client_cls = mocker.patch(
@@ -590,7 +602,8 @@ class TestHuggingFaceLLMStream:
 
         assert len(results) == 1
         assert results[0].delta == ""
-        assert results[0].finish_reason == FinishReason.STOP
+        assert results[0].usage is None
+        assert results[0].finish_reason == FinishReason.UNKNOWN
 
     async def test_stream_with_tools_yields_tool_call_deltas(self, mocker):
         class _Input(BaseModel):
@@ -611,43 +624,26 @@ class TestHuggingFaceLLMStream:
         mock_client_cls.return_value = mock_client
 
         chunks = [
-            SimpleNamespace(
-                choices=[
+            _stream_chunk(
+                tool_calls=[
                     SimpleNamespace(
-                        delta=SimpleNamespace(
-                            content=None,
-                            tool_calls=[
-                                SimpleNamespace(
-                                    index=0,
-                                    id="call_1",
-                                    function=SimpleNamespace(
-                                        name="search", arguments=""
-                                    ),
-                                )
-                            ],
-                        )
+                        index=0,
+                        id="call_1",
+                        function=SimpleNamespace(name="search", arguments=""),
                     )
-                ],
-                usage=None,
+                ]
             ),
-            SimpleNamespace(
-                choices=[
+            _stream_chunk(
+                tool_calls=[
                     SimpleNamespace(
-                        delta=SimpleNamespace(
-                            content=None,
-                            tool_calls=[
-                                SimpleNamespace(
-                                    index=0,
-                                    id=None,
-                                    function=SimpleNamespace(
-                                        name=None, arguments='{"query": "hi"}'
-                                    ),
-                                )
-                            ],
-                        )
+                        index=0,
+                        id=None,
+                        function=SimpleNamespace(
+                            name=None, arguments='{"query": "hi"}'
+                        ),
                     )
                 ],
-                usage=None,
+                finish_reason="tool_calls",
             ),
             SimpleNamespace(
                 choices=[],
@@ -676,3 +672,4 @@ class TestHuggingFaceLLMStream:
         assert deltas[0].id == "call_1"
         assert deltas[0].name == "search"
         assert deltas[1].arguments_delta == '{"query": "hi"}'
+        assert results[-1].finish_reason == FinishReason.TOOL_CALL

@@ -4,6 +4,7 @@ import base64
 import logging
 from typing import Any
 
+from anthropic import transform_schema
 from anthropic.types import Message
 
 from agent_platform.core.errors import ProviderError
@@ -44,7 +45,41 @@ __all__ = [
 
 logger = logging.getLogger(__name__)
 
-_DEFAULT_MAX_TOKENS = 1024
+# Used when the config sets no `max_tokens` (the API requires one). 1024
+# truncated ordinary answers. 4096 is the output cap of the smallest
+# Claude 3 model still in `_SAMPLING_MODEL_PREFIXES`, and at a typical
+# 50-80 tokens/s it finishes inside `DEFAULT_LLM_TIMEOUT_SECONDS` (120 s);
+# a larger default would time out non-streaming calls, and each timeout is
+# retried and billed again. Set `max_tokens` for longer outputs.
+_DEFAULT_MAX_TOKENS = 4096
+
+# Models that still accept `temperature`, `top_p` and `top_k` on the API
+# version the SDK sends (2023-06-01). Claude Opus 4.7 and every later model
+# reject non-default values with a 400, so a model matching none of these
+# prefixes, a future one included, gets none of them.
+# https://platform.claude.com/docs/en/build-with-claude/thinking
+# ("Sampling parameters")
+_SAMPLING_MODEL_PREFIXES = (
+    "claude-3",
+    "claude-4-",
+    "claude-opus-4-0",
+    "claude-opus-4-1",
+    "claude-opus-4-2025",
+    "claude-opus-4-5",
+    "claude-opus-4-6",
+    "claude-sonnet-4-0",
+    "claude-sonnet-4-2025",
+    "claude-sonnet-4-5",
+    "claude-sonnet-4-6",
+    "claude-haiku-4-5",
+)
+# Every Claude 4+ model rejects `temperature` and `top_p` in one request;
+# among the allowlisted models only Claude 3 accepts both. Anthropic's
+# model-migration guide ("Sampling parameters: temperature OR top_p, not
+# both") and docs.claude.com/en/docs/about-claude/models/migrating-to-claude-4.
+_BOTH_SAMPLING_MODEL_PREFIXES = ("claude-3",)
+# Thinking modes under which those models reject `temperature` and `top_k`.
+_THINKING_ON_TYPES = frozenset({"enabled", "adaptive"})
 
 # `output_config.effort` support per model.
 # https://platform.claude.com/docs/en/build-with-claude/effort ("supportedModels"
@@ -179,16 +214,60 @@ def _effort(config: AnthropicGenerationConfig) -> str | None:
     return nearest_level("anthropic", level, supported, model)
 
 
+def _sampling_params(config: AnthropicGenerationConfig) -> dict[str, Any]:
+    """Returns the sampling parameters the model accepts; each one dropped is logged.
+
+    Only the parameter names and the model id are logged, never the values.
+    """
+    model = config.model
+    params = {
+        name: value
+        for name, value in (
+            ("temperature", config.temperature),
+            ("top_p", config.top_p),
+            ("top_k", config.top_k),
+        )
+        if value is not None
+    }
+
+    def drop(name: str, reason: str) -> None:
+        if params.pop(name, None) is not None:
+            logger.warning("%s is ignored: %s", name, reason)
+
+    model_lower = model.lower()
+    if not model_lower.startswith(_SAMPLING_MODEL_PREFIXES):
+        for name in list(params):
+            drop(name, f"{model!r} does not accept sampling parameters")
+        return params
+    thinking = config.extra_params.get("thinking")
+    if isinstance(thinking, dict) and thinking.get("type") in _THINKING_ON_TYPES:
+        drop("temperature", "it is incompatible with thinking")
+        drop("top_k", "it is incompatible with thinking")
+    if "temperature" in params and not model_lower.startswith(
+        _BOTH_SAMPLING_MODEL_PREFIXES
+    ):
+        drop("top_p", f"{model!r} rejects temperature and top_p together")
+    return params
+
+
+def _output_schema(schema: dict[str, Any]) -> dict[str, Any]:
+    """Returns `schema` reduced to the JSON Schema subset structured outputs accept.
+
+    `anthropic.transform_schema` closes every object and moves unsupported
+    constraints (`minimum`, `maxLength`, ...) into descriptions. A schema it
+    cannot read (a node with no `type`, such as an `Any` field) is sent as
+    is, and the API names what it rejects.
+    """
+    try:
+        return transform_schema(schema)
+    except ValueError:
+        return schema
+
+
 def to_native_params(
     config: AnthropicGenerationConfig, *, has_tools: bool = False
 ) -> dict[str, Any]:
-    params: dict[str, Any] = {}
-    if config.temperature is not None:
-        params["temperature"] = config.temperature
-    if config.top_p is not None:
-        params["top_p"] = config.top_p
-    if config.top_k is not None:
-        params["top_k"] = config.top_k
+    params: dict[str, Any] = _sampling_params(config)
     if config.stop_sequences:
         params["stop_sequences"] = config.stop_sequences
     params["max_tokens"] = config.max_tokens or _DEFAULT_MAX_TOKENS
@@ -227,7 +306,7 @@ def to_native_params(
                 )
             output_config["format"] = {
                 "type": "json_schema",
-                "schema": config.json_schema,
+                "schema": _output_schema(config.json_schema),
             }
 
     if output_config:

@@ -701,7 +701,7 @@ class TestStreamedErrorEvents:
 
 class TestRetryAfterAndContextWindow:
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("class_name", ["OpenAILLM", "AnthropicLLM"])
+    @pytest.mark.parametrize("class_name", ["OpenAILLM", "AnthropicLLM", "MistralLLM"])
     async def test_a_429_carries_the_retry_after_header(
         self, class_name, no_retry_sleep
     ):
@@ -716,7 +716,7 @@ class TestRetryAfterAndContextWindow:
         assert caught.value.retry_after == 7.0
 
     @pytest.mark.asyncio
-    @pytest.mark.parametrize("class_name", ["OpenAILLM", "AnthropicLLM"])
+    @pytest.mark.parametrize("class_name", ["OpenAILLM", "AnthropicLLM", "MistralLLM"])
     async def test_an_unparsable_retry_after_is_ignored(
         self, class_name, no_retry_sleep
     ):
@@ -765,6 +765,42 @@ class TestRetryAfterAndContextWindow:
 
         assert caught.value.code == "llm_context_window"
         assert caught.value.retryable is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "body",
+        [
+            '{"message": "Prompt 140000 > 128000 maximum context length",'
+            ' "type": "invalid_request_prompt_too_long", "code": "3059"}',
+            '{"message": "too long", "code": "3059"}',
+            '{"message": "too long", "type": "invalid_request_prompt_too_long"}',
+        ],
+    )
+    async def test_a_mistral_prompt_too_long_400_is_a_context_window_error(self, body):
+        provider = _provider("MistralLLM")
+        response = httpx.Response(400, request=_request(), content=body.encode())
+        _stub_failing_call(provider, MistralError("bad request", response))
+
+        with pytest.raises(LLMContextWindowError) as caught:
+            await provider.agenerate(_PROMPT)
+
+        assert caught.value.code == "llm_context_window"
+        assert caught.value.retryable is False
+
+    @pytest.mark.asyncio
+    @pytest.mark.parametrize(
+        "body",
+        ['{"message": "bad", "type": "invalid_request"}', "[]", "<html>oops</html>"],
+    )
+    async def test_another_mistral_400_is_a_plain_bad_request(self, body):
+        provider = _provider("MistralLLM")
+        response = httpx.Response(400, request=_request(), content=body.encode())
+        _stub_failing_call(provider, MistralError("bad request", response))
+
+        with pytest.raises(ProviderError) as caught:
+            await provider.agenerate(_PROMPT)
+
+        assert caught.value.code == "provider_bad_request"
 
     @pytest.mark.asyncio
     async def test_another_anthropic_400_is_a_plain_bad_request(self):

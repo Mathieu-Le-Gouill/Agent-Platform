@@ -26,6 +26,7 @@ from agent_platform.core.interfaces.llm.errors import (
 from agent_platform.core.interfaces.llm.response import LLMResponse, StreamChunk
 from agent_platform.core.observability import LLMCall, observe
 from agent_platform.core.retry import retry_async, retry_sync
+from agent_platform.core.schemas.enums import FinishReason
 from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.sdk_errors import is_transient_status
@@ -68,10 +69,11 @@ class NativeLLMProvider(
     message/param mapping, response parsing); this base owns the tracing,
     retry, error-translation and token-usage wiring that is otherwise
     identical across providers. The stream body is not templated: token-usage
-    accumulation differs enough per vendor (e.g. Anthropic's additive
-    `message_start`/`message_delta` events vs. a single final-chunk usage
+    accumulation differs enough per vendor (e.g. Anthropic's input count in
+    `message_start` and cumulative counts in `message_delta`, Gemini's
+    cumulative usage repeated on every chunk, a single final-chunk usage
     elsewhere) that forcing one shape risks silently misreporting usage; each
-    provider implements `_stream()` directly and can still reuse `_observe`.
+    provider implements `_stream()` directly and ends it with `_end_stream`.
     Only error translation is templated: `stream()` wraps `_stream()` so a
     vendor failure, before or after the first chunk, reaches the caller as the
     same typed error `generate`/`agenerate` raise.
@@ -198,6 +200,22 @@ class NativeLLMProvider(
         """
         call.input_tokens = usage.input_tokens
         call.output_tokens = usage.output_tokens
+
+    @classmethod
+    def _end_stream(
+        cls,
+        call: LLMCall,
+        usage: TokenUsage | None,
+        finish_reason: FinishReason,
+    ) -> StreamChunk:
+        """Record a finished stream on its observation and return its last chunk.
+
+        The last chunk is the only one that carries usage: callers add up the
+        usage of every chunk, so the call's total must reach them exactly once.
+        """
+        cls._record_usage(call, usage or TokenUsage.zero())
+        call.finish_reasons = (finish_reason.value,)
+        return StreamChunk(delta="", finish_reason=finish_reason, usage=usage)
 
     @classmethod
     def _record_response(cls, call: LLMCall, response: LLMResponse) -> None:

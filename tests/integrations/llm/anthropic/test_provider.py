@@ -1,16 +1,18 @@
+import copy
 from types import SimpleNamespace
 from unittest.mock import AsyncMock, MagicMock
 
 import anthropic
 import httpx
 import pytest
-from pydantic import BaseModel, SecretStr
+from pydantic import BaseModel, Field, SecretStr
 
 from agent_platform.agents.tools.base import Tool
 from agent_platform.core.credentials import ClientOptions
 from agent_platform.core.errors import MissingCredentialError, ProviderError
 from agent_platform.core.interfaces.llm.batch import BatchRequest, BatchStatus
 from agent_platform.core.interfaces.llm.response import ResponseFormat
+from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.document import AudioDocument, ImageDocument
 from agent_platform.core.schemas.enums import AudioFormat, FinishReason, ImageFormat
 from agent_platform.core.schemas.message import (
@@ -25,6 +27,7 @@ from agent_platform.core.schemas.message import (
     ToolResult,
     UserMessage,
 )
+from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import AnthropicCredentials
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 from agent_platform.integrations.llm.anthropic.mappers import (
@@ -190,7 +193,9 @@ class TestToNativeParams:
     def test_default_config(self):
         cfg = AnthropicGenerationConfig()
         result = _to_native_params(cfg)
-        assert result == {"max_tokens": 1024}
+        # Fits the 4096-token cap of Claude 3 models and finishes within
+        # the default 120 s timeout of a non-streaming call.
+        assert result == {"max_tokens": 4096}
 
     def test_with_max_tokens(self):
         cfg = AnthropicGenerationConfig(max_tokens=500)
@@ -199,25 +204,98 @@ class TestToNativeParams:
 
     def test_with_all_fields(self):
         cfg = AnthropicGenerationConfig(
+            model="claude-sonnet-4-6",
             temperature=0.1,
             max_tokens=200,
-            top_p=0.9,
             top_k=40,
             stop_sequences=["stop1"],
         )
         result = _to_native_params(cfg)
         assert result["temperature"] == 0.1
         assert result["max_tokens"] == 200
-        assert result["top_p"] == 0.9
         assert result["top_k"] == 40
         assert result["stop_sequences"] == ["stop1"]
+
+    def test_top_p_alone_is_sent_on_a_model_that_accepts_sampling(self):
+        cfg = AnthropicGenerationConfig(model="claude-haiku-4-5", top_p=0.9)
+        assert _to_native_params(cfg)["top_p"] == 0.9
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "claude-opus-4-0",
+            "claude-sonnet-4-20250514",
+            "claude-opus-4-1-20250805",
+            "claude-sonnet-4-5-20250929",
+            "claude-haiku-4-5",
+            "claude-opus-4-5-20251101",
+            "claude-sonnet-4-6",
+            "claude-opus-4-6",
+        ],
+    )
+    def test_temperature_and_top_p_together_send_only_temperature(self, model, caplog):
+        cfg = AnthropicGenerationConfig(model=model, temperature=0.3, top_p=0.9)
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg)
+        assert result["temperature"] == 0.3
+        assert "top_p" not in result
+        assert "top_p is ignored" in caplog.text
+
+    @pytest.mark.parametrize(
+        "model",
+        ["claude-3-haiku-20240307", "claude-3-5-sonnet-20241022"],
+    )
+    def test_claude_3_models_get_both(self, model, caplog):
+        cfg = AnthropicGenerationConfig(model=model, temperature=0.3, top_p=0.9)
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg)
+        assert (result["temperature"], result["top_p"]) == (0.3, 0.9)
+        assert "top_p is ignored" not in caplog.text
+
+    @pytest.mark.parametrize(
+        "model",
+        [
+            "claude-opus-4-7",
+            "claude-opus-4-8",
+            "claude-opus-5-5",
+            "claude-sonnet-5-5",
+            "claude-haiku-5-5",
+            "claude-fable-5-2",
+            "claude-mythos-5-2",
+            "claude-future-9",
+        ],
+    )
+    def test_models_that_reject_sampling_get_none_and_warn(self, model, caplog):
+        cfg = AnthropicGenerationConfig(
+            model=model, temperature=0.3, top_p=0.9, top_k=5
+        )
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg)
+        assert not {"temperature", "top_p", "top_k"} & result.keys()
+        assert caplog.text.count("does not accept sampling parameters") == 3
+        assert "0.3" not in caplog.text
+
+    def test_thinking_drops_temperature_and_top_k_but_keeps_top_p(self, caplog):
+        cfg = AnthropicGenerationConfig(
+            model="claude-sonnet-4-6",
+            temperature=0.3,
+            top_p=0.97,
+            top_k=5,
+            extra_params={"thinking": {"type": "adaptive"}},
+        )
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg)
+        assert "temperature" not in result
+        assert "top_k" not in result
+        assert result["top_p"] == 0.97
+        assert caplog.text.count("incompatible with thinking") == 2
 
     def test_effort(self):
         cfg = AnthropicGenerationConfig(effort="high")
         result = _to_native_params(cfg)
         assert result["output_config"] == {"effort": "high"}
         assert "thinking" not in result
-        assert result["max_tokens"] == 1024
+        assert result["max_tokens"] == 4096
 
     def test_generic_reasoning_effort_maps_to_effort(self):
         cfg = AnthropicGenerationConfig(reasoning_effort="medium")
@@ -337,8 +415,42 @@ class TestToNativeParams:
         )
         result = _to_native_params(cfg)
         assert result["output_config"] == {
-            "format": {"type": "json_schema", "schema": schema}
+            "format": {
+                "type": "json_schema",
+                "schema": {
+                    "type": "object",
+                    "properties": {"name": {"type": "string"}},
+                    "additionalProperties": False,
+                },
+            }
         }
+
+    def test_json_schema_is_reduced_to_the_supported_subset(self):
+        class _Answer(BaseModel):
+            score: int = Field(ge=1, le=10)
+            label: str = Field(max_length=5)
+
+        schema = model_schema(_Answer)
+        original = copy.deepcopy(schema)
+        cfg = AnthropicGenerationConfig(
+            response_format=ResponseFormat.JSON_SCHEMA, json_schema=schema
+        )
+        sent = _to_native_params(cfg)["output_config"]["format"]["schema"]
+
+        assert sent["additionalProperties"] is False
+        assert "minimum" not in sent["properties"]["score"]
+        assert "maximum" not in sent["properties"]["score"]
+        assert "maxLength" not in sent["properties"]["label"]
+        assert "minimum: 1" in sent["properties"]["score"]["description"]
+        assert schema == original
+
+    def test_json_schema_the_sdk_cannot_read_is_sent_unchanged(self):
+        schema = {"type": "object", "properties": {"anything": {}}}
+        cfg = AnthropicGenerationConfig(
+            response_format=ResponseFormat.JSON_SCHEMA, json_schema=schema
+        )
+        sent = _to_native_params(cfg)["output_config"]["format"]["schema"]
+        assert sent == schema
 
     def test_response_format_json_schema_merges_with_effort(self):
         schema = {"type": "object"}
@@ -350,7 +462,14 @@ class TestToNativeParams:
         result = _to_native_params(cfg)
         assert result["output_config"] == {
             "effort": "high",
-            "format": {"type": "json_schema", "schema": schema},
+            "format": {
+                "type": "json_schema",
+                "schema": {
+                    "type": "object",
+                    "properties": {},
+                    "additionalProperties": False,
+                },
+            },
         }
 
 
@@ -650,7 +769,9 @@ class TestAnthropicLLMStream:
         events = [
             SimpleNamespace(
                 type="message_start",
-                message=SimpleNamespace(usage=SimpleNamespace(input_tokens=5)),
+                message=SimpleNamespace(
+                    usage=SimpleNamespace(input_tokens=5, output_tokens=1)
+                ),
             ),
             SimpleNamespace(
                 type="content_block_delta",
@@ -662,7 +783,8 @@ class TestAnthropicLLMStream:
             ),
             SimpleNamespace(
                 type="message_delta",
-                usage=SimpleNamespace(output_tokens=10),
+                delta=SimpleNamespace(stop_reason="max_tokens"),
+                usage=SimpleNamespace(input_tokens=None, output_tokens=10),
             ),
         ]
 
@@ -681,12 +803,52 @@ class TestAnthropicLLMStream:
 
         _, kwargs = mock_client.messages.create.call_args
         assert kwargs["system"] == "Be nice."
-        assert results[0].delta == "Hello"
-        assert results[1].delta == " World"
-        assert results[2].delta == ""
-        assert results[2].usage.output_tokens == 10
-        assert results[3].delta == ""
-        assert results[3].finish_reason == FinishReason.STOP
+        assert [c.delta for c in results] == ["Hello", " World", ""]
+        assert [c.usage for c in results if c.usage is not None] == [
+            TokenUsage(input_tokens=5, output_tokens=10)
+        ]
+        assert results[-1].finish_reason == FinishReason.LENGTH
+
+    async def test_stream_takes_cumulative_counts_from_the_last_message_delta(
+        self, mocker
+    ):
+        mock_anthropic = mocker.patch(
+            "agent_platform.integrations.llm.anthropic.provider.AsyncAnthropic"
+        )
+        mock_client = MagicMock()
+        mock_anthropic.return_value = mock_client
+
+        # With server tools, `message_delta` reports a cumulative input count
+        # that replaces the one from `message_start`.
+        async def _gen():
+            yield SimpleNamespace(
+                type="message_start",
+                message=SimpleNamespace(
+                    usage=SimpleNamespace(input_tokens=100, output_tokens=2)
+                ),
+            )
+            yield SimpleNamespace(
+                type="message_delta",
+                delta=SimpleNamespace(stop_reason=None),
+                usage=SimpleNamespace(input_tokens=400, output_tokens=20),
+            )
+            yield SimpleNamespace(
+                type="message_delta",
+                delta=SimpleNamespace(stop_reason="end_turn"),
+                usage=SimpleNamespace(input_tokens=400, output_tokens=50),
+            )
+
+        mock_client.messages.create = AsyncMock(return_value=_gen())
+
+        provider = AnthropicLLM(_creds())
+        prompt = Prompt(messages=[UserMessage(content="Hi")])
+        config = AnthropicGenerationConfig(model="claude-sonnet-4-6")
+        results = [c async for c in provider.stream(prompt, config=config)]
+
+        assert [c.usage for c in results if c.usage is not None] == [
+            TokenUsage(input_tokens=400, output_tokens=50)
+        ]
+        assert results[-1].finish_reason == FinishReason.STOP
 
     async def test_stream_with_no_events(self, mocker):
         mock_anthropic = mocker.patch(
@@ -708,7 +870,8 @@ class TestAnthropicLLMStream:
 
         assert len(results) == 1
         assert results[0].delta == ""
-        assert results[0].finish_reason == FinishReason.STOP
+        assert results[0].usage is None
+        assert results[0].finish_reason == FinishReason.UNKNOWN
 
     async def test_stream_with_tools_yields_tool_call_deltas(self, mocker):
         class _Input(BaseModel):
@@ -744,6 +907,11 @@ class TestAnthropicLLMStream:
                 ),
             ),
             SimpleNamespace(type="content_block_stop", index=0),
+            SimpleNamespace(
+                type="message_delta",
+                delta=SimpleNamespace(stop_reason="tool_use"),
+                usage=SimpleNamespace(input_tokens=None, output_tokens=3),
+            ),
         ]
 
         async def _gen():
@@ -767,6 +935,7 @@ class TestAnthropicLLMStream:
         assert deltas[0].id == "call_1"
         assert deltas[0].name == "search"
         assert deltas[1].arguments_delta == '{"query": "hi"}'
+        assert results[-1].finish_reason == FinishReason.TOOL_CALL
 
 
 class TestAnthropicLLMBatch:

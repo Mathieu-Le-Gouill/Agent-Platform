@@ -16,7 +16,6 @@ from agent_platform.core.credentials import (
 )
 from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
-    FinishReason,
     LLMResponse,
     StreamChunk,
     ToolCallDelta,
@@ -26,6 +25,7 @@ from agent_platform.core.schemas.message import Prompt
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import OllamaCredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.ollama.mappers import (
     from_native_response,
@@ -164,7 +164,9 @@ class OllamaLLM(
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
         with self._observe(resolved) as call:
-            usage_totals = TokenUsage.zero()
+            usage: TokenUsage | None = None
+            raw_finish_reason: str | None = None
+            tool_call_count = 0
             events = await client.chat(
                 model=resolved.model, messages=messages, stream=True, **params
             )
@@ -173,32 +175,28 @@ class OllamaLLM(
                 if delta:
                     yield StreamChunk(delta=delta)
                 # Ollama does not fragment tool-call arguments across chunks
-                # like OpenAI/Anthropic; each call arrives whole in one chunk.
+                # like OpenAI/Anthropic; each call arrives whole in one chunk,
+                # so the index counts calls across the whole stream.
                 message_tool_calls = chunk.message.tool_calls if chunk.message else None
                 if message_tool_calls:
                     yield StreamChunk(
                         delta="",
                         tool_call_deltas=[
                             ToolCallDelta(
-                                index=idx,
+                                index=tool_call_count + offset,
                                 id=uuid4().hex,
                                 name=tc.function.name,
                                 arguments_delta=json.dumps(dict(tc.function.arguments)),
                             )
-                            for idx, tc in enumerate(message_tool_calls)
+                            for offset, tc in enumerate(message_tool_calls)
                         ],
                     )
+                    tool_call_count += len(message_tool_calls)
                 if chunk.done:
-                    chunk_usage = TokenUsage(
+                    raw_finish_reason = chunk.done_reason
+                    usage = TokenUsage(
                         input_tokens=chunk.prompt_eval_count or 0,
                         output_tokens=chunk.eval_count or 0,
                     )
-                    usage_totals = chunk_usage
-                    yield StreamChunk(
-                        delta="",
-                        finish_reason=FinishReason.STOP,
-                        usage=chunk_usage,
-                    )
 
-            self._record_usage(call, usage_totals)
-            yield StreamChunk(delta="", finish_reason=FinishReason.STOP)
+            yield self._end_stream(call, usage, to_finish_reason(raw_finish_reason))

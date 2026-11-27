@@ -27,6 +27,7 @@ from agent_platform.core.schemas.message import (
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm._generic_fields import warn_unsupported
+from agent_platform.integrations.llm._json_schema import json_schema_name
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
@@ -138,8 +139,9 @@ def to_native_params(
             params["response_format"] = {
                 "type": "json_schema",
                 "json_schema": {
-                    "name": "response",
+                    "name": json_schema_name(config.json_schema),
                     "schema": config.json_schema,
+                    "strict": True,
                 },
             }
 

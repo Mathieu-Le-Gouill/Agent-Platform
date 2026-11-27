@@ -36,6 +36,17 @@ __all__ = [
 ]
 
 
+def _raw_base64(image: str) -> str:
+    """Strips the `data:<mime>;base64,` prefix of a data URL.
+
+    Ollama's `images` field takes bare base64, so a data URL sent as is
+    reaches the model as corrupt image data.
+    """
+    if image.startswith("data:") and ";base64," in image:
+        return image.split(";base64,", 1)[1]
+    return image
+
+
 def message_content(m: ContentMessage) -> tuple[str, list[str]]:
     if isinstance(m.content, str):
         return m.content, []
@@ -48,7 +59,7 @@ def message_content(m: ContentMessage) -> tuple[str, list[str]]:
                 text_parts.append(block.text)
             case ImageBlock():
                 if isinstance(block.image, str):
-                    images.append(block.image)
+                    images.append(_raw_base64(block.image))
                 else:
                     images.append(base64.b64encode(block.image.content).decode())
             case AudioBlock():

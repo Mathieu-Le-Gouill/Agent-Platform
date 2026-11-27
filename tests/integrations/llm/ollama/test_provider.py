@@ -24,6 +24,7 @@ from agent_platform.core.schemas.message import (
     ToolResult,
     UserMessage,
 )
+from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import OllamaCredentials
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 from agent_platform.integrations.llm.ollama.mappers import (
@@ -76,6 +77,11 @@ class TestMessageContent:
         content, images = _message_content(msg)
         assert content == "describe this"
         assert images == ["https://x/y.png"]
+
+    def test_data_url_image_is_sent_as_raw_base64(self):
+        msg = UserMessage(content=[ImageBlock(image="data:image/png;base64,iVBORw0K")])
+        _, images = _message_content(msg)
+        assert images == ["iVBORw0K"]
 
     def test_image_document_base64(self):
         doc = ImageDocument(content=b"\x89PNG", format=ImageFormat.PNG)
@@ -556,6 +562,7 @@ class TestOllamaLLMStream:
             SimpleNamespace(
                 message=None,
                 done=True,
+                done_reason="length",
                 prompt_eval_count=5,
                 eval_count=10,
             ),
@@ -572,13 +579,11 @@ class TestOllamaLLMStream:
         config = OllamaGenerationConfig(model="llama3.2")
         results = [c async for c in provider.stream(prompt, config=config)]
 
-        assert results[0].delta == "Hello"
-        assert results[1].delta == " World"
-        assert results[2].delta == ""
-        assert results[2].usage.input_tokens == 5
-        assert results[2].usage.output_tokens == 10
-        assert results[3].delta == ""
-        assert results[3].finish_reason == FinishReason.STOP
+        assert [c.delta for c in results] == ["Hello", " World", ""]
+        assert [c.usage for c in results if c.usage is not None] == [
+            TokenUsage(input_tokens=5, output_tokens=10)
+        ]
+        assert results[-1].finish_reason == FinishReason.LENGTH
 
     async def test_stream_with_no_chunks(self, mocker):
         mock_client_cls = mocker.patch(
@@ -600,7 +605,8 @@ class TestOllamaLLMStream:
 
         assert len(results) == 1
         assert results[0].delta == ""
-        assert results[0].finish_reason == FinishReason.STOP
+        assert results[0].usage is None
+        assert results[0].finish_reason == FinishReason.UNKNOWN
 
     async def test_stream_with_tools_yields_tool_call_deltas(self, mocker):
         class _Input(BaseModel):
@@ -629,8 +635,16 @@ class TestOllamaLLMStream:
                 done=False,
             ),
             SimpleNamespace(
+                message=SimpleNamespace(
+                    content=None,
+                    tool_calls=[_tool_call("lookup", {"query": "ho"})],
+                ),
+                done=False,
+            ),
+            SimpleNamespace(
                 message=None,
                 done=True,
+                done_reason="stop",
                 prompt_eval_count=1,
                 eval_count=1,
             ),
@@ -656,3 +670,5 @@ class TestOllamaLLMStream:
         deltas = [d for c in results for d in c.tool_call_deltas]
         assert deltas[0].name == "search"
         assert deltas[0].arguments_delta == '{"query": "hi"}'
+        # Each call arrives in its own chunk; indices must not restart at 0.
+        assert [(d.index, d.name) for d in deltas] == [(0, "search"), (1, "lookup")]

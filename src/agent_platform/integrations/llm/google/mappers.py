@@ -213,7 +213,8 @@ def from_native_response(
     content = candidate.content if candidate else None
     parts = content.parts if content else []
 
-    text_parts = [part.text for part in (parts or []) if part.text]
+    # A thought part (`include_thoughts`) is the model's reasoning summary, not the answer.
+    text_parts = [part.text for part in (parts or []) if part.text and not part.thought]
     tool_calls = [
         ToolCall(
             id=part.function_call.id or uuid4().hex,

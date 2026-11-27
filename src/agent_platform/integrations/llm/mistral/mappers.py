@@ -33,6 +33,7 @@ from agent_platform.integrations.llm.mistral.config import MistralGenerationConf
 __all__ = [
     "block_to_native",
     "content_to_native",
+    "error_body",
     "from_native_response",
     "to_native_messages",
     "to_native_params",
@@ -57,7 +58,20 @@ def block_to_native(block: ContentBlock) -> dict[str, Any]:
             return {"type": "image_url", "image_url": url}
         case AudioBlock():
             data = base64.b64encode(block.audio.content).decode()
-            return {"type": "audio", "input_audio": data}
+            return {"type": "input_audio", "input_audio": data}
+
+
+def error_body(body: str) -> dict[str, Any]:
+    """Returns the JSON object of an error response body, or an empty dict.
+
+    Mistral's error body carries `message`, `type` and a four-digit `code`
+    string; some responses (a 401) carry only `detail`, others no JSON at all.
+    """
+    try:
+        parsed = json.loads(body)
+    except ValueError:
+        return {}
+    return parsed if isinstance(parsed, dict) else {}
 
 
 def content_to_native(m: ContentMessage) -> str | list[dict[str, Any]]:

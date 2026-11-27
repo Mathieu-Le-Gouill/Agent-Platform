@@ -225,18 +225,36 @@ def to_native_messages(prompt: Prompt) -> list[dict[str, Any]]:
     return result
 
 
+def _set_sampling(
+    params: dict[str, Any],
+    name: str,
+    value: float,
+    model: str,
+    *,
+    reasoning_model: bool,
+) -> None:
+    """Sets a sampling parameter, or logs and skips it on a reasoning model, which rejects it."""
+    if reasoning_model:
+        logger.warning("%s is ignored: %r is an OpenAI reasoning model", name, model)
+        return
+    params[name] = value
+
+
 def to_native_params(
     config: OpenAIGenerationConfig, *, has_tools: bool = False
 ) -> dict[str, Any]:
     reasoning_model = is_reasoning_model(config.model)
 
     params: dict[str, Any] = {}
-    if not reasoning_model and config.temperature is not None:
-        params["temperature"] = config.temperature
+    for name, value in (("temperature", config.temperature), ("top_p", config.top_p)):
+        if value is not None:
+            _set_sampling(
+                params, name, value, config.model, reasoning_model=reasoning_model
+            )
     if config.max_tokens is not None:
-        params["max_tokens"] = config.max_tokens
-    if config.top_p is not None:
-        params["top_p"] = config.top_p
+        # `max_tokens` is deprecated and rejected by reasoning models.
+        key = "max_completion_tokens" if reasoning_model else "max_tokens"
+        params[key] = config.max_tokens
     if config.stop_sequences:
         params["stop"] = config.stop_sequences
     if config.seed is not None:

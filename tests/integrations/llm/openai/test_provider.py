@@ -30,6 +30,7 @@ from agent_platform.core.schemas.message import (
     ToolResult,
     UserMessage,
 )
+from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import OpenAICredentials
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 from agent_platform.integrations.llm.openai.mappers import (
@@ -57,6 +58,22 @@ def _creds(key: str = "sk-test") -> OpenAICredentials:
 def _tool_call(id: str, name: str, arguments: str) -> SimpleNamespace:
     return SimpleNamespace(
         id=id, function=SimpleNamespace(name=name, arguments=arguments)
+    )
+
+
+def _stream_chunk(
+    content: str | None = None,
+    tool_calls: list[SimpleNamespace] | None = None,
+    finish_reason: str | None = None,
+) -> SimpleNamespace:
+    return SimpleNamespace(
+        choices=[
+            SimpleNamespace(
+                delta=SimpleNamespace(content=content, tool_calls=tool_calls),
+                finish_reason=finish_reason,
+            )
+        ],
+        usage=None,
     )
 
 
@@ -222,6 +239,30 @@ class TestToNativeParams:
         cfg = OpenAIGenerationConfig(model=model, temperature=0.2)
         result = _to_native_params(cfg)
         assert "temperature" not in result
+
+    @pytest.mark.parametrize("model", ["o3", "gpt-5", "gpt-6.2-astra"])
+    def test_top_p_dropped_with_a_warning_for_reasoning_models(self, model, caplog):
+        cfg = OpenAIGenerationConfig(model=model, top_p=0.5, temperature=0.2)
+        with caplog.at_level("WARNING"):
+            result = _to_native_params(cfg)
+        assert "top_p" not in result
+        assert "temperature" not in result
+        assert "top_p is ignored" in caplog.text
+        assert "temperature is ignored" in caplog.text
+
+    @pytest.mark.parametrize("model", ["o4-mini", "gpt-5-mini", "gpt-6.2-sol"])
+    def test_reasoning_models_get_max_completion_tokens(self, model):
+        cfg = OpenAIGenerationConfig(model=model, max_tokens=100)
+        result = _to_native_params(cfg)
+        assert result["max_completion_tokens"] == 100
+        assert "max_tokens" not in result
+
+    def test_non_reasoning_models_keep_max_tokens_and_top_p(self):
+        cfg = OpenAIGenerationConfig(model="gpt-4.1", max_tokens=100, top_p=0.5)
+        result = _to_native_params(cfg)
+        assert result["max_tokens"] == 100
+        assert result["top_p"] == 0.5
+        assert "max_completion_tokens" not in result
 
     def test_temperature_kept_for_gpt5_chat(self):
         cfg = OpenAIGenerationConfig(model="gpt-5-chat", temperature=0.2)
@@ -785,22 +826,8 @@ class TestOpenAILLMStream:
         mock_openai.return_value = mock_client
 
         chunks = [
-            SimpleNamespace(
-                choices=[
-                    SimpleNamespace(
-                        delta=SimpleNamespace(content="Hello", tool_calls=None)
-                    )
-                ],
-                usage=None,
-            ),
-            SimpleNamespace(
-                choices=[
-                    SimpleNamespace(
-                        delta=SimpleNamespace(content=" World", tool_calls=None)
-                    )
-                ],
-                usage=None,
-            ),
+            _stream_chunk(content="Hello"),
+            _stream_chunk(content=" World", finish_reason="length"),
             SimpleNamespace(
                 choices=[],
                 usage=SimpleNamespace(prompt_tokens=5, completion_tokens=10),
@@ -818,13 +845,10 @@ class TestOpenAILLMStream:
         config = OpenAIGenerationConfig(model="gpt-4.1")
         results = [c async for c in provider.stream(prompt, config=config)]
 
-        assert results[0].delta == "Hello"
-        assert results[1].delta == " World"
-        assert results[2].delta == ""
-        assert results[2].usage.input_tokens == 5
-        assert results[2].usage.output_tokens == 10
-        assert results[3].delta == ""
-        assert results[3].finish_reason == FinishReason.STOP
+        assert [c.delta for c in results] == ["Hello", " World", ""]
+        assert [c.usage for c in results[:-1]] == [None, None]
+        assert results[-1].usage == TokenUsage(input_tokens=5, output_tokens=10)
+        assert results[-1].finish_reason == FinishReason.LENGTH
 
     async def test_stream_with_no_chunks(self, mocker):
         mock_openai = mocker.patch(
@@ -866,43 +890,26 @@ class TestOpenAILLMStream:
         mock_openai.return_value = mock_client
 
         chunks = [
-            SimpleNamespace(
-                choices=[
+            _stream_chunk(
+                tool_calls=[
                     SimpleNamespace(
-                        delta=SimpleNamespace(
-                            content=None,
-                            tool_calls=[
-                                SimpleNamespace(
-                                    index=0,
-                                    id="call_1",
-                                    function=SimpleNamespace(
-                                        name="search", arguments=""
-                                    ),
-                                )
-                            ],
-                        )
+                        index=0,
+                        id="call_1",
+                        function=SimpleNamespace(name="search", arguments=""),
                     )
-                ],
-                usage=None,
+                ]
             ),
-            SimpleNamespace(
-                choices=[
+            _stream_chunk(
+                tool_calls=[
                     SimpleNamespace(
-                        delta=SimpleNamespace(
-                            content=None,
-                            tool_calls=[
-                                SimpleNamespace(
-                                    index=0,
-                                    id=None,
-                                    function=SimpleNamespace(
-                                        name=None, arguments='{"query": "hi"}'
-                                    ),
-                                )
-                            ],
-                        )
+                        index=0,
+                        id=None,
+                        function=SimpleNamespace(
+                            name=None, arguments='{"query": "hi"}'
+                        ),
                     )
                 ],
-                usage=None,
+                finish_reason="tool_calls",
             ),
             SimpleNamespace(
                 choices=[],
@@ -932,7 +939,10 @@ class TestOpenAILLMStream:
         assert deltas[0].id == "call_1"
         assert deltas[0].name == "search"
         assert deltas[1].arguments_delta == '{"query": "hi"}'
-        assert results[0].finish_reason == FinishReason.STOP
+        assert results[-1].finish_reason == FinishReason.TOOL_CALL
+        assert [c.usage for c in results if c.usage is not None] == [
+            TokenUsage(input_tokens=1, output_tokens=1)
+        ]
 
 
 class TestOpenAILLMBatch:
