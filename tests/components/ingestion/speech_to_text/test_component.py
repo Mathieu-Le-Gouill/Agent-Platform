@@ -3,7 +3,10 @@ from uuid import uuid4
 
 import pytest
 
-from agent_platform.components.ingestion.speech_to_text.component import SpeechToText
+from agent_platform.components.ingestion.speech_to_text.component import (
+    SpeechToText,
+    SpeechToTextInput,
+)
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
 from agent_platform.core.interfaces.speech.config import SpeechConfig
 from agent_platform.core.schemas.chunk import AudioChunk
@@ -60,3 +63,13 @@ async def test_astream_forwards_frames_to_backend():
     results = [t async for t in speech_to_text.astream(frames())]
 
     assert results[0].utterances[0].text == f"partial-{chunk.id}"
+
+
+@pytest.mark.asyncio
+async def test_arun_accepts_a_named_input():
+    backend = _FakeSpeechToText()
+    chunk = _audio_chunk()
+
+    await SpeechToText(backend).arun(SpeechToTextInput(audio=chunk, config=None))
+
+    assert backend.calls == [(chunk, None)]

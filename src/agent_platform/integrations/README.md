@@ -165,7 +165,7 @@ Steps:
 1. Add the credential model to `integrations/credentials.py` if needed
 2. Create `integrations/<domain>/<new_provider>/`
 3. Define config model (extend domain config or `BaseModel`)
-4. Implement the domain's ABC, all abstract methods
+4. Implement the domain's ABC, all abstract methods (a `reranking` provider also implements `default_config()`, which `BaseReranker` leaves optional: without it the `Reranker` component makes one unbatched call when given no config)
 5. Put conversion logic in a sibling `mappers.py` if there's more than a couple of
    one-line conversions, otherwise inline it in the provider file
 6. Use `asyncio.to_thread()` for blocking library calls

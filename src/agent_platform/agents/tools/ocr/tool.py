@@ -12,6 +12,9 @@ from agent_platform.agents.tools.base import Tool
 from agent_platform.agents.tools.errors import ToolSourceNotAllowedError
 from agent_platform.agents.tools.safe_execution import safe_call
 from agent_platform.components.ingestion.ocr.component import OCR
+from agent_platform.components.ingestion.ocr.component import (
+    OCRInput as OCRComponentInput,
+)
 from agent_platform.core.interfaces.ocr.config import OCRConfig
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import ImageDocument
@@ -78,7 +81,7 @@ class OCRTool(Tool):
         source = self._policy.resolve(validated.source)
         config = OCRConfig(min_confidence=validated.min_confidence)
         results = await safe_call(
-            self._ocr.arun((source, config)),
+            self._ocr.arun(OCRComponentInput(source, config)),
             "OCR extraction failed",
         )
         return filter_by_score(

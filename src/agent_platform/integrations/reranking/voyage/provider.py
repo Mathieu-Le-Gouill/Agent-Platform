@@ -26,7 +26,7 @@ class VoyageRerankerProvider(
         self._credentials = resolve_credentials(credentials, VoyageCredentials)
         self._client_options = resolve_client_options(client_options)
 
-    def _default_config(self) -> VoyageRerankerConfig:
+    def default_config(self) -> VoyageRerankerConfig:
         return VoyageRerankerConfig()
 
     def _client_kwargs(self, config: VoyageRerankerConfig) -> dict[str, Any]:

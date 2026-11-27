@@ -29,7 +29,7 @@ class JinaRerankerProvider(
         self._credentials = resolve_credentials(credentials, JinaCredentials)
         self._client_options = resolve_client_options(client_options)
 
-    def _default_config(self) -> JinaRerankerConfig:
+    def default_config(self) -> JinaRerankerConfig:
         return JinaRerankerConfig()
 
     def _headers(self) -> dict[str, str]:

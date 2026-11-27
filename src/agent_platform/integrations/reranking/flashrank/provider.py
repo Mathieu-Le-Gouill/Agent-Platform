@@ -22,7 +22,7 @@ class FlashRankReranker(BaseReranker[TextChunk, FlashRankConfig]):
     def __init__(self) -> None:
         self._ranker: Ranker | None = None
 
-    def _default_config(self) -> FlashRankConfig:
+    def default_config(self) -> FlashRankConfig:
         return FlashRankConfig()
 
     def _get_ranker(self, config: FlashRankConfig) -> Ranker:
@@ -41,7 +41,7 @@ class FlashRankReranker(BaseReranker[TextChunk, FlashRankConfig]):
         items: Sequence[TextChunk],
         config: FlashRankConfig | None = None,
     ) -> Sequence[TextChunk]:
-        config = config or self._default_config()
+        config = config or self.default_config()
         if not items:
             return []
 

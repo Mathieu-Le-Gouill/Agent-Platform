@@ -21,7 +21,7 @@ class _FakeReranker(NativeReranker[RerankerConfig, object, object, _Result]):
         self.sync_calls = 0
         self.async_calls = 0
 
-    def _default_config(self) -> RerankerConfig:
+    def default_config(self) -> RerankerConfig:
         return RerankerConfig()
 
     def _async_client(self, config: RerankerConfig) -> object:

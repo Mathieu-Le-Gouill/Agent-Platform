@@ -10,6 +10,11 @@ RerankerConfigT = TypeVar("RerankerConfigT", bound=RerankerConfig)
 
 
 class BaseReranker(ABC, Generic[ChunkT, RerankerConfigT]):
+    # Not abstract, so a backend written before this method keeps working: the
+    # `Reranker` component then reranks without client-side batching.
+    def default_config(self) -> RerankerConfigT:
+        raise NotImplementedError
+
     @abstractmethod
     def rerank(
         self,

@@ -125,6 +125,10 @@ class SimilarityScorer(Component[SimilarityInput, ClassificationResult]):
     async def arun(self, input) -> ClassificationResult: ...
 ```
 
+### Reranker batching
+
+`Reranker` splits its items into `batch_size` batches but returns one global ranking. With `config=None` it uses the backend's `BaseReranker.default_config()` (every bundled provider implements it); a backend that doesn't (the base raises `NotImplementedError`) gets one call with every item and no client-side batching. With more than one batch, it calls the backend with `return_scores=True, normalize_scores=False, top_k=None`, merges every batch on the raw scores, normalizes them if the caller asked, then applies the caller's `top_k`. A single batch forwards the caller's config unchanged; `cohere`, `jina` and `voyage` cut to `top_k` server-side and normalize over those results only, so with them a normalized score can differ between one batch and several (the ranking does not). A backend must therefore return a raw score on every chunk under that config. A missing score raises `ProviderError`. The merge assumes a provider's relevance score depends only on the query and the document, not on the other documents in the call. Listwise models such as Jina's default `jina-reranker-v3` score all candidates in one shared context (jina.ai/models/jina-reranker-v3), so with them a ranking across batches is only approximate; keep `batch_size` above the item count for an exact one.
+
 ## How to Extend
 
 ### Add a component

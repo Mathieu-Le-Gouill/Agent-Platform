@@ -2,7 +2,7 @@ from uuid import UUID
 
 import pytest
 
-from agent_platform.components.ingestion.ocr.component import OCR
+from agent_platform.components.ingestion.ocr.component import OCR, OCRInput
 from agent_platform.core.interfaces.ocr.base import BaseOCR
 from agent_platform.core.interfaces.ocr.config import OCRConfig
 from agent_platform.core.schemas.chunk import TextChunk
@@ -38,3 +38,13 @@ async def test_generates_a_document_id_when_none_given():
     await ocr.arun(("img.png", None))
 
     assert isinstance(backend.calls[0][2], UUID)
+
+
+@pytest.mark.asyncio
+async def test_accepts_a_named_input():
+    backend = _FakeOCR()
+    config = OCRConfig()
+
+    await OCR(backend).arun(OCRInput(source="img.png", config=config))
+
+    assert backend.calls[0][:2] == ("img.png", config)

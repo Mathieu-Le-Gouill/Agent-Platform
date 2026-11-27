@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 from uuid import uuid4
 
 from agent_platform.components.base import Component
@@ -10,7 +10,10 @@ from agent_platform.core.schemas.chunk import TextChunk
 
 OCRConfigT = TypeVar("OCRConfigT", bound=OCRConfig)
 
-OCRInput = tuple[str, OCRConfigT | None]
+
+class OCRInput(NamedTuple, Generic[OCRConfigT]):
+    source: str
+    config: OCRConfigT | None
 
 
 class OCR(Component[OCRInput[OCRConfigT], list[TextChunk]], Generic[OCRConfigT]):

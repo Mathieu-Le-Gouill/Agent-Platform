@@ -33,7 +33,7 @@ Audio → [STT] → Transcript → [Translator] → Translated Transcript
 
 ```python
 async def ingest(sources, loader: Loader, chunker: Chunker, embedder: Embedder, store: VectorStore, loader_config=None, chunker_config=None, embedding_config=None, store_config=None) -> None:
-    documents = await loader.arun((sources, loader_config))
+    documents = await loader.arun(LoaderInput(sources, loader_config))
     chunks = await chunker.arun(ChunkerInput(documents, chunker_config))
     embedding_response = await embedder.arun(EmbedderInput(chunks, embedding_config))
     vectors = [embedding.to_list() for embedding in embedding_response.embeddings]

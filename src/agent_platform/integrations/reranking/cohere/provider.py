@@ -27,7 +27,7 @@ class CohereRerankerProvider(
         self._credentials = resolve_credentials(credentials, CohereCredentials)
         self._client_options = resolve_client_options(client_options)
 
-    def _default_config(self) -> CohereRerankerConfig:
+    def default_config(self) -> CohereRerankerConfig:
         return CohereRerankerConfig()
 
     def _client_kwargs(self, config: CohereRerankerConfig) -> dict[str, Any]:

@@ -1,3 +1,6 @@
+import pytest
+from pydantic import ValidationError
+
 from agent_platform.components.classification.embed_classifier.config import (
     EmbeddingClassifierConfig,
 )
@@ -17,3 +20,7 @@ class TestEmbeddingClassifierConfig:
         config = EmbeddingClassifierConfig(top_k=3, multi_label=True)
         assert config.top_k == 3
         assert config.multi_label is True
+
+    def test_rejects_top_k_below_one(self):
+        with pytest.raises(ValidationError, match="top_k"):
+            EmbeddingClassifierConfig(top_k=0)

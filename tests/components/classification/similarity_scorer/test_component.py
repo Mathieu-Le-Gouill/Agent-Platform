@@ -1,4 +1,8 @@
+from dataclasses import FrozenInstanceError
 from uuid import uuid4
+
+import pytest
+from pydantic import ValidationError
 
 from agent_platform.components.classification.similarity_scorer.component import (
     SimilarityConfig,
@@ -98,3 +102,33 @@ class TestSimilarityScorer:
         )
         assert result.top.score.low == 0.0
         assert result.top.score.high == 1.0
+
+
+class TestSimilarityConfig:
+    def test_defaults(self):
+        config = SimilarityConfig()
+        assert config.top_k == 5
+        assert config.threshold is None
+        assert config.multi_label is False
+        assert config.unknown_label == "unknown"
+        assert config.metric == SimilarityMetric.COSINE
+
+    def test_accepts_positional_arguments(self):
+        config = SimilarityConfig(2, 0.5, True, "none", SimilarityMetric.DOT)
+        assert (config.top_k, config.threshold, config.multi_label) == (2, 0.5, True)
+        assert config.unknown_label == "none"
+        assert config.metric == SimilarityMetric.DOT
+
+    @pytest.mark.parametrize("top_k", [0, -1])
+    def test_rejects_top_k_below_one(self, top_k):
+        with pytest.raises(ValidationError, match="top_k"):
+            SimilarityConfig(top_k=top_k)
+
+    def test_rejects_unknown_metric(self):
+        with pytest.raises(ValidationError, match="metric"):
+            SimilarityConfig(metric="hamming")
+
+    def test_is_frozen(self):
+        config = SimilarityConfig()
+        with pytest.raises(FrozenInstanceError):
+            config.top_k = 3

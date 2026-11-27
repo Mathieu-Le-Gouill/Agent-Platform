@@ -40,7 +40,7 @@ class NativeReranker(
     """
 
     @abstractmethod
-    def _default_config(self) -> RerankerConfigT: ...
+    def default_config(self) -> RerankerConfigT: ...
 
     @abstractmethod
     def _async_client(self, config: RerankerConfigT) -> AsyncClientT: ...
@@ -86,7 +86,7 @@ class NativeReranker(
         items: Sequence[TextChunk],
         config: RerankerConfigT | None = None,
     ) -> Sequence[TextChunk]:
-        config = config or self._default_config()
+        config = config or self.default_config()
         if not items:
             return []
 
@@ -110,7 +110,7 @@ class NativeReranker(
         items: Sequence[TextChunk],
         config: RerankerConfigT | None = None,
     ) -> Sequence[TextChunk]:
-        config = config or self._default_config()
+        config = config or self.default_config()
         if not items:
             return []
 

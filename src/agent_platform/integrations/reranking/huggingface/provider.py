@@ -20,7 +20,7 @@ class HuggingFaceRerankerProvider(BaseReranker[TextChunk, HuggingFaceRerankerCon
     `flashrank`: retrying a deterministic local failure wastes CPU/GPU time
     instead of recovering from it."""
 
-    def _default_config(self) -> HuggingFaceRerankerConfig:
+    def default_config(self) -> HuggingFaceRerankerConfig:
         return HuggingFaceRerankerConfig()
 
     def _client(self, config: HuggingFaceRerankerConfig) -> CrossEncoder:
@@ -32,7 +32,7 @@ class HuggingFaceRerankerProvider(BaseReranker[TextChunk, HuggingFaceRerankerCon
         items: Sequence[TextChunk],
         config: HuggingFaceRerankerConfig | None = None,
     ) -> Sequence[TextChunk]:
-        config = config or self._default_config()
+        config = config or self.default_config()
         if not items:
             return []
 

@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, NamedTuple, TypeVar
+from typing import Generic, NamedTuple, TypeVar, cast
 
 from agent_platform.components.base import Component
 from agent_platform.components.chunking.chunker.component import Chunker, ChunkerInput
@@ -16,15 +16,18 @@ from agent_platform.components.retrieval.embedder.component import (
     Embedder,
     EmbedderInput,
 )
+from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.classification.response import (
     ClassificationResponse,
     ClassificationResult,
 )
 from agent_platform.core.interfaces.embeddings.config import EmbeddingConfig
+from agent_platform.core.interfaces.embeddings.response import EmbeddingResponse
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.document import TextDocument
 
 EmbedConfigT = TypeVar("EmbedConfigT", bound=EmbeddingConfig)
+KeyT = TypeVar("KeyT")
 
 
 class EmbedClassifierInput(NamedTuple):
@@ -49,29 +52,42 @@ class EmbeddingClassifier(
 
     async def arun(self, input: EmbedClassifierInput) -> ClassificationResponse:
         items, candidate_labels, config = input
+        # The field defaults are provider-specific (recursive chunker,
+        # HuggingFace embeddings), so only a config the caller set is
+        # forwarded; otherwise the injected backend keeps its own default.
+        # A caller-set embedding_config must match the injected embedder's type.
+        chunker_config = (
+            config.chunker_config
+            if "chunker_config" in config.model_fields_set
+            else None
+        )
+        embedding_config = cast(
+            "EmbedConfigT | None",
+            config.embedding_config
+            if "embedding_config" in config.model_fields_set
+            else None,
+        )
 
         chunks_per_doc: dict[int, list[TextChunk]] = {}
         for i, doc in enumerate(items):
-            chunks = await self._chunker.arun(ChunkerInput([doc], None))
+            chunks = await self._chunker.arun(ChunkerInput([doc], chunker_config))
             chunks_per_doc[i] = chunks
 
         # embed every doc's chunks in one batched call, then re-split by doc below
         all_chunks = [c for chunks in chunks_per_doc.values() for c in chunks]
 
-        embed_response = await self._embedder.arun(EmbedderInput(all_chunks, None))
-        chunk_vectors = [
-            (chunk, list(emb.vector))
-            for chunk, emb in zip(all_chunks, embed_response.embeddings)
-        ]
+        embed_response = await self._embedder.arun(
+            EmbedderInput(all_chunks, embedding_config)
+        )
+        chunk_vectors = _pair_vectors(all_chunks, embed_response, "chunks")
 
         label_chunks = [TextChunk(text=label) for label in candidate_labels]
         label_embed_response = await self._embedder.arun(
-            EmbedderInput(label_chunks, None)
+            EmbedderInput(label_chunks, embedding_config)
         )
-        label_vectors = {
-            label: list(emb.vector)
-            for label, emb in zip(candidate_labels, label_embed_response.embeddings)
-        }
+        label_vectors = dict(
+            _pair_vectors(candidate_labels, label_embed_response, "labels")
+        )
 
         results: list[ClassificationResult] = []
         for doc_idx in range(len(items)):
@@ -90,3 +106,18 @@ class EmbeddingClassifier(
             results.append(result)
 
         return ClassificationResponse(results=results)
+
+
+def _pair_vectors(
+    keys: list[KeyT], response: EmbeddingResponse, what: str
+) -> list[tuple[KeyT, list[float]]]:
+    try:
+        return [
+            (key, list(emb.vector))
+            for key, emb in zip(keys, response.embeddings, strict=True)
+        ]
+    except ValueError as exc:
+        raise ProviderError(
+            f"Embedder returned {len(response.embeddings)} embeddings "
+            f"for {len(keys)} {what}"
+        ) from exc

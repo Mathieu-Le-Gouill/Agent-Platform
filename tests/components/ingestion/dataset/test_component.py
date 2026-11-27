@@ -2,7 +2,7 @@ from unittest.mock import AsyncMock
 
 from pydantic import BaseModel
 
-from agent_platform.components.ingestion.dataset.component import Dataset
+from agent_platform.components.ingestion.dataset.component import Dataset, DatasetInput
 from agent_platform.core.interfaces.dataset.config import DatasetConfig
 from agent_platform.core.schemas.enums import DatasetSplit
 
@@ -41,3 +41,13 @@ class TestDatasetComponent:
         result = component.run(("json", None))
 
         assert result == {DatasetSplit.TRAIN: "sentinel"}
+
+    async def test_arun_accepts_named_input(self):
+        backend = AsyncMock()
+        backend.aload.return_value = {DatasetSplit.TRAIN: "sentinel"}
+        component = Dataset(backend=backend, record_type=Record)
+        config = DatasetConfig(data_files="data.jsonl")
+
+        await component.arun(DatasetInput(path="json", config=config))
+
+        backend.aload.assert_awaited_once_with(Record, "json", config)

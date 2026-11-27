@@ -18,7 +18,7 @@ class EmbeddingClassifierConfig(BaseModel):
         default_factory=HuggingFaceEmbeddingConfig,
     )
 
-    top_k: int = 5
+    top_k: int = Field(default=5, ge=1)
     similarity_threshold: float | None = None
     multi_label: bool = False
     unknown_label: str = "unknown"

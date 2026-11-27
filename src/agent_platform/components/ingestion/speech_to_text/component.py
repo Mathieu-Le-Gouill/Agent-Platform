@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 from agent_platform.components.base import Component
 from agent_platform.core.interfaces.speech.base import BaseSpeechToText
@@ -11,7 +11,10 @@ from agent_platform.core.schemas.conversation import Transcript
 
 SpeechConfigT = TypeVar("SpeechConfigT", bound=SpeechConfig)
 
-SpeechToTextInput = tuple[AudioChunk, SpeechConfigT | None]
+
+class SpeechToTextInput(NamedTuple, Generic[SpeechConfigT]):
+    audio: AudioChunk
+    config: SpeechConfigT | None
 
 
 class SpeechToText(

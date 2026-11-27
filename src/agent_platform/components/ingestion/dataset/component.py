@@ -1,6 +1,6 @@
 from __future__ import annotations
 
-from typing import Generic, TypeVar
+from typing import Generic, NamedTuple, TypeVar
 
 from agent_platform.components.base import Component
 from agent_platform.core.interfaces.dataset.base import (
@@ -13,7 +13,10 @@ from agent_platform.core.schemas.enums import DatasetSplit
 RecordT = TypeVar("RecordT")
 DatasetConfigT = TypeVar("DatasetConfigT", bound=DatasetConfig)
 
-DatasetInput = tuple[str, DatasetConfigT | None]
+
+class DatasetInput(NamedTuple, Generic[DatasetConfigT]):
+    path: str
+    config: DatasetConfigT | None
 
 
 class Dataset(

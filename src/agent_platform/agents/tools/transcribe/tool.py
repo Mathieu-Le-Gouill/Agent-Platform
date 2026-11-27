@@ -8,7 +8,10 @@ from pydantic import BaseModel, Field
 
 from agent_platform.agents.tools.base import Tool, ToolError
 from agent_platform.agents.tools.safe_execution import safe_call, safe_stream
-from agent_platform.components.ingestion.speech_to_text.component import SpeechToText
+from agent_platform.components.ingestion.speech_to_text.component import (
+    SpeechToText,
+    SpeechToTextInput,
+)
 from agent_platform.core.interfaces.speech.config import SpeechConfig
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.conversation import Transcript
@@ -54,7 +57,7 @@ class TranscribeTool(Tool):
         validated = TranscribeInput(**kwargs)
         result = await safe_call(
             self._speech_to_text.arun(
-                (self._build_chunk(validated), self._default_config)
+                SpeechToTextInput(self._build_chunk(validated), self._default_config)
             ),
             "Speech-to-text failed",
         )

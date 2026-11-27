@@ -5,7 +5,11 @@ from agent_platform.components.chunking.chunker.component import (
     ChunkerConfigT,
     ChunkerInput,
 )
-from agent_platform.components.ingestion.loader.component import Loader, LoaderConfigT
+from agent_platform.components.ingestion.loader.component import (
+    Loader,
+    LoaderConfigT,
+    LoaderInput,
+)
 from agent_platform.components.retrieval.embedder.component import (
     EmbedConfigT,
     Embedder,
@@ -28,7 +32,7 @@ async def ingest(
     embedding_config: EmbedConfigT | None = None,
     store_config: VectorStoreConfig | None = None,
 ) -> None:
-    documents = await loader.arun((sources, loader_config))
+    documents = await loader.arun(LoaderInput(sources, loader_config))
     chunks = await chunker.arun(ChunkerInput(documents, chunker_config))
     embedding_response = await embedder.arun(EmbedderInput(chunks, embedding_config))
     vectors = [embedding.to_list() for embedding in embedding_response.embeddings]

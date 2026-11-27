@@ -2,6 +2,9 @@ from __future__ import annotations
 
 from collections import defaultdict
 
+from pydantic import Field
+from pydantic.dataclasses import dataclass
+
 from agent_platform.components.base import Component
 from agent_platform.core.interfaces.classification.response import (
     ClassificationPrediction,
@@ -25,20 +28,15 @@ class SimilarityInput:
         self.config = config
 
 
+# A pydantic dataclass, not a BaseModel, so the existing positional
+# constructor `SimilarityConfig(5, 0.5, ...)` keeps working.
+@dataclass(frozen=True)
 class SimilarityConfig:
-    def __init__(
-        self,
-        top_k: int = 5,
-        threshold: float | None = None,
-        multi_label: bool = False,
-        unknown_label: str = "unknown",
-        metric: SimilarityMetric = SimilarityMetric.COSINE,
-    ) -> None:
-        self.top_k = top_k
-        self.threshold = threshold
-        self.multi_label = multi_label
-        self.unknown_label = unknown_label
-        self.metric = metric
+    top_k: int = Field(default=5, ge=1)
+    threshold: float | None = None
+    multi_label: bool = False
+    unknown_label: str = "unknown"
+    metric: SimilarityMetric = SimilarityMetric.COSINE
 
 
 class SimilarityScorer(Component[SimilarityInput, ClassificationResult]):
