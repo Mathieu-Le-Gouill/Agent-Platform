@@ -1,6 +1,6 @@
 import pytest
 
-from agent_platform.agents.agent import Agent, _assemble_tool_calls
+from agent_platform.agents.agent import Agent
 from agent_platform.agents.errors import (
     AgentMaxIterations,
     AgentRecoveryExhausted,
@@ -8,7 +8,6 @@ from agent_platform.agents.errors import (
 )
 from agent_platform.agents.executor import AgentExecutor
 from agent_platform.agents.tools.registry import ToolRegistry
-from agent_platform.core.interfaces.llm.response import ToolCallDelta
 from agent_platform.core.interfaces.llm.structured import StructuredOutputError
 from agent_platform.core.schemas.message import UserMessage
 from agent_platform.core.schemas.token import TokenUsage
@@ -256,47 +255,6 @@ class TestExecutorTracing:
 
         (span,) = recorded_spans.get_finished_spans()
         assert span.attributes["conversation.id"] == "conv-456"
-
-
-class TestAssembleToolCalls:
-    def test_malformed_arguments_json_is_flagged_not_swallowed(self):
-        deltas = [
-            ToolCallDelta(
-                index=0, id="c1", name="get_weather", arguments_delta="{not json"
-            )
-        ]
-
-        calls = _assemble_tool_calls(deltas)
-
-        assert len(calls) == 1
-        assert calls[0].id == "c1"
-        assert calls[0].name == "get_weather"
-        assert calls[0].arguments == {}
-        assert calls[0].arguments_error is not None
-
-    @pytest.mark.parametrize("text", ["[]", "null", '"x"', "3"])
-    def test_non_object_arguments_json_is_flagged(self, text):
-        deltas = [
-            ToolCallDelta(index=0, id="c1", name="get_weather", arguments_delta=text)
-        ]
-
-        (call,) = _assemble_tool_calls(deltas)
-
-        assert call.arguments == {}
-        assert call.arguments_error == "arguments must be a JSON object"
-
-    def test_valid_and_empty_arguments_have_no_error(self):
-        deltas = [
-            ToolCallDelta(index=0, id="c1", name="a", arguments_delta='{"x": 1}'),
-            ToolCallDelta(index=1, id="c2", name="b"),
-        ]
-
-        first, second = _assemble_tool_calls(deltas)
-
-        assert first.arguments == {"x": 1}
-        assert second.arguments == {}
-        assert first.arguments_error is None
-        assert second.arguments_error is None
 
 
 class TestExecutorLoopObservability:

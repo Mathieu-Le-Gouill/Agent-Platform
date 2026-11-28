@@ -1,10 +1,8 @@
 from __future__ import annotations
 
 import asyncio
-import json
 import logging
 from collections.abc import AsyncIterator, Awaitable, Callable
-from typing import Any
 
 from pydantic import BaseModel
 
@@ -34,6 +32,7 @@ from agent_platform.core.interfaces.llm.structured import (
     schema_correction,
     schema_error,
 )
+from agent_platform.core.interfaces.llm.tool_calls import assemble_tool_calls
 from agent_platform.core.middleware import MiddlewarePipeline
 from agent_platform.core.observability import ModelCost, emit
 from agent_platform.core.retry import retry_once_on_invalid
@@ -41,7 +40,6 @@ from agent_platform.core.schemas.message import (
     AssistantMessage,
     Message,
     Prompt,
-    ToolCall,
     ToolMessage,
     ToolResult,
 )
@@ -51,53 +49,6 @@ from agent_platform.core.token_usage import TokenUsageAggregator
 logger = logging.getLogger(__name__)
 
 _Generate = Callable[[list[Message]], Awaitable[AssistantMessage]]
-
-
-def _assemble_tool_calls(deltas: list[ToolCallDelta]) -> list[ToolCall]:
-    """Reassemble fragmented `ToolCallDelta`s (by stream index) into complete `ToolCall`s."""
-    assembled: dict[int, dict[str, Any]] = {}
-    order: list[int] = []
-    for delta in deltas:
-        if delta.index not in assembled:
-            assembled[delta.index] = {"id": "", "name": "", "arguments": ""}
-            order.append(delta.index)
-        entry = assembled[delta.index]
-        if delta.id is not None:
-            entry["id"] = delta.id
-        if delta.name is not None:
-            entry["name"] = delta.name
-        if delta.arguments_delta is not None:
-            entry["arguments"] += delta.arguments_delta
-
-    calls = []
-    for index in order:
-        entry = assembled[index]
-        arguments: dict[str, Any] = {}
-        arguments_error: str | None = None
-        try:
-            decoded = json.loads(entry["arguments"]) if entry["arguments"] else {}
-        except json.JSONDecodeError as exc:
-            # `exc` describes the syntax error only, never the argument text.
-            arguments_error = str(exc)
-        else:
-            if isinstance(decoded, dict):
-                arguments = decoded
-            else:
-                arguments_error = "arguments must be a JSON object"
-        if arguments_error is not None:
-            logger.warning(
-                "Tool call '%s' streamed arguments that are not a JSON object",
-                entry["name"],
-            )
-        calls.append(
-            ToolCall(
-                id=entry["id"],
-                name=entry["name"],
-                arguments=arguments,
-                arguments_error=arguments_error,
-            )
-        )
-    return calls
 
 
 class Agent:
@@ -265,7 +216,7 @@ class Agent:
             tool_call_deltas.extend(chunk.tool_call_deltas)
         message = AssistantMessage(
             content="".join(deltas),
-            tool_calls=_assemble_tool_calls(tool_call_deltas),
+            tool_calls=assemble_tool_calls(tool_call_deltas),
         )
         return message, deltas
 

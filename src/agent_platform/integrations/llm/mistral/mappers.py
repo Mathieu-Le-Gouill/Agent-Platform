@@ -11,6 +11,7 @@ from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     ResponseFormat,
 )
+from agent_platform.core.interfaces.llm.tool_calls import tool_call_from_json
 from agent_platform.core.schemas.message import (
     AssistantMessage,
     AudioBlock,
@@ -181,20 +182,21 @@ def _closed_schema(node: Any) -> Any:
 def from_native_response(response: ChatCompletionResponse, model: str) -> LLMResponse:
     message = response.choices[0].message
 
-    tool_calls = [
-        ToolCall(
-            # Mistral's SDK types `tc.id` as optional, but the API always assigns
-            # one; the uuid4 fallback only guards against that type/reality gap.
-            id=tc.id or uuid4().hex,
-            name=tc.function.name,
-            arguments=(
-                tc.function.arguments
-                if isinstance(tc.function.arguments, dict)
-                else json.loads(tc.function.arguments)
-            ),
-        )
-        for tc in (message.tool_calls or [])
-    ]
+    tool_calls = []
+    for tc in message.tool_calls or []:
+        # Mistral's SDK types `tc.id` as optional, but the API always assigns
+        # one; the uuid4 fallback only guards against that type/reality gap.
+        call_id = tc.id or uuid4().hex
+        if isinstance(tc.function.arguments, dict):
+            tool_calls.append(
+                ToolCall(
+                    id=call_id, name=tc.function.name, arguments=tc.function.arguments
+                )
+            )
+        else:
+            tool_calls.append(
+                tool_call_from_json(call_id, tc.function.name, tc.function.arguments)
+            )
 
     content = message.content if isinstance(message.content, str) else ""
     usage = response.usage

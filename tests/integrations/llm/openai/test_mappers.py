@@ -452,6 +452,16 @@ class TestFromNative:
         assert tc.name == "get_weather"
         assert tc.arguments == {"location": "Paris"}
 
+    def test_malformed_tool_arguments_are_flagged_not_raised(self):
+        response = make_chat_completion(
+            None,
+            tool_calls=[make_chat_tool_call("call_abc", "get_weather", "{not json")],
+        )
+        result = _from_native_response(response, model="gpt-4.1")
+        tc = result.message.tool_calls[0]
+        assert tc.arguments == {}
+        assert tc.arguments_error is not None
+
     def test_no_tool_calls(self):
         response = make_chat_completion("Hi")
         result = _from_native_response(response, model="gpt-4.1")

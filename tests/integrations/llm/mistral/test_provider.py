@@ -326,6 +326,16 @@ class TestFromNative:
         result = _from_native_response(response, model="mistral-medium-latest")
         assert result.message.tool_calls[0].arguments == {"location": "Paris"}
 
+    def test_malformed_string_tool_arguments_are_flagged_not_raised(self):
+        response = _response(
+            None,
+            tool_calls=[_tool_call("call_abc", "get_weather", "{not json")],
+        )
+        result = _from_native_response(response, model="mistral-medium-latest")
+        tc = result.message.tool_calls[0]
+        assert tc.arguments == {}
+        assert tc.arguments_error is not None
+
     def test_no_tool_calls(self):
         response = _response("Hi")
         result = _from_native_response(response, model="mistral-medium-latest")

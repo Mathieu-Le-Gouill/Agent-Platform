@@ -7,7 +7,6 @@ the readers here take them structurally.
 
 from __future__ import annotations
 
-import json
 from collections.abc import Iterator
 from typing import Any
 
@@ -16,7 +15,8 @@ from agent_platform.core.interfaces.llm.response import (
     StreamChunk,
     ToolCallDelta,
 )
-from agent_platform.core.schemas.message import AssistantMessage, ToolCall
+from agent_platform.core.interfaces.llm.tool_calls import tool_call_from_json
+from agent_platform.core.schemas.message import AssistantMessage
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
 
@@ -27,11 +27,7 @@ def from_chat_completion(response: Any, model: str) -> LLMResponse:
     message = response.choices[0].message
     tool_calls = [
         # Only function tools are ever sent, so only function calls come back.
-        ToolCall(
-            id=tc.id,
-            name=tc.function.name,
-            arguments=json.loads(tc.function.arguments),
-        )
+        tool_call_from_json(tc.id, tc.function.name, tc.function.arguments)
         for tc in (message.tool_calls or [])
     ]
     usage = response.usage
