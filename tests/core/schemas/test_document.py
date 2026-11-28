@@ -10,10 +10,6 @@ from agent_platform.core.schemas.document import (
     AudioDocument,
     ImageDocument,
     VideoDocument,
-    _image_bit_depth,
-    _infer_audio_format,
-    _infer_image_format,
-    _infer_video_format,
 )
 from agent_platform.core.schemas.enums import AudioFormat, ImageFormat, VideoFormat
 
@@ -193,24 +189,18 @@ class TestVideoDocumentSaveContent:
             assert f.read() == doc.content
 
 
-class TestFormatInferenceHelpers:
-    def test_infer_image_format_known_extension(self):
-        assert _infer_image_format("photo.png") == ImageFormat.PNG
+class TestFormatFromExtension:
+    def test_unrecognized_extension_gives_unknown(self, tmp_path):
+        path = tmp_path / "pixel.xyz"
+        Image.new("RGB", (1, 1)).save(path, format="PNG")
 
-    def test_infer_image_format_unknown_extension(self):
-        assert _infer_image_format("photo.xyz") == ImageFormat.UNKNOWN
+        assert ImageDocument.load_content(str(path)).format == ImageFormat.UNKNOWN
 
-    def test_infer_audio_format_known_extension(self):
-        assert _infer_audio_format("clip.wav") == AudioFormat.WAV
+    def test_extension_of_another_media_type_gives_unknown(self, tmp_path):
+        path = tmp_path / "tone.mp4"
+        sf.write(str(path), np.zeros((10, 1), dtype=np.float32), 16000, format="WAV")
 
-    def test_infer_audio_format_unknown_extension(self):
-        assert _infer_audio_format("clip.xyz") == AudioFormat.UNKNOWN
+        assert AudioDocument.load_content(str(path)).format == AudioFormat.UNKNOWN
 
-    def test_infer_video_format_known_extension(self):
-        assert _infer_video_format("movie.mp4") == VideoFormat.MP4
-
-    def test_infer_video_format_unknown_extension(self):
-        assert _infer_video_format("movie.xyz") == VideoFormat.UNKNOWN
-
-    def test_image_bit_depth_rgb(self):
-        assert _image_bit_depth("RGB") == 8
+    def test_video_extension_gives_its_format(self, mp4_path):
+        assert VideoDocument.load_content(mp4_path).format == VideoFormat.MP4

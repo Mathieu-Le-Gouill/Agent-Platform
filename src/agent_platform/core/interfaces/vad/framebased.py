@@ -10,10 +10,6 @@ from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.span import SampleSpan
 
 
-def _duration_ms(chunk: AudioChunk) -> float:
-    return (chunk.end - chunk.start) * 1000 / chunk.sample_rate
-
-
 def _ms_to_samples(ms: int, sample_rate: int) -> int:
     return ms * sample_rate // 1000
 
@@ -74,7 +70,7 @@ class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
     ) -> None:
 
         state.silence_ms = 0
-        state.speech_ms += _duration_ms(chunk)
+        state.speech_ms += chunk.duration_ms
 
         if state.in_speech:
             return
@@ -101,7 +97,7 @@ class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
             state.silence_ms = 0
             return None
 
-        state.silence_ms += _duration_ms(chunk)
+        state.silence_ms += chunk.duration_ms
 
         if state.silence_ms < config.min_silence_duration_ms:
             return None

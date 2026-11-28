@@ -45,6 +45,11 @@ class AudioChunk(Chunk, frozen=True):
     channels: int = 1
     format: AudioFormat = AudioFormat.UNKNOWN
 
+    @property
+    def duration_ms(self) -> float:
+        # `start`/`end` are sample offsets, not milliseconds.
+        return (self.end - self.start) * 1000 / self.sample_rate
+
 
 class VideoChunk(Chunk, frozen=True):
     media_type: MediaType = MediaType.VIDEO

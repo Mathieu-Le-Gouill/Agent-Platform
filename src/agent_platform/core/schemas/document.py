@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import os
 from datetime import datetime
-from typing import Any
+from typing import Any, TypeVar
 
 from pydantic import BaseModel, Field
 
@@ -11,11 +11,14 @@ from agent_platform.core.schemas.dimensions import Dimensions, bit_depth_for_mod
 from agent_platform.core.schemas.enums import (
     AudioFormat,
     DocumentFormat,
+    FileFormat,
     ImageFormat,
     Language,
     MediaType,
     VideoFormat,
 )
+
+_MediaFormatT = TypeVar("_MediaFormatT", ImageFormat, AudioFormat, VideoFormat)
 
 # --- Metadata ---
 
@@ -70,11 +73,11 @@ class ImageDocument(Document, frozen=True):
         from PIL import Image
 
         with Image.open(path) as img:
-            fmt = _infer_image_format(path)
+            fmt = _format_from_path(path, ImageFormat)
             width, height = img.size
             has_alpha = img.mode == "RGBA"
             channels = len(img.getbands())
-            bit_depth = _image_bit_depth(img.mode)
+            bit_depth = bit_depth_for_mode(img.mode)
         with open(path, "rb") as f:
             content = f.read()
         return ImageDocument(
@@ -125,7 +128,7 @@ class AudioDocument(Document, frozen=True):
 
         info = sf.info(path)
         data, sr = sf.read(path, dtype="float32", always_2d=True)
-        fmt = _infer_audio_format(path)
+        fmt = _format_from_path(path, AudioFormat)
         return AudioDocument(
             source=path,
             content=data.tobytes(),
@@ -199,7 +202,7 @@ class VideoDocument(Document, frozen=True):
             )
             audio_channels = audio_stream.channels if audio_stream else None
             audio_sample_rate = audio_stream.rate if audio_stream else None
-            fmt = _infer_video_format(path)
+            fmt = _format_from_path(path, VideoFormat)
         with open(path, "rb") as f:
             content = f.read()
         return VideoDocument(
@@ -245,32 +248,10 @@ _SF_FORMAT_MAP: dict[AudioFormat, str] = {
 }
 
 
-def _image_bit_depth(mode: str) -> int | None:
-    return bit_depth_for_mode(mode)
-
-
-def _infer_image_format(path: str) -> ImageFormat:
-    from agent_platform.core.schemas.enums import FileFormat
-
-    ff = FileFormat.from_path(path)
-    if isinstance(ff.extension_format, ImageFormat):
-        return ff.extension_format
-    return ImageFormat.UNKNOWN
-
-
-def _infer_audio_format(path: str) -> AudioFormat:
-    from agent_platform.core.schemas.enums import FileFormat
-
-    ff = FileFormat.from_path(path)
-    if isinstance(ff.extension_format, AudioFormat):
-        return ff.extension_format
-    return AudioFormat.UNKNOWN
-
-
-def _infer_video_format(path: str) -> VideoFormat:
-    from agent_platform.core.schemas.enums import FileFormat
-
-    ff = FileFormat.from_path(path)
-    if isinstance(ff.extension_format, VideoFormat):
-        return ff.extension_format
-    return VideoFormat.UNKNOWN
+def _format_from_path(path: str, format_type: type[_MediaFormatT]) -> _MediaFormatT:
+    """The path extension's format, or UNKNOWN when the extension is
+    unrecognized or names another media type."""
+    extension_format = FileFormat.from_path(path).extension_format
+    if isinstance(extension_format, format_type):
+        return extension_format
+    return format_type.UNKNOWN
