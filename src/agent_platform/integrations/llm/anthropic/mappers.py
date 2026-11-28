@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import logging
 from typing import Any
 
@@ -32,6 +31,7 @@ from agent_platform.integrations.llm._generic_fields import (
     levels_for_model,
     nearest_level,
 )
+from agent_platform.integrations.llm._media import image_base64, image_mime_type
 from agent_platform.integrations.llm.anthropic.config import AnthropicGenerationConfig
 
 __all__ = [
@@ -134,15 +134,13 @@ def block_to_native(block: ContentBlock) -> dict[str, Any]:
         case ImageBlock():
             if isinstance(block.image, str):
                 return {"type": "image", "source": {"type": "url", "url": block.image}}
-            mime = (
-                f"image/{block.image.format.value}"
-                if block.image.format
-                else "image/png"
-            )
-            data = base64.b64encode(block.image.content).decode()
             return {
                 "type": "image",
-                "source": {"type": "base64", "media_type": mime, "data": data},
+                "source": {
+                    "type": "base64",
+                    "media_type": image_mime_type(block.image),
+                    "data": image_base64(block.image),
+                },
             }
         case AudioBlock():
             raise ProviderError("Anthropic does not support audio content blocks")

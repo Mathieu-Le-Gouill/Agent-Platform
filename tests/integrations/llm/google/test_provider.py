@@ -202,6 +202,18 @@ class TestToNativeContents:
         assert parts[2].file_data.file_uri == "https://example.com/a.png"
         assert parts[3].inline_data.mime_type == "audio/wav"
 
+    def test_unknown_media_formats_fall_back_to_png_and_wav(self):
+        prompt = Prompt().add_user_content(
+            [
+                ImageBlock(image=ImageDocument(content=b"\x89PNG")),
+                AudioBlock(audio=AudioDocument(content=b"RIFF....")),
+            ]
+        )
+        _, contents = _to_native_contents(prompt)
+        parts = contents[0].parts
+        assert parts[0].inline_data.mime_type == "image/png"
+        assert parts[1].inline_data.mime_type == "audio/wav"
+
 
 class TestToNativeConfig:
     def test_default_config(self):

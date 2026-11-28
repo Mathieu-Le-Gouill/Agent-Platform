@@ -108,6 +108,11 @@ class TestBlockToNative:
         assert result["type"] == "image_url"
         assert result["image_url"].startswith("data:image/png;base64,")
 
+    def test_image_block_unknown_format_falls_back_to_png(self):
+        doc = ImageDocument(content=b"\x89PNG")
+        result = _block_to_native(ImageBlock(image=doc))
+        assert result["image_url"].startswith("data:image/png;base64,")
+
     def test_audio_block(self):
         doc = AudioDocument(content=b"RIFF....", format=AudioFormat.WAV)
         result = _block_to_native(AudioBlock(audio=doc))

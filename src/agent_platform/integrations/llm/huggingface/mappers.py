@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 import json
 from typing import Any
 
@@ -26,6 +25,7 @@ from agent_platform.core.schemas.message import (
 from agent_platform.integrations.llm._chat_completions import from_chat_completion
 from agent_platform.integrations.llm._generic_fields import warn_unsupported
 from agent_platform.integrations.llm._json_schema import json_schema_name
+from agent_platform.integrations.llm._media import image_data_url
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
 )
@@ -44,16 +44,11 @@ def block_to_native(block: ContentBlock) -> dict[str, Any]:
         case TextBlock():
             return {"type": "text", "text": block.text}
         case ImageBlock():
-            if isinstance(block.image, str):
-                url = block.image
-            else:
-                mime = (
-                    f"image/{block.image.format.value}"
-                    if block.image.format
-                    else "image/png"
-                )
-                data = base64.b64encode(block.image.content).decode()
-                url = f"data:{mime};base64,{data}"
+            url = (
+                block.image
+                if isinstance(block.image, str)
+                else image_data_url(block.image)
+            )
             return {"type": "image_url", "image_url": {"url": url}}
         case AudioBlock():
             raise ProviderError("Hugging Face does not support audio content blocks")

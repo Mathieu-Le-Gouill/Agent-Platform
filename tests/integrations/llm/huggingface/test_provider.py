@@ -70,6 +70,11 @@ class TestBlockToNative:
         result = _block_to_native(ImageBlock(image=doc))
         assert result["image_url"]["url"].startswith("data:image/png;base64,")
 
+    def test_image_block_unknown_format_falls_back_to_png(self):
+        doc = ImageDocument(content=b"\x89PNG")
+        result = _block_to_native(ImageBlock(image=doc))
+        assert result["image_url"]["url"].startswith("data:image/png;base64,")
+
     def test_audio_block_unsupported(self):
         doc = AudioDocument(content=b"RIFF....", format=AudioFormat.WAV)
         with pytest.raises(ProviderError, match="does not support audio"):

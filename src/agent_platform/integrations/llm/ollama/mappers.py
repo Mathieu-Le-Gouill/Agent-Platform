@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-import base64
 from typing import Any
 from uuid import uuid4
 
@@ -26,6 +25,7 @@ from agent_platform.core.schemas.message import (
 from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm._generic_fields import warn_unsupported
+from agent_platform.integrations.llm._media import image_base64
 from agent_platform.integrations.llm.ollama.config import OllamaGenerationConfig
 
 __all__ = [
@@ -61,7 +61,7 @@ def message_content(m: ContentMessage) -> tuple[str, list[str]]:
                 if isinstance(block.image, str):
                     images.append(_raw_base64(block.image))
                 else:
-                    images.append(base64.b64encode(block.image.content).decode())
+                    images.append(image_base64(block.image))
             case AudioBlock():
                 raise ProviderError("Ollama does not support audio content blocks")
 

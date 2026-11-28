@@ -30,6 +30,7 @@ from agent_platform.integrations.llm._generic_fields import (
     nearest_level,
 )
 from agent_platform.integrations.llm._json_schema import json_schema_name
+from agent_platform.integrations.llm._media import audio_format_name, image_data_url
 from agent_platform.integrations.llm.openai.config import OpenAIGenerationConfig
 
 __all__ = [
@@ -163,20 +164,15 @@ def block_to_native(block: ContentBlock) -> dict[str, Any]:
         case TextBlock():
             return {"type": "text", "text": block.text}
         case ImageBlock():
-            if isinstance(block.image, str):
-                url = block.image
-            else:
-                mime = (
-                    f"image/{block.image.format.value}"
-                    if block.image.format
-                    else "image/png"
-                )
-                data = base64.b64encode(block.image.content).decode()
-                url = f"data:{mime};base64,{data}"
+            url = (
+                block.image
+                if isinstance(block.image, str)
+                else image_data_url(block.image)
+            )
             return {"type": "image_url", "image_url": {"url": url}}
         case AudioBlock():
             data = base64.b64encode(block.audio.content).decode()
-            fmt = block.audio.format.value if block.audio.format else "wav"
+            fmt = audio_format_name(block.audio)
             return {"type": "input_audio", "input_audio": {"data": data, "format": fmt}}
 
 

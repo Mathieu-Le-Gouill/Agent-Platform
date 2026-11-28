@@ -32,6 +32,7 @@ from agent_platform.integrations.llm._generic_fields import (
     nearest_level,
     warn_unsupported,
 )
+from agent_platform.integrations.llm._media import audio_format_name, image_mime_type
 from agent_platform.integrations.llm.google.config import GoogleGenerationConfig
 
 __all__ = [
@@ -72,16 +73,13 @@ def block_to_native_part(block: ContentBlock) -> types.Part:
         case ImageBlock():
             if isinstance(block.image, str):
                 return types.Part.from_uri(file_uri=block.image, mime_type="image/png")
-            mime = (
-                f"image/{block.image.format.value}"
-                if block.image.format
-                else "image/png"
-            )
-            return types.Part.from_bytes(data=block.image.content, mime_type=mime)
-        case AudioBlock():
-            mime = block.audio.format.value if block.audio.format else "wav"
             return types.Part.from_bytes(
-                data=block.audio.content, mime_type=f"audio/{mime}"
+                data=block.image.content, mime_type=image_mime_type(block.image)
+            )
+        case AudioBlock():
+            return types.Part.from_bytes(
+                data=block.audio.content,
+                mime_type=f"audio/{audio_format_name(block.audio)}",
             )
 
 
