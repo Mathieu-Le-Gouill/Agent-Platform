@@ -11,9 +11,6 @@ one of the SDKs it needs is missing.
 
 from __future__ import annotations
 
-import importlib.util
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
 from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
@@ -39,8 +36,18 @@ from agent_platform.integrations.credentials import (
     OpenAICredentials,
     VoyageCredentials,
 )
-
-_REQUEST = httpx.Request("POST", "https://vendor.test/v1")
+from tests.helpers.retry_rule import (
+    REQUEST,
+    Case,
+    Patch,
+    google_api_status,
+    http_response,
+    httpx_connection,
+    raised_from,
+    requests_connection,
+    retry_rule_tests,
+    skip_unless_installed,
+)
 
 _EMBEDDING = "Embedding generation failed"
 _MODERATION = "Moderation request failed"
@@ -49,17 +56,6 @@ _OCR = "OCR extraction failed"
 _STT = "Speech-to-text failed"
 
 _PROVIDER_MODULE = "agent_platform.integrations"
-
-
-def _installed(module: str) -> bool:
-    try:
-        return importlib.util.find_spec(module) is not None
-    except ImportError:
-        return False
-
-
-def _response(status: int) -> httpx.Response:
-    return httpx.Response(status, request=_REQUEST)
 
 
 def _chunks() -> list[TextChunk]:
@@ -83,22 +79,16 @@ def _openai_status(status: int) -> Exception:
         400: openai.BadRequestError,
         503: openai.InternalServerError,
     }[status]
-    return error_class("vendor said no", response=_response(status), body=None)
-
-
-def _raised_from(error: Exception, cause: Exception) -> Exception:
-    """Chain `error` to `cause` as `raise error from cause` does in an SDK."""
-    error.__cause__ = cause
-    return error
+    return error_class("vendor said no", response=http_response(status), body=None)
 
 
 def _openai_connection() -> Exception:
     import openai
 
     # The SDK raises this `from` the httpx transport error.
-    return _raised_from(
-        openai.APIConnectionError(request=_REQUEST),
-        httpx.ConnectError("connection refused", request=_REQUEST),
+    return raised_from(
+        openai.APIConnectionError(request=REQUEST),
+        httpx.ConnectError("connection refused", request=REQUEST),
     )
 
 
@@ -107,7 +97,7 @@ def _voyage_connection() -> Exception:
     import voyageai.error
 
     # The SDK raises this `from` the aiohttp client error.
-    return _raised_from(
+    return raised_from(
         voyageai.error.APIConnectionError("Error communicating with Voyage"),
         aiohttp.ClientConnectionError("connection refused"),
     )
@@ -121,14 +111,14 @@ def _genai_status(status: int) -> Exception:
         503: genai_errors.ServerError,
     }[status]
     return error_class(
-        status, {"error": {"message": "vendor said no"}}, _response(status)
+        status, {"error": {"message": "vendor said no"}}, http_response(status)
     )
 
 
 def _mistral_status(status: int) -> Exception:
     from mistralai.models.mistralerror import MistralError
 
-    return MistralError("vendor said no", _response(status))
+    return MistralError("vendor said no", http_response(status))
 
 
 def _ollama_status(status: int) -> Exception:
@@ -140,7 +130,7 @@ def _ollama_status(status: int) -> Exception:
 def _huggingface_status(status: int) -> Exception:
     from huggingface_hub.errors import HfHubHTTPError
 
-    return HfHubHTTPError("vendor said no", response=_response(status))
+    return HfHubHTTPError("vendor said no", response=http_response(status))
 
 
 def _cohere_status(status: int) -> Exception:
@@ -165,12 +155,8 @@ def _voyage_status(status: int) -> Exception:
 
 def _httpx_status(status: int) -> Exception:
     return httpx.HTTPStatusError(
-        "vendor said no", request=_REQUEST, response=_response(status)
+        "vendor said no", request=REQUEST, response=http_response(status)
     )
-
-
-def _httpx_connection() -> Exception:
-    return httpx.ConnectError("connection refused", request=_REQUEST)
 
 
 def _botocore_error(status: int, code: str) -> Exception:
@@ -198,30 +184,10 @@ def _botocore_connection() -> Exception:
     return botocore.exceptions.EndpointConnectionError(endpoint_url="https://x.test")
 
 
-def _google_api_status(status: int) -> Exception:
-    import google.api_core.exceptions
-
-    error_class = {
-        400: google.api_core.exceptions.InvalidArgument,
-        503: google.api_core.exceptions.ServiceUnavailable,
-    }[status]
-    return error_class("vendor said no")
-
-
-def _requests_connection() -> Exception:
-    import requests
-
-    return requests.ConnectionError("connection refused")
-
-
 def _deepgram_status(status: int) -> Exception:
     import deepgram.core.api_error
 
     return deepgram.core.api_error.ApiError(status_code=status, body="vendor said no")
-
-
-Patch = Callable[[Any, Exception], Any]
-Call = Callable[[Path], Awaitable[object]]
 
 
 def _patch_attribute(target: str, mock_class: type) -> Patch:
@@ -240,17 +206,6 @@ def _patch_google_vision_client(mocker: Any, error: Exception) -> Any:
     method = client_class.ImageAnnotatorClient.return_value.document_text_detection
     method.side_effect = error
     return method
-
-
-@dataclass(frozen=True)
-class Case:
-    operation: str
-    # Top-level or dotted modules the case imports; it is skipped without them.
-    requires: tuple[str, ...]
-    patch: Patch
-    call: Call
-    status_error: Callable[[int], Exception]
-    connection_error: Callable[[], Exception]
 
 
 def _openai_key() -> OpenAICredentials:
@@ -394,7 +349,7 @@ CASES = {
         _patch_attribute("google.genai.models.AsyncModels.embed_content", AsyncMock),
         _embed_google,
         _genai_status,
-        _httpx_connection,
+        httpx_connection,
     ),
     "mistral-embeddings": Case(
         _EMBEDDING,
@@ -402,7 +357,7 @@ CASES = {
         _patch_attribute("mistralai.embeddings.Embeddings.create_async", AsyncMock),
         _embed_mistral,
         _mistral_status,
-        _httpx_connection,
+        httpx_connection,
     ),
     "ollama-embeddings": Case(
         _EMBEDDING,
@@ -421,7 +376,7 @@ CASES = {
         ),
         _embed_huggingface_hosted,
         _huggingface_status,
-        _httpx_connection,
+        httpx_connection,
     ),
     "openai-moderation": Case(
         _MODERATION,
@@ -439,7 +394,7 @@ CASES = {
         _patch_attribute("cohere.AsyncClient.rerank", AsyncMock),
         _rerank_cohere,
         _cohere_status,
-        _httpx_connection,
+        httpx_connection,
     ),
     "voyage-reranking": Case(
         _RERANKING,
@@ -455,7 +410,7 @@ CASES = {
         _patch_attribute("httpx.AsyncClient.post", AsyncMock),
         _rerank_jina,
         _httpx_status,
-        _httpx_connection,
+        httpx_connection,
     ),
     "textract-ocr": Case(
         _OCR,
@@ -470,8 +425,8 @@ CASES = {
         ("google.cloud.vision", "google.api_core", "requests"),
         _patch_google_vision_client,
         _ocr_google_vision,
-        _google_api_status,
-        _requests_connection,
+        google_api_status,
+        requests_connection,
     ),
     "mistral-ocr": Case(
         _OCR,
@@ -479,7 +434,7 @@ CASES = {
         _patch_attribute("mistralai.ocr.Ocr.process", MagicMock),
         _ocr_mistral,
         _mistral_status,
-        _httpx_connection,
+        httpx_connection,
     ),
     "openai-whisper": Case(
         _STT,
@@ -501,66 +456,15 @@ CASES = {
         ),
         _stt_deepgram,
         _deepgram_status,
-        _httpx_connection,
+        httpx_connection,
     ),
 }
 
 
-def _skip_unless_installed(*modules: str) -> pytest.MarkDecorator:
-    missing = [module for module in modules if not _installed(module)]
-    return pytest.mark.skipif(bool(missing), reason=f"{missing} not installed")
+TestRetryRule = retry_rule_tests(CASES)
 
 
-_case = pytest.mark.parametrize(
-    "case",
-    [
-        pytest.param(case, id=name, marks=_skip_unless_installed(*case.requires))
-        for name, case in CASES.items()
-    ],
-)
-
-
-@_case
-async def test_a_503_costs_three_calls(case: Case, mocker, no_retry_sleep, tmp_path):
-    sdk_call = case.patch(mocker, case.status_error(503))
-
-    with pytest.raises(ProviderError) as caught:
-        await case.call(tmp_path)
-
-    assert sdk_call.call_count == 3
-    assert caught.value.retryable is True
-    assert str(caught.value).startswith(case.operation)
-
-
-@_case
-async def test_a_connection_error_costs_three_calls(
-    case: Case, mocker, no_retry_sleep, tmp_path
-):
-    sdk_call = case.patch(mocker, case.connection_error())
-
-    with pytest.raises(ProviderError) as caught:
-        await case.call(tmp_path)
-
-    assert sdk_call.call_count == 3
-    assert caught.value.retryable is True
-    assert str(caught.value).startswith(case.operation)
-
-
-@_case
-async def test_a_400_costs_one_call_and_is_not_retryable(
-    case: Case, mocker, no_retry_sleep, tmp_path
-):
-    sdk_call = case.patch(mocker, case.status_error(400))
-
-    with pytest.raises(ProviderError) as caught:
-        await case.call(tmp_path)
-
-    assert sdk_call.call_count == 1
-    assert caught.value.retryable is False
-    assert str(caught.value).startswith(case.operation)
-
-
-@_skip_unless_installed("boto3", "botocore")
+@skip_unless_installed("boto3", "botocore")
 @pytest.mark.parametrize(
     "code", ["ThrottlingException", "ProvisionedThroughputExceededException"]
 )
@@ -577,7 +481,7 @@ async def test_textract_throttling_sent_as_a_400_is_retried(
     assert str(caught.value).startswith(_OCR)
 
 
-@_skip_unless_installed("cohere")
+@skip_unless_installed("cohere")
 async def test_cohere_turns_its_own_retries_off_on_every_call(
     mocker, no_retry_sleep, tmp_path
 ):
@@ -589,11 +493,11 @@ async def test_cohere_turns_its_own_retries_off_on_every_call(
     assert sdk_call.call_args.kwargs["request_options"] == {"max_retries": 0}
 
 
-@_skip_unless_installed("google.cloud.vision", "google.api_core", "requests")
+@skip_unless_installed("google.cloud.vision", "google.api_core", "requests")
 async def test_google_vision_turns_its_own_retry_off_on_every_call(
     mocker, no_retry_sleep, tmp_path
 ):
-    sdk_call = _patch_google_vision_client(mocker, _google_api_status(400))
+    sdk_call = _patch_google_vision_client(mocker, google_api_status(400))
 
     with pytest.raises(ProviderError):
         await _ocr_google_vision(tmp_path)

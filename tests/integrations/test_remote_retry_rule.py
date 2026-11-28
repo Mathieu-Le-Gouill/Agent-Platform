@@ -12,9 +12,7 @@ one of the SDKs it needs is missing.
 
 from __future__ import annotations
 
-import importlib.util
-from collections.abc import Awaitable, Callable
-from dataclasses import dataclass
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock, MagicMock
 
@@ -33,8 +31,17 @@ from agent_platform.integrations.credentials import (
     QdrantCredentials,
     WeaviateCredentials,
 )
+from tests.helpers.retry_rule import (
+    Case,
+    Patch,
+    google_api_status,
+    httpx_connection,
+    raised_from,
+    requests_connection,
+    retry_rule_tests,
+    skip_unless_installed,
+)
 
-_REQUEST = httpx.Request("POST", "https://vendor.test/v1")
 _PROVIDER = "agent_platform.integrations"
 
 _TRANSLATION = "Translation failed"
@@ -43,28 +50,6 @@ _HYBRID_SEARCH = "Vector store hybrid search failed"
 
 _TEXT = TextChunk(text="Hello", metadata={})
 _VECTOR = [0.1, 0.2]
-
-
-def _installed(module: str) -> bool:
-    try:
-        return importlib.util.find_spec(module) is not None
-    except ImportError:
-        return False
-
-
-def _skip_unless_installed(*modules: str) -> pytest.MarkDecorator:
-    missing = [module for module in modules if not _installed(module)]
-    return pytest.mark.skipif(bool(missing), reason=f"{missing} not installed")
-
-
-def _raised_from(error: Exception, cause: Exception) -> Exception:
-    """Chain `error` to `cause` as `raise error from cause` does in an SDK."""
-    error.__cause__ = cause
-    return error
-
-
-def _httpx_connection() -> Exception:
-    return httpx.ConnectError("connection refused", request=_REQUEST)
 
 
 def _azure_status(status: int) -> Exception:
@@ -96,22 +81,6 @@ def _deepl_connection() -> Exception:
     return deepl.ConnectionException("Connection failed", should_retry=True)
 
 
-def _google_status(status: int) -> Exception:
-    import google.api_core.exceptions
-
-    error_class = {
-        400: google.api_core.exceptions.InvalidArgument,
-        503: google.api_core.exceptions.ServiceUnavailable,
-    }[status]
-    return error_class("vendor said no")
-
-
-def _requests_connection() -> Exception:
-    import requests
-
-    return requests.ConnectionError("connection refused")
-
-
 def _pinecone_status(status: int) -> Exception:
     import pinecone.exceptions
 
@@ -138,8 +107,8 @@ def _qdrant_connection() -> Exception:
     from qdrant_client.http.exceptions import ResponseHandlingException
 
     # The client raises this `from` the httpx transport error.
-    return _raised_from(
-        ResponseHandlingException(_httpx_connection()), _httpx_connection()
+    return raised_from(
+        ResponseHandlingException(httpx_connection()), httpx_connection()
     )
 
 
@@ -164,7 +133,7 @@ def _weaviate_status(status: int) -> Exception:
 
     code_name = {400: "INVALID_ARGUMENT", 503: "UNAVAILABLE"}[status]
     # The client raises this `from` the gRPC error.
-    return _raised_from(
+    return raised_from(
         weaviate.exceptions.WeaviateQueryError("vendor said no", "GRPC search"),
         _grpc_error(code_name),
     )
@@ -195,10 +164,6 @@ def _chroma_status(status: int) -> Exception:
         400: chromadb.errors.InvalidArgumentError,
         503: chromadb.errors.InternalError,
     }[status]("vendor said no")
-
-
-Patch = Callable[[Any, Exception], Any]
-Call = Callable[[], Awaitable[object]]
 
 
 def _patch_translate_method(patch_target: str, method: str) -> Patch:
@@ -265,7 +230,7 @@ def _patch_chroma(mocker: Any, error: Exception) -> Any:
     return collection.query
 
 
-async def _translate_azure() -> object:
+async def _translate_azure(_: Path) -> object:
     from agent_platform.integrations.translation.azure.provider import AzureTranslator
 
     translator = AzureTranslator(
@@ -274,14 +239,14 @@ async def _translate_azure() -> object:
     return await translator.atranslate(_TEXT, target=Language.FR)
 
 
-async def _translate_deepl() -> object:
+async def _translate_deepl(_: Path) -> object:
     from agent_platform.integrations.translation.deepl.provider import DeepLTranslator
 
     translator = DeepLTranslator(DeepLCredentials(auth_key="test-key"))
     return await translator.atranslate(_TEXT, target=Language.FR)
 
 
-async def _translate_google() -> object:
+async def _translate_google(_: Path) -> object:
     from agent_platform.integrations.translation.google_translate.provider import (
         GoogleTranslator,
     )
@@ -290,7 +255,7 @@ async def _translate_google() -> object:
     return await translator.atranslate(_TEXT, target=Language.FR)
 
 
-async def _search_pinecone() -> object:
+async def _search_pinecone(_: Path) -> object:
     from agent_platform.integrations.vector_store.pinecone.config import PineconeConfig
     from agent_platform.integrations.vector_store.pinecone.provider import (
         PineconeStore,
@@ -302,7 +267,7 @@ async def _search_pinecone() -> object:
     )
 
 
-async def _search_qdrant() -> object:
+async def _search_qdrant(_: Path) -> object:
     from agent_platform.integrations.vector_store.qdrant.provider import (
         QdrantVectorStoreProvider,
     )
@@ -311,7 +276,7 @@ async def _search_qdrant() -> object:
     return await store.search_with_scores(_VECTOR)
 
 
-async def _hybrid_search_qdrant() -> object:
+async def _hybrid_search_qdrant(_: Path) -> object:
     from agent_platform.core.schemas.vector import SparseVector
     from agent_platform.integrations.vector_store.qdrant.provider import (
         QdrantVectorStoreProvider,
@@ -323,37 +288,26 @@ async def _hybrid_search_qdrant() -> object:
     )
 
 
-async def _search_weaviate() -> object:
+async def _search_weaviate(_: Path) -> object:
     from agent_platform.integrations.vector_store.weaviate.provider import WeaviateStore
 
     store = WeaviateStore(WeaviateCredentials(api_key=None))
     return await store.search_with_scores(_VECTOR)
 
 
-async def _plain_search_weaviate() -> object:
+async def _plain_search_weaviate(_: Path) -> object:
     from agent_platform.integrations.vector_store.weaviate.provider import WeaviateStore
 
     store = WeaviateStore(WeaviateCredentials(api_key=None))
     return await store.search(_VECTOR)
 
 
-async def _search_chroma() -> object:
+async def _search_chroma(_: Path) -> object:
     from agent_platform.integrations.vector_store.chroma.config import ChromaConfig
     from agent_platform.integrations.vector_store.chroma.provider import ChromaStore
 
     store = ChromaStore(ChromaCredentials())
     return await store.search_with_scores(_VECTOR, config=ChromaConfig())
-
-
-@dataclass(frozen=True)
-class Case:
-    operation: str
-    # Modules the case imports; it is skipped when one is missing.
-    requires: tuple[str, ...]
-    patch: Patch
-    call: Call
-    status_error: Callable[[int], Exception]
-    connection_error: Callable[[], Exception]
 
 
 _AZURE = ("azure.core", "azure.ai.translation.text")
@@ -388,8 +342,8 @@ CASES = {
         ("google.cloud.translate_v2", "google.api_core", "requests"),
         _patch_google,
         _translate_google,
-        _google_status,
-        _requests_connection,
+        google_api_status,
+        requests_connection,
     ),
     "pinecone-search": Case(
         _SEARCH,
@@ -437,80 +391,38 @@ CASES = {
         _patch_chroma,
         _search_chroma,
         _chroma_status,
-        _httpx_connection,
+        httpx_connection,
     ),
 }
 
-_case = pytest.mark.parametrize(
-    "case",
-    [
-        pytest.param(case, id=name, marks=_skip_unless_installed(*case.requires))
-        for name, case in CASES.items()
-    ],
-)
-
-
-@_case
-async def test_a_503_costs_three_calls(case: Case, mocker, no_retry_sleep):
-    sdk_call = case.patch(mocker, case.status_error(503))
-
-    with pytest.raises(ProviderError) as caught:
-        await case.call()
-
-    assert sdk_call.call_count == 3
-    assert caught.value.retryable is True
-    assert str(caught.value).startswith(case.operation)
-
-
-@_case
-async def test_a_connection_error_costs_three_calls(case: Case, mocker, no_retry_sleep):
-    sdk_call = case.patch(mocker, case.connection_error())
-
-    with pytest.raises(ProviderError) as caught:
-        await case.call()
-
-    assert sdk_call.call_count == 3
-    assert caught.value.retryable is True
-    assert str(caught.value).startswith(case.operation)
-
-
-@_case
-async def test_a_400_costs_one_call_and_is_not_retryable(
-    case: Case, mocker, no_retry_sleep
-):
-    sdk_call = case.patch(mocker, case.status_error(400))
-
-    with pytest.raises(ProviderError) as caught:
-        await case.call()
-
-    assert sdk_call.call_count == 1
-    assert caught.value.retryable is False
-    assert str(caught.value).startswith(case.operation)
+TestRetryRule = retry_rule_tests(CASES)
 
 
 class TestTransientErrorsWithoutAStatus:
-    @_skip_unless_installed(*_QDRANT)
-    async def test_qdrant_rate_limit_costs_three_calls(self, mocker, no_retry_sleep):
+    @skip_unless_installed(*_QDRANT)
+    async def test_qdrant_rate_limit_costs_three_calls(
+        self, mocker, no_retry_sleep, tmp_path
+    ):
         sdk_call = _patch_qdrant_query(mocker, _qdrant_rate_limit())
 
         with pytest.raises(ProviderError) as caught:
-            await _search_qdrant()
+            await _search_qdrant(tmp_path)
 
         assert sdk_call.call_count == 3
         assert caught.value.retryable is True
         assert str(caught.value).startswith(_SEARCH)
 
-    @_skip_unless_installed(*_WEAVIATE)
+    @skip_unless_installed(*_WEAVIATE)
     @pytest.mark.parametrize(
         "make_error", [_weaviate_timeout, _weaviate_retry], ids=["timeout", "retry"]
     )
     async def test_weaviate_timeout_and_retry_errors_cost_three_calls(
-        self, make_error, mocker, no_retry_sleep
+        self, make_error, mocker, no_retry_sleep, tmp_path
     ):
         sdk_call = _patch_weaviate(mocker, make_error())
 
         with pytest.raises(ProviderError) as caught:
-            await _plain_search_weaviate()
+            await _plain_search_weaviate(tmp_path)
 
         assert sdk_call.call_count == 3
         assert caught.value.retryable is True
@@ -518,7 +430,7 @@ class TestTransientErrorsWithoutAStatus:
 
 
 class TestTheSdkDoesNotRetry:
-    @_skip_unless_installed(*_AZURE)
+    @skip_unless_installed(*_AZURE)
     def test_azure_sets_retry_total_to_zero(self, mocker):
         from agent_platform.integrations.translation.azure.provider import (
             AzureTranslator,
@@ -535,7 +447,7 @@ class TestTheSdkDoesNotRetry:
 
         assert client_class.call_args.kwargs["retry_total"] == 0
 
-    @_skip_unless_installed("deepl")
+    @skip_unless_installed("deepl")
     def test_deepl_sets_its_process_wide_retry_count_to_zero(self):
         import deepl
 
@@ -543,7 +455,7 @@ class TestTheSdkDoesNotRetry:
 
         assert deepl.http_client.max_network_retries == 0
 
-    @_skip_unless_installed("pinecone", "aiohttp")
+    @skip_unless_installed("pinecone", "aiohttp")
     async def test_pinecone_builds_every_client_with_a_single_attempt(self, mocker):
         from agent_platform.integrations.vector_store.pinecone.config import (
             PineconeConfig,

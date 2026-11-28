@@ -167,6 +167,11 @@ async def test_kmeans_clusterize(mocker):
     assert result.items[0].label == "cluster_0"
     assert result.items[2].cluster_id == 1
     assert result.items[2].label == "cluster_1"
+    # each item's probability is its softmax weight for its own cluster
+    expected = _softmax(-mock_instance.transform.return_value)
+    assert [item.probability for item in result.items] == pytest.approx(
+        [expected[0, 0], expected[1, 0], expected[2, 1], expected[3, 1]]
+    )
 
     mock_instance.fit_predict.assert_called_once()
     mock_instance.transform.assert_called_once()
@@ -249,6 +254,10 @@ async def test_gmm_clusterize(mocker):
     assert len(result.items) == 4
     assert result.items[0].cluster_id == 0
     assert result.items[2].cluster_id == 1
+    # each item's probability is predict_proba's column for its own cluster
+    assert [item.probability for item in result.items] == pytest.approx(
+        [0.9, 0.8, 0.9, 0.8]
+    )
 
 
 async def test_gmm_forwards_reg_covar_and_init_params(mocker):

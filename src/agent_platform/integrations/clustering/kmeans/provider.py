@@ -6,10 +6,11 @@ from agent_platform.core.interfaces.clustering.base import BaseClusteringAlgorit
 from agent_platform.core.interfaces.clustering.response import ClusterResult
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.clustering.kmeans.config import KMeansConfig
-from agent_platform.integrations.clustering.kmeans.mappers import (
+from agent_platform.integrations.clustering.kmeans.mappers import softmax
+from agent_platform.integrations.clustering.mappers import (
     build_result,
     extract_vectors,
-    softmax,
+    validate_vectors,
 )
 
 
@@ -26,9 +27,7 @@ class KMeansClusterer(BaseClusteringAlgorithm[KMeansConfig]):
 
         if not items:
             return ClusterResult(clusters=[], items=[])
-        for item in items:
-            if "embedding" not in item.metadata:
-                raise ValueError("Item missing embedding in metadata")
+        validate_vectors(items)
 
         vectors = extract_vectors(items)
         if config.n_clusters is None:
@@ -57,4 +56,6 @@ class KMeansClusterer(BaseClusteringAlgorithm[KMeansConfig]):
         # Negate distances so the closest centroid gets the highest softmax weight.
         probs = softmax(-distances)
 
-        return build_result(items, labels, probs)
+        return build_result(
+            items, labels, [probs[i, label] for i, label in enumerate(labels)]
+        )

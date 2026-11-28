@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import json
-from collections.abc import AsyncIterator, Iterator
+from collections.abc import AsyncIterator, Awaitable, Callable, Iterator
 from contextlib import contextmanager
 
 from agent_platform.agents.agent import Agent
@@ -74,6 +74,15 @@ class _PreviousAttempt:
                     metadata=dict(message.metadata),
                 )
         return None
+
+    def split(
+        self, calls: list[ToolCall]
+    ) -> tuple[list[ToolMessage | None], list[ToolCall]]:
+        """Take the stored result of each call in `calls` (None when it must
+        run), and list the calls that must run, in order."""
+        reused = [self.take(call) for call in calls]
+        pending = [call for call, stored in zip(calls, reused) if stored is None]
+        return reused, pending
 
     def keys_for(self, calls: list[ToolCall]) -> dict[str, str]:
         """Map the id of each call in `calls` that repeats a failed call to
@@ -233,12 +242,7 @@ class AgentExecutor:
         """Run the calls of `assistant_msg`, except those that already succeeded
         in the attempt before the corrective retry, repeated failed calls under
         their earlier key; results keep the call order."""
-        reused = [previous.take(call) for call in assistant_msg.tool_calls]
-        pending = [
-            call
-            for call, stored in zip(assistant_msg.tool_calls, reused)
-            if stored is None
-        ]
+        reused, pending = previous.split(assistant_msg.tool_calls)
         with bind_idempotency_keys(previous.keys_for(pending)):
             if len(pending) == len(reused):
                 return await self._agent.act(assistant_msg)
@@ -269,6 +273,39 @@ class AgentExecutor:
             )
         )
 
+    async def _run_turn(
+        self,
+        attempt: Callable[[], Awaitable[_ThinkActResult]],
+        messages: list[Message],
+        trace: _LoopTrace,
+    ) -> _ThinkActResult:
+        """Run one turn under the corrective retry and record it on `trace`."""
+        try:
+            assistant_msg, tool_messages = await retry_once_on_invalid(
+                attempt=attempt,
+                check=_tool_call_error,
+                correct=lambda error: self._correct_tool_call(messages, error),
+                on_retry=trace.on_retry,
+            )
+        except StructuredOutputError:
+            # Raised by a structured call inside the attempt, not by
+            # this retry: its last_result is not a turn to record.
+            raise
+        except RecoveryExhausted as exc:
+            failed_msg, failed_tool_messages = exc.last_result
+            trace.record_turn(failed_msg, failed_tool_messages)
+            trace.finish(EXIT_RECOVERY_EXHAUSTED)
+            raise self._recovery_exhausted(failed_msg) from exc
+        trace.record_turn(assistant_msg, tool_messages)
+        return assistant_msg, tool_messages
+
+    def _out_of_iterations(self, trace: _LoopTrace) -> AgentMaxIterations:
+        trace.finish(EXIT_MAX_ITERATIONS)
+        return AgentMaxIterations(
+            f"Agent '{self._agent.name}' exceeded "
+            f"max iterations ({self._max_iterations})"
+        )
+
     async def _execute(
         self, messages: list[Message], *, conversation_id: str | None = None
     ) -> tuple[str, list[Message]]:
@@ -278,33 +315,14 @@ class AgentExecutor:
             for _ in range(self._max_iterations):
                 trace.start_iteration()
                 previous = _PreviousAttempt()
-                try:
-                    assistant_msg, tool_messages = await retry_once_on_invalid(
-                        attempt=lambda: self._think_and_act(messages, previous),
-                        check=_tool_call_error,
-                        correct=lambda error: self._correct_tool_call(messages, error),
-                        on_retry=trace.on_retry,
-                    )
-                except StructuredOutputError:
-                    # Raised by a structured call inside the attempt, not by
-                    # this retry: its last_result is not a turn to record.
-                    raise
-                except RecoveryExhausted as exc:
-                    failed_msg, failed_tool_messages = exc.last_result
-                    trace.record_turn(failed_msg, failed_tool_messages)
-                    trace.finish(EXIT_RECOVERY_EXHAUSTED)
-                    raise self._recovery_exhausted(failed_msg) from exc
-
-                trace.record_turn(assistant_msg, tool_messages)
+                assistant_msg, _ = await self._run_turn(
+                    lambda: self._think_and_act(messages, previous), messages, trace
+                )
                 if not assistant_msg.tool_calls:
                     trace.finish(EXIT_STOP)
                     return assistant_msg.text, messages
 
-            trace.finish(EXIT_MAX_ITERATIONS)
-            raise AgentMaxIterations(
-                f"Agent '{self._agent.name}' exceeded "
-                f"max iterations ({self._max_iterations})"
-            )
+            raise self._out_of_iterations(trace)
 
     async def _stream_think_and_act(
         self,
@@ -319,16 +337,10 @@ class AgentExecutor:
         if not assistant_msg.tool_calls:
             return assistant_msg, []
 
-        reused = [previous.take(call) for call in assistant_msg.tool_calls]
+        reused, pending = previous.split(assistant_msg.tool_calls)
         # Computed over all the calls that will run, so a failed call's key
         # is never also the own id of another one of them.
-        keys = previous.keys_for(
-            [
-                call
-                for call, stored in zip(assistant_msg.tool_calls, reused)
-                if stored is None
-            ]
-        )
+        keys = previous.keys_for(pending)
         tool_messages: list[ToolMessage] = []
         for call, stored in zip(assistant_msg.tool_calls, reused):
             if stored is not None:
@@ -376,24 +388,7 @@ class AgentExecutor:
                     sink = []
                     return await self._stream_think_and_act(messages, sink, previous)
 
-                try:
-                    assistant_msg, tool_messages = await retry_once_on_invalid(
-                        attempt=attempt,
-                        check=_tool_call_error,
-                        correct=lambda error: self._correct_tool_call(messages, error),
-                        on_retry=trace.on_retry,
-                    )
-                except StructuredOutputError:
-                    # Raised by a structured call inside the attempt, not by
-                    # this retry: its last_result is not a turn to record.
-                    raise
-                except RecoveryExhausted as exc:
-                    failed_msg, failed_tool_messages = exc.last_result
-                    trace.record_turn(failed_msg, failed_tool_messages)
-                    trace.finish(EXIT_RECOVERY_EXHAUSTED)
-                    raise self._recovery_exhausted(failed_msg) from exc
-
-                trace.record_turn(assistant_msg, tool_messages)
+                assistant_msg, _ = await self._run_turn(attempt, messages, trace)
                 for event in sink:
                     yield event
 
@@ -401,8 +396,4 @@ class AgentExecutor:
                     trace.finish(EXIT_STOP)
                     return
 
-            trace.finish(EXIT_MAX_ITERATIONS)
-            raise AgentMaxIterations(
-                f"Agent '{self._agent.name}' exceeded "
-                f"max iterations ({self._max_iterations})"
-            )
+            raise self._out_of_iterations(trace)

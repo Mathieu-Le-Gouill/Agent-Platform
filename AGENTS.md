@@ -108,9 +108,14 @@ a version change is deliberate: `uv lock --upgrade-package <name>` (or
   covers their users (root `tests/conftest.py` for cross-domain fixtures
   like `fake_text_chunk`/`mock_llm`; a domain-level `conftest.py`, e.g.
   `tests/integrations/vector_store/conftest.py`, for fixtures specific to
-  that domain's provider tests). Common assertion helpers and response
-  builders live in `tests/helpers/` (`assertions.py`, `responses.py`), not
-  duplicated per test file.
+  that domain's provider tests). Shared test code that isn't a fixture
+  (assertion helpers, response builders, fake tools and guardrails, the
+  retry-rule harness) lives in `tests/helpers/`: check it before writing
+  a helper, and add a new one there when a second test file needs it.
+  A remote provider's retry rule is a case table passed to
+  `tests/helpers/retry_rule.py::retry_rule_tests`; assign the result to a
+  `Test*` name (`TestRetryRule = retry_rule_tests(CASES)`) so pytest
+  collects it.
 - **Rule:** any new function/branch/edge case gets a corresponding test in
   the same change. No exceptions for "small" changes, small changes are
   where regressions hide.

@@ -21,12 +21,10 @@ from agent_platform.core.schemas.message import (
     Prompt,
     SystemMessage,
     TextBlock,
-    ToolCall,
     ToolMessage,
     UserMessage,
 )
-from agent_platform.core.schemas.token import TokenUsage
-from agent_platform.integrations.llm._finish_reason import to_finish_reason
+from agent_platform.integrations.llm._chat_completions import from_chat_completion
 from agent_platform.integrations.llm._generic_fields import (
     levels_for_model,
     nearest_level,
@@ -308,29 +306,4 @@ def to_native_params(
 
 
 def from_native_response(response: ChatCompletion, model: str) -> LLMResponse:
-    message = response.choices[0].message
-
-    tool_calls = [
-        # `_tool_to_schema` only ever sends `"type": "function"` tools, so the
-        # response only ever carries function-tool calls, never the SDK's
-        # custom-tool-call variant.
-        ToolCall(
-            id=tc.id,
-            name=tc.function.name,  # type: ignore[union-attr]
-            arguments=json.loads(tc.function.arguments),  # type: ignore[union-attr]
-        )
-        for tc in (message.tool_calls or [])
-    ]
-
-    usage = response.usage
-
-    return LLMResponse(
-        message=AssistantMessage(content=message.content or "", tool_calls=tool_calls),
-        usage=TokenUsage(
-            input_tokens=usage.prompt_tokens if usage else 0,
-            output_tokens=usage.completion_tokens if usage else 0,
-        ),
-        model=model,
-        finish_reason=to_finish_reason(response.choices[0].finish_reason),
-        response_id=response.id,
-    )
+    return from_chat_completion(response, model)

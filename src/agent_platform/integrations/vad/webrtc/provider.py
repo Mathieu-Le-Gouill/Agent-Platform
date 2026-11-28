@@ -1,5 +1,4 @@
 import warnings
-from collections.abc import AsyncIterator, Sequence
 
 with warnings.catch_warnings():
     warnings.filterwarnings("ignore", message="pkg_resources is deprecated")
@@ -7,10 +6,8 @@ with warnings.catch_warnings():
 
 from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
-from agent_platform.core.interfaces.vad.state import VADState
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.enums import DataType
-from agent_platform.core.schemas.span import SampleSpan
 from agent_platform.integrations.vad.webrtc.config import WebrtcVadConfig
 
 
@@ -52,55 +49,8 @@ class Webrtcvad(FrameBasedVAD[WebrtcVadConfig]):
             normalized=False,
         )
 
-    def detect(
-        self,
-        audio_sequence: Sequence[AudioChunk],
-        config: WebrtcVadConfig | None = None,
-    ) -> list[SampleSpan]:
-
-        if not audio_sequence:
-            return []
-
-        config = config or self._default_config()
-        state = VADState()
-
+    def _prepare(self, config: WebrtcVadConfig) -> None:
         self.model.set_mode(config.mode)
-
-        voiced_frames: list[SampleSpan] = []
-
-        for chunk in audio_sequence:
-            self._validate_chunk(chunk, config.sample_rate)
-
-            if self._is_speech(chunk, config):
-                self._on_speech(state, chunk, config)
-            else:
-                span = self._on_silence(state, chunk, config)
-                if span is not None:
-                    voiced_frames.append(span)
-
-        return voiced_frames
-
-    async def adetect(
-        self,
-        audio_sequence: AsyncIterator[AudioChunk],
-        config: WebrtcVadConfig | None = None,
-    ) -> AsyncIterator[SampleSpan]:
-
-        config = config or self._default_config()
-        state = VADState()
-
-        self.model.set_mode(config.mode)
-
-        async for chunk in audio_sequence:
-            self._validate_chunk(chunk, config.sample_rate)
-
-            if self._is_speech(chunk, config):
-                self._on_speech(state, chunk, config)
-            else:
-                span = self._on_silence(state, chunk, config)
-
-                if span is not None:
-                    yield span
 
     def _is_speech(
         self,

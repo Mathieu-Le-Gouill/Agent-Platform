@@ -10,8 +10,22 @@ from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.enums import DataType
 from agent_platform.core.schemas.span import SampleSpan
 
+_SPEECH = b"\x01\x00"
+_SILENCE = b"\x00\x80"
+
 
 class _TestableVAD(FrameBasedVAD[VADConfig]):
+    def __init__(self) -> None:
+        self.prepared: list[VADConfig] = []
+
+    def _default_config(self) -> VADConfig:
+        return VADConfig(
+            speech_pad_ms=30, min_silence_duration_ms=100, min_speech_duration_ms=250
+        )
+
+    def _prepare(self, config: VADConfig) -> None:
+        self.prepared.append(config)
+
     @property
     def requirements(self) -> AudioRequirements:
         return AudioRequirements(
@@ -29,14 +43,7 @@ class _TestableVAD(FrameBasedVAD[VADConfig]):
         pass
 
     def _is_speech(self, chunk, config):
-        return True
-
-    def detect(self, audio_sequence, config=None):
-        return []
-
-    async def adetect(self, audio_sequence, config=None):
-        return
-        yield
+        return chunk.data == _SPEECH
 
 
 @pytest.fixture
@@ -51,16 +58,58 @@ def config():
     )
 
 
-def _chunk(start: int, end: int, sample_rate: int = 1000) -> AudioChunk:
+def _chunk(
+    start: int, end: int, sample_rate: int = 1000, data: bytes = _SILENCE
+) -> AudioChunk:
     return AudioChunk(
         id=uuid4(),
-        data=b"\x00\x80",
+        data=data,
         sample_rate=sample_rate,
         start=start,
         end=end,
         channels=1,
         dtype=DataType.FLOAT32,
     )
+
+
+def _speech_then_silence() -> list[AudioChunk]:
+    # 300 ms of speech, then 200 ms of silence, at 1 kHz
+    return [_chunk(0, 300, data=_SPEECH), _chunk(300, 500)]
+
+
+async def _aiter(chunks):
+    for chunk in chunks:
+        yield chunk
+
+
+# --- detect / adetect ---
+
+
+def test_detect_turns_speech_then_silence_into_a_padded_span(vad):
+    assert vad.detect(_speech_then_silence()) == [SampleSpan(start=0, end=330)]
+
+
+async def test_adetect_yields_the_same_spans_as_detect(vad):
+    spans = [span async for span in vad.adetect(_aiter(_speech_then_silence()))]
+    assert spans == vad.detect(_speech_then_silence())
+
+
+@pytest.mark.parametrize("mode", ["detect", "adetect"])
+async def test_the_backend_is_prepared_once_with_the_given_config(vad, config, mode):
+    if mode == "detect":
+        vad.detect(_speech_then_silence(), config)
+    else:
+        [span async for span in vad.adetect(_aiter(_speech_then_silence()), config)]
+    assert vad.prepared == [config]
+
+
+def test_detect_on_no_audio_returns_no_span_and_uses_the_default_config(vad):
+    assert vad.detect([]) == []
+    assert vad.prepared == [vad._default_config()]
+
+
+def test_speech_still_open_at_the_end_yields_no_span(vad):
+    assert vad.detect([_chunk(0, 300, data=_SPEECH)]) == []
 
 
 # --- _on_speech ---

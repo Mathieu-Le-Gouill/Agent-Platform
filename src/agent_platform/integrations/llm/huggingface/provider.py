@@ -22,13 +22,12 @@ from agent_platform.core.interfaces.llm.config import GenerationConfig
 from agent_platform.core.interfaces.llm.response import (
     LLMResponse,
     StreamChunk,
-    ToolCallDelta,
 )
 from agent_platform.core.schemas import model_schema
 from agent_platform.core.schemas.message import Prompt
-from agent_platform.core.schemas.token import TokenUsage
 from agent_platform.integrations.credentials import HuggingFaceCredentials
 from agent_platform.integrations.llm._base import NativeLLMProvider
+from agent_platform.integrations.llm._chat_completions import ChatCompletionStream
 from agent_platform.integrations.llm._finish_reason import to_finish_reason
 from agent_platform.integrations.llm.huggingface.config import (
     HuggingFaceGenerationConfig,
@@ -161,8 +160,7 @@ class HuggingFaceLLM(
             params["tools"] = [self._tool_to_schema(t) for t in tools]
 
         with self._observe(resolved) as call:
-            usage: TokenUsage | None = None
-            raw_finish_reason: str | None = None
+            stream = ChatCompletionStream()
             # Without `include_usage` the stream carries no usage at all.
             events = await client.chat_completion(
                 messages=messages,
@@ -171,29 +169,9 @@ class HuggingFaceLLM(
                 **params,
             )
             async for chunk in events:
-                if chunk.choices:
-                    if chunk.choices[0].finish_reason is not None:
-                        raw_finish_reason = chunk.choices[0].finish_reason
-                    delta = chunk.choices[0].delta.content
-                    if delta:
-                        yield StreamChunk(delta=delta)
-                    tool_call_deltas = [
-                        ToolCallDelta(
-                            index=tc.index,
-                            id=tc.id,
-                            name=tc.function.name if tc.function else None,
-                            arguments_delta=tc.function.arguments
-                            if tc.function
-                            else None,
-                        )
-                        for tc in (chunk.choices[0].delta.tool_calls or [])
-                    ]
-                    if tool_call_deltas:
-                        yield StreamChunk(delta="", tool_call_deltas=tool_call_deltas)
-                if chunk.usage is not None:
-                    usage = TokenUsage(
-                        input_tokens=chunk.usage.prompt_tokens,
-                        output_tokens=chunk.usage.completion_tokens,
-                    )
+                for out in stream.read(chunk):
+                    yield out
 
-            yield self._end_stream(call, usage, to_finish_reason(raw_finish_reason))
+            yield self._end_stream(
+                call, stream.usage, to_finish_reason(stream.raw_finish_reason)
+            )

@@ -40,6 +40,7 @@ from tests.helpers import (
     make_text_stream_chunks,
     make_tool_call_stream_chunks,
 )
+from tests.helpers.agents import RewritingGuardrail
 
 
 class _WeatherInput(BaseModel):
@@ -771,14 +772,6 @@ class TestAgentThinkStream:
                 pass
 
 
-class _RewritingGuardrail:
-    async def before(self, ctx):
-        return None
-
-    async def after(self, ctx, result):
-        return AssistantMessage(content="[redacted]")
-
-
 class _BlockingInputGuardrail:
     async def before(self, ctx):
         raise AgentGuardrailError("input blocked")
@@ -839,7 +832,7 @@ class TestAgentThinkFromStream:
         mock_llm.stream.side_effect = lambda **kw: make_fake_stream(
             make_text_stream_chunks(["secret ", "text"])
         )
-        agent = Agent(name="guarded", llm=mock_llm, guardrails=[_RewritingGuardrail()])
+        agent = Agent(name="guarded", llm=mock_llm, guardrails=[RewritingGuardrail()])
 
         message, deltas = await agent.think_from_stream([UserMessage(content="Hi")])
 

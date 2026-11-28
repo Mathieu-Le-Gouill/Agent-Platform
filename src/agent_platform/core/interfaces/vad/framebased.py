@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from abc import abstractmethod
+from collections.abc import AsyncIterator, Sequence
 from typing import Generic
 
 from agent_platform.core.interfaces.vad.base import BaseVAD, ConfigT
@@ -17,6 +19,53 @@ def _ms_to_samples(ms: int, sample_rate: int) -> int:
 
 
 class FrameBasedVAD(BaseVAD[ConfigT], Generic[ConfigT]):
+    """Runs `_is_speech` on each frame and turns the speech/silence sequence
+    into padded spans. Subclasses supply `_is_speech`, `_default_config` and,
+    when the backend needs setup per config, `_prepare`."""
+
+    @abstractmethod
+    def _default_config(self) -> ConfigT: ...
+
+    def _prepare(self, config: ConfigT) -> None:
+        """Set the backend up for `config` before the first frame."""
+
+    def detect(
+        self,
+        audio_sequence: Sequence[AudioChunk],
+        config: ConfigT | None = None,
+    ) -> list[SampleSpan]:
+        config = config or self._default_config()
+        self._prepare(config)
+        state = VADState()
+        spans: list[SampleSpan] = []
+        for chunk in audio_sequence:
+            span = self._step(state, chunk, config)
+            if span is not None:
+                spans.append(span)
+        return spans
+
+    async def adetect(
+        self,
+        audio_sequence: AsyncIterator[AudioChunk],
+        config: ConfigT | None = None,
+    ) -> AsyncIterator[SampleSpan]:
+        config = config or self._default_config()
+        self._prepare(config)
+        state = VADState()
+        async for chunk in audio_sequence:
+            span = self._step(state, chunk, config)
+            if span is not None:
+                yield span
+
+    def _step(
+        self, state: VADState, chunk: AudioChunk, config: ConfigT
+    ) -> SampleSpan | None:
+        self._validate_chunk(chunk, config.sample_rate)
+        if self._is_speech(chunk, config):
+            self._on_speech(state, chunk, config)
+            return None
+        return self._on_silence(state, chunk, config)
+
     def _on_speech(
         self,
         state: VADState,

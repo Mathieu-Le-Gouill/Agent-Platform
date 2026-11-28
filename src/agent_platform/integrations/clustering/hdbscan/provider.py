@@ -6,11 +6,16 @@ from agent_platform.core.interfaces.clustering.base import BaseClusteringAlgorit
 from agent_platform.core.interfaces.clustering.response import ClusterResult
 from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.integrations.clustering.hdbscan.config import HDBSCANConfig
-from agent_platform.integrations.clustering.hdbscan.mappers import (
+from agent_platform.integrations.clustering.mappers import (
     build_result,
+    cluster_label,
     extract_vectors,
     validate_vectors,
 )
+
+
+def _label_with_noise(label: int) -> str:
+    return cluster_label(label) if label >= 0 else "noise"
 
 
 class HDBSCANClusterer(BaseClusteringAlgorithm[HDBSCANConfig]):
@@ -42,4 +47,4 @@ class HDBSCANClusterer(BaseClusteringAlgorithm[HDBSCANConfig]):
         labels = clusterer.fit_predict(vectors)
         probabilities = getattr(clusterer, "probabilities_", None)
 
-        return build_result(items, labels, probabilities)
+        return build_result(items, labels, probabilities, label_name=_label_with_noise)

@@ -1,7 +1,5 @@
 from __future__ import annotations
 
-from collections.abc import AsyncIterator, Sequence
-
 import pvcobra
 
 from agent_platform.audio.io import AudioIO
@@ -9,10 +7,8 @@ from agent_platform.core.credentials import resolve_credentials
 from agent_platform.core.errors import ProviderError
 from agent_platform.core.interfaces.vad.framebased import FrameBasedVAD
 from agent_platform.core.interfaces.vad.requirements import AudioRequirements
-from agent_platform.core.interfaces.vad.state import VADState
 from agent_platform.core.schemas.chunk import AudioChunk
 from agent_platform.core.schemas.enums import DataType
-from agent_platform.core.schemas.span import SampleSpan
 from agent_platform.integrations.credentials import PicoVoiceCredentials
 from agent_platform.integrations.vad.pvcobra.config import PvcobraVadConfig
 
@@ -57,54 +53,8 @@ class PvcobraVAD(FrameBasedVAD[PvcobraVadConfig]):
             normalized=False,
         )
 
-    def detect(
-        self,
-        audio_sequence: Sequence[AudioChunk],
-        config: PvcobraVadConfig | None = None,
-    ) -> list[SampleSpan]:
-
-        config = config or self._default_config()
+    def _prepare(self, config: PvcobraVadConfig) -> None:
         self._ensure_handle(config)
-        state = VADState()
-
-        if not audio_sequence:
-            return []
-
-        voiced_frames: list[SampleSpan] = []
-
-        for chunk in audio_sequence:
-            self._validate_chunk(chunk, config.sample_rate)
-
-            if self._is_speech(chunk, config):
-                self._on_speech(state, chunk, config)
-            else:
-                span = self._on_silence(state, chunk, config)
-
-                if span is not None:
-                    voiced_frames.append(span)
-
-        return voiced_frames
-
-    async def adetect(
-        self,
-        audio_sequence: AsyncIterator[AudioChunk],
-        config: PvcobraVadConfig | None = None,
-    ) -> AsyncIterator[SampleSpan]:
-
-        config = config or self._default_config()
-        self._ensure_handle(config)
-        state = VADState()
-
-        async for chunk in audio_sequence:
-            self._validate_chunk(chunk, config.sample_rate)
-
-            if self._is_speech(chunk, config):
-                self._on_speech(state, chunk, config)
-            else:
-                span = self._on_silence(state, chunk, config)
-
-                if span is not None:
-                    yield span
 
     def _is_speech(
         self,

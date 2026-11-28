@@ -1,4 +1,8 @@
+"""Conversion shared by every clustering provider: embeddings in, result out."""
+
 from __future__ import annotations
+
+from collections.abc import Callable, Sequence
 
 from agent_platform.core.interfaces.clustering.response import (
     ClusteredItem,
@@ -8,7 +12,7 @@ from agent_platform.core.schemas.chunk import TextChunk
 from agent_platform.core.schemas.cluster import Cluster
 from agent_platform.core.schemas.document import TextDocument
 
-__all__ = ["build_label", "build_result", "extract_vectors", "validate_vectors"]
+__all__ = ["build_result", "cluster_label", "extract_vectors", "validate_vectors"]
 
 
 def validate_vectors(items: list[TextChunk]) -> None:
@@ -18,33 +22,36 @@ def validate_vectors(items: list[TextChunk]) -> None:
 
 
 def extract_vectors(items: list[TextChunk]) -> list[list[float]]:
-    return [item.metadata.get("embedding", []) for item in items]
+    return [item.metadata["embedding"] for item in items]
 
 
-def build_label(label: int) -> str:
-    return f"cluster_{label}" if label >= 0 else "noise"
+def cluster_label(label: int) -> str:
+    return f"cluster_{label}"
 
 
 def build_result(
     items: list[TextChunk],
-    labels: list[int],
-    probabilities: list[float] | None = None,
+    labels: Sequence[int],
+    probabilities: Sequence[float] | None = None,
+    label_name: Callable[[int], str] = cluster_label,
 ) -> ClusterResult:
+    """`probabilities[i]` is item i's membership probability in its own cluster."""
+    cluster_ids = [int(label) for label in labels]
     clusters_map: dict[int, list[TextChunk | TextDocument]] = {}
-    for item, label in zip(items, labels):
-        clusters_map.setdefault(label, []).append(item)
+    for item, cluster_id in zip(items, cluster_ids):
+        clusters_map.setdefault(cluster_id, []).append(item)
 
     clusters = [
-        Cluster(label=build_label(cid), items=citems)
+        Cluster(label=label_name(cid), items=citems)
         for cid, citems in clusters_map.items()
     ]
     clustered_items = [
         ClusteredItem(
             index=i,
-            cluster_id=label,
-            label=build_label(label),
+            cluster_id=cluster_id,
+            label=label_name(cluster_id),
             probability=float(probabilities[i]) if probabilities is not None else 0.0,
         )
-        for i, label in enumerate(labels)
+        for i, cluster_id in enumerate(cluster_ids)
     ]
     return ClusterResult(clusters=clusters, items=clustered_items)

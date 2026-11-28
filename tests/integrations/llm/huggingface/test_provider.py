@@ -40,54 +40,15 @@ from agent_platform.integrations.llm.huggingface.mappers import (
     to_native_params as _to_native_params,
 )
 from agent_platform.integrations.llm.huggingface.provider import HuggingFaceLLM
+from tests.helpers import (
+    make_chat_completion,
+    make_chat_completion_chunk,
+    make_chat_tool_call,
+)
 
 
 def _creds(key: str = "hf_test") -> HuggingFaceCredentials:
     return HuggingFaceCredentials(api_key=SecretStr(key))
-
-
-def _stream_chunk(
-    content: str | None = None,
-    tool_calls: list[SimpleNamespace] | None = None,
-    finish_reason: str | None = None,
-) -> SimpleNamespace:
-    return SimpleNamespace(
-        choices=[
-            SimpleNamespace(
-                delta=SimpleNamespace(content=content, tool_calls=tool_calls),
-                finish_reason=finish_reason,
-            )
-        ],
-        usage=None,
-    )
-
-
-def _tool_call(id: str, name: str, arguments: str) -> SimpleNamespace:
-    return SimpleNamespace(
-        id=id, function=SimpleNamespace(name=name, arguments=arguments)
-    )
-
-
-def _response(
-    content: str | None,
-    tool_calls: list[SimpleNamespace] | None = None,
-    prompt_tokens: int = 0,
-    completion_tokens: int = 0,
-    finish_reason: str | None = "stop",
-    id: str = "resp-1",
-) -> SimpleNamespace:
-    return SimpleNamespace(
-        id=id,
-        choices=[
-            SimpleNamespace(
-                message=SimpleNamespace(content=content, tool_calls=tool_calls),
-                finish_reason=finish_reason,
-            )
-        ],
-        usage=SimpleNamespace(
-            prompt_tokens=prompt_tokens, completion_tokens=completion_tokens
-        ),
-    )
 
 
 class TestBlockToNative:
@@ -306,7 +267,9 @@ class TestToNativeParams:
 
 class TestFromNative:
     def test_simple_message(self):
-        response = _response("Hello world", prompt_tokens=1, completion_tokens=2)
+        response = make_chat_completion(
+            "Hello world", prompt_tokens=1, completion_tokens=2
+        )
         result = _from_native_response(response, model="test/model")
         assert result.message.content == "Hello world"
         assert result.message.tool_calls == []
@@ -316,9 +279,11 @@ class TestFromNative:
         assert result.usage.output_tokens == 2
 
     def test_with_tool_calls(self):
-        response = _response(
+        response = make_chat_completion(
             None,
-            tool_calls=[_tool_call("call_abc", "get_weather", '{"location": "Paris"}')],
+            tool_calls=[
+                make_chat_tool_call("call_abc", "get_weather", '{"location": "Paris"}')
+            ],
         )
         result = _from_native_response(response, model="test/model")
         tc = result.message.tool_calls[0]
@@ -327,7 +292,7 @@ class TestFromNative:
         assert tc.arguments == {"location": "Paris"}
 
     def test_no_tool_calls(self):
-        response = _response("Hi")
+        response = make_chat_completion("Hi")
         result = _from_native_response(response, model="test/model")
         assert result.message.tool_calls == []
 
@@ -420,7 +385,7 @@ class TestHuggingFaceLLMGenerate:
         )
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
-        mock_client.chat_completion.return_value = _response("Sync hello")
+        mock_client.chat_completion.return_value = make_chat_completion("Sync hello")
 
         provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
@@ -447,7 +412,7 @@ class TestHuggingFaceLLMGenerate:
         )
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
-        mock_client.chat_completion.return_value = _response("ok")
+        mock_client.chat_completion.return_value = make_chat_completion("ok")
 
         provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
@@ -463,7 +428,9 @@ class TestHuggingFaceLLMGenerate:
         )
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
-        mock_client.chat_completion = AsyncMock(return_value=_response("Async hello"))
+        mock_client.chat_completion = AsyncMock(
+            return_value=make_chat_completion("Async hello")
+        )
 
         provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
@@ -489,7 +456,7 @@ class TestHuggingFaceLLMGenerate:
         )
         mock_client = MagicMock()
         mock_client_cls.return_value = mock_client
-        mock_client.chat_completion = AsyncMock(return_value=_response("ok"))
+        mock_client.chat_completion = AsyncMock(return_value=make_chat_completion("ok"))
 
         provider = HuggingFaceLLM(_creds(), model="test/model")
         prompt = Prompt(messages=[UserMessage(content="Hi")])
@@ -513,7 +480,7 @@ class TestHuggingFaceLLMGenerate:
             calls["n"] += 1
             if calls["n"] < 2:
                 raise ConnectionError("transient")
-            return _response("ok")
+            return make_chat_completion("ok")
 
         mock_client.chat_completion = flaky
 
@@ -555,8 +522,8 @@ class TestHuggingFaceLLMStream:
         mock_client_cls.return_value = mock_client
 
         chunks = [
-            _stream_chunk(content="Hello"),
-            _stream_chunk(content=" World", finish_reason="length"),
+            make_chat_completion_chunk(content="Hello"),
+            make_chat_completion_chunk(content=" World", finish_reason="length"),
             SimpleNamespace(
                 choices=[],
                 usage=SimpleNamespace(prompt_tokens=5, completion_tokens=10),
@@ -624,7 +591,7 @@ class TestHuggingFaceLLMStream:
         mock_client_cls.return_value = mock_client
 
         chunks = [
-            _stream_chunk(
+            make_chat_completion_chunk(
                 tool_calls=[
                     SimpleNamespace(
                         index=0,
@@ -633,7 +600,7 @@ class TestHuggingFaceLLMStream:
                     )
                 ]
             ),
-            _stream_chunk(
+            make_chat_completion_chunk(
                 tool_calls=[
                     SimpleNamespace(
                         index=0,
